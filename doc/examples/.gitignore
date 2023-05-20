@@ -1,6 +1,7 @@
-test_args*
-test_timing*
-example*
-testsuite*
+test_args
+test_timing
+example
+testsuite
+*.exe
 *.o
 *.obj
