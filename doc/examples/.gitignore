@@ -1,0 +1,6 @@
+test_args*
+test_timing*
+example*
+testsuite*
+*.o
+*.obj

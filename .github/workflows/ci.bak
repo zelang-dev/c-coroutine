@@ -1,0 +1,234 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: amd64
+            flags: -O3 -fomit-frame-pointer
+          - target: x86
+            flags: -m32 -O3 -fomit-frame-pointer
+    steps:
+      - uses: actions/checkout@v3
+      - name: Prepare
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -q -y
+          sudo apt-get install -y gcc-multilib g++-multilib valgrind libc6-dbg libc6-dbg:i386
+      - name: Build
+        working-directory: doc/examples
+        run: |
+          cc ${{ matrix.flags }} -D CO_DEBUG -I../.. -o c_coro.o -c ../../c_coro.c
+          c++ ${{ matrix.flags }} -I../.. -c test_timing.cpp
+          c++ ${{ matrix.flags }} -o test_timing c_coro.o test_timing.o
+          c++ ${{ matrix.flags }} -I../.. -c test_args.cpp
+          c++ ${{ matrix.flags }} -o test_args c_coro.o test_args.o
+          c++ ${{ matrix.flags }} -I../.. -c example.cpp
+          c++ ${{ matrix.flags }} -o example c_coro.o example.o
+          c++ ${{ matrix.flags }} -I../.. -c testsuite.cpp
+          c++ ${{ matrix.flags }} -o testsuite c_coro.o testsuite.o
+      - name: Run examples
+        working-directory: doc/examples
+        run: |
+          ./test_args
+          ./test_timing
+          ./example
+          ./testsuite
+      - name: Run valgrind
+        working-directory: doc/examples
+        run: |
+          valgrind --error-exitcode=99 ./test_args
+          valgrind --error-exitcode=99 ./test_timing
+          valgrind --error-exitcode=99 ./example
+          valgrind --error-exitcode=99 ./testsuite
+          if valgrind --error-exitcode=99 ./test_serialization ; then
+            (echo "Expected test_serialization to fail valgrind test"; exit 98)
+          fi
+
+  build-qemu:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: arm
+            arch: armv7
+          - target: aarch64
+            arch: aarch64
+          - target: ppc64v2
+            arch: ppc64le
+    steps:
+      - uses: actions/checkout@v3
+      - uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ubuntu_latest
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y --no-install-recommends build-essential valgrind
+          env: |
+            target: ${{ matrix.target }}
+          run: |
+            cd doc/examples
+            ./build.sh
+            ./test_args
+            ./test_timing
+            ./example
+            ./testsuite
+            if [ "$target" == "arm" ]; then
+              if valgrind --error-exitcode=99 ./test_args ; then
+                (echo "Expected test_args to fail valgrind test"; exit 98)
+              fi
+            else
+              valgrind --error-exitcode=99 ./test_args
+            fi
+            if valgrind --error-exitcode=99 ./test_serialization ; then
+              (echo "Expected test_serialization to fail valgrind test"; exit 98)
+            fi
+            # test_timing not run with valgrind on qemu since it's very slow.
+
+  build-posix:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: setjmp
+            file: sjlj.c
+            defines: -D_FORTIFY_SOURCE=0
+          - name: ucontext
+            file: ucontext.c
+            defines:
+    steps:
+      - uses: actions/checkout@v3
+      - name: Prepare
+        run: |
+          sudo apt-get install -y valgrind
+      - name: Build
+        working-directory: doc/examples
+        env:
+          FLAGS: -O3 -fomit-frame-pointer
+        run: |
+          cc ${{ matrix.defines }} $FLAGS -I../.. -o c_coro.o -c ../../${{ matrix.file }}
+          c++ $FLAGS -I../.. -c test_timing.cpp
+          c++ $FLAGS -o test_timing c_coro.o test_timing.o
+          c++ $FLAGS -I../.. -c test_args.cpp
+          c++ $FLAGS -o test_args c_coro.o test_args.o
+          c++ $FLAGS -I../.. -c example.cpp
+          c++ $FLAGS -o example c_coro.o example.o
+          c++ $FLAGS -I../.. -c testsuite.cpp
+          c++ $FLAGS -o testsuite c_coro.o testsuite.o
+          # Serialization not supported
+      - name: Run examples
+        working-directory: doc/examples
+        run: |
+          ./test_args
+          # test_timing not run for ucontext since it's very slow.
+          if [ "${{ matrix.name }}" != "ucontext" ]; then
+            ./test_timing
+          fi
+      - name: Run valgrind
+        working-directory: doc/examples
+        run: |
+          if [ "${{ matrix.name }}" == "setjmp" ]; then
+            if valgrind --error-exitcode=99 ./test_args ; then
+              (echo "Expected test_args to fail valgrind test"; exit 98)
+            fi
+            if valgrind --error-exitcode=99 ./test_timing ; then
+              (echo "Expected test_timing to fail valgrind test"; exit 98)
+            fi
+          elif [ "${{ matrix.name }}" == "ucontext" ]; then
+            valgrind --error-exitcode=99 ./test_args
+            # test_timing not run with valgrind since it's very slow.
+          else
+            (echo "Valgrind test missing for ${{ matrix.name }}"; exit 98)
+          fi
+
+  build-windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, x86]
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - uses: actions/checkout@v3
+      - name: Build
+        working-directory: doc/examples
+        run: |
+          # __STDC__ required for `alignas` (or using /Za)
+          cl /I ../.. /D CO_DEBUG /D CO_MPROTECT /D __STDC__ /c ../../c_coro.c
+          cl /I ../.. test_args.cpp c_coro.obj
+          cl /I ../.. test_timing.cpp c_coro.obj
+          cl /I ../.. example.cpp c_coro.obj
+          cl /I ../.. testsuite.cpp c_coro.obj
+      - name: Run examples
+        working-directory: doc/examples
+        run: |
+          ./test_args.exe
+          ./test_timing.exe
+          ./example.exe
+          ./testsuite.exe
+
+  build-windows-fibers:
+    name: Windows (fibers)
+    runs-on: windows-latest
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/checkout@v3
+      - name: Build
+        working-directory: doc/examples
+        run: |
+          # __STDC__ required for `alignas` (or using /Za)
+          cl /I ../.. /D CO_DEBUG /D CO_MPROTECT /D __STDC__ /Foc_coro /c ../../c_coro.c
+          cl /I ../.. test_args.cpp c_coro.obj
+          cl /I ../.. test_timing.cpp c_coro.obj
+          cl /I ../.. example.cpp c_coro.obj
+          cl /I ../.. testsuite.cpp c_coro.obj
+          # Serialization not supported
+      - name: Run examples
+        working-directory: doc/examples
+        run: |
+          ./test_args.exe
+          ./test_timing.exe
+          ./example.exe
+          ./testsuite.exe
+
+  sanitizers:
+    name: ${{ matrix.sanitizer }}-sanitizer
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [thread, undefined, leak, address]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and run examples
+        working-directory: doc/examples
+        env:
+          FLAGS: -fsanitize=${{ matrix.sanitizer }} -fno-sanitize-recover=all -fno-omit-frame-pointer
+        run: |
+          clang $FLAGS -D CO_DEBUG -I../.. -o c_coro.o -c ../../c_coro.c
+          clang++ $FLAGS -I../.. -c test_timing.cpp
+          clang++ $FLAGS -o test_timing c_coro.o test_timing.o
+          clang++ $FLAGS -I../.. -c test_args.cpp
+          clang++ $FLAGS -o test_args c_coro.o test_args.o
+          clang++ $FLAGS -I../.. -c example.cpp
+          clang++ $FLAGS -o example c_coro.o example.o
+          clang++ $FLAGS -I../.. -c testsuite.cpp
+          clang++ $FLAGS -o testsuite c_coro.o testsuite.o
+          ./test_args
+          ./test_timing
+          ./example
+          ./testsuite
