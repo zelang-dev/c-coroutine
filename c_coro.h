@@ -59,6 +59,11 @@
    do not use this unless you are certain your application won't use SSE */
 /* #define CO_NO_SSE */
 
+/*[amd64, aarch64]:
+   Win64 only: provides a small speed-up, but will break stack unwinding
+   do not use this if your application uses exceptions or setjmp/longjmp */
+/* #define CO_NO_TIB */
+
 #if !defined(thread_local) /* User can override thread_local for obscure compilers */
   #if !defined(CO_MP) /* Running in single-threaded environment */
     #define thread_local

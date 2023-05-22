@@ -45,6 +45,12 @@ static void co_awaitable()
     co->state = CO_NORMAL;
 }
 
+static void co_func(co_routine_t handle)
+{
+    co_awaitable();
+    co_done(); /* called only if coroutine function returns */
+}
+
 /* Utility for aligning addresses. */
 static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
 {
@@ -142,52 +148,60 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
     #ifdef _WIN32
         /* ABI: Win64 */
         static const unsigned char co_swap_function[4096] = {
-            0x48, 0x89, 0x22,             /* mov [rdx],rsp          */
-            0x48, 0x8b, 0x21,             /* mov rsp,[rcx]          */
-            0x58,                         /* pop rax                */
-            0x48, 0x89, 0x6a, 0x08,       /* mov [rdx+ 8],rbp       */
-            0x48, 0x89, 0x72, 0x10,       /* mov [rdx+16],rsi       */
-            0x48, 0x89, 0x7a, 0x18,       /* mov [rdx+24],rdi       */
-            0x48, 0x89, 0x5a, 0x20,       /* mov [rdx+32],rbx       */
-            0x4c, 0x89, 0x62, 0x28,       /* mov [rdx+40],r12       */
-            0x4c, 0x89, 0x6a, 0x30,       /* mov [rdx+48],r13       */
-            0x4c, 0x89, 0x72, 0x38,       /* mov [rdx+56],r14       */
-            0x4c, 0x89, 0x7a, 0x40,       /* mov [rdx+64],r15       */
+            0x48, 0x89, 0x22,              /* mov [rdx],rsp           */
+            0x48, 0x8b, 0x21,              /* mov rsp,[rcx]           */
+            0x58,                          /* pop rax                 */
+            0x48, 0x83, 0xe9, 0x80,        /* sub rcx,-0x80           */
+            0x48, 0x83, 0xea, 0x80,        /* sub rdx,-0x80           */
+            0x48, 0x89, 0x6a, 0x88,        /* mov [rdx-0x78],rbp      */
+            0x48, 0x89, 0x72, 0x90,        /* mov [rdx-0x70],rsi      */
+            0x48, 0x89, 0x7a, 0x98,        /* mov [rdx-0x68],rdi      */
+            0x48, 0x89, 0x5a, 0xa0,        /* mov [rdx-0x60],rbx      */
+            0x4c, 0x89, 0x62, 0xa8,        /* mov [rdx-0x58],r12      */
+            0x4c, 0x89, 0x6a, 0xb0,        /* mov [rdx-0x50],r13      */
+            0x4c, 0x89, 0x72, 0xb8,        /* mov [rdx-0x48],r14      */
+            0x4c, 0x89, 0x7a, 0xc0,        /* mov [rdx-0x40],r15      */
         #if !defined(CO_NO_SSE)
-            0x0f, 0x29, 0x72, 0x50,       /* movaps [rdx+ 80],xmm6  */
-            0x0f, 0x29, 0x7a, 0x60,       /* movaps [rdx+ 96],xmm7  */
-            0x44, 0x0f, 0x29, 0x42, 0x70, /* movaps [rdx+112],xmm8  */
-            0x48, 0x83, 0xc2, 0x70,       /* add rdx,112            */
-            0x44, 0x0f, 0x29, 0x4a, 0x10, /* movaps [rdx+ 16],xmm9  */
-            0x44, 0x0f, 0x29, 0x52, 0x20, /* movaps [rdx+ 32],xmm10 */
-            0x44, 0x0f, 0x29, 0x5a, 0x30, /* movaps [rdx+ 48],xmm11 */
-            0x44, 0x0f, 0x29, 0x62, 0x40, /* movaps [rdx+ 64],xmm12 */
-            0x44, 0x0f, 0x29, 0x6a, 0x50, /* movaps [rdx+ 80],xmm13 */
-            0x44, 0x0f, 0x29, 0x72, 0x60, /* movaps [rdx+ 96],xmm14 */
-            0x44, 0x0f, 0x29, 0x7a, 0x70, /* movaps [rdx+112],xmm15 */
+            0x0f, 0x29, 0x72, 0xd0,        /* movaps [rdx-0x30],xmm6  */
+            0x0f, 0x29, 0x7a, 0xe0,        /* movaps [rdx-0x20],xmm7  */
+            0x44, 0x0f, 0x29, 0x42, 0xf0,  /* movaps [rdx-0x10],xmm8  */
+            0x44, 0x0f, 0x29, 0x0a,        /* movaps [rdx],     xmm9  */
+            0x44, 0x0f, 0x29, 0x52, 0x10,  /* movaps [rdx+0x10],xmm10 */
+            0x44, 0x0f, 0x29, 0x5a, 0x20,  /* movaps [rdx+0x20],xmm11 */
+            0x44, 0x0f, 0x29, 0x62, 0x30,  /* movaps [rdx+0x30],xmm12 */
+            0x44, 0x0f, 0x29, 0x6a, 0x40,  /* movaps [rdx+0x40],xmm13 */
+            0x44, 0x0f, 0x29, 0x72, 0x50,  /* movaps [rdx+0x50],xmm14 */
+            0x44, 0x0f, 0x29, 0x7a, 0x60,  /* movaps [rdx+0x60],xmm15 */
         #endif
-            0x48, 0x8b, 0x69, 0x08,       /* mov rbp,[rcx+ 8]       */
-            0x48, 0x8b, 0x71, 0x10,       /* mov rsi,[rcx+16]       */
-            0x48, 0x8b, 0x79, 0x18,       /* mov rdi,[rcx+24]       */
-            0x48, 0x8b, 0x59, 0x20,       /* mov rbx,[rcx+32]       */
-            0x4c, 0x8b, 0x61, 0x28,       /* mov r12,[rcx+40]       */
-            0x4c, 0x8b, 0x69, 0x30,       /* mov r13,[rcx+48]       */
-            0x4c, 0x8b, 0x71, 0x38,       /* mov r14,[rcx+56]       */
-            0x4c, 0x8b, 0x79, 0x40,       /* mov r15,[rcx+64]       */
+            0x48, 0x8b, 0x69, 0x88,        /* mov rbp,[rcx-0x78]      */
+            0x48, 0x8b, 0x71, 0x90,        /* mov rsi,[rcx-0x70]      */
+            0x48, 0x8b, 0x79, 0x98,        /* mov rdi,[rcx-0x68]      */
+            0x48, 0x8b, 0x59, 0xa0,        /* mov rbx,[rcx-0x60]      */
+            0x4c, 0x8b, 0x61, 0xa8,        /* mov r12,[rcx-0x58]      */
+            0x4c, 0x8b, 0x69, 0xb0,        /* mov r13,[rcx-0x50]      */
+            0x4c, 0x8b, 0x71, 0xb8,        /* mov r14,[rcx-0x48]      */
+            0x4c, 0x8b, 0x79, 0xc0,        /* mov r15,[rcx-0x40]      */
         #if !defined(CO_NO_SSE)
-            0x0f, 0x28, 0x71, 0x50,       /* movaps xmm6, [rcx+ 80] */
-            0x0f, 0x28, 0x79, 0x60,       /* movaps xmm7, [rcx+ 96] */
-            0x44, 0x0f, 0x28, 0x41, 0x70, /* movaps xmm8, [rcx+112] */
-            0x48, 0x83, 0xc1, 0x70,       /* add rcx,112            */
-            0x44, 0x0f, 0x28, 0x49, 0x10, /* movaps xmm9, [rcx+ 16] */
-            0x44, 0x0f, 0x28, 0x51, 0x20, /* movaps xmm10,[rcx+ 32] */
-            0x44, 0x0f, 0x28, 0x59, 0x30, /* movaps xmm11,[rcx+ 48] */
-            0x44, 0x0f, 0x28, 0x61, 0x40, /* movaps xmm12,[rcx+ 64] */
-            0x44, 0x0f, 0x28, 0x69, 0x50, /* movaps xmm13,[rcx+ 80] */
-            0x44, 0x0f, 0x28, 0x71, 0x60, /* movaps xmm14,[rcx+ 96] */
-            0x44, 0x0f, 0x28, 0x79, 0x70, /* movaps xmm15,[rcx+112] */
+            0x0f, 0x28, 0x71, 0xd0,        /* movaps xmm6, [rcx-0x30] */
+            0x0f, 0x28, 0x79, 0xe0,        /* movaps xmm7, [rcx-0x20] */
+            0x44, 0x0f, 0x28, 0x41, 0xf0,  /* movaps xmm8, [rcx-0x10] */
+            0x44, 0x0f, 0x28, 0x09,        /* movaps xmm9, [rcx]      */
+            0x44, 0x0f, 0x28, 0x51, 0x10,  /* movaps xmm10,[rcx+0x10] */
+            0x44, 0x0f, 0x28, 0x59, 0x20,  /* movaps xmm11,[rcx+0x20] */
+            0x44, 0x0f, 0x28, 0x61, 0x30,  /* movaps xmm12,[rcx+0x30] */
+            0x44, 0x0f, 0x28, 0x69, 0x40,  /* movaps xmm13,[rcx+0x40] */
+            0x44, 0x0f, 0x28, 0x71, 0x50,  /* movaps xmm14,[rcx+0x50] */
+            0x44, 0x0f, 0x28, 0x79, 0x60,  /* movaps xmm15,[rcx+0x60] */
         #endif
-            0xff, 0xe0,                   /* jmp rax                */
+        #if !defined(CO_NO_TIB)
+            0x65, 0x4c, 0x8b, 0x04, 0x25,  /* mov r8,gs:0x30          */
+            0x30, 0x00, 0x00, 0x00,
+            0x41, 0x0f, 0x10, 0x40, 0x08,  /* movups xmm0,[r8+0x8]    */
+            0x0f, 0x29, 0x42, 0x70,        /* movaps [rdx+0x70],xmm0  */
+            0x0f, 0x28, 0x41, 0x70,        /* movaps xmm0,[rcx+0x70]  */
+            0x41, 0x0f, 0x11, 0x40, 0x08,  /* movups [r8+0x8],xmm0    */
+        #endif
+            0xff, 0xe0,                    /* jmp rax                 */
         };
 
         #include <windows.h>
@@ -251,9 +265,14 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             stack_top -= 32;
             stack_top &= ~((size_t)15);
             long long *p = (long long *)(stack_top);               /* seek to top of stack */
-            *--p = (long long)co_done;                             /* if func returns */
-            *--p = (long long)co_awaitable;                         /* start of function */
-            *(long long *)handle = (long long)p;                    /* stack pointer */
+            *--p = (long long)co_done;                            /* if coroutine returns */
+            *--p = (long long)co_func;
+            ((long long *)handle)[0] = (long long)p;              /* stack pointer */
+            ((long long *)handle)[1] = (long long)co_awaitable;   /* start of function */
+#if defined(_WIN32) && !defined(CO_NO_TIB)
+            ((long long *)handle)[30] = (long long)handle + size; /* stack base */
+            ((long long *)handle)[31] = (long long)handle;        /* stack limit */
+#endif
 
             size_t context_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
             size_t storage_addr = _co_align_forward(context_addr, 16);
@@ -314,7 +333,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             stack_top &= ~((size_t)15);
             size_t *p = (size_t *)(stack_top);
             handle[8] = (size_t)p;
-            handle[9] = (size_t)co_awaitable;
+            handle[9] = (size_t)co_func;
 
             co = (co_routine_t *)handle;
             size_t context_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
@@ -340,38 +359,54 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
     }
   #elif defined(__aarch64__)
     #include <stdint.h>
+    static const uint32_t co_swap_function[1024] = {
+        0x910003f0,  /* mov x16,sp           */
+        0xa9007830,  /* stp x16,x30,[x1]     */
+        0xa9407810,  /* ldp x16,x30,[x0]     */
+        0x9100021f,  /* mov sp,x16           */
+        0xa9015033,  /* stp x19,x20,[x1, 16] */
+        0xa9415013,  /* ldp x19,x20,[x0, 16] */
+        0xa9025835,  /* stp x21,x22,[x1, 32] */
+        0xa9425815,  /* ldp x21,x22,[x0, 32] */
+        0xa9036037,  /* stp x23,x24,[x1, 48] */
+        0xa9436017,  /* ldp x23,x24,[x0, 48] */
+        0xa9046839,  /* stp x25,x26,[x1, 64] */
+        0xa9446819,  /* ldp x25,x26,[x0, 64] */
+        0xa905703b,  /* stp x27,x28,[x1, 80] */
+        0xa945701b,  /* ldp x27,x28,[x0, 80] */
+        0xf900303d,  /* str x29,    [x1, 96] */
+        0xf940301d,  /* ldr x29,    [x0, 96] */
+        0x6d072428,  /* stp d8, d9, [x1,112] */
+        0x6d472408,  /* ldp d8, d9, [x0,112] */
+        0x6d082c2a,  /* stp d10,d11,[x1,128] */
+        0x6d482c0a,  /* ldp d10,d11,[x0,128] */
+        0x6d09342c,  /* stp d12,d13,[x1,144] */
+        0x6d49340c,  /* ldp d12,d13,[x0,144] */
+        0x6d0a3c2e,  /* stp d14,d15,[x1,160] */
+        0x6d4a3c0e,  /* ldp d14,d15,[x0,160] */
+        #if defined(_WIN32) && !defined(CO_NO_TIB)
+        0xa940c650,  /* ldp x16,x17,[x18, 8] */
+        0xa90b4430,  /* stp x16,x17,[x1,176] */
+        0xa94b4410,  /* ldp x16,x17,[x0,176] */
+        0xa900c650,  /* stp x16,x17,[x18, 8] */
+        #endif
+        0xd61f03c0,  /* br x30               */
+    };
+
+#ifdef _WIN32
+    #include <windows.h>
+
+    static void co_init() {
+    #ifdef CO_MPROTECT
+        DWORD old_privileges;
+        VirtualProtect((void*)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
+    #endif
+    }
+#else
     #ifdef CO_MPROTECT
         #include <unistd.h>
         #include <sys/mman.h>
     #endif
-
-    static const uint32_t co_swap_function[1024] = {
-        0x910003f0, /* mov x16,sp           */
-        0xa9007830, /* stp x16,x30,[x1]     */
-        0xa9407810, /* ldp x16,x30,[x0]     */
-        0x9100021f, /* mov sp,x16           */
-        0xa9015033, /* stp x19,x20,[x1, 16] */
-        0xa9415013, /* ldp x19,x20,[x0, 16] */
-        0xa9025835, /* stp x21,x22,[x1, 32] */
-        0xa9425815, /* ldp x21,x22,[x0, 32] */
-        0xa9036037, /* stp x23,x24,[x1, 48] */
-        0xa9436017, /* ldp x23,x24,[x0, 48] */
-        0xa9046839, /* stp x25,x26,[x1, 64] */
-        0xa9446819, /* ldp x25,x26,[x0, 64] */
-        0xa905703b, /* stp x27,x28,[x1, 80] */
-        0xa945701b, /* ldp x27,x28,[x0, 80] */
-        0xf900303d, /* str x29,    [x1, 96] */
-        0xf940301d, /* ldr x29,    [x0, 96] */
-        0x6d072428, /* stp d8, d9, [x1,112] */
-        0x6d472408, /* ldp d8, d9, [x0,112] */
-        0x6d082c2a, /* stp d10,d11,[x1,128] */
-        0x6d482c0a, /* ldp d10,d11,[x0,128] */
-        0x6d09342c, /* stp d12,d13,[x1,144] */
-        0x6d49340c, /* ldp d12,d13,[x0,144] */
-        0x6d0a3c2e, /* stp d14,d15,[x1,160] */
-        0x6d4a3c0e, /* ldp d14,d15,[x0,160] */
-        0xd61f03c0, /* br x30               */
-    };
 
     static void co_init(void)
     {
@@ -382,7 +417,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
         mprotect((void *)base, size, PROT_READ | PROT_EXEC);
     #endif
     }
-
+#endif
     co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
     {
         size_t *handle;
@@ -399,9 +434,15 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             size_t stack_top = (size_t)handle + size;
             stack_top &= ~((size_t)15);
             size_t *p = (size_t *)(stack_top);
-            handle[0] = (size_t *)p;  /* x16 (stack pointer) */
-            handle[1] = (size_t)co_awaitable; /* x30 (link register) */
-            handle[12] = (size_t)p;   /* x29 (frame pointer) */
+            handle[0] = (size_t)p;                 /* x16 (stack pointer) */
+            handle[1] = (size_t)co_func;           /* x30 (link register) */
+            handle[2] = (size_t)co_awaitable;      /* x19 (entry point) */
+            handle[12] = (size_t)p;                /* x29 (frame pointer) */
+
+#if defined(_WIN32) && !defined(CO_NO_TIB)
+            handle[22] = (size_t)handle + size;    /* stack base */
+            handle[23] = (size_t)handle;           /* stack limit */
+#endif
 
             co = (co_routine_t *)handle;
             size_t context_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
