@@ -126,7 +126,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             size_t context_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
             size_t storage_addr = _co_align_forward(context_addr, 16);
             handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
-            size_t stack_addr = _co_align_forward(storage_addr + handle->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
@@ -135,7 +134,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
 
             handle->func = func;
             handle->state = CO_SUSPENDED;
-            handle->stack_base = (void *)stack_addr;
             handle->stack_size = size;
             handle->storage = storage;
             handle->halt = 0;
@@ -266,18 +264,16 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             stack_top &= ~((size_t)15);
             long long *p = (long long *)(stack_top);               /* seek to top of stack */
             *--p = (long long)co_done;                            /* if coroutine returns */
-            *--p = (long long)co_func;
-            ((long long *)handle)[0] = (long long)p;              /* stack pointer */
-            ((long long *)handle)[1] = (long long)co_awaitable;   /* start of function */
+            *--p = (long long)co_awaitable;
+            *(long long *)handle = (long long)p;              /* stack pointer */
 #if defined(_WIN32) && !defined(CO_NO_TIB)
             ((long long *)handle)[30] = (long long)handle + size; /* stack base */
             ((long long *)handle)[31] = (long long)handle;        /* stack limit */
 #endif
 
             size_t context_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
-            size_t storage_addr = _co_align_forward(context_addr, 16);
             handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
-            size_t stack_addr = _co_align_forward(storage_addr + handle->storage_size, 16);
+            size_t storage_addr = _co_align_forward(context_addr, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
@@ -286,7 +282,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
 
             handle->func = func;
             handle->state = CO_SUSPENDED;
-            handle->stack_base = (void *)stack_addr;
             handle->stack_size = size;
             handle->storage = storage;
             handle->halt = 0;
@@ -339,7 +334,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             size_t context_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
             size_t storage_addr = _co_align_forward(context_addr, 16);
             co->storage_size = CO_DEFAULT_STORAGE_SIZE;
-            size_t stack_addr = _co_align_forward(storage_addr + co->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
@@ -348,7 +342,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
 
             co->func = func;
             co->state = CO_SUSPENDED;
-            co->stack_base = (void *)stack_addr;
             co->stack_size = size;
             co->storage = storage;
             co->halt = 0;
@@ -448,7 +441,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             size_t context_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
             size_t storage_addr = _co_align_forward(context_addr, 16);
             co->storage_size = CO_DEFAULT_STORAGE_SIZE;
-            size_t stack_addr = _co_align_forward(storage_addr + co->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
@@ -457,7 +449,6 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
 
             co->func = func;
             co->state = CO_SUSPENDED;
-            co->stack_base = (void *)stack_addr;
             co->stack_size = size;
             co->storage = storage;
             co->halt = 0;

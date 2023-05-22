@@ -32,8 +32,6 @@
 #ifndef CO_DEFAULT_STORAGE_SIZE
     #define CO_DEFAULT_STORAGE_SIZE 1024
 #endif
-/* Number used only to assist checking for stack overflows. */
-#define CO_MAGIC_NUMBER 0x7E3CB1A9
 
 /* Public API qualifier. */
 #ifndef C_API
@@ -245,16 +243,51 @@ typedef struct co_value co_value_t;
 
 struct co_routine_t
 {
-    void *handle;
-    void *user_data;
+#if defined(__x86_64__) || defined(_M_X64)
+#ifdef _WIN32
+    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15, *rdi, *rsi;
+    void *xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
+    void *fiber_storage;
+    void *dealloc_stack;
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void *stack_base;
+    void *stack_limit;
+#else
+    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
+#endif
+#elif defined(__i386) || defined(__i386__)
+    void *eip, *esp, *ebp, *ebx, *esi, *edi;
+#elif defined(__ARM_EABI__)
+#ifndef __SOFTFP__
+    void *f[16];
+#endif
+    void *d[4]; /* d8-d15 */
+    void *r[4]; /* r4-r11 */
+    void *lr;
+    void *sp;
+#elif defined(__aarch64__)
+    void *x[12]; /* x19-x30 */
+    void *sp;
+    void *lr;
+    void *d[8]; /* d8-d15 */
+#elif defined(__riscv)
+    void *s[12]; /* s0-s11 */
+    void *ra;
+    void *pc;
+    void *sp;
+#ifdef __riscv_flen
+#if __riscv_flen == 64
+    double fs[12]; /* fs0-fs11 */
+#elif __riscv_flen == 32
+    float fs[12]; /* fs0-fs11 */
+#endif
+#endif /* __riscv_flen */
+#endif
+    co_state state;
     co_callable_t func;
     /* Coroutine stack size. */
+    void *user_data;
     size_t stack_size;
-    /* Used to check stack overflow. */
-    size_t magic_number;
-    co_state state;
     unsigned char *storage;
     size_t bytes_stored;
     /* Coroutine storage size, to be used with the storage APIs. */
