@@ -34,6 +34,7 @@ static void(fastcall *co_swap)(co_routine_t *, co_routine_t *) = 0;
 /* called only if co_routine_t func returns */
 static void co_done() {
     co_active()->halt = 1;
+    co_active()->state = CO_DEAD;
     co_switch(co_main_handle);
 }
 
@@ -42,6 +43,12 @@ static void co_awaitable()
     co_routine_t *co = co_active();
     co->results =  co->func(co->args);
     co->state = CO_NORMAL;
+}
+
+/* Utility for aligning addresses. */
+static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
+{
+    return (addr + (align - 1)) & ~(align - 1);
 }
 
 #ifdef CO_MPROTECT
@@ -83,15 +90,15 @@ static void co_awaitable()
 
         static void co_init(void) {
             #ifdef CO_MPROTECT
-                unsigned long addr = (unsigned long)co_swap_function;
-                unsigned long base = addr - (addr % sysconf(_SC_PAGESIZE));
-                unsigned long size = (addr - base) + sizeof co_swap_function;
+                size_t addr = (size_t)co_swap_function;
+                size_t base = addr - (addr % sysconf(_SC_PAGESIZE));
+                size_t size = (addr - base) + sizeof co_swap_function;
                 mprotect((void*)base, size, PROT_READ | PROT_EXEC);
             #endif
         }
     #endif
 
-    co_routine_t *co_derive(void* memory, unsigned int size, co_callable_t func, void *args) {
+    co_routine_t *co_derive(void* memory, size_t size, co_callable_t func, void *args) {
         co_routine_t *handle;
         if(!co_swap) {
             co_init();
@@ -102,33 +109,29 @@ static void co_awaitable()
         if(!co_current_handle) co_current_handle = co_active();
 
         if((handle = (co_routine_t *)memory)) {
-            unsigned long stack_top = (unsigned long)handle + size;
+            size_t stack_top = (size_t)handle + size;
             stack_top -= 32;
-            stack_top &= ~((unsigned long)15);
+            stack_top &= ~((size_t)15);
             long *p = (long *)(stack_top);              /* seek to top of stack */
             *--p = (long)co_done;                       /* if func returns */
             *--p = (long)co_awaitable;                  /* start of function */
             *(long*)handle = (long)p;                   /* stack pointer */
 
-            const unsigned int size_stct = CO_ALIGN(sizeof(handle[0]), CO_STACK_ALIGNMENT);
-            uintptr_t addr = (uintptr_t)memory;
-            uintptr_t end_addr = addr + size;
-            uintptr_t storage_addr = (uintptr_t)end_addr + size_stct;
-            uintptr_t base_addr = CO_ALIGN(storage_addr, CO_STACK_ALIGNMENT);
-            uintptr_t handle_addr = base_addr + size_stct;
+            size_t context_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
+            size_t storage_addr = _co_align_forward(context_addr, 16);
+            handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
+            size_t stack_addr = _co_align_forward(storage_addr + handle->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
-            handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
             memset(storage, 0, handle->storage_size);
-            handle->storage = storage;
             handle->bytes_stored = 0;
 
             handle->func = func;
             handle->state = CO_SUSPENDED;
-            handle->stack_base = (void *)handle_addr;
-            handle->stack_size = (unsigned int)(end_addr - handle_addr);
-            handle->magic_number = CO_MAGIC_NUMBER;
+            handle->stack_base = (void *)stack_addr;
+            handle->stack_size = size;
+            handle->storage = storage;
             handle->halt = 0;
             handle->args = args;
         }
@@ -232,7 +235,7 @@ static void co_awaitable()
         #endif
         }
 #endif
-    co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, void *args)
+    co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
     {
         co_routine_t *handle;
         if (!co_swap) {
@@ -244,33 +247,29 @@ static void co_awaitable()
         if (!co_current_handle) co_current_handle = co_active();
 
         if ((handle = (co_routine_t *)memory)) {
-            unsigned long long stack_top = (unsigned long long)handle + size;
+            size_t stack_top = (size_t)handle + size;
             stack_top -= 32;
-            stack_top &= ~((unsigned long long)15);
+            stack_top &= ~((size_t)15);
             long long *p = (long long *)(stack_top);               /* seek to top of stack */
             *--p = (long long)co_done;                             /* if func returns */
-            *--p = (long long)co_awaitable;                        /* start of function */
-            *(long long *)handle = (long long)p;                   /* stack pointer */
+            *--p = (long long)co_awaitable;                         /* start of function */
+            *(long long *)handle = (long long)p;                    /* stack pointer */
 
-            const unsigned int size_stct = CO_ALIGN(sizeof(handle[0]), CO_STACK_ALIGNMENT);
-            uintptr_t addr = (uintptr_t)memory;
-            uintptr_t end_addr = addr + size;
-            uintptr_t storage_addr = (uintptr_t)end_addr + size_stct;
-            uintptr_t base_addr = CO_ALIGN(storage_addr, CO_STACK_ALIGNMENT);
-            uintptr_t handle_addr = base_addr + size_stct;
+            size_t context_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
+            size_t storage_addr = _co_align_forward(context_addr, 16);
+            handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
+            size_t stack_addr = _co_align_forward(storage_addr + handle->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
-            handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
             memset(storage, 0, handle->storage_size);
-            handle->storage = storage;
             handle->bytes_stored = 0;
 
             handle->func = func;
             handle->state = CO_SUSPENDED;
-            handle->stack_base = (void *)handle_addr;
-            handle->stack_size = (unsigned int)(end_addr - handle_addr);
-            handle->magic_number = CO_MAGIC_NUMBER;
+            handle->stack_base = (void *)stack_addr;
+            handle->stack_size = size;
+            handle->storage = storage;
             handle->halt = 0;
             handle->args = args;
         }
@@ -284,7 +283,7 @@ static void co_awaitable()
         #include <sys/mman.h>
     #endif
 
-    static const unsigned long co_swap_function[1024] = {
+    static const size_t co_swap_function[1024] = {
         0xe8a16ff0,  /* stmia r1!, {r4-r11,sp,lr} */
         0xe8b0aff0,  /* ldmia r0!, {r4-r11,sp,pc} */
         0xe12fff1e,  /* bx lr                     */
@@ -292,55 +291,52 @@ static void co_awaitable()
 
     static void co_init(void) {
     #ifdef CO_MPROTECT
-        unsigned long addr = (unsigned long)co_swap_function;
-        unsigned long base = addr - (addr % sysconf(_SC_PAGESIZE));
-        unsigned long size = (addr - base) + sizeof co_swap_function;
+        size_t addr = (size_t)co_swap_function;
+        size_t base = addr - (addr % sysconf(_SC_PAGESIZE));
+        size_t size = (addr - base) + sizeof co_swap_function;
         mprotect((void*)base, size, PROT_READ | PROT_EXEC);
     #endif
     }
 
-    co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, void *args) {
-        unsigned long *handle;
-        if(!co_swap) {
+    co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args) {
+        size_t *handle;
+        co_routine_t *co;
+        if (!co_swap) {
             co_init();
             co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
         }
-        if(!co_active_handle) co_active_handle = co_active_buffer;
+        if (!co_active_handle) co_active_handle = co_active_buffer;
         if (!co_main_handle) co_main_handle = co_active_handle;
-        if(!co_current_handle) co_current_handle = co_active();
+        if (!co_current_handle) co_current_handle = co_active();
 
-        if((handle = (unsigned long *)memory)) {
-            unsigned long stack_top = (unsigned long)handle + size;
-            stack_top &= ~((unsigned long)15);
-            unsigned long *p = (unsigned long *)(stack_top);
-            handle[8] = (unsigned long)p;
-            handle[9] = (unsigned long)co_awaitable;
+        if((handle = (size_t *)memory)) {
+            size_t stack_top = (size_t)handle + size;
+            stack_top &= ~((size_t)15);
+            size_t *p = (size_t *)(stack_top);
+            handle[8] = (size_t)p;
+            handle[9] = (size_t)co_awaitable;
 
-            const unsigned int size_stct = CO_ALIGN(sizeof(handle[0]), CO_STACK_ALIGNMENT);
-            uintptr_t addr = (uintptr_t)memory;
-            uintptr_t end_addr = addr + size;
-            uintptr_t storage_addr = (uintptr_t)end_addr + size_stct;
-            uintptr_t base_addr = CO_ALIGN(storage_addr, CO_STACK_ALIGNMENT);
-            uintptr_t handle_addr = base_addr + size_stct;
+            co = (co_routine_t *)handle;
+            size_t context_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
+            size_t storage_addr = _co_align_forward(context_addr, 16);
+            co->storage_size = CO_DEFAULT_STORAGE_SIZE;
+            size_t stack_addr = _co_align_forward(storage_addr + co->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
-            handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
-            memset(storage, 0, handle->storage_size);
-            handle->storage = storage;
-            handle->bytes_stored = 0;
+            memset(storage, 0, co->storage_size);
+            co->bytes_stored = 0;
 
-            handle->func = func;
-            handle->state = CO_SUSPENDED;
-            handle->stack_base = (void *)handle_addr;
-            handle->stack_size = (unsigned int)(end_addr - handle_addr);
-            memset(stack_base, 0, stack_size);
-            handle->magic_number = CO_MAGIC_NUMBER;
-            handle->halt = 0;
-            handle->args = args;
+            co->func = func;
+            co->state = CO_SUSPENDED;
+            co->stack_base = (void *)stack_addr;
+            co->stack_size = size;
+            co->storage = storage;
+            co->halt = 0;
+            co->args = args;
         }
 
-        return (co_routine_t *)handle;
+        return co;
     }
   #elif defined(__aarch64__)
     #include <stdint.h>
@@ -380,16 +376,17 @@ static void co_awaitable()
     static void co_init(void)
     {
     #ifdef CO_MPROTECT
-        unsigned long addr = (unsigned long)co_swap_function;
-        unsigned long base = addr - (addr % sysconf(_SC_PAGESIZE));
-        unsigned long size = (addr - base) + sizeof co_swap_function;
+        size_t addr = (size_t)co_swap_function;
+        size_t base = addr - (addr % sysconf(_SC_PAGESIZE));
+        size_t size = (addr - base) + sizeof co_swap_function;
         mprotect((void *)base, size, PROT_READ | PROT_EXEC);
     #endif
     }
 
-    co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, void *args)
+    co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
     {
-        unsigned long *handle;
+        size_t *handle;
+        co_routine_t *co;
         if (!co_swap) {
             co_init();
             co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
@@ -398,38 +395,35 @@ static void co_awaitable()
         if (!co_main_handle) co_main_handle = co_active_handle;
         if (!co_current_handle) co_current_handle = co_active();
 
-        if ((handle = (unsigned long *)memory)) {
-            unsigned long stack_top = (unsigned long)handle + size;
-            stack_top &= ~((unsigned long)15);
-            unsigned long *p = (unsigned long *)(stack_top);
-            handle[0] = (unsigned long *)p;  /* x16 (stack pointer) */
-            handle[1] = (unsigned long)co_awaitable; /* x30 (link register) */
-            handle[12] = (unsigned long)p;   /* x29 (frame pointer) */
+        if ((handle = (size_t *)memory)) {
+            size_t stack_top = (size_t)handle + size;
+            stack_top &= ~((size_t)15);
+            size_t *p = (size_t *)(stack_top);
+            handle[0] = (size_t *)p;  /* x16 (stack pointer) */
+            handle[1] = (size_t)co_awaitable; /* x30 (link register) */
+            handle[12] = (size_t)p;   /* x29 (frame pointer) */
 
-            const unsigned int size_stct = CO_ALIGN(sizeof(handle[0]), CO_STACK_ALIGNMENT);
-            uintptr_t addr = (uintptr_t)memory;
-            uintptr_t end_addr = addr + size;
-            uintptr_t storage_addr = (uintptr_t)end_addr + size_stct;
-            uintptr_t base_addr = CO_ALIGN(storage_addr, CO_STACK_ALIGNMENT);
-            uintptr_t handle_addr = base_addr + size_stct;
+            co = (co_routine_t *)handle;
+            size_t context_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
+            size_t storage_addr = _co_align_forward(context_addr, 16);
+            co->storage_size = CO_DEFAULT_STORAGE_SIZE;
+            size_t stack_addr = _co_align_forward(storage_addr + co->storage_size, 16);
 
             /* Initialize storage. */
             unsigned char *storage = (unsigned char *)storage_addr;
-            handle->storage_size = CO_DEFAULT_STORAGE_SIZE;
-            memset(storage, 0, handle->storage_size);
-            handle->storage = storage;
-            handle->bytes_stored = 0;
+            memset(storage, 0, co->storage_size);
+            co->bytes_stored = 0;
 
-            handle->func = func;
-            handle->state = CO_SUSPENDED;
-            handle->stack_base = (void *)handle_addr;
-            handle->stack_size = (unsigned int)(end_addr - handle_addr);
-            handle->magic_number = CO_MAGIC_NUMBER;
-            handle->halt = 0;
-            handle->args = args;
+            co->func = func;
+            co->state = CO_SUSPENDED;
+            co->stack_base = (void *)stack_addr;
+            co->stack_size = size;
+            co->storage = storage;
+            co->halt = 0;
+            co->args = args;
         }
 
-        return (co_routine_t *)handle;
+        return co;
     }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
     #define USE_NATIVE
@@ -469,13 +463,13 @@ static void co_awaitable()
         return co_active_;
     }
 
-    co_routine_t *co_derive(void *memory, unsigned int heapsize, co_callable_t func, void *args)
+    co_routine_t *co_derive(void *memory, size_t heapsize, co_callable_t func, void *args)
     {
         /* Windows fibers do not allow users to supply their own memory */
         return (co_routine_t *)0;
     }
 
-    co_routine_t *co_create(unsigned int heapsize, co_callable_t func, void *args)
+    co_routine_t *co_create(size_t heapsize, co_callable_t func, void *args)
     {
         if (!co_active_) {
             ConvertThreadToFiber(0);
@@ -508,7 +502,7 @@ static void co_awaitable()
         return co_active_handle;
     }
 
-    co_routine_t *co_create(unsigned int size, co_callable_t func, void *args)
+    co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     {
         if (size != 0)  {
             /* Stack size should be at least `CO_MIN_STACK_SIZE`. */
@@ -527,8 +521,14 @@ static void co_awaitable()
 
     void co_delete(co_routine_t *handle)
     {
-        CO_FREE(handle);
-        handle->state = CO_DEAD;
+        if (!handle) {
+            CO_LOG("attempt to delete an invalid coroutine");
+        } else if (!(handle->state == CO_NORMAL || handle->state == CO_DEAD)) {
+            CO_LOG("attempt to delete a coroutine that is not dead or suspended");
+        } else {
+            CO_FREE(handle);
+            handle->state = CO_DEAD;
+        }
     }
 
     void co_switch(co_routine_t *handle)
@@ -622,6 +622,14 @@ size_t co_get_storage_size(co_routine_t *co) {
   return co->storage_size;
 }
 
+void *co_get_user_data(co_routine_t *co)
+{
+  if(co != NULL) {
+    return co->user_data;
+  }
+  return NULL;
+}
+
 co_state co_status(co_routine_t *co)
 {
   if(co != NULL) return co->state;
@@ -644,10 +652,12 @@ value_t co_value(void *data)
 
 co_routine_t *co_start(co_callable_t func, void *args)
 {
-  void *memory = CO_MALLOC(CO_MIN_STACK_SIZE);
+  size_t stack_size = CO_DEFAULT_STACK_SIZE;
+  stack_size = _co_align_forward(stack_size, 16); /* Stack size should be aligned to 16 bytes. */
+  void *memory = CO_MALLOC(stack_size);
   if (!memory) return (co_routine_t *)0;
 
-  return co_derive(memory, CO_MIN_STACK_SIZE, func, args);
+  return co_derive(memory, stack_size, func, args);
 }
 
 void co_suspend()

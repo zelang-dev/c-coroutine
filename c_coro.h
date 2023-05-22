@@ -1,5 +1,5 @@
 #include <stddef.h> /* for size_t */
-#include <string.h>
+#include <string.h> /* For memcpy and memset. */
 #if defined(__clang__) || defined(__GNUC__)
     #include <stdint.h>
 #endif
@@ -25,7 +25,7 @@
 
 /* Default stack size when creating a coroutine. */
 #ifndef CO_DEFAULT_STACK_SIZE
-    #define CO_DEFAULT_STACK_SIZE 65536
+#define CO_DEFAULT_STACK_SIZE 57344
 #endif
 
 /* Size of coroutine storage buffer. */
@@ -200,47 +200,6 @@
 
 #define CO_ALIGN(value,alignment) (((value) + ((alignment) - 1)) & ~((alignment) - 1))
 
-#if defined(__clang__) || defined(__GNUC__)
-  #if defined(__i386__)
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #elif defined(__amd64__)
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #elif defined(__arm__)
-    #define CO_STACK_ALIGNMENT 16
-    #define CO_STACK_MINIMAL_SIZE 128
-  #elif defined(__aarch64__)
-    #define CO_STACK_ALIGNMENT 32
-    #define CO_STACK_MINIMAL_SIZE 256
-  #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #elif defined(_ARCH_PPC) && !defined(__LITTLE_ENDIAN__)
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #elif defined(_WIN32)
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #else
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #endif
-#elif defined(_MSC_VER)
-  #if defined(_M_IX86)
-    #define CO_STACK_ALIGNMENT 32
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #elif defined(_M_AMD64)
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #else
-    #define CO_STACK_ALIGNMENT 64
-    #define CO_STACK_MINIMAL_SIZE 128 * 1024
-  #endif
-#else
-  #error "unsupported processor, compiler or operating system"
-#endif
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -250,9 +209,9 @@ extern "C"
 typedef enum co_state
 {
     CO_DEAD = 0, /* The coroutine is uninitialized or deleted. */
-    CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine). */
+    CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
     CO_RUNNING,  /* The coroutine is active and running. */
-    CO_SUSPENDED /* The coroutine is suspended (in a call to yield/switch, or it has not started running yet). */
+    CO_SUSPENDED /* The coroutine is suspended (in a startup, or it has not started running yet). */
 } co_state;
 
 /* Coroutine result codes. */
@@ -282,7 +241,7 @@ typedef struct co_value co_value_t;
 struct co_routine_t
 {
     void *handle;
-    void *allocated;
+    void *user_data;
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void *stack_base;
     co_callable_t func;
@@ -297,33 +256,35 @@ struct co_routine_t
     size_t storage_size;
     unsigned char halt;
     void *args;
-    /* Coroutine return result on function exit. */
+    /* Coroutine result of function return/exit. */
     void *results;
 };
 
 enum value_args_t
 {
-    CO_FUNC,
-    CO_OBJ,
     CO_INT,
+    CO_LONG,
+    CO_MAX,
     CO_FLOAT,
     CO_DOUBLE,
     CO_BOOL,
     CO_STRING,
-    CO_ARRAY_CHR,
-    CO_ARRAY_INT
+    CO_ARRAY,
+    CO_OBJ,
+    CO_FUNC
 };
 
 typedef struct co_value co_value_t;
 typedef union
 {
     int integer;
+    long big_int;
+    unsigned long long max_int;
     float point;
     double precision;
     unsigned char boolean;
     char *string;
-    char **array_char;
-    int *array_int;
+    char **array;
     void *object;
     co_callable_t function;
 } value_t;
@@ -331,7 +292,7 @@ typedef union
 struct co_value
 {
     value_t value;
-    int type;
+    unsigned int type;
     size_t size_args;
     size_t number_args;
 };
@@ -340,10 +301,10 @@ struct co_value
 C_API co_routine_t *co_active(void);
 
 /* Initializes new coroutine. */
-C_API co_routine_t *co_derive(void *, unsigned int, co_callable_t func, void *);
+C_API co_routine_t *co_derive(void *, size_t, co_callable_t, void *);
 
 /* Create new coroutine. */
-C_API co_routine_t *co_create(unsigned int, co_callable_t func, void *);
+C_API co_routine_t *co_create(size_t, co_callable_t, void *);
 
 /* Delete specified coroutine. */
 C_API void co_delete(co_routine_t *);
@@ -363,10 +324,10 @@ C_API int co_serializable(void);
 C_API co_routine_t *co_running(void);
 
 /* Get the description of a result. */
-C_API const char *co_result_description(co_result res);
+C_API const char *co_result_description(co_result);
 
 /* Initialize and starts the coroutine passing any args. */
-C_API co_routine_t *co_start(co_callable_t func, void *);
+C_API co_routine_t *co_start(co_callable_t, void *);
 
 C_API value_t co_value(void *data);
 
@@ -382,19 +343,23 @@ C_API co_state co_status(co_routine_t *);
 /* Storage interface functions, used to pass values between suspend and resume/switch. */
 
 /* Push bytes to the coroutine storage. Use to send values between suspend and resume/switch. */
-C_API co_result co_push(co_routine_t *, const void *src, size_t len);
+C_API co_result co_push(co_routine_t *, const void *, size_t);
 
 /* Pop bytes from the coroutine storage. Use to get values between suspend and resume/switch. */
-C_API co_result co_pop(co_routine_t *, void *dest, size_t len);
+C_API co_result co_pop(co_routine_t *, void *, size_t);
 
 /* Like `co_pop` but it does not consumes the storage. */
-C_API co_result co_peek(co_routine_t *, void *dest, size_t len);
+C_API co_result co_peek(co_routine_t *, void *, size_t);
 
 /* Get the available bytes that can be retrieved with a `co_pop`. */
 C_API size_t co_get_bytes_stored(co_routine_t *);
 
  /* Get the total storage size. */
 C_API size_t co_get_storage_size(co_routine_t *);
+
+/* Get coroutine user data. */
+C_API void *co_get_user_data(co_routine_t *);
+
 #ifdef __cplusplus
 }
 #endif
