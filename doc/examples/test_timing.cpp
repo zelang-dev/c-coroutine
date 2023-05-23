@@ -15,7 +15,7 @@ namespace thread {
 void *co_timingtest(void *any) {
   for(;;) {
       thread::counter++;
-      co_suspend();
+      co_switch(thread::x);
   }
 }
 
@@ -37,6 +37,7 @@ int main() {
   t1 = (int)difftime(end, start);
   printf("%2.3f seconds per  50 million subroutine calls (%d iterations)\n", (float)t1 / CLOCKS_PER_SEC, thread::counter);
 
+  thread::x = co_active();
   thread::y = co_start(co_timingtest, NULL);
 
   start = clock();
@@ -45,11 +46,13 @@ int main() {
   }
   end = clock();
 
-  co_delete(thread::y);
-
   t2 = (int)difftime(end, start);
   printf("%2.3f seconds per 100 million co_switch  calls (%d iterations)\n", (float)t2 / CLOCKS_PER_SEC, thread::counter);
 
   printf("co_switch skew = %fx\n\n", (double)t2 / (double)t1);
+
+  co_delete(thread::y);
+  co_delete(thread::x);
+
   return 0;
 }

@@ -429,6 +429,6 @@ void co_switch(co_routine_t *t) {
   CO_SWAP_ASM(co_active_handle, old);
 }
 
-int co_serializable(void) {
+unsigned char co_serializable(void) {
   return 0;
 }

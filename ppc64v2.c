@@ -269,7 +269,7 @@ void co_switch(co_routine_t *to) {
   swap_context((struct ppc64_context*)to, from);
 }
 
-int co_serializable(void) {
+unsigned char co_serializable(void) {
   return 1;
 }
 

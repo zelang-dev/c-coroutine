@@ -76,7 +76,7 @@ void co_switch(co_routine_t *co_thread) {
   swapcontext(old_thread, co_running);
 }
 
-int co_serializable(void) {
+unsigned char co_serializable(void) {
   return 0;
 }
 

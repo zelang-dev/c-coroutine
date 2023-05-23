@@ -138,6 +138,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             handle->storage = storage;
             handle->halt = 0;
             handle->args = args;
+            co->magic_number = CO_MAGIC_NUMBER;
         }
 
         return handle;
@@ -286,6 +287,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             handle->storage = storage;
             handle->halt = 0;
             handle->args = args;
+            handle->magic_number = CO_MAGIC_NUMBER;
         }
 
         return handle;
@@ -346,6 +348,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             co->storage = storage;
             co->halt = 0;
             co->args = args;
+            co->magic_number = CO_MAGIC_NUMBER;
         }
 
         return co;
@@ -453,6 +456,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
             co->storage = storage;
             co->halt = 0;
             co->args = args;
+            co->magic_number = CO_MAGIC_NUMBER;
         }
 
         return co;
@@ -522,7 +526,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
         SwitchToFiber((LPVOID)thread);
     }
 
-    int co_serializable(void)
+    unsigned char co_serializable(void)
     {
         return 0;
     }
@@ -573,7 +577,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align)
         co_swap(co_active_handle, co_previous_handle);
     }
 
-    int co_serializable(void)
+    unsigned char co_serializable(void)
     {
         return 1;
     }
@@ -697,9 +701,28 @@ void co_suspend()
   co_switch(co_running());
 }
 
-void co_resume(co_routine_t *handle)
+void co_yielding(co_routine_t *handle, void *data)
 {
+  if (handle->magic_number != CO_MAGIC_NUMBER) {
+    /* Stack overflow. */
+    CO_LOG("coroutine stack overflow, try increasing the stack size");
+  } else {
+    co_push(handle, &data, sizeof(data));
+    co_switch(handle);
+  }
+}
+
+void *co_resuming(co_routine_t *handle)
+{
+  if (co_terminated(handle)) return (void *)-1;
   co_switch(handle);
+  co_pop(handle, &handle->yield_value, sizeof(handle->yield_value));
+  return handle->yield_value;
+}
+
+value_t co_returning(co_routine_t *co)
+{
+  return co_value(co->results);
 }
 
 unsigned char co_terminated(co_routine_t *co)

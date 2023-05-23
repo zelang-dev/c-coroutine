@@ -136,7 +136,7 @@ void co_switch(co_routine_t *co_thread) {
   }
 }
 
-int co_serializable(void) {
+unsigned char co_serializable(void) {
   return 0;
 }
 

@@ -203,6 +203,9 @@
 
 #define CO_ALIGN(value,alignment) (((value) + ((alignment) - 1)) & ~((alignment) - 1))
 
+/* Number used only to assist checking for stack overflows. */
+#define CO_MAGIC_NUMBER 0x7E3CB1A9
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -296,6 +299,9 @@ struct co_routine_t
     void *args;
     /* Coroutine result of function return/exit. */
     void *results;
+    void *yield_value;
+    /* Used to check stack overflow. */
+    size_t magic_number;
 };
 
 enum value_args_t
@@ -356,7 +362,7 @@ C_API unsigned char co_terminated(co_routine_t *);
 /* Results from an coroutine function completetion and return. */
 C_API void *co_results(co_routine_t *) ;
 
-C_API int co_serializable(void);
+C_API unsigned char co_serializable(void);
 
 /* Return handle to previous coroutine. */
 C_API co_routine_t *co_running(void);
@@ -367,13 +373,19 @@ C_API const char *co_result_description(co_result);
 /* Initialize and starts the coroutine passing any args. */
 C_API co_routine_t *co_start(co_callable_t, void *);
 
-C_API value_t co_value(void *data);
+C_API value_t co_value(void *);
 
 /* Suspends the execution of current coroutine. */
 C_API void co_suspend(void);
 
-/* Resume specified coroutine. */
-C_API void co_resume(co_routine_t *);
+/* Yield to specified coroutine, passing data. */
+C_API void co_yielding(co_routine_t *, void *);
+
+/* Resume specified coroutine, returning data passed to co_yielding. */
+C_API void *co_resuming(co_routine_t *);
+
+/* Return union data type of co_results. */
+C_API value_t co_returning(co_routine_t *);
 
 /* Returns the status of the coroutine. */
 C_API co_state co_status(co_routine_t *);

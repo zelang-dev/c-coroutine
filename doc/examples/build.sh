@@ -7,4 +7,6 @@ c++ -O3 -fomit-frame-pointer -I../.. -c example.cpp
 c++ -O3 -fomit-frame-pointer -o example c_coro.o example.o
 c++ -O3 -fomit-frame-pointer -I../.. -c testsuite.cpp
 c++ -O3 -fomit-frame-pointer -o testsuite c_coro.o testsuite.o
+c++ -O3 -fomit-frame-pointer -I../.. -c test_resume.cpp
+c++ -O3 -fomit-frame-pointer -o test_resume c_coro.o test_resume.o
 rm -f *.o
