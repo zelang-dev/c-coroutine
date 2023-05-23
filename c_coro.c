@@ -688,7 +688,7 @@ value_t co_value(void *data)
 
 co_routine_t *co_start(co_callable_t func, void *args)
 {
-  size_t stack_size = CO_DEFAULT_STACK_SIZE;
+  size_t stack_size = CO_MIN_STACK_SIZE;
   stack_size = _co_align_forward(stack_size, 16); /* Stack size should be aligned to 16 bytes. */
   void *memory = CO_MALLOC(stack_size);
   if (!memory) return (co_routine_t *)0;
