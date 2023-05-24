@@ -1,6 +1,6 @@
 /* ppc64le (ELFv2) is not currently supported */
 
-#include "c_coro.h"
+#include "coroutine.h"
 
 #include <stdint.h>
 #include <string.h>

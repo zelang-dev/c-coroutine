@@ -25,7 +25,7 @@ platforms.
 
 This document is included as a reference for porting **c-coroutine**.
 
-Note that there are a variety of compile-time options in `c_coro.h`,
+Note that there are a variety of compile-time options in `coroutine.h`,
 so if you want to use **c-coroutine** on a platform where it is not supported by default,
 you may be able to configure the implementation appropriately without having
 to make a whole new port.

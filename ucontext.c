@@ -10,7 +10,7 @@
   use this library only as a *last resort*
 */
 
-#include "c_coro.h"
+#include "coroutine.h"
 
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500

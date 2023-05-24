@@ -3,7 +3,7 @@
   for SJLJ on other systems, one would want to rewrite springboard() and co_create() and hack the jmb_buf stack pointer.
 */
 
-#include "c_coro.h"
+#include "coroutine.h"
 
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500

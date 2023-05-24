@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
-#include "c_coro.h"
+#include "coroutine.h"
 
 void *hello_world(void *args)
 {

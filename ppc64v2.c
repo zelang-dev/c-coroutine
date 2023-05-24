@@ -1,6 +1,6 @@
 /* author: Shawn Anastasio */
 
-#include "c_coro.h"
+#include "coroutine.h"
 
 #include <stdint.h>
 

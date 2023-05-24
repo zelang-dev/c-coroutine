@@ -1,4 +1,4 @@
-#include "c_coro.h"
+#include "coroutine.h"
 
 #ifdef __cplusplus
 extern "C"

@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "c_coro.h"
+#include "coroutine.h"
 
 static void fail(const char* message, co_result res) {
   printf("%s: %s\n", message, co_result_description(res));

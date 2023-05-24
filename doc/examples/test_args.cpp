@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
-#include "c_coro.h"
+#include "coroutine.h"
 
 co_routine_t *thread[3];
 
