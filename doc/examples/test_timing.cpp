@@ -51,8 +51,5 @@ int main() {
 
   printf("co_switch skew = %fx\n\n", (double)t2 / (double)t1);
 
-  co_delete(thread::y);
-  co_delete(thread::x);
-
   return 0;
 }
