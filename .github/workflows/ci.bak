@@ -24,32 +24,29 @@ jobs:
       - name: Build
         working-directory: doc/examples
         run: |
-          cc ${{ matrix.flags }} -D CO_DEBUG -I../.. -o c_coro.o -c ../../c_coro.c
+          cc ${{ matrix.flags }} -D CO_DEBUG -I../.. -o coroutine.o -c ../../coroutine.c
           c++ ${{ matrix.flags }} -I../.. -c test_timing.cpp
-          c++ ${{ matrix.flags }} -o test_timing c_coro.o test_timing.o
+          c++ ${{ matrix.flags }} -o test_timing coroutine.o test_timing.o
           c++ ${{ matrix.flags }} -I../.. -c test_args.cpp
-          c++ ${{ matrix.flags }} -o test_args c_coro.o test_args.o
+          c++ ${{ matrix.flags }} -o test_args coroutine.o test_args.o
           c++ ${{ matrix.flags }} -I../.. -c example.cpp
-          c++ ${{ matrix.flags }} -o example c_coro.o example.o
-          c++ ${{ matrix.flags }} -I../.. -c testsuite.cpp
-          c++ ${{ matrix.flags }} -o testsuite c_coro.o testsuite.o
+          c++ ${{ matrix.flags }} -o example coroutine.o example.o
+          c++ ${{ matrix.flags }} -I../.. -c test_resume.cpp
+          c++ ${{ matrix.flags }} -o test_resume coroutine.o test_resume.o
       - name: Run examples
         working-directory: doc/examples
         run: |
           ./test_args
           ./test_timing
           ./example
-          ./testsuite
+          ./test_resume
       - name: Run valgrind
         working-directory: doc/examples
         run: |
           valgrind --error-exitcode=99 ./test_args
           valgrind --error-exitcode=99 ./test_timing
           valgrind --error-exitcode=99 ./example
-          valgrind --error-exitcode=99 ./testsuite
-          if valgrind --error-exitcode=99 ./test_serialization ; then
-            (echo "Expected test_serialization to fail valgrind test"; exit 98)
-          fi
+          valgrind --error-exitcode=99 ./test_resume
 
   build-qemu:
     name: ${{ matrix.target }}
@@ -81,7 +78,7 @@ jobs:
             ./test_args
             ./test_timing
             ./example
-            ./testsuite
+            ./test_resume
             if [ "$target" == "arm" ]; then
               if valgrind --error-exitcode=99 ./test_args ; then
                 (echo "Expected test_args to fail valgrind test"; exit 98)
@@ -117,15 +114,15 @@ jobs:
         env:
           FLAGS: -O3 -fomit-frame-pointer
         run: |
-          cc ${{ matrix.defines }} $FLAGS -I../.. -o c_coro.o -c ../../${{ matrix.file }}
+          cc ${{ matrix.defines }} $FLAGS -I../.. -o coroutine.o -c ../../${{ matrix.file }}
           c++ $FLAGS -I../.. -c test_timing.cpp
-          c++ $FLAGS -o test_timing c_coro.o test_timing.o
+          c++ $FLAGS -o test_timing coroutine.o test_timing.o
           c++ $FLAGS -I../.. -c test_args.cpp
-          c++ $FLAGS -o test_args c_coro.o test_args.o
+          c++ $FLAGS -o test_args coroutine.o test_args.o
           c++ $FLAGS -I../.. -c example.cpp
-          c++ $FLAGS -o example c_coro.o example.o
-          c++ $FLAGS -I../.. -c testsuite.cpp
-          c++ $FLAGS -o testsuite c_coro.o testsuite.o
+          c++ $FLAGS -o example coroutine.o example.o
+          c++ $FLAGS -I../.. -c test_resume.cpp
+          c++ $FLAGS -o test_resume coroutine.o test_resume.o
           # Serialization not supported
       - name: Run examples
         working-directory: doc/examples
@@ -168,18 +165,18 @@ jobs:
         working-directory: doc/examples
         run: |
           # __STDC__ required for `alignas` (or using /Za)
-          cl /I ../.. /D CO_DEBUG /D CO_MPROTECT /D __STDC__ /c ../../c_coro.c
-          cl /I ../.. test_args.cpp c_coro.obj
-          cl /I ../.. test_timing.cpp c_coro.obj
-          cl /I ../.. example.cpp c_coro.obj
-          cl /I ../.. testsuite.cpp c_coro.obj
+          cl /I ../.. /D CO_DEBUG /c ../../coroutine.c
+          cl /I ../.. test_args.cpp coroutine.obj
+          cl /I ../.. test_timing.cpp coroutine.obj
+          cl /I ../.. example.cpp coroutine.obj
+          cl /I ../.. test_resume.cpp coroutine.obj
       - name: Run examples
         working-directory: doc/examples
         run: |
           ./test_args.exe
           ./test_timing.exe
           ./example.exe
-          ./testsuite.exe
+          ./test_resume.exe
 
   build-windows-fibers:
     name: Windows (fibers)
@@ -191,11 +188,11 @@ jobs:
         working-directory: doc/examples
         run: |
           # __STDC__ required for `alignas` (or using /Za)
-          cl /I ../.. /D CO_DEBUG /D CO_MPROTECT /D __STDC__ /Foc_coro /c ../../c_coro.c
-          cl /I ../.. test_args.cpp c_coro.obj
-          cl /I ../.. test_timing.cpp c_coro.obj
-          cl /I ../.. example.cpp c_coro.obj
-          cl /I ../.. testsuite.cpp c_coro.obj
+          cl /I ../.. /D CO_DEBUG /Focoroutine /c ../../coroutine.c
+          cl /I ../.. test_args.cpp coroutine.obj
+          cl /I ../.. test_timing.cpp coroutine.obj
+          cl /I ../.. example.cpp coroutine.obj
+          cl /I ../.. test_resume.cpp coroutine.obj
           # Serialization not supported
       - name: Run examples
         working-directory: doc/examples
@@ -203,7 +200,7 @@ jobs:
           ./test_args.exe
           ./test_timing.exe
           ./example.exe
-          ./testsuite.exe
+          ./test_resume.exe
 
   sanitizers:
     name: ${{ matrix.sanitizer }}-sanitizer
@@ -219,16 +216,16 @@ jobs:
         env:
           FLAGS: -fsanitize=${{ matrix.sanitizer }} -fno-sanitize-recover=all -fno-omit-frame-pointer
         run: |
-          clang $FLAGS -D CO_DEBUG -I../.. -o c_coro.o -c ../../c_coro.c
+          clang $FLAGS -D CO_DEBUG -I../.. -o coroutine.o -c ../../coroutine.c
           clang++ $FLAGS -I../.. -c test_timing.cpp
-          clang++ $FLAGS -o test_timing c_coro.o test_timing.o
+          clang++ $FLAGS -o test_timing coroutine.o test_timing.o
           clang++ $FLAGS -I../.. -c test_args.cpp
-          clang++ $FLAGS -o test_args c_coro.o test_args.o
+          clang++ $FLAGS -o test_args coroutine.o test_args.o
           clang++ $FLAGS -I../.. -c example.cpp
-          clang++ $FLAGS -o example c_coro.o example.o
-          clang++ $FLAGS -I../.. -c testsuite.cpp
-          clang++ $FLAGS -o testsuite c_coro.o testsuite.o
+          clang++ $FLAGS -o example coroutine.o example.o
+          clang++ $FLAGS -I../.. -c test_resume.cpp
+          clang++ $FLAGS -o test_resume coroutine.o test_resume.o
           ./test_args
           ./test_timing
           ./example
-          ./testsuite
+          ./test_resume

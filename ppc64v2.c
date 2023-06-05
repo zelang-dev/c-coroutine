@@ -255,12 +255,14 @@ co_routine_t *co_derive(void* memory, unsigned int size, co_callable_t func, voi
 co_routine_t *co_create(unsigned int size, co_callable_t func, void *args) {
   void* memory = CO_MALLOC(size);
   if(!memory) return (co_routine_t *)0;
+
+  memset(memory, 0, size);
   return co_derive(memory, size, func, args);
 }
 
 void co_delete(co_routine_t *handle) {
   CO_FREE(handle);
-  handle->state = CO_DEAD;
+  handle->status = CO_DEAD;
 }
 
 void co_switch(co_routine_t *to) {
@@ -269,8 +271,8 @@ void co_switch(co_routine_t *to) {
   swap_context((struct ppc64_context*)to, from);
 }
 
-unsigned char co_serializable(void) {
-  return 1;
+bool co_serializable(void) {
+  return true;
 }
 
 #ifdef __cplusplus

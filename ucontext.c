@@ -15,28 +15,31 @@
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500
 #include <stdlib.h>
-#include <ucontext.h>
 
-#ifdef __cplusplus
-extern "C" {
+#if __APPLE__ && __MACH__
+    #include <sys/ucontext.h>
+#elif defined(_WIN32) || defined(_WIN64)
+    #include "ucontext_windows.c"
+#else
+    #include <ucontext.h>
 #endif
 
 static thread_local ucontext_t co_primary;
-static thread_local ucontext_t* co_running = 0;
+static thread_local ucontext_t *co_running_handle = 0;
 
-co_routine_t co_active(void) {
-  if(!co_running) co_running = &co_primary;
-  return (co_routine_t)co_running;
+co_routine_t *co_active(void) {
+  if(!co_running_handle) co_running_handle = &co_primary;
+  return (co_routine_t *)co_running_handle;
 }
 
 co_routine_t *co_derive(void* memory, unsigned int heapsize, co_callable_t func, void *args) {
-  if(!co_running) co_running = &co_primary;
+  if(!co_running_handle) co_running_handle = &co_primary;
   ucontext_t* thread = (ucontext_t*)memory;
   memory = (unsigned char*)memory + sizeof(ucontext_t);
   heapsize -= sizeof(ucontext_t);
   if(thread) {
     if((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory)) {
-      thread->uc_link = co_running;
+      thread->uc_link = co_running_handle;
       thread->uc_stack.ss_size = heapsize;
       makecontext(thread, func, 0);
     } else {
@@ -47,11 +50,12 @@ co_routine_t *co_derive(void* memory, unsigned int heapsize, co_callable_t func,
 }
 
 co_routine_t *co_create(unsigned int heapsize, co_callable_t func, void *args) {
-  if(!co_running) co_running = &co_primary;
-  ucontext_t* thread = (ucontext_t*)malloc(sizeof(ucontext_t));
+  if(!co_running_handle) co_running_handle = &co_primary;
+  ucontext_t* thread = (ucontext_t*)CO_MALLOC(sizeof(ucontext_t));
+  memset(thread, 0, heapsize);
   if(thread) {
-    if((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = malloc(heapsize))) {
-      thread->uc_link = co_running;
+    if((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = CO_MALLOC(heapsize))) {
+      thread->uc_link = co_running_handle;
       thread->uc_stack.ss_size = heapsize;
       makecontext(thread, func, 0);
     } else {
@@ -62,24 +66,20 @@ co_routine_t *co_create(unsigned int heapsize, co_callable_t func, void *args) {
   return (co_routine_t *)thread;
 }
 
-void co_delete(co_routine_t *co_thread) {
-  if(co_thread) {
-    if(((ucontext_t*)co_thread)->uc_stack.ss_sp) { free(((ucontext_t*)co_thread)->uc_stack.ss_sp); }
-    free(co_thread);
-        handle->state = CO_DEAD;
+void co_delete(co_routine_t *handle) {
+  if(handle) {
+    if(((ucontext_t*)handle)->uc_stack.ss_sp) { CO_FREE(((ucontext_t*)handle)->uc_stack.ss_sp); }
+    CO_FREE(handle);
+        handle->status = CO_DEAD;
   }
 }
 
-void co_switch(co_routine_t *co_thread) {
-  ucontext_t* old_thread = co_running;
-  co_running = (ucontext_t*)co_thread;
-  swapcontext(old_thread, co_running);
+void co_switch(co_routine_t *handle) {
+  ucontext_t* old_thread = co_running_handle;
+  co_running_handle = (ucontext_t*)handle;
+  swapcontext(old_thread, co_running_handle);
 }
 
-unsigned char co_serializable(void) {
-  return 0;
+bool co_serializable(void) {
+  return false;
 }
-
-#ifdef __cplusplus
-}
-#endif

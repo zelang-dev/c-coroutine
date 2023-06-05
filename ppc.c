@@ -391,7 +391,7 @@ co_routine_t *co_create(unsigned int size, co_callable_t entry_)
 
 void co_delete(co_routine_t *t) {
   CO_FREE(t);
-  t->state = CO_DEAD;
+  t->status = CO_DEAD;
 }
 
 static void co_init_(void) {
@@ -423,12 +423,12 @@ co_routine_t *co_active(void) {
 void co_switch(co_routine_t *t) {
   co_routine_t *old = co_active_handle;
   co_active_handle = t;
-  co_active_handle->state = CO_RUNNING;
-  old->state = CO_NORMAL;
+  co_active_handle->status = CO_RUNNING;
+  old->status = CO_NORMAL;
   co_current_handle = old;
   CO_SWAP_ASM(co_active_handle, old);
 }
 
-unsigned char co_serializable(void) {
-  return 0;
+bool co_serializable(void) {
+  return false;
 }

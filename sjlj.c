@@ -82,8 +82,9 @@ co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, voi
 co_routine_t *co_create(unsigned int size, co_callable_t func, void *args) {
   if(!co_running) co_running = &co_primary;
 
-  co_thread_struct* thread = (co_thread_struct*)malloc(sizeof(co_thread_struct));
+  co_thread_struct* thread = (co_thread_struct*)CO_MALLOC(sizeof(co_thread_struct));
   if(thread) {
+    memset(thread, 0, size);
     struct sigaction handler;
     struct sigaction old_handler;
 
@@ -94,7 +95,7 @@ co_routine_t *co_create(unsigned int size, co_callable_t func, void *args) {
 
     stack.ss_flags = 0;
     stack.ss_size = size;
-    thread->stack = stack.ss_sp = malloc(size);
+    thread->stack = stack.ss_sp = CO_MALLOC(size);
     if(stack.ss_sp && !sigaltstack(&stack, &old_stack)) {
       handler.sa_handler = springboard;
       handler.sa_flags = SA_ONSTACK;
@@ -122,10 +123,10 @@ co_routine_t *co_create(unsigned int size, co_callable_t func, void *args) {
 void co_delete(co_routine_t *co_thread) {
   if(co_thread) {
     if(((co_thread_struct*)co_thread)->stack) {
-      free(((co_thread_struct*)co_thread)->stack);
+      CO_FREE(((co_thread_struct*)co_thread)->stack);
     }
-    free(co_thread);
-    co_thread->state = CO_DEAD;
+    CO_FREE(co_thread);
+    co_thread->status = CO_DEAD;
   }
 }
 
@@ -136,8 +137,8 @@ void co_switch(co_routine_t *co_thread) {
   }
 }
 
-unsigned char co_serializable(void) {
-  return 0;
+bool co_serializable(void) {
+  return false;
 }
 
 #ifdef __cplusplus
