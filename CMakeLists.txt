@@ -32,7 +32,7 @@ endif()
 
 if(WIN32)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D CO_DEBUG")
-    add_subdirectory(staging/pthreads4w)
+    add_subdirectory(pthreads4w)
     target_link_libraries(coroutine PUBLIC pthreadVC3)
 endif()
 

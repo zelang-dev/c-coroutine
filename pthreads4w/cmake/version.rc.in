@@ -29,7 +29,7 @@
  */
 
 #include <winver.h>
-#include "../staging/pthreads4w/pthread.h"
+#include "../pthreads4w/pthread.h"
 
 /*
  * Note: the correct __PTW32_CLEANUP_* macro must be defined corresponding to
