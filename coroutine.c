@@ -61,7 +61,7 @@ static void co_done()
 {
     co_active()->halt = true;
     co_active()->status = CO_DEAD;
-    co_switch(coroutine_active() ? co_running : co_main_handle);
+    co_switch(coroutine_active() ? co_main_handle : co_running);
 }
 
 static void co_awaitable()
@@ -600,7 +600,7 @@ static const uint32_t co_swap_function[1024] = {
             size = CO_STACK_SIZE;
         }
 
-        size = _co_align_forward(size, 16); /* Stack size should be aligned to 16 bytes. */
+        size = _co_align_forward(size + sizeof(co_callable_t), 16); /* Stack size should be aligned to 16 bytes. */
         void *memory = CO_MALLOC(size);
         if (!memory)
             return (co_routine_t *)0;
@@ -620,7 +620,7 @@ static const uint32_t co_swap_function[1024] = {
     {
         if (!handle) {
             CO_LOG("attempt to delete an invalid coroutine");
-        } else if (!(handle->status == CO_NORMAL || handle->status == CO_DEAD)) {
+        } else if (!(handle->status == CO_NORMAL || handle->status == CO_DEAD) && !handle->exiting) {
             CO_LOG("attempt to delete a coroutine that is not dead or suspended");
         } else {
 #ifdef CO_USE_VALGRIND
@@ -681,7 +681,7 @@ value_t co_value(void *data)
 co_routine_t *co_start(co_callable_t func, void *args)
 {
   size_t stack_size = CO_STACK_SIZE;
-  stack_size = _co_align_forward(stack_size, 16); /* Stack size should be aligned to 16 bytes. */
+  stack_size = _co_align_forward(stack_size + sizeof(co_callable_t), 16); /* Stack size should be aligned to 16 bytes. */
   void *memory = CO_MALLOC(stack_size);
   if (!memory) return (co_routine_t *)0;
 
@@ -703,6 +703,7 @@ void co_suspend(void)
 
 void co_suspend_set(void *data)
 {
+  co_stack_check(0);
   co_active()->yield_value = data;
   co_switch(co_current());
 }
@@ -1359,6 +1360,8 @@ static void *coroutine_main(void *v)
 {
     coroutine_name("co_main");
     exiting = co_main(main_argc, main_argv);
+    co_active()->exiting = true;
+    co_switch(co_main_handle);
 
     return 0;
 }

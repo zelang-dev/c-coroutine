@@ -99,7 +99,7 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE 32768
+    #define CO_STACK_SIZE (8 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
