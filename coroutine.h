@@ -579,7 +579,8 @@ C_API void *co_user_data(co_routine_t *);
 
 C_API void co_deferred_free(co_routine_t *);
 
-/* Defer execution of given function with argument, to when current coroutine exits/returns. */
+/* Defer execution of given function with argument,
+to when current coroutine exits/returns. */
 C_API void co_defer(defer_func, void *);
 C_API void co_deferred(co_routine_t *, defer_func, void *);
 C_API void co_deferred2(co_routine_t *, defer_func2, void *, void *);
@@ -588,7 +589,7 @@ C_API size_t co_deferred_count(const co_routine_t *);
 
 /* Allocate memory of given size in current coroutine,
 will auto free on fuction exit/return, do not free! */
-C_API void *co_new(size_t size);
+C_API void *co_new(size_t);
 C_API void *co_malloc(co_routine_t *, size_t);
 C_API void *co_malloc_full(co_routine_t *, size_t, defer_func);
 C_API char *co_strdup(co_routine_t *, const char *);
