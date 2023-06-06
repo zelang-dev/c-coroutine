@@ -912,6 +912,11 @@ static void co_deferred_any(co_routine_t *coro, defer_func func, void *data1, vo
   }
 }
 
+void co_defer(defer_func func, void *data)
+{
+  co_deferred(co_active(), func, data);
+}
+
 void co_deferred(co_routine_t *coro, defer_func func, void *data)
 {
   co_deferred_any(coro, func, data, NULL);
@@ -930,6 +935,11 @@ void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
       co_deferred(coro, func, ptr);
 
   return ptr;
+}
+
+void *co_new(size_t size)
+{
+  return co_malloc_full(co_active(), size, CO_FREE);
 }
 
 void *co_malloc(co_routine_t *coro, size_t size)
@@ -1361,6 +1371,7 @@ static void *coroutine_main(void *v)
     coroutine_name("co_main");
     exiting = co_main(main_argc, main_argv);
     co_active()->exiting = true;
+    co_deferred_free(co_active());
     co_switch(co_main_handle);
 
     return 0;

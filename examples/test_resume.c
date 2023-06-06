@@ -4,7 +4,7 @@
 
 void *hello_world(void *args)
 {
-    co_deferred(co_active(), CO_DEFER(puts), "all done");
+    co_defer(CO_DEFER(puts), "all done");
     puts("Hello");
     // Suspension point that send `1` and receive `15`
     int value = co_value(co_yielding_get(co_active(), (void *)1)).integer;

@@ -62,7 +62,7 @@ void *co_entrypoint(void *args)
 
 int co_main(int argc, char **argv)
 {
-  co_arg *param = (co_arg *)CO_MALLOC(sizeof(co_arg));
+  co_arg *param = (co_arg *)co_new(sizeof(co_arg));
   printf("cothread parameterized function example\n\n");
 
   thread[0] = co_active();
@@ -84,8 +84,6 @@ int co_main(int argc, char **argv)
   assert(co_status(thread[0]) == CO_NORMAL);
 
   printf("\ndone\n");
-
-  CO_FREE(param);
 
   return 0;
 }
