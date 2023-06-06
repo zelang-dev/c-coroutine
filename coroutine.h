@@ -102,6 +102,10 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
     #define CO_STACK_SIZE 32768
 #endif
 
+#ifndef CO_MAIN_STACK
+    #define CO_MAIN_STACK (256 * 1024)
+#endif
+
 #ifndef CO_EVENT_LOOP
     #define CO_EVENT_LOOP(h, m)
 #endif

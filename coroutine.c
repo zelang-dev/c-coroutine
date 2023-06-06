@@ -1368,7 +1368,7 @@ int main(int argc, char **argv)
   main_argc = argc;
   main_argv = argv;
 
-  coroutine_create(coroutine_main, NULL, 0);
+  coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
   coroutine_scheduler();
   CO_LOG("Coroutine scheduler returned to main, when it shouldn't have!");
   abort();
