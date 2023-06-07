@@ -13,6 +13,11 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include "compat/unistd.h"
+#else
+#include <unistd.h>
+#endif
 
 /* Exception handling can be added to C code using the<setjmp.h> library. */
 #include <setjmp.h>

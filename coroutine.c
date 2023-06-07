@@ -600,7 +600,7 @@ static const uint32_t co_swap_function[1024] = {
             size = CO_STACK_SIZE;
         }
 
-        size = _co_align_forward(size + sizeof(co_callable_t), 16); /* Stack size should be aligned to 16 bytes. */
+        size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
         void *memory = CO_MALLOC(size);
         if (!memory)
             return (co_routine_t *)0;
@@ -681,7 +681,7 @@ value_t co_value(void *data)
 co_routine_t *co_start(co_callable_t func, void *args)
 {
   size_t stack_size = CO_STACK_SIZE;
-  stack_size = _co_align_forward(stack_size + sizeof(co_callable_t), 16); /* Stack size should be aligned to 16 bytes. */
+  stack_size = _co_align_forward(stack_size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
   void *memory = CO_MALLOC(stack_size);
   if (!memory) return (co_routine_t *)0;
 
