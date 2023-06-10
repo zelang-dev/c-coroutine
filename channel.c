@@ -4,22 +4,43 @@
 channel_t *channel_create(int elem_size, int bufsize)
 {
     channel_t *c;
+    co_value_t *s;
 
     c = CO_MALLOC(sizeof *c + bufsize * elem_size);
+
     if (c == NULL)
     {
         CO_INFO("channel_create malloc failed!");
         exit(1);
     }
     memset(c, 0, sizeof *c);
+
+    s = CO_MALLOC(sizeof(s));
+    if (s == NULL)
+    {
+        CO_INFO("channel_create malloc failed!");
+        exit(1);
+    }
+    memset(s, 0, sizeof *s);
+
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;
+    c->tmp = s;
     c->buf = (unsigned char *)(c + 1);
     return c;
 }
 
-/* bug - work out races */
+CO_FORCE_INLINE channel_t *co_make()
+{
+    return channel_create(sizeof(co_value_t), 0);
+}
+
+CO_FORCE_INLINE channel_t *co_make_buf(int elem_count)
+{
+    return channel_create(sizeof(co_value_t), elem_count);
+}
+
 void channel_free(channel_t *c)
 {
     if (c == NULL)
@@ -27,6 +48,7 @@ void channel_free(channel_t *c)
     CO_FREE(c->name);
     CO_FREE(c->a_recv.a);
     CO_FREE(c->a_send.a);
+    CO_FREE(c->tmp);
     CO_FREE(c);
 }
 
@@ -333,26 +355,13 @@ static int _channel_op(channel_t *c, unsigned int op, void *p, unsigned int can_
     return 1;
 }
 
-int channel_send(channel_t *c, void *v)
+int co_send(channel_t *c, void *v)
 {
     return _channel_op(c, CHANNEL_SEND, v, 1);
 }
 
-void *channel_recv(channel_t *c)
+co_value_t *co_recv(channel_t *c)
 {
-    _channel_op(c, CHANNEL_RECV, c->store, 1);
-    return c->store;
-}
-
-int channel_send_wait(channel_t *c, void *v)
-{
-    return _channel_op(c, CHANNEL_SEND, v, 0);
-}
-
-void *channel_recv_wait(channel_t *c)
-{
-    void *v;
-
-    _channel_op(c, CHANNEL_RECV, &v, 0);
-    return v;
+    _channel_op(c, CHANNEL_RECV, c->tmp, 1);
+    return c->tmp;
 }

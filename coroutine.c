@@ -912,7 +912,7 @@ static void co_deferred_any(co_routine_t *coro, defer_func func, void *data1, vo
   }
 }
 
-void co_defer(defer_func func, void *data)
+CO_FORCE_INLINE void co_defer(defer_func func, void *data)
 {
   co_deferred(co_active(), func, data);
 }
@@ -937,7 +937,7 @@ void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
   return ptr;
 }
 
-void *co_new(size_t size)
+CO_FORCE_INLINE void *co_new(size_t size)
 {
   return co_malloc_full(co_active(), size, CO_FREE);
 }
@@ -1112,8 +1112,14 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   return id;
 }
 
+CO_FORCE_INLINE int co_go(co_callable_t fn, void *arg)
+{
+  return coroutine_create(fn, arg, CO_STACK_SIZE);
+}
+
 #if defined(_WIN32) || defined(_WIN64)
-int gettimeofday(struct timeval *tp, struct timezone *tzp)
+    int
+    gettimeofday(struct timeval *tp, struct timezone *tzp)
 {
   // Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
   // This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)

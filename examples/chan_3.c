@@ -1,15 +1,14 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "../coroutine.h"
 
 void *co_2(void *arg)
 {
     channel_t *c = (channel_t *)arg;
+    co_defer(channel_free, c);
+
     printf("co_2 start\n");
     for (int i = 0; i < 10; i++)
     {
-        void *v = channel_recv(c);
-        printf("received: %lu\n", co_value(v).big_int);
+        printf("received: %lu\n", co_recv(c)->value.big_int);
     }
     printf("co_2 end\n");
 
@@ -18,13 +17,14 @@ void *co_2(void *arg)
 
 int co_main(int argc, char **argv)
 {
-    channel_t *c = channel_create(sizeof(co_value_t), 3);
+    channel_t *c = co_make_buf(3);
     int s;
-    coroutine_create(co_2, (void *)c, 0);
+
+    co_go(co_2, (void *)c);
     for (unsigned long i = 0; i < 10; i++)
     {
         printf("going to send number: %lu\n", i);
-        s = channel_send(c, &i);
+        s = co_send(c, &i);
         printf("status: %d send success: %lu\n", s, i);
     }
     printf("co_main end\n");

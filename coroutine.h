@@ -500,7 +500,7 @@ typedef struct channel_s
     unsigned char *buf;
     unsigned int nbuf;
     unsigned int off;
-    void *store;
+    co_value_t *tmp;
     msg_queue_t a_send;
     msg_queue_t a_recv;
     char *name;
@@ -609,14 +609,24 @@ C_API void *co_array_append(co_array_t *, size_t);
 C_API void co_array_sort(co_array_t *a, size_t, int (*cmp)(const void *a, const void *b));
 C_API co_array_t *co_array_new(co_routine_t *);
 
+/* Creates an unbuffered channel, similar to golang channels. */
+C_API channel_t *co_make(void);
+
+/* Creates an buffered channel of given element count,
+similar to golang channels. */
+C_API channel_t *co_make_buf(int elem_count);
+
+C_API int co_send(channel_t *c, void *v);
+C_API co_value_t *co_recv(channel_t *c);
+
 C_API void channel_print(channel_t *c);
 C_API int channel_proc(channel_co_t *alts);
 C_API channel_t *channel_create(int elem_size, int elem_count);
 C_API void channel_free(channel_t *c);
-C_API void *channel_recv(channel_t *c);
-C_API int channel_send(channel_t *c, void *v);
-C_API int channel_send_wait(channel_t *c, void *v);
-C_API void *channel_recv_wait(channel_t *c);
+
+/* Creates an coroutine of given function with arguments,
+and add to schedular, same behavior as go in golang. */
+C_API int co_go(co_callable_t, void *);
 
 /* Add coroutine to scheduler queue, appending. */
 C_API void coroutine_add(co_queue_t *, co_routine_t *);
