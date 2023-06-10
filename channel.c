@@ -245,8 +245,12 @@ int channel_proc(channel_co_t *a)
         c = a[i].c;
 
         CO_INFO(" %c:", "esrnb"[a[i].op]);
-        CO_INFO("%s", c->name);
-
+#ifdef CO_DEBUG
+            if (c->name)
+                printf("%s", c->name);
+            else
+                printf("%p", c);
+#endif
         if (channel_co_can_exec(&a[i])) {
             CO_INFO("*");
             n_can++;
@@ -260,7 +264,12 @@ int channel_proc(channel_co_t *a)
                 if (j-- == 0) {
                     c = a[i].c;
                     CO_INFO(" => %c:", "esrnb"[a[i].op]);
-                    CO_INFO("%s", c->name);
+#ifdef CO_DEBUG
+                    if (c->name)
+                        printf("%s", c->name);
+                    else
+                        printf("%p", c);
+#endif
                     CO_LOG(" ");
 
                     channel_co_exec(&a[i]);
@@ -279,7 +288,7 @@ int channel_proc(channel_co_t *a)
             channel_co_enqueue(&a[i]);
     }
 
-    co_switch(t);
+    co_suspend();
 
     /*
      * the guy who ran the op took care of dequeueing us
@@ -331,10 +340,8 @@ int channel_send(channel_t *c, void *v)
 
 void *channel_recv(channel_t *c)
 {
-    void *v;
-
-    _channel_op(c, CHANNEL_RECV, &v, 1);
-    return v;
+    _channel_op(c, CHANNEL_RECV, c->store, 1);
+    return c->store;
 }
 
 int channel_send_wait(channel_t *c, void *v)

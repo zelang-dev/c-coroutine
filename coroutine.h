@@ -104,7 +104,7 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (8 * 1024)
+    #define CO_STACK_SIZE (16 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
@@ -500,6 +500,7 @@ typedef struct channel_s
     unsigned char *buf;
     unsigned int nbuf;
     unsigned int off;
+    void *store;
     msg_queue_t a_send;
     msg_queue_t a_recv;
     char *name;
