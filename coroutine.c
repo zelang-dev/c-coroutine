@@ -61,7 +61,7 @@ static void co_done()
 {
     co_active()->halt = true;
     co_active()->status = CO_DEAD;
-    co_switch(coroutine_active() ? co_main_handle : co_running);
+    co_switch(co_main_handle);
 }
 
 static void co_awaitable()
@@ -1342,17 +1342,17 @@ static void coroutine_scheduler(void)
 
     for (;;)
     {
-      if (co_count == 0) {
-        CO_LOG("Coroutine scheduler exited");
-        exit(exiting);
+      if (co_count == 0 || !coroutine_active()) {
+        if (co_count > 0) {
+            CO_INFO("No runnable coroutines! %d stalled\n", co_count);
+            exit(1);
+        } else {
+            CO_LOG("Coroutine scheduler exited");
+            exit(exiting);
+        }
       }
 
       t = co_run_queue.head;
-      if (t == NULL) {
-        CO_INFO("No runnable coroutines! %d stalled\n", co_count);
-        exit(1);
-      }
-
       coroutine_remove(&co_run_queue, t);
       t->ready = 0;
       co_running = t;
@@ -1376,10 +1376,6 @@ static void *coroutine_main(void *v)
 {
     coroutine_name("co_main");
     exiting = co_main(main_argc, main_argv);
-    co_active()->exiting = true;
-    co_deferred_free(co_active());
-    co_switch(co_main_handle);
-
     return 0;
 }
 

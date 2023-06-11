@@ -48,7 +48,6 @@ void channel_free(channel_t *c)
     CO_FREE(c->name);
     CO_FREE(c->a_recv.a);
     CO_FREE(c->a_send.a);
-    CO_FREE(c->tmp);
     CO_FREE(c);
 }
 
@@ -243,7 +242,7 @@ static void channel_co_exec(channel_co_t *a)
     }
 }
 
-int channel_proc(channel_co_t *a)
+static int channel_proc(channel_co_t *a)
 {
     int i, j, n_can, n, can_block;
     channel_t *c;
@@ -260,7 +259,7 @@ int channel_proc(channel_co_t *a)
         a[i].x_msg = a;
     }
 
-    CO_INFO("proc ");
+    CO_INFO("processed ");
 
     n_can = 0;
     for (i = 0; i < n; i++) {
@@ -314,7 +313,7 @@ int channel_proc(channel_co_t *a)
 
     /*
      * the guy who ran the op took care of dequeueing us
-     * and then set a[0].alt to the one that was executed.
+     * and then set a[0].x_msg to the one that was executed.
      */
     return (int)(a[0].x_msg - a);
 }
