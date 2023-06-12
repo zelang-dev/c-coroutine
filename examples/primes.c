@@ -1,67 +1,50 @@
-/* Copyright (c) 2005 Russ Cox, MIT; see COPYRIGHT */
-
-#include <stdio.h>
-#include <stdlib.h>
-#if defined(_WIN32) || defined(_WIN64)
-#include "../../compat/unistd.h"
-#else
-#include <unistd.h>
-#endif
-#include "coroutine.h"
+#include "../coroutine.h"
 
 int quiet;
 int goal;
 int buffer;
 
-void
-primetask(void *arg)
+void *prime_co(void *arg)
 {
-	Channel *c, *nc;
-	int p, i;
-	c = arg;
+    channel_t *c, *nc;
+    int p, i;
+    c = arg;
 
-	p = chanrecvul(c);
-	if(p > goal)
-		taskexitall(0);
-	if(!quiet) {
-		printf(taskgetname());
-		printf("%d\n", p);
-	}
-	nc = chancreate(sizeof(unsigned long), buffer);
-	taskcreate(primetask, nc, 32768);
-	for(;;){
-		i = chanrecvul(c);
-		if(i%p)
-			chansendul(nc, i);
-	}
+    p = co_recv(c)->value.integer;
+    if (p > goal)
+        exit(0);
+    if (!quiet)
+    {
+        printf(coroutine_get_name());
+        printf("%d\n", p);
+    }
+    nc = co_make_buf(buffer);
+    co_go(prime_co, nc);
+    for (;;)
+    {
+        i = co_recv(c)->value.integer;
+        if (i % p)
+            co_send(nc, &i);
+    }
+
+    return 0;
 }
 
-void
-taskmain(int argc, char **argv)
+int co_main(int argc, char **argv)
 {
-	int i;
-	Channel *c;
+    int i;
+    channel_t *c;
 
-	if(argc>1)
-		goal = atoi(argv[1]);
-	else
-		goal = 100;
-	printf("goal=%d\n", goal);
+    if (argc > 1)
+        goal = atoi(argv[1]);
+    else
+        goal = 100;
+    printf("goal=%d\n", goal);
 
-	c = chancreate(sizeof(unsigned long), buffer);
-	taskcreate(primetask, c, 32768);
-	for(i=2;; i++)
-		chansendul(c, i);
-}
+    c = co_make_buf(buffer);
+    co_go(prime_co, c);
+    for (i = 2;; i++)
+        co_send(c, &i);
 
-void*
-emalloc(unsigned long n)
-{
-	return calloc(n ,1);
-}
-
-long
-lrand(void)
-{
-	return rand();
+    return 0;
 }

@@ -37,7 +37,7 @@ if(WIN32)
 endif()
 
 if(CO_BUILD_TESTS)
-    set(TARGET_LIST test_args test_timing example test_resume chan_3)
+    set(TARGET_LIST test_args test_timing example test_resume chan_3 go_channel go_sleep test_delay primes)
     foreach (TARGET ${TARGET_LIST})
         add_executable(${TARGET} examples/${TARGET}.c)
         target_link_libraries(${TARGET} coroutine)

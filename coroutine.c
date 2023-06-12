@@ -14,34 +14,34 @@ static int main_argc;
 static char **main_argv;
 
 /* coroutine unique id generator */
-static int co_id_generate;
+thread_local int co_id_generate;
 
-static co_queue_t sleeping;
-static int sleeping_counted;
-static int started_wait;
-
+thread_local co_queue_t sleeping;
+thread_local int sleeping_counted;
+thread_local int started_wait;
 
 /* Exception handling with longjmp() */
-jmp_buf exception_buffer;
-int exception_status;
+thread_local jmp_buf exception_buffer;
+thread_local int exception_status;
 
-int exiting = 0;
+thread_local int exiting = 0;
 
 /* number of other coroutine that ran while the current coroutine was waiting.*/
-int n_co_switched;
-int n_all_coroutine;
+thread_local int n_co_switched;
 
 /* track the number of coroutines used */
-int co_count;
+thread_local int co_count;
 
 /* record which coroutine is executing for scheduler */
-co_routine_t *co_running;
+thread_local co_routine_t *co_running;
 
 /* coroutines's FIFO scheduler queue */
-co_queue_t co_run_queue;
+thread_local co_queue_t co_run_queue;
 
 /* scheduler tracking for all coroutines */
 co_routine_t **all_coroutine;
+
+int n_all_coroutine;
 
 volatile C_ERROR_FRAME_T CExceptionFrames[C_ERROR_NUM_ID] = {{0}};
 
@@ -1022,7 +1022,7 @@ int asprintf(char **str_p, const char *fmt, ...)
 }
 #endif
 
-char *co_printf(co_routine_t *coro, const char *fmt, ...)
+char *co_printf(const char *fmt, ...)
 {
   va_list values;
   int len;
@@ -1035,7 +1035,7 @@ char *co_printf(co_routine_t *coro, const char *fmt, ...)
   if (UNLIKELY(len < 0))
       return NULL;
 
-  co_deferred(coro, CO_FREE, tmp_str);
+  co_deferred(co_active(), CO_FREE, tmp_str);
   return tmp_str;
 }
 
@@ -1058,7 +1058,8 @@ void co_stack_check(int n)
   }
 }
 
-void coroutine_add(co_queue_t *l, co_routine_t *t)
+/* Add coroutine to scheduler queue, appending. */
+static void coroutine_add(co_queue_t *l, co_routine_t *t)
 {
   if (l->tail)
   {
@@ -1075,7 +1076,8 @@ void coroutine_add(co_queue_t *l, co_routine_t *t)
   t->next = NULL;
 }
 
-void coroutine_remove(co_queue_t *l, co_routine_t *t)
+/* Remove coroutine from scheduler queue. */
+static void coroutine_remove(co_queue_t *l, co_routine_t *t)
 {
   if (t->prev)
       t->prev->next = t->next;
@@ -1153,10 +1155,10 @@ static size_t nsec(void)
 
 void coroutine_loop(int mode)
 {
-  CO_EVENT_LOOP(co_running->loop, mode);
+  CO_EVENT_LOOP(co_active()->loop, mode);
 }
 
-void *coroutine_wait(void *v)
+static void *coroutine_wait(void *v)
 {
   int ms;
   co_routine_t *t;
@@ -1195,7 +1197,7 @@ void *coroutine_wait(void *v)
   }
 }
 
-unsigned int coroutine_delay(unsigned int ms)
+unsigned int co_sleep(unsigned int ms)
 {
 	size_t when, now;
     co_routine_t *t;
@@ -1230,9 +1232,9 @@ unsigned int coroutine_delay(unsigned int ms)
 		sleeping.tail = t;
 
 	if (!t->system && sleeping_counted++ == 0)
-		co_count++;
+        co_count++;
 
-    co_switch(co_running);
+    co_switch(co_current());
 
     return (unsigned int)(nsec() - now) / 1000000;
 }

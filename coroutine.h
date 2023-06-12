@@ -457,12 +457,14 @@ enum value_args_t
 typedef union
 {
     int integer;
+    unsigned int u_integer;
     long big_int;
     unsigned long long max_int;
     float point;
     double precision;
     bool boolean;
     char *string;
+    const char chars[512];
     char **array;
     void *object;
     co_callable_t function;
@@ -500,7 +502,7 @@ typedef struct channel_s
     unsigned char *buf;
     unsigned int nbuf;
     unsigned int off;
-    co_value_t *tmp;
+    co_value_t *value;
     msg_queue_t a_send;
     msg_queue_t a_recv;
     char *name;
@@ -600,7 +602,7 @@ C_API void *co_malloc(co_routine_t *, size_t);
 C_API void *co_malloc_full(co_routine_t *, size_t, defer_func);
 C_API char *co_strdup(co_routine_t *, const char *);
 C_API char *co_strndup(co_routine_t *, const char *, size_t);
-C_API char *co_printf(co_routine_t *, const char *, ...);
+C_API char *co_printf(const char *, ...);
 C_API void *co_memdup(co_routine_t *, const void *, size_t);
 
 C_API int co_array_init(co_array_t *);
@@ -614,32 +616,30 @@ C_API channel_t *co_make(void);
 
 /* Creates an buffered channel of given element count,
 similar to golang channels. */
-C_API channel_t *co_make_buf(int elem_count);
+C_API channel_t *co_make_buf(int);
 
-C_API int co_send(channel_t *c, void *v);
-C_API co_value_t *co_recv(channel_t *c);
+/* Send data to the channel. */
+C_API int co_send(channel_t *, void *);
 
-C_API void channel_print(channel_t *c);
-C_API int channel_proc(channel_co_t *alts);
-C_API channel_t *channel_create(int elem_size, int elem_count);
-C_API void channel_free(channel_t *c);
+/* Receive data from the channel. */
+C_API co_value_t *co_recv(channel_t *);
 
-/* Creates an coroutine of given function with arguments,
-and add to schedular, same behavior as go in golang. */
+/* Creates an coroutine of given function with argument,
+and add to schedular, same behavior as Go in golang. */
 C_API int co_go(co_callable_t, void *);
 
-/* Add coroutine to scheduler queue, appending. */
-C_API void coroutine_add(co_queue_t *, co_routine_t *);
+/* Explicitly give up the CPU for at least ms milliseconds.
+Other tasks continue to run during this time. */
+C_API unsigned int co_sleep(unsigned int ms);
 
-/* Remove coroutine from scheduler queue. */
-C_API void coroutine_remove(co_queue_t *, co_routine_t *);
+C_API void coroutine_ready(co_routine_t *);
 
 /* Create a new coroutine running func(arg) with stack size. */
 C_API int coroutine_create(co_callable_t, void *, unsigned int);
 
-/* The current coroutine will be scheduled again once all the other currently-ready
-coroutines have a chance to run. Returns the number of other tasks that ran while
-the current task was waiting. */
+/* The current coroutine will be scheduled again once all the
+other currently-ready coroutines have a chance to run. Returns
+the number of other tasks that ran while the current task was waiting. */
 C_API int coroutine_yield(void);
 
 /* Return the unique coroutine id for the current coroutine. */
@@ -665,18 +665,14 @@ C_API char *coroutine_get_state(void);
 exit the entire program using the given exit status. */
 C_API void coroutine_exit(int);
 
-/* Explicitly give up the CPU for at least ms milliseconds.
-Other tasks continue to run during this time. */
-C_API unsigned int coroutine_delay(unsigned int ms);
-
-C_API void coroutine_ready(co_routine_t *);
-
 C_API bool coroutine_active(void);
-
-C_API void coroutine_info();
-
+C_API void coroutine_info(void);
 C_API void coroutine_loop(int);
 C_API void coroutine_interrupt();
+
+C_API void channel_print(channel_t *);
+C_API channel_t *channel_create(int, int);
+C_API void channel_free(channel_t *);
 
 #if defined(_WIN32) || defined(_WIN64)
 C_API int vasprintf(char **, const char *, va_list);
