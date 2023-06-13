@@ -1,8 +1,8 @@
 #include "../coroutine.h"
 
-int quiet;
-int goal;
-int buffer;
+int quiet = 0;
+int goal = 0;
+int buffer = 0;
 
 void *prime_co(void *arg)
 {

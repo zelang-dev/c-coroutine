@@ -4,6 +4,7 @@
 channel_t *channel_create(int elem_size, int bufsize)
 {
     channel_t *c;
+    co_value_t *s;
 
     c = CO_MALLOC(sizeof *c + bufsize * elem_size);
 
@@ -14,9 +15,19 @@ channel_t *channel_create(int elem_size, int bufsize)
     }
     memset(c, 0, sizeof *c);
 
+    s = CO_MALLOC(sizeof *s);
+    if (s == NULL)
+    {
+        CO_INFO("channel_create malloc failed!");
+        exit(1);
+    }
+    memset(s, 0, sizeof(s));
+
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;
+    c->value = (co_value_t *)s;
+    c->select_ready = false;
     c->buf = (unsigned char *)(c + 1);
     return c;
 }
@@ -303,6 +314,8 @@ static int channel_proc(channel_co_t *a)
     }
 
     co_suspend();
+
+    a[0].c->select_ready = true;
 
     /*
      * the guy who ran the op took care of dequeueing us

@@ -87,6 +87,14 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define DivisionByZero 2
 #define OutOfMemory 3
 
+#define selection() while(true) { \
+    switch (true) {
+
+#define selection_end() default: \
+        co_suspend(); \
+    } \
+}
+
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
     #if !defined(__cplusplus)
@@ -506,6 +514,7 @@ typedef struct channel_s
     msg_queue_t a_send;
     msg_queue_t a_recv;
     char *name;
+    bool select_ready;
 } channel_t;
 
 enum
@@ -688,7 +697,7 @@ which will call this function as an coroutine! */
 int co_main(int, char **);
 
 /* Throw an Error */
-C_API void throw(C_ERROR_T ExceptionID);
+C_API void panic(C_ERROR_T ExceptionID);
 
 #ifdef __cplusplus
 }
