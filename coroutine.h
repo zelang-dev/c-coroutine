@@ -361,7 +361,6 @@ typedef enum co_state
 
 typedef void *(*co_callable_t)(void *);
 typedef struct routine_s co_routine_t;
-typedef struct co_value co_value_t;
 
 /* Coroutine context structure. */
 struct routine_s
@@ -478,13 +477,13 @@ typedef union
     co_callable_t function;
 } value_t;
 
-struct co_value
+typedef struct co_value
 {
     value_t value;
     unsigned int type;
     size_t s_args;
     size_t n_args;
-};
+} co_value_t;
 
 C_API co_routine_t *co_running;
 C_API int co_count;
@@ -503,6 +502,7 @@ typedef struct msg_queue_s
     unsigned int n;
     unsigned int m;
 } msg_queue_t;
+
 typedef struct channel_s
 {
     unsigned int bufsize;
