@@ -87,19 +87,28 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define DivisionByZero 2
 #define OutOfMemory 3
 
-#define select_switch() while(true) { \
-    switch (true) {
+#define select_if(label) \
+  bool __##label;            \
+  while (true)               \
+  {                          \
+      if (true)              \
+      {                      \
+          __##label = false;
 
-#define select_case(channel) \
-    case channel->select_ready: \
-        channel->select_ready = false;
+#define select_case(label, ch)                    \
+  if (((ch))->select_ready && __##label == false) \
+  {                                               \
+      ((ch))->select_ready = false;
 
-#define select_end() \
-    default: \
-        co_suspend(); \
-        break; \
-    } \
-}
+#define select_break(label) \
+  __##label = true;         \
+  }
+
+#define select_end(label) \
+  if (__##label == false) \
+      co_suspend();       \
+  }                       \
+  }
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
