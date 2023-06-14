@@ -109,6 +109,21 @@ This uses the POSIX "ucontext" API.
 which will call this function as an coroutine! */
 int co_main(int, char **);
 
+/*
+The `select_if(label)` macro sets up a coroutine to wait on multiple channel operations.
+Must be closed out with `select_end(label)`, and if no `select_case(label, channel)`, `select_break(label)`
+present creates an infinite loop.
+
+This behaves same as GoLang `select {}` statement.
+*/
+select_if(label)
+    select_case(label, channel_t channel)
+        co_send(channel, data);
+        // Or
+        data = co_recv(channel);
+    select_break(label)
+select_end(label)
+
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *co_make(void);
 
@@ -255,6 +270,8 @@ func sendData(ch chan string) {
 }
 ```
 
+This **C** library version of it.
+
 ```c
 #include "../coroutine.h"
 
@@ -280,6 +297,88 @@ int co_main(int argc, char **argv)
     printf("%s\n", co_recv(ch)->value.chars);
 
     return 0;
+}
+```
+
+Another **Go** example from <https://go.dev/tour/concurrency/5>
+
+```go
+package main
+
+import "fmt"
+
+func fibonacci(c, quit chan int) {
+    x, y := 0, 1
+    for {
+        select {
+        case c <- x:
+            x, y = y, x+y
+        case <-quit:
+            fmt.Println("quit")
+            return
+        }
+    }
+}
+
+func main() {
+    c := make(chan int)
+    quit := make(chan int)
+    go func() {
+        for i := 0; i < 10; i++ {
+            fmt.Println(<-c)
+        }
+        quit <- 0
+    }()
+    fibonacci(c, quit)
+}
+```
+
+This **C** library version of it.
+
+```c
+#include "../coroutine.h"
+
+int fibonacci(channel_t *c, channel_t *quit)
+{
+    int x = 0;
+    int y = 1;
+    select_if(fib)
+        select_case(fib, c)
+            co_send(c, &x);
+            x = y;
+            y = x + y;
+        select_break(fib)
+        select_case(fib, quit)
+            co_recv(quit);
+            puts("quit");
+            return 0;
+        select_break(fib)
+    select_end(fib)
+}
+
+void *func(void *args)
+{
+    channel_t *c = ((channel_t **)args)[0];
+    channel_t *quit = ((channel_t **)args)[1];
+    for (int i = 0; i < 10; i++)
+    {
+        printf("%d\n", co_recv(c)->value.integer);
+    }
+    co_send(quit, 0);
+
+    return 0;
+}
+
+int co_main(int argc, char **argv)
+{
+    channel_t *args[2];
+    channel_t *c = co_make();
+    channel_t *quit = co_make();
+
+    args[0] = c;
+    args[1] = quit;
+    co_go(func, args);
+    return fibonacci(c, quit);
 }
 ```
 

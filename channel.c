@@ -313,9 +313,8 @@ static int channel_proc(channel_co_t *a)
             channel_co_enqueue(&a[i]);
     }
 
-    co_suspend();
-
     a[0].c->select_ready = true;
+    co_suspend();
 
     /*
      * the guy who ran the op took care of dequeueing us
