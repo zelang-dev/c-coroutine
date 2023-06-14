@@ -98,9 +98,7 @@ This behaves same as GoLang `select {}` statement.
   bool __##label;            \
   while (true)               \
   {                          \
-      if (true)              \
-      {                      \
-          __##label = false;
+      __##label = false;
 
 #define select_case(label, ch)                    \
   if ((ch)->select_ready && __##label == false)   \
@@ -114,7 +112,6 @@ This behaves same as GoLang `select {}` statement.
 #define select_end(label) \
   if (__##label == false) \
       coroutine_yield();  \
-  }                       \
   }
 
 #if defined(_MSC_VER)
