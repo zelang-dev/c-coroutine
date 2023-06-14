@@ -87,11 +87,17 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define DivisionByZero 2
 #define OutOfMemory 3
 
-#define selection() while(true) { \
+#define select_switch() while(true) { \
     switch (true) {
 
-#define selection_end() default: \
+#define select_case(channel) \
+    case channel->select_ready: \
+        channel->select_ready = false;
+
+#define select_end() \
+    default: \
         co_suspend(); \
+        break; \
     } \
 }
 
