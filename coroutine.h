@@ -114,6 +114,11 @@ This behaves same as GoLang `select {}` statement.
       coroutine_yield();         \
   }
 
+/* The `select_default()` is run if no other case is ready.
+Must also closed out with `select_break()`. */
+#define select_default()          \
+  if (___##__FUNCTION__ == false) {
+
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
     #if !defined(__cplusplus)

@@ -122,6 +122,10 @@ select_if()
         // Or
         co_value_t *r = co_recv(channel);
     select_break()
+
+    /* The `select_default()` is run if no other case is ready.
+    Must also closed out with `select_break()`. */
+    select_default()
 select_end()
 
 /* Creates an unbuffered channel, similar to golang channels. */
