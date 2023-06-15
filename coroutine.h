@@ -89,42 +89,39 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 
 /*
 The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_break()`
-provided, an infinite loop is created.
+Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_case_if(channel)`,
+`select_break()` provided, an infinite loop is created.
 
 This behaves same as GoLang `select {}` statement.
 */
-#define select_if() \
-  bool ___##__FUNCTION__;            \
-  while (true)               \
-  {                          \
+#define select_if()       \
+  bool ___##__FUNCTION__; \
+  while (true)            \
+  {                       \
       ___##__FUNCTION__ = false;
 
-#define select_case_if(ch)                                   \
-  ___##__FUNCTION__ = true;                                  \
-  }                                                          \
-  else if ((ch)->select_ready && ___##__FUNCTION__ == false) \
-  {                                                          \
-      (ch)->select_ready = false;
-
-#define select_case(ch)                    \
-  if ((ch)->select_ready && ___##__FUNCTION__ == false)   \
-  {                                               \
-      (ch)->select_ready = false;
-
-#define select_break() \
-  ___##__FUNCTION__= true;         \
-  }
-
-#define select_end()        \
+#define select_end()              \
   if (___##__FUNCTION__ == false) \
-      coroutine_yield();         \
+      coroutine_yield();          \
   }
+
+#define select_case(ch)                                 \
+  if ((ch)->select_ready && ___##__FUNCTION__ == false) \
+  {                                                     \
+      (ch)->select_ready = false;
+
+#define select_break()      \
+  ___##__FUNCTION__ = true; \
+  }
+
+#define select_case_if(ch) \
+  select_break() else select_case(ch)
 
 /* The `select_default()` is run if no other case is ready.
 Must also closed out with `select_break()`. */
-#define select_default()          \
-  if (___##__FUNCTION__ == false) {
+#define select_default()                         \
+  select_break() if (___##__FUNCTION__ == false) \
+  {
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1

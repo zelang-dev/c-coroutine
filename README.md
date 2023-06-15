@@ -111,8 +111,8 @@ int co_main(int, char **);
 
 /*
 The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_break()`
-provided, an infinite loop is created.
+Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_case_if(channel)`,
+`select_break()` provided, an infinite loop is created.
 
 This behaves same as GoLang `select {}` statement.
 */
@@ -123,12 +123,13 @@ select_if()
         co_value_t *r = co_recv(channel);
     // Or
     select_case_if(channel)
-        // co_send(); || co_recv();
-    select_break()
+        // co_send(channel); || co_recv(channel);
 
     /* The `select_default()` is run if no other case is ready.
     Must also closed out with `select_break()`. */
     select_default()
+        // ...
+    select_break()
 select_end()
 
 /* Creates an unbuffered channel, similar to golang channels. */
@@ -354,8 +355,7 @@ int fibonacci(channel_t *c, channel_t *quit)
             co_send(c, &x);
             x = y;
             y = x + y;
-        select_break()
-        select_case(quit)
+        select_case_if(quit)
             co_recv(quit);
             puts("quit");
             return 0;
