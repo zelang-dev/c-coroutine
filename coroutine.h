@@ -100,6 +100,13 @@ This behaves same as GoLang `select {}` statement.
   {                          \
       ___##__FUNCTION__ = false;
 
+#define select_case_if(ch)                                   \
+  ___##__FUNCTION__ = true;                                  \
+  }                                                          \
+  else if ((ch)->select_ready && ___##__FUNCTION__ == false) \
+  {                                                          \
+      (ch)->select_ready = false;
+
 #define select_case(ch)                    \
   if ((ch)->select_ready && ___##__FUNCTION__ == false)   \
   {                                               \

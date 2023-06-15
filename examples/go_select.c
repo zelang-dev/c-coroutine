@@ -9,8 +9,7 @@ int fibonacci(channel_t *c, channel_t *quit)
             co_send(c, &x);
             x = y;
             y = x + y;
-        select_break()
-        select_case(quit)
+        select_case_if(quit)
             co_recv(quit);
             puts("quit");
             return 0;

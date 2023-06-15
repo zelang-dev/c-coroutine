@@ -121,6 +121,9 @@ select_if()
         co_send(channel, void *s);
         // Or
         co_value_t *r = co_recv(channel);
+    // Or
+    select_case_if(channel)
+        // co_send(); || co_recv();
     select_break()
 
     /* The `select_default()` is run if no other case is ready.
