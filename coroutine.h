@@ -88,30 +88,30 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define OutOfMemory 3
 
 /*
-The `select_if(label)` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end(label)`, and if no `select_case(label, channel)`, `select_break(label)`
-present creates an infinite loop.
+The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
+Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_break()`
+provided, an infinite loop is created.
 
 This behaves same as GoLang `select {}` statement.
 */
-#define select_if(label) \
-  bool __##label;            \
+#define select_if() \
+  bool ___##__FUNCTION__;            \
   while (true)               \
   {                          \
-      __##label = false;
+      ___##__FUNCTION__ = false;
 
-#define select_case(label, ch)                    \
-  if ((ch)->select_ready && __##label == false)   \
+#define select_case(ch)                    \
+  if ((ch)->select_ready && ___##__FUNCTION__ == false)   \
   {                                               \
       (ch)->select_ready = false;
 
-#define select_break(label) \
-  __##label = true;         \
+#define select_break() \
+  ___##__FUNCTION__= true;         \
   }
 
-#define select_end(label) \
-  if (__##label == false) \
-      coroutine_yield();  \
+#define select_end()        \
+  if (___##__FUNCTION__ == false) \
+      coroutine_yield();         \
   }
 
 #if defined(_MSC_VER)

@@ -4,18 +4,18 @@ int fibonacci(channel_t *c, channel_t *quit)
 {
     int x = 0;
     int y = 1;
-    select_if(fib)
-        select_case(fib, c)
+    select_if()
+        select_case(c)
             co_send(c, &x);
             x = y;
             y = x + y;
-        select_break(fib)
-        select_case(fib, quit)
+        select_break()
+        select_case(quit)
             co_recv(quit);
             puts("quit");
             return 0;
-        select_break(fib)
-    select_end(fib)
+        select_break()
+    select_end()
 }
 
 void *func(void *args)

@@ -110,19 +110,19 @@ which will call this function as an coroutine! */
 int co_main(int, char **);
 
 /*
-The `select_if(label)` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end(label)`, and if no `select_case(label, channel)`, `select_break(label)`
-present creates an infinite loop.
+The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
+Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_break()`
+provided, an infinite loop is created.
 
 This behaves same as GoLang `select {}` statement.
 */
-select_if(label)
-    select_case(label, channel_t channel)
-        co_send(channel, data);
+select_if()
+    select_case(channel_t channel)
+        co_send(channel, void *s);
         // Or
-        data = co_recv(channel);
-    select_break(label)
-select_end(label)
+        co_value_t *r = co_recv(channel);
+    select_break()
+select_end()
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *co_make(void);
@@ -342,18 +342,18 @@ int fibonacci(channel_t *c, channel_t *quit)
 {
     int x = 0;
     int y = 1;
-    select_if(fib)
-        select_case(fib, c)
+    select_if()
+        select_case(c)
             co_send(c, &x);
             x = y;
             y = x + y;
-        select_break(fib)
-        select_case(fib, quit)
+        select_break()
+        select_case(quit)
             co_recv(quit);
             puts("quit");
             return 0;
-        select_break(fib)
-    select_end(fib)
+        select_break()
+    select_end()
 }
 
 void *func(void *args)
