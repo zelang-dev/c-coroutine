@@ -26,15 +26,14 @@ add_library(coroutine STATIC ${lib_files})
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D CO_DEBUG ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer ")
-    find_package(Threads)
-    target_link_libraries(coroutine ${CMAKE_THREAD_LIBS_INIT} )
 endif()
 
 if(WIN32)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D CO_DEBUG")
-    add_subdirectory(pthreads4w)
-    target_link_libraries(coroutine PUBLIC pthreadVC3)
 endif()
+
+add_subdirectory(libuv)
+target_link_libraries(coroutine PUBLIC uv)
 
 if(CO_BUILD_TESTS)
     set(TARGET_LIST test_args test_timing example test_resume chan_3 go_channel go_sleep test_delay primes go_select)

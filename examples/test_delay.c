@@ -1,5 +1,4 @@
-#define CO_STACK_SIZE 32768
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 channel_t *c;
 

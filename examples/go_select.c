@@ -1,4 +1,4 @@
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 int fibonacci(channel_t *c, channel_t *quit)
 {

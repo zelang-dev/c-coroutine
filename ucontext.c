@@ -10,11 +10,10 @@
   use this library only as a *last resort*
 */
 
-#include "coroutine.h"
+#include "include/coroutine.h"
 
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500
-#include <stdlib.h>
 
 #if __APPLE__ && __MACH__
     #include <sys/ucontext.h>

@@ -1,4 +1,4 @@
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 int quiet = 0;
 int goal = 0;

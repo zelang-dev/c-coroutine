@@ -1,8 +1,6 @@
 /* author: Shawn Anastasio */
 
-#include "coroutine.h"
-
-#include <stdint.h>
+#include "include/coroutine.h"
 
 #ifdef __cplusplus
 extern "C" {

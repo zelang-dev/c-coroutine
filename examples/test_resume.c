@@ -1,6 +1,4 @@
-#include <stdio.h>
-#include <assert.h>
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 void *hello_world(void *args)
 {

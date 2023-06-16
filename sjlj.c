@@ -3,13 +3,11 @@
   for SJLJ on other systems, one would want to rewrite springboard() and co_create() and hack the jmb_buf stack pointer.
 */
 
-#include "coroutine.h"
+#include "include/coroutine.h"
 
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500
-#include <stdlib.h>
 #include <signal.h>
-#include <setjmp.h>
 
 #ifdef __cplusplus
 extern "C" {

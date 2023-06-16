@@ -1,9 +1,6 @@
 /* ppc64le (ELFv2) is not currently supported */
 
-#include "coroutine.h"
-
-#include <stdint.h>
-#include <string.h>
+#include "include/coroutine.h"
 
 #ifdef CO_MPROTECT
   #include <unistd.h>

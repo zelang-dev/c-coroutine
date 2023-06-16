@@ -1,7 +1,5 @@
 
-#include <stdio.h>
-#include <assert.h>
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 static void *fibonacci_coro(void* args)
 {

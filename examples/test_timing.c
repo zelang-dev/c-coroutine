@@ -1,7 +1,4 @@
-#include "../coroutine.h"
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include "../include/coroutine.h"
 #include <time.h>
 
 enum { Iterations = 500000000 };
