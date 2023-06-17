@@ -14,7 +14,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #if defined(_WIN32) || defined(_WIN64)
-#include "include/compat/unistd.h"
+#include "compat/unistd.h"
 #else
 #include <unistd.h>
 #endif
@@ -140,11 +140,11 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (16 * 1024)
+    #define CO_STACK_SIZE (9 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
-    #define CO_MAIN_STACK (256 * 1024)
+    #define CO_MAIN_STACK (512 * 1024)
 #endif
 
 #ifndef CO_EVENT_LOOP
@@ -300,10 +300,11 @@ Must also closed out with `select_break()`. */
   #endif
 #endif
 
-#if !defined(CO_MALLOC) || !defined(CO_FREE)
+#if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)
   #include <stdlib.h>
   #define CO_MALLOC malloc
   #define CO_FREE   free
+  #define CO_REALLOC realloc
 #endif
 
 #if defined(__clang__)

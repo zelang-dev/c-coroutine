@@ -1,4 +1,3 @@
-
 #include "include/coroutine.h"
 
 channel_t *channel_create(int elem_size, int bufsize)
@@ -50,6 +49,7 @@ void channel_free(channel_t *c)
     if (c->name != NULL)
         CO_FREE(c->name);
 
+    CO_FREE(c->value);
     CO_FREE(c->a_recv.a);
     CO_FREE(c->a_send.a);
     CO_FREE(c);
@@ -60,7 +60,7 @@ static void add_array(msg_queue_t *a, channel_co_t *alt)
     if (a->n == a->m)
     {
         a->m += 16;
-        a->a = realloc(a->a, a->m * sizeof a->a[0]);
+        a->a = CO_REALLOC(a->a, a->m * sizeof(a->a[0]));
     }
     a->a[a->n++] = alt;
 }

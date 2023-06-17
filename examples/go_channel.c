@@ -15,6 +15,7 @@ int co_main(int argc, char **argv)
 {
     // create channel
     channel_t *ch = co_make();
+    co_defer(channel_free, ch);
 
     // function call with goroutine
     co_go(sendData, ch);

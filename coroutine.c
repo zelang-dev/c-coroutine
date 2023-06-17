@@ -800,7 +800,7 @@ void *realloc_array(void *optr, size_t nmemb, size_t size)
       errno = ENOMEM;
       return NULL;
   }
-  return realloc(optr, total_size);
+  return CO_REALLOC(optr, total_size);
 }
 
 #endif /* HAS_REALLOC_ARRAY */
@@ -1100,7 +1100,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   co_count++;
   id = t->cid;
   if (n_all_coroutine % 64 == 0) {
-      all_coroutine = realloc(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[0]));
+      all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[0]));
       if (all_coroutine == NULL) {
         CO_LOG("out of memory");
         abort();
