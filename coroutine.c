@@ -206,6 +206,8 @@ static CO_FORCE_INLINE size_t co_deferred_array_len(const defer_t *array)
             handle->status = CO_SUSPENDED;
             handle->stack_size = size;
             handle->halt = false;
+            handle->synced = false;
+            handle->wait_active = false;
             handle->args = args;
             handle->magic_number = CO_MAGIC_NUMBER;
         }
@@ -349,6 +351,8 @@ static CO_FORCE_INLINE size_t co_deferred_array_len(const defer_t *array)
             handle->status = CO_SUSPENDED;
             handle->stack_size = size;
             handle->halt = false;
+            handle->synced = false;
+            handle->wait_active = false;
             handle->args = args;
             handle->magic_number = CO_MAGIC_NUMBER;
         }
@@ -404,6 +408,8 @@ static CO_FORCE_INLINE size_t co_deferred_array_len(const defer_t *array)
             co->status = CO_SUSPENDED;
             co->stack_size = size;
             co->halt = false;
+            co->synced = false;
+            co->wait_active = false;
             co->args = args;
             co->magic_number = CO_MAGIC_NUMBER;
         }
@@ -506,6 +512,8 @@ static const uint32_t co_swap_function[1024] = {
             co->status = CO_SUSPENDED;
             co->stack_size = size;
             co->halt = false;
+            co->synced = false;
+            co->wait_active = false;
             co->args = args;
             co->magic_number = CO_MAGIC_NUMBER;
         }
@@ -602,13 +610,15 @@ static const uint32_t co_swap_function[1024] = {
 
         size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
         void *memory = CO_MALLOC(size);
-        if (!memory)
+        if (!memory) {
+            fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
             return (co_routine_t *)0;
+        }
 
         memset(memory, 0, size);
         co_routine_t *co = co_derive(memory, size, func, args);
         if (UNLIKELY(co_deferred_array_init(&co->defer) < 0)) {
-            free(co);
+            CO_FREE(co);
             return (co_routine_t *)-1;
         }
 
@@ -683,12 +693,15 @@ co_routine_t *co_start(co_callable_t func, void *args)
   size_t stack_size = CO_STACK_SIZE;
   stack_size = _co_align_forward(stack_size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
   void *memory = CO_MALLOC(stack_size);
-  if (!memory) return (co_routine_t *)0;
+  if (!memory) {
+    fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+    return (co_routine_t *)0;
+  }
 
   memset(memory, 0, stack_size);
   co_routine_t *co = co_derive(memory, stack_size, func, args);
   if (UNLIKELY(co_deferred_array_init(&co->defer) < 0)) {
-    free(co);
+    CO_FREE(co);
     return (co_routine_t *)-1;
   }
 
@@ -1053,7 +1066,7 @@ void co_stack_check(int n)
   t = co_running;
   if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER)
   {
-      CO_INFO("coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
+      fprintf(stderr, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
       abort();
   }
 }
@@ -1094,6 +1107,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
 {
   int id;
   co_routine_t *t;
+  co_routine_t *c = co_active();
 
   t = co_create(stack, fn, arg);
   t->cid = ++co_id_generate;
@@ -1111,12 +1125,61 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   all_coroutine[n_all_coroutine++] = t;
   coroutine_ready(t);
 
+  if (c->wait_active && c->wait_group != NULL)
+  {
+      t->synced = true;
+      co_hash_put(c->wait_group, (void *)&id, t);
+      c->wait_counter++;
+  }
+
   return id;
 }
 
 CO_FORCE_INLINE int co_go(co_callable_t fn, void *arg)
 {
   return coroutine_create(fn, arg, CO_STACK_SIZE);
+}
+
+co_hast_t *co_wait_group(void)
+{
+  co_routine_t *c = co_active();
+  co_hast_t *wg = co_hash_init();
+  co_defer(co_hash_free, wg);
+  c->wait_active = true;
+  c->wait_group = wg;
+
+  return wg;
+}
+
+void co_wait(co_hast_t *wg)
+{
+  co_routine_t *c = co_active();
+  if (c->wait_active && c->wait_group == wg)
+  {
+      int counter = c->wait_counter;
+      oa_pair *pair;
+      while (counter > 0)
+      {
+        for (int i = 0; i < wg->capacity; i++)
+        {
+            pair = wg->buckets[i];
+            if (NULL != pair)
+            {
+                if (co_terminated(pair->val))
+                {
+                    co_delete(pair->val);
+                    co_hash_delete(wg, pair->key);
+                    counter--;
+                }
+            }
+        }
+
+        coroutine_yield();
+      }
+      c->wait_active = false;
+      c->wait_counter = counter;
+      c->wait_group = NULL;
+  }
 }
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -1346,7 +1409,7 @@ static void coroutine_scheduler(void)
     {
       if (co_count == 0 || !coroutine_active()) {
         if (co_count > 0) {
-            CO_INFO("No runnable coroutines! %d stalled\n", co_count);
+            fprintf(stderr, "No runnable coroutines! %d stalled\n", co_count);
             exit(1);
         } else {
             CO_LOG("Coroutine scheduler exited");
@@ -1369,7 +1432,8 @@ static void coroutine_scheduler(void)
         i = t->all_coroutine_slot;
         all_coroutine[i] = all_coroutine[--n_all_coroutine];
         all_coroutine[i]->all_coroutine_slot = i;
-        co_delete(t);
+        if (t->synced == false)
+            co_delete(t);
       }
     }
 }
@@ -1388,7 +1452,6 @@ int main(int argc, char **argv)
 
   coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
   coroutine_scheduler();
-  CO_LOG("Coroutine scheduler returned to main, when it shouldn't have!");
-  abort();
+  fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
   return exiting;
 }

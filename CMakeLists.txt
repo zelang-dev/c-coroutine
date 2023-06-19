@@ -16,9 +16,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BUILD_DIR}/lib)
 
 file(GLOB lib_files
-    ${CMAKE_SOURCE_DIR}/coroutine.h
     ${CMAKE_SOURCE_DIR}/coroutine.c
     ${CMAKE_SOURCE_DIR}/channel.c
+    ${CMAKE_SOURCE_DIR}/hash.c
 )
 
 add_library(coroutine STATIC ${lib_files})

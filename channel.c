@@ -6,20 +6,13 @@ channel_t *channel_create(int elem_size, int bufsize)
     co_value_t *s;
 
     c = CO_MALLOC(sizeof *c + bufsize * elem_size);
-
-    if (c == NULL)
-    {
-        CO_INFO("channel_create malloc failed!");
-        exit(1);
-    }
-    memset(c, 0, sizeof *c);
-
     s = CO_MALLOC(sizeof *s);
-    if (s == NULL)
+    if (c == NULL || s == NULL)
     {
-        CO_INFO("channel_create malloc failed!");
+        fprintf(stderr, "channel_create failed in file %s at line # %d", __FILE__, __LINE__);
         exit(1);
     }
+    memset(c, 0, sizeof(*c));
     memset(s, 0, sizeof(s));
 
     c->elem_size = elem_size;
@@ -55,7 +48,7 @@ void channel_free(channel_t *c)
     CO_FREE(c);
 }
 
-static void add_array(msg_queue_t *a, channel_co_t *alt)
+static void add_msg(msg_queue_t *a, channel_co_t *alt)
 {
     if (a->n == a->m)
     {
@@ -65,7 +58,7 @@ static void add_array(msg_queue_t *a, channel_co_t *alt)
     a->a[a->n++] = alt;
 }
 
-static void del_array(msg_queue_t *a, int i)
+static void del_msg(msg_queue_t *a, int i)
 {
     --a->n;
     a->a[i] = a->a[a->n];
@@ -122,7 +115,7 @@ static void channel_co_enqueue(channel_co_t *a)
     msg_queue_t *ar;
 
     ar = channel_msg(a->c, a->op);
-    add_array(ar, a);
+    add_msg(ar, a);
 }
 
 static void channel_co_dequeue(channel_co_t *a)
@@ -133,17 +126,17 @@ static void channel_co_dequeue(channel_co_t *a)
     ar = channel_msg(a->c, a->op);
     if (ar == NULL)
     {
-        CO_INFO("bad use of channel_co_dequeue op=%d\n", a->op);
+        fprintf(stderr, "bad use of channel_co_dequeue op=%d\n", a->op);
         abort();
     }
 
     for (i = 0; i < ar->n; i++)
         if (ar->a[i] == a)
         {
-            del_array(ar, i);
+            del_msg(ar, i);
             return;
         }
-    CO_INFO("cannot find self in channel_co_dequeue\n");
+    fprintf(stderr, "cannot find self in channel_co_dequeue\n");
     abort();
 }
 

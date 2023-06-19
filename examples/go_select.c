@@ -7,8 +7,9 @@ int fibonacci(channel_t *c, channel_t *quit)
     select_if()
         select_case(c)
             co_send(c, &x);
+            unsigned long tmp = x + y;
             x = y;
-            y = x + y;
+            y = tmp;
         select_case_if(quit)
             co_recv(quit);
             puts("quit");
@@ -38,6 +39,7 @@ int co_main(int argc, char **argv)
 
     args[0] = c;
     args[1] = quit;
+    co_wait_group();
     co_go(func, args);
     return fibonacci(c, quit);
 }

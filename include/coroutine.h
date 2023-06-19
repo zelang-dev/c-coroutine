@@ -13,6 +13,12 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <inttypes.h>
+#if !defined(_WIN32)
+#include <sys/time.h>
+#include <sys/resource.h> /* setrlimit() */
+#endif
+#include "uv.h"
 #if defined(_WIN32) || defined(_WIN64)
 #include "compat/unistd.h"
 #else
@@ -390,6 +396,7 @@ typedef enum co_state
 
 typedef void *(*co_callable_t)(void *);
 typedef struct routine_s co_routine_t;
+typedef struct oa_hash_s co_hast_t;
 
 /* Coroutine context structure. */
 struct routine_s
@@ -452,6 +459,10 @@ struct routine_s
     bool system;
     bool exiting;
     bool halt;
+    bool synced;
+    bool wait_active;
+    int wait_counter;
+    co_hast_t *wait_group;
     int all_coroutine_slot;
     /* custom event loop handle */
     void *loop;
@@ -718,8 +729,55 @@ C_API int asprintf(char **, const char *, ...);
 C_API int gettimeofday(struct timeval *, struct timezone *);
 #endif
 
+#define OA_HASH_LOAD_FACTOR (0.75)
+#define OA_HASH_GROWTH_FACTOR (1<<2)
+#define OA_HASH_INIT_CAPACITY (1<<4)
+
+typedef struct oa_key_ops_s {
+    uint32_t (*hash)(const void *data, void *arg);
+    void* (*cp)(const void *data, void *arg);
+    void (*free)(void *data, void *arg);
+    bool (*eq)(const void *data1, const void *data2, void *arg);
+    void *arg;
+} oa_key_ops;
+
+typedef struct oa_val_ops_s {
+    void* (*cp)(const void *data, void *arg);
+    void (*free)(void *data, void *arg);
+    bool (*eq)(const void *data1, const void *data2, void *arg);
+    void *arg;
+} oa_val_ops;
+
+typedef struct oa_pair_s {
+    uint32_t hash;
+    void *key;
+    void *val;
+} oa_pair;
+
+typedef struct oa_hash_s oa_hash;
+struct oa_hash_s {
+    size_t capacity;
+    size_t size;
+    oa_pair **buckets;
+    void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx);
+    oa_key_ops key_ops;
+    oa_val_ops val_ops;
+};
+
+C_API void co_hash_free(co_hast_t *);
+C_API void co_hash_put(co_hast_t *, const void *, const void *);
+C_API void *co_hash_get(co_hast_t *, const void *);
+C_API void co_hash_delete(co_hast_t *, const void *);
+C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
+
+/* Creates a new hash table */
+C_API co_hast_t *co_hash_init(void);
+
+C_API co_hast_t *co_wait_group(void);
+C_API void co_wait(co_hast_t *);
+
 /* Check for at least `n` bytes left on the stack. If not present, abort. */
-C_API void co_stack_check(int n);
+C_API void co_stack_check(int);
 
 /* Write this function instead of main, this library provides its own main, the scheduler,
 which will call this function as an coroutine! */
