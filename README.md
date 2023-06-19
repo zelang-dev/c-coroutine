@@ -28,6 +28,8 @@ The **libco** and **minicoro** library included _CPU_ backends for:
 
 * x86, amd64, PowerPC, PowerPC64 ELFv1, PowerPC64 ELFv2, ARM 32-bit,  ARM 64-bit (AArch64), POSIX platforms (setjmp), Windows platforms (fibers)
 
+You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly.
+
 In the following lists only _Windows and Linux_ targets been tested by **c-coroutine**, the others are reprints from **libco**. It is quite possible that this library will work on more processors, compilers and operating systems than those listed below.
 
 The "Overhead" is the cost of switching coroutines, as compared to an ordinary `C` function call.
@@ -387,6 +389,49 @@ int co_main(int argc, char **argv)
     co_go(func, args);
     return fibonacci(c, quit);
 }
+```
+
+Another **Go** example from <https://gobyexample.com/waitgroups>
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+func worker(id int) {
+    fmt.Printf("Worker %d starting\n", id)
+
+    time.Sleep(time.Second)
+    fmt.Printf("Worker %d done\n", id)
+}
+
+func main() {
+
+    var wg sync.WaitGroup
+
+    for i := 1; i <= 5; i++ {
+        wg.Add(1)
+
+        i := i
+
+        go func() {
+            defer wg.Done()
+            worker(i)
+        }()
+    }
+
+    wg.Wait()
+
+}
+```
+
+This **C** library version of it.
+
+```c
 ```
 
 see [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder.

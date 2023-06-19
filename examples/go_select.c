@@ -39,7 +39,6 @@ int co_main(int argc, char **argv)
 
     args[0] = c;
     args[1] = quit;
-    co_wait_group();
     co_go(func, args);
     return fibonacci(c, quit);
 }

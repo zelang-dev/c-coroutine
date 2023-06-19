@@ -1169,10 +1169,12 @@ void co_wait(co_hast_t *wg)
                 {
                     co_delete(pair->val);
                     co_hash_delete(wg, pair->key);
-                    counter--;
+                    --counter;
                 }
             }
         }
+        if (counter == 0)
+            break;
 
         coroutine_yield();
       }
