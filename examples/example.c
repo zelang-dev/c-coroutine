@@ -48,8 +48,8 @@ int co_main(int argc, char **argv)
 
   co_resuming(co);
 
-  assert(co_terminated(co) == true);
-  assert(strcmp((char *)co_results(co), "hello world") == 0);
+  CO_ASSERT(co_terminated(co) == true);
+  CO_ASSERT(strcmp((char *)co_results(co), "hello world") == 0);
 
   /* Destroy the coroutine. */
   co_delete(co);

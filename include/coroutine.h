@@ -681,6 +681,9 @@ C_API int co_go(co_callable_t, void *);
 Other tasks continue to run during this time. */
 C_API unsigned int co_sleep(unsigned int ms);
 
+/* Return the unique coroutine id for the current coroutine. */
+C_API unsigned int co_id(void);
+
 C_API void coroutine_ready(co_routine_t *);
 
 /* Create a new coroutine running func(arg) with stack size. */
@@ -690,9 +693,6 @@ C_API int coroutine_create(co_callable_t, void *, unsigned int);
 other currently-ready coroutines have a chance to run. Returns
 the number of other tasks that ran while the current task was waiting. */
 C_API int coroutine_yield(void);
-
-/* Return the unique coroutine id for the current coroutine. */
-C_API unsigned int coroutine_id(void);
 
 /* Sets the current coroutine's name.*/
 C_API void coroutine_name(char *, ...);
@@ -743,7 +743,7 @@ typedef struct oa_key_ops_s {
 
 typedef struct oa_val_ops_s {
     void* (*cp)(const void *data, void *arg);
-    void (*free)(void *data, void *arg);
+    void (*free)(void *data);
     bool (*eq)(const void *data1, const void *data2, void *arg);
     void *arg;
 } oa_val_ops;

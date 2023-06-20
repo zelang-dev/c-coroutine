@@ -110,7 +110,7 @@ void oa_hash_free(oa_hash *htable)
         if (NULL != htable->buckets[i])
         {
             htable->key_ops.free(htable->buckets[i]->key, htable->key_ops.arg);
-            htable->val_ops.free(htable->buckets[i]->val, htable->val_ops.arg);
+            htable->val_ops.free(htable->buckets[i]->val);
         }
         CO_FREE(htable->buckets[i]);
     }
@@ -156,7 +156,7 @@ inline static void oa_hash_grow(oa_hash *htable)
         {
             oa_hash_put(htable, crt_pair->key, crt_pair->val);
             htable->key_ops.free(crt_pair->key, htable->key_ops.arg);
-            htable->val_ops.free(crt_pair->val, htable->val_ops.arg);
+            htable->val_ops.free(crt_pair->val);
             CO_FREE(crt_pair);
         }
     }
@@ -204,12 +204,13 @@ void oa_hash_put(oa_hash *htable, const void *key, const void *val)
         {
             // Update the existing value
             // Free the old values
-            htable->val_ops.free(htable->buckets[idx]->val, htable->val_ops.arg);
+            htable->val_ops.free(htable->buckets[idx]->val);
             htable->key_ops.free(htable->buckets[idx]->key, htable->key_ops.arg);
             // Update the new values
             htable->buckets[idx]->val = htable->val_ops.cp(val, htable->val_ops.arg);
             htable->buckets[idx]->key = htable->val_ops.cp(key, htable->key_ops.arg);
             htable->buckets[idx]->hash = hash_val;
+            --htable->size;
         }
     }
     htable->size++;
@@ -271,8 +272,9 @@ void oa_hash_delete(oa_hash *htable, const void *key)
         return;
     }
 
-    htable->val_ops.free(htable->buckets[idx]->val, htable->val_ops.arg);
+    htable->val_ops.free(htable->buckets[idx]->val);
     htable->key_ops.free(htable->buckets[idx]->key, htable->key_ops.arg);
+    --htable->size;
 
     oa_hash_put_tombstone(htable, idx);
 }
@@ -415,7 +417,7 @@ void oa_string_print(const void *data)
 }
 
 oa_key_ops oa_key_ops_string = {oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL};
-oa_val_ops oa_val_ops_string = {oa_string_cp, oa_string_free, oa_string_eq, NULL};
+oa_val_ops oa_val_ops_string = {oa_string_cp, co_delete, oa_string_eq, NULL};
 
 CO_FORCE_INLINE co_hast_t *co_hash_init()
 {

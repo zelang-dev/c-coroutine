@@ -1127,8 +1127,14 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
 
   if (c->wait_active && c->wait_group != NULL)
   {
+      char str[20];
+#if defined(_WIN32) || defined(_WIN64)
+      sprintf_s(str, 20, "%d", id);
+#else
+      snprintf(str, 20, "%d", id);
+#endif
       t->synced = true;
-      co_hash_put(c->wait_group, (void *)&id, t);
+      co_hash_put(c->wait_group, str, t);
       c->wait_counter++;
   }
 
@@ -1156,30 +1162,29 @@ void co_wait(co_hast_t *wg)
   co_routine_t *c = co_active();
   if (c->wait_active && c->wait_group == wg)
   {
-      int counter = c->wait_counter;
       oa_pair *pair;
-      while (counter > 0)
+      while (c->wait_counter != 0)
       {
         for (int i = 0; i < wg->capacity; i++)
         {
             pair = wg->buckets[i];
             if (NULL != pair)
             {
-                if (co_terminated(pair->val))
+                if (pair->val != NULL)
                 {
-                    co_delete(pair->val);
-                    co_hash_delete(wg, pair->key);
-                    --counter;
+                    if (!co_terminated(pair->val)) {
+                        co_yielding(co_current(), NULL);
+                    } else {
+                        co_hash_delete(wg, pair->key);
+                        --c->wait_counter;
+                    }
                 }
             }
         }
-        if (counter == 0)
-            break;
 
         coroutine_yield();
       }
       c->wait_active = false;
-      c->wait_counter = counter;
       c->wait_group = NULL;
   }
 }
@@ -1357,9 +1362,9 @@ char *coroutine_get_name()
     return co_running->name;
 }
 
-unsigned int coroutine_id()
+unsigned int co_id()
 {
-    return co_running->cid;
+    return co_active()->cid;
 }
 
 void coroutine_system(void)
@@ -1434,7 +1439,7 @@ static void coroutine_scheduler(void)
         i = t->all_coroutine_slot;
         all_coroutine[i] = all_coroutine[--n_all_coroutine];
         all_coroutine[i]->all_coroutine_slot = i;
-        if (t->synced == false)
+        //if (t->synced == false)
             co_delete(t);
       }
     }
