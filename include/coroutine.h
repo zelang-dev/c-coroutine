@@ -776,6 +776,8 @@ C_API co_hast_t *co_hash_init(void);
 C_API co_hast_t *co_wait_group(void);
 C_API void co_wait(co_hast_t *);
 
+C_API value_t co_wait_result(co_hast_t *, int cid);
+
 /* Check for at least `n` bytes left on the stack. If not present, abort. */
 C_API void co_stack_check(int);
 

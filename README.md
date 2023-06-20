@@ -228,7 +228,7 @@ func greetings(name string) {
 This **C** library version of it.
 
 ```c
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 void *greetings(void *arg)
 {
@@ -283,7 +283,7 @@ func sendData(ch chan string) {
 This **C** library version of it.
 
 ```c
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 void *sendData(void *arg)
 {
@@ -346,7 +346,7 @@ func main() {
 This **C** library version of it.
 
 ```c
-#include "../coroutine.h"
+#include "../include/coroutine.h"
 
 int fibonacci(channel_t *c, channel_t *quit)
 {
@@ -432,6 +432,29 @@ func main() {
 This **C** library version of it.
 
 ```c
+#include "../include/coroutine.h"
+
+void *worker(void *arg)
+{
+    // int id = co_value(arg).integer;
+    int id = co_id();
+    printf("Worker %d starting\n", id);
+
+    co_sleep(1000);
+    printf("Worker %d done\n", id);
+    return 0;
+}
+
+int co_main(int argc, char **argv)
+{
+    co_hast_t *wg = co_wait_group();
+    for (int i = 1; i <= 5; i++)
+    {
+        co_go(worker, &i);
+    }
+    co_wait(wg);
+    return 0;
+}
 ```
 
 see [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder.

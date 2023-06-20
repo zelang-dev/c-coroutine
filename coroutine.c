@@ -1160,10 +1160,13 @@ co_hast_t *co_wait_group(void)
 void co_wait(co_hast_t *wg)
 {
   co_routine_t *c = co_active();
-  if (c->wait_active && c->wait_group == wg)
+  // co_hast_t *wgr = NULL;
+  if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0))
   {
+      // co_hast_t *wgr = co_hash_init();
+      // co_defer(co_hash_free, wgr);
       oa_pair *pair;
-      while (c->wait_counter != 0)
+      while (wg->size != 0)
       {
         for (int i = 0; i < wg->capacity; i++)
         {
@@ -1172,21 +1175,29 @@ void co_wait(co_hast_t *wg)
             {
                 if (pair->val != NULL)
                 {
-                    if (!co_terminated(pair->val)) {
-                        co_yielding(co_current(), NULL);
-                    } else {
+                    if (!co_terminated((co_routine_t *)pair->val))
+                    {
+                        if (((co_routine_t *)pair->val)->status == CO_NORMAL)
+                            coroutine_ready((co_routine_t *)co_hash_get(wg, pair->key));
+
+                        coroutine_yield();
+                    }
+                    else
+                    {
+                        // co_hash_put(wgr, (char *)pair->key, (co_routine_t *)co_hash_get(wg, pair->key));
                         co_hash_delete(wg, pair->key);
                         --c->wait_counter;
                     }
                 }
             }
         }
-
-        coroutine_yield();
       }
       c->wait_active = false;
       c->wait_group = NULL;
+      --co_count;
   }
+
+  // return wgr;
 }
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -1439,7 +1450,7 @@ static void coroutine_scheduler(void)
         i = t->all_coroutine_slot;
         all_coroutine[i] = all_coroutine[--n_all_coroutine];
         all_coroutine[i]->all_coroutine_slot = i;
-        //if (t->synced == false)
+        if (!t->synced)
             co_delete(t);
       }
     }
