@@ -115,7 +115,9 @@ void oa_hash_free(oa_hash *htable)
         }
         CO_FREE(htable->buckets[i]);
     }
-    CO_FREE(htable->buckets);
+    if (htable->buckets != NULL)
+        CO_FREE(htable->buckets);
+
     CO_FREE(htable);
 }
 
@@ -418,6 +420,26 @@ void *oa_coroutine_cp(const void *data, void *arg)
     return input;
 }
 
+void *oa_value_cp(const void *data, void *arg)
+{
+    co_value_t *input = (co_value_t *)data;
+    co_value_t *result;
+    result = CO_MALLOC(sizeof(*result));
+    if (NULL == result)
+    {
+        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
+    memcpy(result, input, sizeof(*result));
+    return result;
+}
+
+bool oa_value_eq(const void *data1, const void *data2, void *arg)
+{
+    return memcmp(data1, data1, sizeof(co_value_t)) == 0 ? true : false;
+}
+
 void oa_string_free(void *data, void *arg)
 {
     CO_FREE(data);
@@ -430,10 +452,16 @@ void oa_string_print(const void *data)
 
 oa_key_ops oa_key_ops_string = {oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL};
 oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, co_delete, oa_coroutine_eq, NULL};
+oa_val_ops oa_val_ops_value = {oa_value_cp, free, oa_value_eq, NULL};
 
-CO_FORCE_INLINE co_hast_t *co_hash_init()
+CO_FORCE_INLINE co_hast_t *co_ht_group_init()
 {
     return (co_hast_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
+}
+
+CO_FORCE_INLINE co_hast_t *co_ht_result_init()
+{
+    return (co_hast_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
 }
 
 CO_FORCE_INLINE void co_hash_free(co_hast_t *htable)

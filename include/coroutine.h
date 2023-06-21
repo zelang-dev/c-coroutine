@@ -93,8 +93,7 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define DivisionByZero 2
 #define OutOfMemory 3
 
-/*
-The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
+/* The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
 Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_case_if(channel)`,
 `select_break()` provided, an infinite loop is created.
 
@@ -681,7 +680,7 @@ C_API int co_go(co_callable_t, void *);
 Other tasks continue to run during this time. */
 C_API unsigned int co_sleep(unsigned int ms);
 
-/* Return the unique coroutine id for the current coroutine. */
+/* Return the unique id for the current coroutine. */
 C_API unsigned int co_id(void);
 
 C_API void coroutine_ready(co_routine_t *);
@@ -770,11 +769,21 @@ C_API void *co_hash_get(co_hast_t *, const void *);
 C_API void co_hash_delete(co_hast_t *, const void *);
 C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
 
-/* Creates a new hash table */
-C_API co_hast_t *co_hash_init(void);
+/* Creates a new wait group coroutine hash table. */
+C_API co_hast_t *co_ht_group_init(void);
 
+/* Creates a new wait group results hash table. */
+C_API co_hast_t *co_ht_result_init(void);
+
+/* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
+
+All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
+
+The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API co_hast_t *co_wait_group(void);
-C_API void co_wait(co_hast_t *);
+
+/* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
+C_API co_hast_t *co_wait(co_hast_t *);
 
 C_API value_t co_wait_result(co_hast_t *, int cid);
 

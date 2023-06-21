@@ -111,8 +111,17 @@ This uses the POSIX "ucontext" API.
 which will call this function as an coroutine! */
 int co_main(int, char **);
 
-/*
-The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
+/* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
+
+All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
+
+The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
+C_API co_hast_t *co_wait_group(void);
+
+/* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
+C_API void co_wait(co_hast_t *);
+
+/* The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
 Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_case_if(channel)`,
 `select_break()` provided, an infinite loop is created.
 

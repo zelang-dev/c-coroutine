@@ -1149,7 +1149,7 @@ CO_FORCE_INLINE int co_go(co_callable_t fn, void *arg)
 co_hast_t *co_wait_group(void)
 {
   co_routine_t *c = co_active();
-  co_hast_t *wg = co_hash_init();
+  co_hast_t *wg = co_ht_group_init();
   co_defer(co_hash_free, wg);
   c->wait_active = true;
   c->wait_group = wg;
@@ -1157,14 +1157,14 @@ co_hast_t *co_wait_group(void)
   return wg;
 }
 
-void co_wait(co_hast_t *wg)
+co_hast_t *co_wait(co_hast_t *wg)
 {
   co_routine_t *c = co_active();
-  // co_hast_t *wgr = NULL;
+  co_hast_t *wgr = NULL;
   if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0))
   {
-      // co_hast_t *wgr = co_hash_init();
-      // co_defer(co_hash_free, wgr);
+      wgr = co_ht_result_init();
+      co_defer(co_hash_free, wgr);
       oa_pair *pair;
       while (wg->size != 0)
       {
@@ -1175,16 +1175,25 @@ void co_wait(co_hast_t *wg)
             {
                 if (pair->val != NULL)
                 {
-                    if (!co_terminated((co_routine_t *)pair->val))
+                    co_routine_t *found = (co_routine_t *)pair->val;
+                    if (!co_terminated(found))
                     {
-                        if (((co_routine_t *)pair->val)->status == CO_NORMAL)
-                            coroutine_ready((co_routine_t *)co_hash_get(wg, pair->key));
+                        if (found->status == CO_NORMAL)
+                            coroutine_ready(found);
 
                         coroutine_yield();
                     }
                     else
                     {
-                        // co_hash_put(wgr, (char *)pair->key, (co_routine_t *)co_hash_get(wg, pair->key));
+                        char str[20];
+#if defined(_WIN32) || defined(_WIN64)
+                        sprintf_s(str, 20, "%d", found->cid);
+#else
+                        snprintf(str, 20, "%d", found->cid);
+#endif
+                        if (found->results != NULL)
+                            co_hash_put(wgr, str, found->results);
+
                         co_hash_delete(wg, pair->key);
                         --c->wait_counter;
                     }
@@ -1197,7 +1206,7 @@ void co_wait(co_hast_t *wg)
       --co_count;
   }
 
-  // return wgr;
+  return wgr;
 }
 
 #if defined(_WIN32) || defined(_WIN64)
