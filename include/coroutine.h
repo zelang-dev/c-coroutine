@@ -503,7 +503,7 @@ enum value_args_t
 typedef union
 {
     int integer;
-    unsigned int u_integer;
+    signed int s_integer;
     long big_int;
     unsigned long long max_int;
     float point;
@@ -519,7 +519,7 @@ typedef union
 typedef struct co_value
 {
     value_t value;
-    unsigned int type;
+    enum value_args_t type;
     size_t s_args;
     size_t n_args;
 } co_value_t;
