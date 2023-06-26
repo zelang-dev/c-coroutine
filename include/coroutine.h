@@ -18,7 +18,7 @@
 #include <sys/time.h>
 #include <sys/resource.h> /* setrlimit() */
 #endif
-#include "uv.h"
+#include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
 #include "compat/unistd.h"
 #else
@@ -93,19 +93,20 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define DivisionByZero 2
 #define OutOfMemory 3
 
-/* The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_case_if(channel)`,
-`select_break()` provided, an infinite loop is created.
+/* The `for_select` macro sets up a coroutine to wait on multiple channel operations.
+Must be closed out with `select_end`, and if no `select_case(channel)`, `select_case_if(channel)`,
+`select_break` provided, an infinite loop is created.
 
 This behaves same as GoLang `select {}` statement.
 */
-#define select_if()       \
+#define for_select       \
   bool ___##__FUNCTION__; \
   while (true)            \
   {                       \
-      ___##__FUNCTION__ = false;
+      ___##__FUNCTION__ = false; \
+    if (true)
 
-#define select_end()              \
+#define select_end              \
   if (___##__FUNCTION__ == false) \
       coroutine_yield();          \
   }
@@ -113,20 +114,19 @@ This behaves same as GoLang `select {}` statement.
 #define select_case(ch)                                 \
   if ((ch)->select_ready && ___##__FUNCTION__ == false) \
   {                                                     \
-      (ch)->select_ready = false;
+      (ch)->select_ready = false; if (true)
 
-#define select_break()      \
+#define select_break      \
   ___##__FUNCTION__ = true; \
   }
 
 #define select_case_if(ch) \
-  select_break() else select_case(ch)
+  select_break else select_case(ch)
 
-/* The `select_default()` is run if no other case is ready.
+/* The `select_default` is run if no other case is ready.
 Must also closed out with `select_break()`. */
 #define select_default()                         \
-  select_break() if (___##__FUNCTION__ == false) \
-  {
+  select_break if (___##__FUNCTION__ == false) {
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
@@ -396,6 +396,8 @@ typedef enum co_state
 typedef void *(*co_callable_t)(void *);
 typedef struct routine_s co_routine_t;
 typedef struct oa_hash_s co_hast_t;
+typedef co_hast_t co_ht_group_t;
+typedef co_hast_t co_ht_result_t;
 
 /* Coroutine context structure. */
 struct routine_s
@@ -465,6 +467,7 @@ struct routine_s
     int all_coroutine_slot;
     /* custom event loop handle */
     void *loop;
+    bool loop_active;
     void *user_data;
 #if defined(CO_USE_VALGRIND)
     unsigned int vg_stack_id;
@@ -609,6 +612,8 @@ C_API value_t co_value(void *);
 /* Suspends the execution of current coroutine. */
 C_API void co_suspend(void);
 
+C_API void co_scheduler(void);
+
 /* Suspends the execution of current coroutine, and passing data. */
 C_API void co_suspend_set(void *data);
 
@@ -675,6 +680,10 @@ C_API co_value_t *co_recv(channel_t *);
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
 C_API int co_go(co_callable_t, void *);
+
+C_API uv_loop_t *co_loop(void);
+
+C_API int co_uv(co_callable_t, void *arg);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
@@ -770,22 +779,22 @@ C_API void co_hash_delete(co_hast_t *, const void *);
 C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
 
 /* Creates a new wait group coroutine hash table. */
-C_API co_hast_t *co_ht_group_init(void);
+C_API co_ht_group_t *co_ht_group_init(void);
 
 /* Creates a new wait group results hash table. */
-C_API co_hast_t *co_ht_result_init(void);
+C_API co_ht_result_t *co_ht_result_init(void);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
-C_API co_hast_t *co_wait_group(void);
+C_API co_ht_group_t *co_wait_group(void);
 
 /* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
-C_API co_hast_t *co_wait(co_hast_t *);
+C_API co_ht_result_t *co_wait(co_ht_group_t *);
 
-C_API value_t co_wait_result(co_hast_t *, int cid);
+C_API value_t co_wait_result(co_ht_result_t *, int cid);
 
 /* Check for at least `n` bytes left on the stack. If not present, abort. */
 C_API void co_stack_check(int);

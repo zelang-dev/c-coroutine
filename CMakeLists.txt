@@ -19,6 +19,7 @@ file(GLOB lib_files
     ${CMAKE_SOURCE_DIR}/coroutine.c
     ${CMAKE_SOURCE_DIR}/channel.c
     ${CMAKE_SOURCE_DIR}/hash.c
+    ${CMAKE_SOURCE_DIR}/uv_routine.c
 )
 
 add_library(coroutine STATIC ${lib_files})
@@ -36,7 +37,7 @@ add_subdirectory(libuv)
 target_link_libraries(coroutine PUBLIC uv)
 
 if(CO_BUILD_TESTS)
-    set(TARGET_LIST test_args test_timing example test_resume chan_3 go_channel go_sleep test_delay primes go_select go_wait_group)
+    set(TARGET_LIST test_args test_timing example test_resume chan_3 go_channel go_sleep test_delay primes go_select go_wait_group co_call)
     foreach (TARGET ${TARGET_LIST})
         add_executable(${TARGET} examples/${TARGET}.c)
         target_link_libraries(${TARGET} coroutine)

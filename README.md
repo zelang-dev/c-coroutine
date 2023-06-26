@@ -116,32 +116,10 @@ int co_main(int, char **);
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
-C_API co_hast_t *co_wait_group(void);
+C_API co_ht_group_t *co_wait_group(void);
 
 /* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
-C_API void co_wait(co_hast_t *);
-
-/* The `select_if()` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end()`, and if no `select_case(channel)`, `select_case_if(channel)`,
-`select_break()` provided, an infinite loop is created.
-
-This behaves same as GoLang `select {}` statement.
-*/
-select_if()
-    select_case(channel_t channel)
-        co_send(channel, void *s);
-        // Or
-        co_value_t *r = co_recv(channel);
-    // Or
-    select_case_if(channel)
-        // co_send(channel); || co_recv(channel);
-
-    /* The `select_default()` is run if no other case is ready.
-    Must also closed out with `select_break()`. */
-    select_default()
-        // ...
-    select_break()
-select_end()
+C_API co_ht_result_t co_wait(co_ht_group_t *);
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *co_make(void);
@@ -155,6 +133,28 @@ C_API int co_send(channel_t *, void *);
 
 /* Receive data from the channel. */
 C_API co_value_t *co_recv(channel_t *);
+
+/* The `for_select {` macro sets up a coroutine to wait on multiple channel operations.
+Must be closed out with `} select_end;`, and if no `select_case(channel)`, `select_case_if(channel)`,
+`select_break` provided, an infinite loop is created.
+
+This behaves same as GoLang `select {}` statement.
+*/
+for_select {
+    select_case(channel) {
+        co_send(channel, void *data);
+        // Or
+        co_value_t *r = co_recv(channel);
+    // Or
+    } select_case_if(channel) {
+        // co_send(channel); || co_recv(channel);
+
+    /* The `select_default` is run if no other case is ready.
+    Must also closed out with `select_break;`. */
+    } select_default {
+        // ...
+    } select_break;
+} select_end;
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */

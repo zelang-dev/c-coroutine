@@ -454,14 +454,14 @@ oa_key_ops oa_key_ops_string = {oa_string_hash, oa_string_cp, oa_string_free, oa
 oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, co_delete, oa_coroutine_eq, NULL};
 oa_val_ops oa_val_ops_value = {oa_value_cp, free, oa_value_eq, NULL};
 
-CO_FORCE_INLINE co_hast_t *co_ht_group_init()
+CO_FORCE_INLINE co_ht_group_t *co_ht_group_init()
 {
-    return (co_hast_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
+    return (co_ht_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE co_hast_t *co_ht_result_init()
+CO_FORCE_INLINE co_ht_group_t *co_ht_result_init()
 {
-    return (co_hast_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
+    return (co_ht_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
 }
 
 CO_FORCE_INLINE void co_hash_free(co_hast_t *htable)

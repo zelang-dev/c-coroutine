@@ -61,12 +61,27 @@ static void co_done()
 {
     co_active()->halt = true;
     co_active()->status = CO_DEAD;
-    co_switch(co_main_handle);
+    co_scheduler();
+}
+
+static void loop_routine()
+{
+    co_routine_t *co = co_active();
+    co->func(co->args);
+    co->loop_active = false;
+    co->status = CO_NORMAL;
+    co_deferred_free(co);
 }
 
 static void co_awaitable()
 {
     co_routine_t *co = co_active();
+    if (co->loop_active)
+    {
+        loop_routine();
+        return;
+    }
+
     co->results = co->func(co->args);
     co->status = CO_NORMAL;
     co_deferred_free(co);
@@ -709,9 +724,14 @@ co_routine_t *co_start(co_callable_t func, void *args)
   return co;
 }
 
-void co_suspend(void)
+CO_FORCE_INLINE void co_suspend()
 {
   co_suspend_set(NULL);
+}
+
+CO_FORCE_INLINE void co_scheduler()
+{
+  co_switch(co_main_handle);
 }
 
 void co_suspend_set(void *data)
@@ -734,7 +754,7 @@ void *co_yielding_get(co_routine_t *handle, void *data)
   return handle->resume_value;
 }
 
-void *co_resuming(co_routine_t *handle)
+CO_FORCE_INLINE void *co_resuming(co_routine_t *handle)
 {
   return co_resuming_set(handle, NULL);
 }
@@ -747,17 +767,17 @@ void *co_resuming_set(co_routine_t *handle, void *data)
   return handle->yield_value;
 }
 
-value_t co_returning(co_routine_t *co)
+CO_FORCE_INLINE value_t co_returning(co_routine_t *co)
 {
   return co_value(co->results);
 }
 
-bool co_terminated(co_routine_t *co)
+CO_FORCE_INLINE bool co_terminated(co_routine_t *co)
 {
   return co->halt;
 }
 
-void *co_results(co_routine_t *co)
+CO_FORCE_INLINE void *co_results(co_routine_t *co)
 {
   return co->results;
 }
@@ -1115,9 +1135,10 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   id = t->cid;
   if (n_all_coroutine % 64 == 0) {
       all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[0]));
-      if (all_coroutine == NULL) {
-        CO_LOG("out of memory");
-        abort();
+      if (all_coroutine == NULL)
+      {
+      fprintf(stderr, "realloc() failed in file %s at line # %d", __FILE__, __LINE__);
+      abort();
       }
   }
 
@@ -1138,12 +1159,26 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
       c->wait_counter++;
   }
 
+  if (c->loop_active)
+  {
+      c->loop_active = false;
+      t->loop_active = true;
+  }
+
   return id;
 }
 
 CO_FORCE_INLINE int co_go(co_callable_t fn, void *arg)
 {
   return coroutine_create(fn, arg, CO_STACK_SIZE);
+}
+
+CO_FORCE_INLINE int co_uv(co_callable_t fn, void *arg)
+{
+
+  co_routine_t *co = co_active();
+  co->loop_active = true;
+  coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
 co_hast_t *co_wait_group(void)
@@ -1157,10 +1192,10 @@ co_hast_t *co_wait_group(void)
   return wg;
 }
 
-co_hast_t *co_wait(co_hast_t *wg)
+co_ht_result_t *co_wait(co_ht_group_t *wg)
 {
   co_routine_t *c = co_active();
-  co_hast_t *wgr = NULL;
+  co_ht_result_t *wgr = NULL;
   if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0))
   {
       wgr = co_ht_result_init();

@@ -13,7 +13,7 @@ void *worker(void *arg)
 
 int co_main(int argc, char **argv)
 {
-    co_hast_t *wg = co_wait_group();
+    co_ht_group_t *wg = co_wait_group();
     for (int i = 1; i <= 5; i++)
     {
         co_go(worker, &i);
