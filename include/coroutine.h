@@ -305,11 +305,12 @@ Must also closed out with `select_break()`. */
   #endif
 #endif
 
-#if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)
+#if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
   #include <stdlib.h>
   #define CO_MALLOC malloc
   #define CO_FREE   free
   #define CO_REALLOC realloc
+  #define CO_CALLOC calloc
 #endif
 
 #if defined(__clang__)

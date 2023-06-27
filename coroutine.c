@@ -1178,7 +1178,7 @@ CO_FORCE_INLINE int co_uv(co_callable_t fn, void *arg)
 
   co_routine_t *co = co_active();
   co->loop_active = true;
-  coroutine_create(fn, arg, CO_STACK_SIZE);
+  return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
 co_hast_t *co_wait_group(void)
