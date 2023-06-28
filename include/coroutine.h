@@ -93,6 +93,9 @@ extern volatile C_ERROR_FRAME_T CExceptionFrames[];
 #define DivisionByZero 2
 #define OutOfMemory 3
 
+/* invalid address indicator */
+#define CO_ERROR ((void *)-1)
+
 /* The `for_select` macro sets up a coroutine to wait on multiple channel operations.
 Must be closed out with `select_end`, and if no `select_case(channel)`, `select_case_if(channel)`,
 `select_break` provided, an infinite loop is created.
@@ -489,7 +492,7 @@ typedef struct co_queue_s
     co_routine_t *tail;
 } co_queue_t;
 
-enum value_args_t
+enum value_types
 {
     CO_INT,
     CO_LONG,
@@ -509,10 +512,12 @@ typedef union
     int integer;
     signed int s_integer;
     long big_int;
+    long long long_int;
     unsigned long long max_int;
     float point;
     double precision;
     bool boolean;
+    unsigned char uchar;
     char *string;
     const char chars[512];
     char **array;
@@ -523,10 +528,26 @@ typedef union
 typedef struct co_value
 {
     value_t value;
-    enum value_args_t type;
-    size_t s_args;
-    size_t n_args;
+    enum value_types type;
 } co_value_t;
+
+typedef struct uv_args_s
+{
+    /* allocated array of arguments */
+    co_value_t *args;
+
+    bool is_path;
+    enum uv_fs_type fs_type;
+    enum uv_req_type req_type;
+    enum uv_handle_type handle_type;
+    enum uv_dirent_type_t dirent_type;
+    enum uv_tty_mode_t tty_mode;
+    enum uv_stdio_flags stdio_flag;
+    enum uv_errno_t errno_code;
+
+    /* total number of args in set */
+    size_t n_args;
+} uv_args_t;
 
 C_API co_routine_t *co_running;
 C_API int co_count;
@@ -597,7 +618,7 @@ C_API void co_switch(co_routine_t *);
 C_API bool co_terminated(co_routine_t *);
 
 /* Results from an coroutine function completetion and return. */
-C_API void *co_results(co_routine_t *) ;
+C_API value_t co_results(co_routine_t *) ;
 
 C_API bool co_serializable(void);
 
@@ -607,7 +628,7 @@ C_API co_routine_t *co_current(void);
 /* Initialize and starts the coroutine passing any args. */
 C_API co_routine_t *co_start(co_callable_t, void *);
 
-/* Return value in union type storage. */
+/* Return the value in union storage type. */
 C_API value_t co_value(void *);
 
 /* Suspends the execution of current coroutine. */
@@ -629,9 +650,6 @@ C_API void *co_resuming(co_routine_t *);
 
 /* Resume specified coroutine, sending and returning data from co_yielding. */
 C_API void *co_resuming_set(co_routine_t *, void *);
-
-/* Return union data type of co_results. */
-C_API value_t co_returning(co_routine_t *);
 
 /* Returns the status of the coroutine. */
 C_API co_state co_status(co_routine_t *);
@@ -693,7 +711,7 @@ C_API unsigned int co_sleep(unsigned int ms);
 /* Return the unique id for the current coroutine. */
 C_API unsigned int co_id(void);
 
-C_API void coroutine_ready(co_routine_t *);
+C_API void coroutine_schedule(co_routine_t *);
 
 /* Create a new coroutine running func(arg) with stack size. */
 C_API int coroutine_create(co_callable_t, void *, unsigned int);
@@ -795,7 +813,11 @@ C_API co_ht_group_t *co_wait_group(void);
 /* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
 C_API co_ht_result_t *co_wait(co_ht_group_t *);
 
-C_API value_t co_wait_result(co_ht_result_t *, int cid);
+C_API value_t co_group_result_get(co_ht_result_t *, int);
+
+C_API void co_result_set(int, void *);
+
+C_API value_t co_result_get(int);
 
 /* Check for at least `n` bytes left on the stack. If not present, abort. */
 C_API void co_stack_check(int);

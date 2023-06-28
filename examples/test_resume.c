@@ -22,8 +22,8 @@ int co_main(int argc, char **argv)
     coro = co_start(hello_world, &i);
     i++;
     CO_ASSERT(co_resuming_set(coro, &v) == (void *)1);     // Verifying return value
-    CO_ASSERT(co_resuming(coro) == (void *)-1);    // Invalid call
-    CO_ASSERT(co_returning(coro).integer == 32); // returning final value
+    CO_ASSERT(co_resuming(coro) == CO_ERROR);    // Invalid call
+    CO_ASSERT(co_results(coro).integer == 32); // returning final value
     CO_ASSERT(i == 32);
     co_delete(coro);
     return EXIT_SUCCESS;

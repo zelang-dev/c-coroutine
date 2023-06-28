@@ -10,6 +10,8 @@ static thread_local co_routine_t *co_main_handle = NULL;
 static thread_local co_routine_t *co_current_handle = NULL;
 static void(fastcall *co_swap)(co_routine_t *, co_routine_t *) = 0;
 
+static thread_local uv_loop_t *co_main_loop_handle = NULL;
+
 static int main_argc;
 static char **main_argv;
 
@@ -42,6 +44,7 @@ thread_local co_queue_t co_run_queue;
 co_routine_t **all_coroutine;
 
 int n_all_coroutine;
+
 
 volatile C_ERROR_FRAME_T CExceptionFrames[C_ERROR_NUM_ID] = {{0}};
 
@@ -145,6 +148,15 @@ static CO_FORCE_INLINE co_array_t *co_deferred_array_get_element(const defer_t *
 static CO_FORCE_INLINE size_t co_deferred_array_len(const defer_t *array)
 {
     return array->base.elements;
+}
+
+static CO_FORCE_INLINE void int_str(int cid, int len, char *str)
+{
+#if defined(_WIN32) || defined(_WIN64)
+    sprintf_s(str, len, "%d", cid);
+#else
+    snprintf(str, len, "%d", cid);
+#endif
 }
 
 #ifdef CO_MPROTECT
@@ -576,7 +588,7 @@ static const uint32_t co_swap_function[1024] = {
     co_routine_t *co_derive(void *memory, size_t heapsize, co_callable_t func, void *args)
     {
         /* Windows fibers do not allow users to supply their own memory */
-        return (co_routine_t *)0;
+        return CO_ERROR;
     }
 
     co_routine_t *co_create(size_t heapsize, co_callable_t func, void *args)
@@ -627,7 +639,7 @@ static const uint32_t co_swap_function[1024] = {
         void *memory = CO_MALLOC(size);
         if (!memory) {
             fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
-            return (co_routine_t *)0;
+            return CO_ERROR;
         }
 
         memset(memory, 0, size);
@@ -710,7 +722,7 @@ co_routine_t *co_start(co_callable_t func, void *args)
   void *memory = CO_MALLOC(stack_size);
   if (!memory) {
     fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
-    return (co_routine_t *)0;
+    return CO_ERROR;
   }
 
   memset(memory, 0, stack_size);
@@ -761,13 +773,13 @@ CO_FORCE_INLINE void *co_resuming(co_routine_t *handle)
 
 void *co_resuming_set(co_routine_t *handle, void *data)
 {
-  if (co_terminated(handle)) return (void *)-1;
+  if (co_terminated(handle)) return CO_ERROR;
   handle->resume_value = data;
   co_switch(handle);
   return handle->yield_value;
 }
 
-CO_FORCE_INLINE value_t co_returning(co_routine_t *co)
+CO_FORCE_INLINE value_t co_results(co_routine_t *co)
 {
   return co_value(co->results);
 }
@@ -775,11 +787,6 @@ CO_FORCE_INLINE value_t co_returning(co_routine_t *co)
 CO_FORCE_INLINE bool co_terminated(co_routine_t *co)
 {
   return co->halt;
-}
-
-CO_FORCE_INLINE void *co_results(co_routine_t *co)
-{
-  return co->results;
 }
 
 int co_array_init(co_array_t *a)
@@ -1144,16 +1151,12 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
 
   t->all_coroutine_slot = n_all_coroutine;
   all_coroutine[n_all_coroutine++] = t;
-  coroutine_ready(t);
+  coroutine_schedule(t);
 
   if (c->wait_active && c->wait_group != NULL)
   {
       char str[20];
-#if defined(_WIN32) || defined(_WIN64)
-      sprintf_s(str, 20, "%d", id);
-#else
-      snprintf(str, 20, "%d", id);
-#endif
+      int_str(id, 20, str);
       t->synced = true;
       co_hash_put(c->wait_group, str, t);
       c->wait_counter++;
@@ -1214,18 +1217,14 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                     if (!co_terminated(found))
                     {
                         if (found->status == CO_NORMAL)
-                            coroutine_ready(found);
+                            coroutine_schedule(found);
 
                         coroutine_yield();
                     }
                     else
                     {
                         char str[20];
-#if defined(_WIN32) || defined(_WIN64)
-                        sprintf_s(str, 20, "%d", found->cid);
-#else
-                        snprintf(str, 20, "%d", found->cid);
-#endif
+                        int_str(found->cid, 20, str);
                         if (found->results != NULL)
                             co_hash_put(wgr, str, found->results);
 
@@ -1242,6 +1241,16 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
   }
 
   return wgr;
+}
+
+value_t co_group_result_get(co_ht_result_t *wg, int cid)
+{
+  co_routine_t *co;
+  char str[20];
+  int_str(cid, 20, str);
+  co = (co_routine_t *)co_hash_get(wg, str);
+
+  return co_results(co);
 }
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -1317,7 +1326,7 @@ static void *coroutine_wait(void *v)
         if (!t->system && --sleeping_counted == 0)
             co_count--;
 
-        coroutine_ready(t);
+        coroutine_schedule(t);
       }
   }
 }
@@ -1364,7 +1373,7 @@ unsigned int co_sleep(unsigned int ms)
     return (unsigned int)(nsec() - now) / 1000000;
 }
 
-void coroutine_ready(co_routine_t *t)
+void coroutine_schedule(co_routine_t *t)
 {
     t->ready = 1;
     coroutine_add(&co_run_queue, t);
@@ -1374,7 +1383,7 @@ int coroutine_yield()
 {
     int n;
     n = n_co_switched;
-    coroutine_ready(co_running);
+    coroutine_schedule(co_running);
     coroutine_state("yield");
     co_suspend();
     return n_co_switched - n - 1;
@@ -1469,6 +1478,7 @@ static void coroutine_scheduler(void)
 
     for (;;)
     {
+      coroutine_loop(UV_RUN_NOWAIT);
       if (co_count == 0 || !coroutine_active()) {
         if (co_count > 0) {
             fprintf(stderr, "No runnable coroutines! %d stalled\n", co_count);

@@ -49,7 +49,7 @@ int co_main(int argc, char **argv)
   co_resuming(co);
 
   CO_ASSERT(co_terminated(co) == true);
-  CO_ASSERT(strcmp((char *)co_results(co), "hello world") == 0);
+  CO_ASSERT(strcmp(co_results(co).string, "hello world") == 0);
 
   /* Destroy the coroutine. */
   co_delete(co);
