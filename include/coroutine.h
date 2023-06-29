@@ -155,8 +155,10 @@ Must also closed out with `select_break()`. */
     #define CO_MAIN_STACK (512 * 1024)
 #endif
 
-#ifndef CO_EVENT_LOOP
-    #define CO_EVENT_LOOP(h, m)
+#if defined(UV_H)
+#define CO_EVENT_LOOP(h, m) uv_run(h, m)
+#elif !defined(CO_EVENT_LOOP)
+#define CO_EVENT_LOOP(h, m)
 #endif
 
 /* Public API qualifier. */
@@ -604,6 +606,8 @@ struct channel_co_s
     co_routine_t *co;
     channel_co_t *x_msg;
 };
+
+uv_loop_t *co_loop(void);
 
 /* Return handle to current coroutine. */
 C_API co_routine_t *co_active(void);

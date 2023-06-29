@@ -49,6 +49,7 @@ volatile C_ERROR_FRAME_T CExceptionFrames[C_ERROR_NUM_ID] = {{0}};
 
 void coroutine_loop(int);
 void coroutine_interrupt(void);
+
 /* Create a new coroutine running func(arg) with stack size. */
 int coroutine_create(co_callable_t, void *, unsigned int);
 
@@ -88,9 +89,8 @@ static void co_done()
     co_scheduler();
 }
 
-static void loop_routine()
+static void loop_awaitable(co_routine_t *co)
 {
-    co_routine_t *co = co_active();
     co->func(co->args);
     co->status = CO_NORMAL;
 }
@@ -100,7 +100,7 @@ static void co_awaitable()
     co_routine_t *co = co_active();
     if (co->loop_active)
     {
-        loop_routine();
+        loop_awaitable(co);
     }
     else
     {
@@ -179,6 +179,14 @@ static CO_FORCE_INLINE void ito_s(int cid, int len, char *str)
 #endif
 }
 
+uv_loop_t *co_loop()
+{
+    if (co_main_loop_handle != NULL)
+        return co_main_loop_handle;
+
+    return uv_default_loop();
+}
+
 #ifdef CO_MPROTECT
     alignas(4096)
 #else
@@ -233,7 +241,17 @@ static CO_FORCE_INLINE void ito_s(int cid, int len, char *str)
             co_swap = (void(fastcall *)(co_routine_t *, co_routine_t *))co_swap_function;
         }
         if(!co_active_handle) co_active_handle = co_active_buffer;
-        if(!co_main_handle) co_main_handle = co_active_handle;
+        if(!co_main_handle)
+            co_main_handle = co_active_handle;
+#ifdef UV_H
+        if (!co_main_loop_handle)
+        {
+            co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
+            int r = uv_loop_init(co_main_loop_handle);
+            if (r)
+                fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+        }
+#endif
         if(!co_current_handle) co_current_handle = co_active();
 
         if((handle = (co_routine_t *)memory)) {
@@ -375,6 +393,15 @@ static CO_FORCE_INLINE void ito_s(int cid, int len, char *str)
         }
         if (!co_active_handle) co_active_handle = co_active_buffer;
         if (!co_main_handle) co_main_handle = co_active_handle;
+#ifdef UV_H
+        if (!co_main_loop_handle)
+        {
+            co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
+            int r = uv_loop_init(co_main_loop_handle);
+            if (r)
+                fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+        }
+#endif
         if (!co_current_handle) co_current_handle = co_active();
 
         if ((handle = (co_routine_t *)memory)) {
@@ -436,7 +463,17 @@ static CO_FORCE_INLINE void ito_s(int cid, int len, char *str)
             co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
         }
         if (!co_active_handle) co_active_handle = co_active_buffer;
-        if (!co_main_handle) co_main_handle = co_active_handle;
+        if (!co_main_handle)
+            co_main_handle = co_active_handle;
+#ifdef UV_H
+        if (!co_main_loop_handle)
+        {
+            co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
+            int r = uv_loop_init(co_main_loop_handle);
+            if (r)
+                fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+        }
+#endif
         if (!co_current_handle) co_current_handle = co_active();
 
         if((handle = (size_t *)memory)) {
@@ -533,7 +570,17 @@ static const uint32_t co_swap_function[1024] = {
             co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
         }
         if (!co_active_handle) co_active_handle = co_active_buffer;
-        if (!co_main_handle) co_main_handle = co_active_handle;
+        if (!co_main_handle)
+            co_main_handle = co_active_handle;
+#ifdef UV_H
+        if (!co_main_loop_handle)
+        {
+            co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
+            int r = uv_loop_init(co_main_loop_handle);
+            if (r)
+                fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+        }
+#endif
         if (!co_current_handle) co_current_handle = co_active();
 
         if ((handle = (size_t *)memory)) {
@@ -1325,12 +1372,12 @@ static size_t nsec(void)
   return (size_t)tv.tv_sec * 1000 * 1000 * 1000 + tv.tv_usec * 1000;
 }
 
-void coroutine_loop(int mode)
+CO_FORCE_INLINE void coroutine_loop(int mode)
 {
-  CO_EVENT_LOOP(co_active()->loop, mode);
+  CO_EVENT_LOOP(co_loop(), mode);
 }
 
-void coroutine_interrupt()
+CO_FORCE_INLINE void coroutine_interrupt()
 {
   coroutine_loop(UV_RUN_NOWAIT);
 }
@@ -1362,7 +1409,7 @@ static void *coroutine_wait(void *v)
             ms = 5000;
       }
 
-      coroutine_loop(2);
+      coroutine_loop(UV_RUN_NOWAIT);
       now = nsec();
       while ((t = sleeping.head) && now >= t->alarm_time) {
         coroutine_remove(&sleeping, t);
@@ -1527,8 +1574,15 @@ static void coroutine_scheduler(void)
 
     for (;;)
     {
-      coroutine_loop(UV_RUN_NOWAIT);
+      coroutine_interrupt();
       if (co_count == 0 || !coroutine_active()) {
+#ifdef UV_H
+        if (co_main_loop_handle != NULL)
+        {
+            uv_loop_close(co_main_loop_handle);
+            CO_FREE(co_main_loop_handle);
+        }
+#endif
         if (co_count > 0) {
             fprintf(stderr, "No runnable coroutines! %d stalled\n", co_count);
             exit(1);
