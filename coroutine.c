@@ -62,7 +62,11 @@ void throw(C_ERROR_T ExceptionID)
 /* called only if co_routine_t func returns */
 static void co_done()
 {
-    co_active()->halt = true;
+    if (!co_active()->loop_active)
+    {
+        co_active()->halt = true;
+    }
+
     co_active()->status = CO_DEAD;
     co_scheduler();
 }
@@ -71,9 +75,7 @@ static void loop_routine()
 {
     co_routine_t *co = co_active();
     co->func(co->args);
-    co->loop_active = false;
     co->status = CO_NORMAL;
-    co_deferred_free(co);
 }
 
 static void co_awaitable()
@@ -82,12 +84,13 @@ static void co_awaitable()
     if (co->loop_active)
     {
         loop_routine();
-        return;
     }
-
-    co->results = co->func(co->args);
-    co->status = CO_NORMAL;
-    co_deferred_free(co);
+    else
+    {
+        co->results = co->func(co->args);
+        co->status = CO_NORMAL;
+        co_deferred_free(co);
+    }
 }
 
 static void co_func(co_routine_t handle)
@@ -150,7 +153,7 @@ static CO_FORCE_INLINE size_t co_deferred_array_len(const defer_t *array)
     return array->base.elements;
 }
 
-static CO_FORCE_INLINE void int_str(int cid, int len, char *str)
+static CO_FORCE_INLINE void ito_s(int cid, int len, char *str)
 {
 #if defined(_WIN32) || defined(_WIN64)
     sprintf_s(str, len, "%d", cid);
@@ -1156,7 +1159,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   if (c->wait_active && c->wait_group != NULL)
   {
       char str[20];
-      int_str(id, 20, str);
+      ito_s(id, 20, str);
       t->synced = true;
       co_hash_put(c->wait_group, str, t);
       c->wait_counter++;
@@ -1216,7 +1219,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                     co_routine_t *found = (co_routine_t *)pair->val;
                     if (!co_terminated(found))
                     {
-                        if (found->status == CO_NORMAL)
+                        if ((found->status == CO_NORMAL || found->status == CO_SUSPENDED) && !found->loop_active)
                             coroutine_schedule(found);
 
                         coroutine_yield();
@@ -1224,7 +1227,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                     else
                     {
                         char str[20];
-                        int_str(found->cid, 20, str);
+                        ito_s(found->cid, 20, str);
                         if (found->results != NULL)
                             co_hash_put(wgr, str, found->results);
 
@@ -1245,12 +1248,16 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
 
 value_t co_group_result_get(co_ht_result_t *wg, int cid)
 {
-  co_routine_t *co;
   char str[20];
-  int_str(cid, 20, str);
-  co = (co_routine_t *)co_hash_get(wg, str);
+  ito_s(cid, 20, str);
+  co_routine_t *co = (co_routine_t *)co_hash_get(wg, str);
 
   return co_results(co);
+}
+
+void co_result_set(co_routine_t *co, void *data)
+{
+  co->results = data;
 }
 
 #if defined(_WIN32) || defined(_WIN64)

@@ -17,98 +17,62 @@ uv_loop_t *co_loop()
 void fs_cb(uv_fs_t *req)
 {
     ssize_t result = uv_fs_get_result(req);
-    void *fs_ptr = uv_fs_get_ptr(req);
-    uv_fs_type fs_type = uv_fs_get_type(req);
-/*/
-    switch (fs_type)
-    {
-    case UV_FS_CLOSE:
-    case UV_FS_SYMLINK:
-    case UV_FS_LINK:
-    case UV_FS_CHMOD:
-    case UV_FS_RENAME:
-    case UV_FS_UNLINK:
-    case UV_FS_RMDIR:
-    case UV_FS_MKDIR:
-    case UV_FS_CHOWN:
-    case UV_FS_UTIME:
-    case UV_FS_FUTIME:
-        params[0] = result;
-        break;
-    case UV_FS_FCHMOD:
-    case UV_FS_FCHOWN:
-    case UV_FS_FTRUNCATE:
-    case UV_FS_FDATASYNC:
-    case UV_FS_FSYNC:
-        params[1] = result;
-        break;
-    case UV_FS_OPEN:
-        if (result < 0)
-            params[0] = result;
-        else
-            params[0] = \create_resource_object(result, uv_fSystem);
-        break;
-    case UV_FS_SCANDIR:
-        if (result < 0)
+    uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
+    co_routine_t *co = uv_args->co;
+    if (result < 0) {
+        fprintf(stderr, "Error: %s\n", uv_strerror(result));
+    } else {
+        void *fs_ptr = uv_fs_get_ptr(req);
+        uv_fs_type fs_type = uv_fs_get_type(req);
+
+        switch (fs_type)
         {
-            params[0] = result;
+        case UV_FS_CLOSE:
+        case UV_FS_SYMLINK:
+        case UV_FS_LINK:
+        case UV_FS_CHMOD:
+        case UV_FS_RENAME:
+        case UV_FS_UNLINK:
+        case UV_FS_RMDIR:
+        case UV_FS_MKDIR:
+        case UV_FS_CHOWN:
+        case UV_FS_UTIME:
+        case UV_FS_FUTIME:
+        case UV_FS_FCHMOD:
+        case UV_FS_FCHOWN:
+        case UV_FS_FTRUNCATE:
+        case UV_FS_FDATASYNC:
+        case UV_FS_FSYNC:
+            break;
+        case UV_FS_OPEN:
+            break;
+        case UV_FS_SCANDIR:
+            break;
+        case UV_FS_LSTAT:
+        case UV_FS_STAT:
+            break;
+        case UV_FS_FSTAT:
+            break;
+        case UV_FS_READLINK:
+            break;
+        case UV_FS_READ:
+            break;
+        case UV_FS_SENDFILE:
+            break;
+        case UV_FS_WRITE:
+            break;
+        case UV_FS_UNKNOWN:
+        case UV_FS_CUSTOM:
+        default:
+            fprintf(stderr, "type; %d not supported.", fs_type);
+            break;
         }
-        else
-        {
-            zval = \zval_array(\ze_ffi()->_zend_new_array(0));
-            dent = \UVDirent::init('struct uv_dirent_s');
-            while (UV_EOF != uv_fs_scandir_next(req, dent()))
-            {
-                \ze_ffi()->add_next_index_string(zval(), dent()->name);
-            }
-            params[0] = \zval_native(zval);
-        }
-        break;
-    case UV_FS_LSTAT:
-    case UV_FS_STAT:
-        if (!\is_null(fs_ptr))
-            params[0] = \uv_stat_to_zval((\uv_cast('uv_stat_t *', fs_ptr)));
-        else
-            params[0] = result;
-        break;
-    case UV_FS_FSTAT:
-        if (!\is_null(fs_ptr))
-            params[1] = \uv_stat_to_zval((\uv_cast('uv_stat_t *', fs_ptr)));
-        else
-            params[1] = result;
-        break;
-    case UV_FS_READLINK:
-        if (result == 0)
-            params[0] = \ffi_string(fs_ptr);
-        else
-            params[0] = result;
-        break;
-    case UV_FS_READ:
-        buffer = uv_fSystem->buffer();
-        if (result >= 0)
-            params[1] = buffer->getString(result);
-        else
-            params[1] = result;
-        break;
-    case UV_FS_SENDFILE:
-        params[1] = result;
-        break;
-    case UV_FS_WRITE:
-        params[1] = result;
-        break;
-    case UV_FS_UNKNOWN:
-    case UV_FS_CUSTOM:
-    default:
-        fprintf(stderr, "type; %d not supported.", fs->fs_type);
-        break;
-    }
-*/
-    if (result == -1)
-    {
-        fprintf(stderr, "Error at opening file: %sn", uv_strerror(result));
     }
 
-    uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)&req);
+    co->halt = true;
+    co->loop_active = false;
+    co_result_set(co, &req->result);
+    co_deferred_free(co);
     if (uv_args != NULL)
     {
         CO_FREE(uv_args->args);
@@ -116,6 +80,8 @@ void fs_cb(uv_fs_t *req)
     }
 
     uv_fs_req_cleanup(req);
+    coroutine_schedule(co);
+    co_scheduler();
 }
 
 void *fs_init(void *uv_args)
@@ -263,7 +229,7 @@ void *fs_init(void *uv_args)
     return 0;
 }
 
-int co_fs_open(const char *path, int flags, int mode)
+uv_file co_fs_open(const char *path, int flags, int mode)
 {
     co_value_t *args;
     uv_args_t *uv_args;
@@ -280,5 +246,8 @@ int co_fs_open(const char *path, int flags, int mode)
     uv_args->n_args = 3;
     uv_args->is_path = true;
 
-    return co_uv(fs_init, uv_args);
+    co_ht_group_t *wg = co_wait_group();
+    int cid = co_uv(fs_init, uv_args);
+    co_ht_result_t *wgr = co_wait(wg);
+    return (uv_file)co_group_result_get(wgr, cid).integer;
 }

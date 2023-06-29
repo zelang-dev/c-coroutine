@@ -494,13 +494,18 @@ typedef struct co_queue_s
 
 enum value_types
 {
+    CO_NULL = -1,
     CO_INT,
+    CO_SINT,
     CO_LONG,
+    CO_LLONG,
     CO_MAX,
     CO_FLOAT,
     CO_DOUBLE,
     CO_BOOL,
+    CO_UCHAR,
     CO_STRING,
+    CO_CCHAR,
     CO_ARRAY,
     CO_OBJ,
     CO_FUNC
@@ -535,6 +540,7 @@ typedef struct uv_args_s
 {
     /* allocated array of arguments */
     co_value_t *args;
+    co_routine_t *co;
 
     bool is_path;
     enum uv_fs_type fs_type;
@@ -815,7 +821,7 @@ C_API co_ht_result_t *co_wait(co_ht_group_t *);
 
 C_API value_t co_group_result_get(co_ht_result_t *, int);
 
-C_API void co_result_set(int, void *);
+C_API void co_result_set(co_routine_t *, void *);
 
 C_API value_t co_result_get(int);
 
