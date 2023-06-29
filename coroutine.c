@@ -45,8 +45,25 @@ co_routine_t **all_coroutine;
 
 int n_all_coroutine;
 
-
 volatile C_ERROR_FRAME_T CExceptionFrames[C_ERROR_NUM_ID] = {{0}};
+
+void coroutine_loop(int);
+void coroutine_interrupt(void);
+/* Create a new coroutine running func(arg) with stack size. */
+int coroutine_create(co_callable_t, void *, unsigned int);
+
+/* Sets the current coroutine's name.*/
+void coroutine_name(char *, ...);
+
+/* Mark the current coroutine as a ``system`` coroutine. These are ignored for the
+purposes of deciding the program is done running */
+void coroutine_system(void);
+
+/* Sets the current coroutine's state name.*/
+void coroutine_state(char *, ...);
+
+/* Returns the current coroutine's state name. */
+char *coroutine_get_state(void);
 
 void throw(C_ERROR_T ExceptionID)
 {
@@ -980,6 +997,21 @@ void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
   return ptr;
 }
 
+void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func)
+{
+  void *ptr = CO_CALLOC(count, size);
+
+  if (LIKELY(ptr))
+      co_deferred(coro, func, ptr);
+
+  return ptr;
+}
+
+CO_FORCE_INLINE void *co_new_by(int count, size_t size)
+{
+  return co_calloc_full(co_active(), count, size, CO_FREE);
+}
+
 CO_FORCE_INLINE void *co_new(size_t size)
 {
   return co_malloc_full(co_active(), size, CO_FREE);
@@ -1219,7 +1251,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                     co_routine_t *found = (co_routine_t *)pair->val;
                     if (!co_terminated(found))
                     {
-                        if ((found->status == CO_NORMAL || found->status == CO_SUSPENDED) && !found->loop_active)
+                        if (found->status == CO_NORMAL && !found->loop_active)
                             coroutine_schedule(found);
 
                         coroutine_yield();
@@ -1229,7 +1261,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                         char str[20];
                         ito_s(found->cid, 20, str);
                         if (found->results != NULL)
-                            co_hash_put(wgr, str, found->results);
+                            co_hash_put(wgr, str, &found->results);
 
                         co_hash_delete(wg, pair->key);
                         --c->wait_counter;
@@ -1246,13 +1278,12 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
   return wgr;
 }
 
-value_t co_group_result_get(co_ht_result_t *wg, int cid)
+value_t co_group_get_result(co_ht_result_t *wg, int cid)
 {
   char str[20];
   ito_s(cid, 20, str);
-  co_routine_t *co = (co_routine_t *)co_hash_get(wg, str);
-
-  return co_results(co);
+  co_value_t *data = (co_value_t *)co_hash_get(wg, str);
+  return data->value;
 }
 
 void co_result_set(co_routine_t *co, void *data)
@@ -1297,6 +1328,11 @@ static size_t nsec(void)
 void coroutine_loop(int mode)
 {
   CO_EVENT_LOOP(co_active()->loop, mode);
+}
+
+void coroutine_interrupt()
+{
+  coroutine_loop(UV_RUN_NOWAIT);
 }
 
 static void *coroutine_wait(void *v)
@@ -1394,6 +1430,12 @@ int coroutine_yield()
     coroutine_state("yield");
     co_suspend();
     return n_co_switched - n - 1;
+}
+
+void co_pause()
+{
+    coroutine_schedule(co_running);
+    co_suspend();
 }
 
 bool coroutine_active()

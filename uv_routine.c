@@ -19,9 +19,12 @@ void fs_cb(uv_fs_t *req)
     ssize_t result = uv_fs_get_result(req);
     uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
     co_routine_t *co = uv_args->co;
-    if (result < 0) {
-        fprintf(stderr, "Error: %s\n", uv_strerror(result));
-    } else {
+    if (result < 0)
+    {
+        fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
+    }
+    else
+    {
         void *fs_ptr = uv_fs_get_ptr(req);
         uv_fs_type fs_type = uv_fs_get_type(req);
 
@@ -81,7 +84,6 @@ void fs_cb(uv_fs_t *req)
 
     uv_fs_req_cleanup(req);
     coroutine_schedule(co);
-    co_scheduler();
 }
 
 void *fs_init(void *uv_args)
@@ -95,59 +97,63 @@ void *fs_init(void *uv_args)
     if (fs->is_path)
     {
         const char *path = args[0].value.string;
+        const char *n_path;
+        int flags, mode;
+        double atime, mtime;
+        uv_uid_t uid, gid;
         switch (fs->fs_type)
         {
         case UV_FS_OPEN:
-            int flags = args[1].value.integer;
-            int mode = args[2].value.integer;
+            flags = args[1].value.integer;
+            mode = args[2].value.integer;
             result = uv_fs_open(loop, &req, path, flags, mode, fs_cb);
             break;
         case UV_FS_UNLINK:
             result = uv_fs_unlink(loop, &req, path, fs_cb);
             break;
         case UV_FS_MKDIR:
-            int mode = args[1].value.integer;
+            mode = args[1].value.integer;
             result = uv_fs_mkdir(loop, &req, path, mode, fs_cb);
             break;
         case UV_FS_RENAME:
-            const char *n_path = args[1].value.string;
+            n_path = args[1].value.string;
             result = uv_fs_rename(loop, &req, path, n_path, fs_cb);
             break;
         case UV_FS_CHMOD:
-            int mode = args[1].value.integer;
+            mode = args[1].value.integer;
             result = uv_fs_chmod(loop, &req, path, mode, fs_cb);
             break;
         case UV_FS_UTIME:
-            double atime = args[1].value.precision;
-            double mtime = args[2].value.precision;
+            atime = args[1].value.precision;
+            mtime = args[2].value.precision;
             result = uv_fs_utime(loop, &req, path, atime, mtime, fs_cb);
             break;
         case UV_FS_CHOWN:
-            uv_uid_t uid = args[1].value.uchar;
-            uv_uid_t gid = args[2].value.uchar;
+            uid = args[1].value.uchar;
+            gid = args[2].value.uchar;
             result = uv_fs_chown(loop, &req, path, uid, gid, fs_cb);
             break;
         case UV_FS_LINK:
-            const char *n_path = args[1].value.string;
+            n_path = args[1].value.string;
             result = uv_fs_link(loop, &req, path, n_path, fs_cb);
             break;
         case UV_FS_SYMLINK:
-            const char *n_path = args[1].value.string;
-            int flags = args[2].value.integer;
+            n_path = args[1].value.string;
+            flags = args[2].value.integer;
             result = uv_fs_symlink(loop, &req, path, n_path, flags, fs_cb);
             break;
         case UV_FS_RMDIR:
             result = uv_fs_rmdir(loop, &req, path, fs_cb);
             break;
         case UV_FS_FSTAT:
-            const char *n_path = args[1].value.string;
-            result = uv_fs_lstat(loop, &req, path, n_path, fs_cb);
+            n_path = args[1].value.string;
+            result = uv_fs_lstat(loop, &req, path, fs_cb);
             break;
         case UV_FS_STAT:
             result = uv_fs_stat(loop, &req, path, fs_cb);
             break;
         case UV_FS_SCANDIR:
-            int flags = args[1].value.integer;
+            flags = args[1].value.integer;
             result = uv_fs_scandir(loop, &req, path, flags, fs_cb);
             break;
         case UV_FS_READLINK:
@@ -163,15 +169,22 @@ void *fs_init(void *uv_args)
     else
     {
         uv_file fd = args[0].value.integer;
+        uv_file in_fd;
+        int64_t offset;
+        int mode;
+        size_t length;
+        double atime, mtime;
+        uv_uid_t uid, gid;
+        uv_buf_t *bufs;
         switch (fs->fs_type)
         {
         case UV_FS_FSTAT:
             result = uv_fs_fstat(loop, &req, fd, fs_cb);
             break;
         case UV_FS_SENDFILE:
-            uv_file in_fd = args[1].value.integer;
-            int64_t offset = args[2].value.long_int;
-            size_t length = args[3].value.max_int;
+            in_fd = args[1].value.integer;
+            offset = args[2].value.long_int;
+            length = args[3].value.max_int;
             result = uv_fs_sendfile(loop, &req, fd, in_fd, offset, length, fs_cb);
             break;
         case UV_FS_CLOSE:
@@ -184,31 +197,31 @@ void *fs_init(void *uv_args)
             result = uv_fs_fdatasync(loop, &req, fd, fs_cb);
             break;
         case UV_FS_FTRUNCATE:
-            int64_t offset = args[1].value.long_int;
+            offset = args[1].value.long_int;
             result = uv_fs_ftruncate(loop, &req, fd, offset, fs_cb);
             break;
         case UV_FS_FCHMOD:
-            int mode = args[1].value.integer;
+            mode = args[1].value.integer;
             result = uv_fs_fchmod(loop, &req, fd, mode, fs_cb);
             break;
         case UV_FS_FUTIME:
-            double atime = args[1].value.precision;
-            double mtime = args[2].value.precision;
+            atime = args[1].value.precision;
+            mtime = args[2].value.precision;
             result = uv_fs_futime(loop, &req, fd, atime, mtime, fs_cb);
             break;
         case UV_FS_FCHOWN:
-            uv_uid_t uid = args[1].value.uchar;
-            uv_uid_t gid = args[2].value.uchar;
+            uid = args[1].value.uchar;
+            gid = args[2].value.uchar;
             result = uv_fs_fchown(loop, &req, fd, uid, gid, fs_cb);
             break;
         case UV_FS_READ:
-            int64_t offset = args[1].value.long_int;
-            uv_buf_t *bufs = args[2].value.object;
+            offset = args[1].value.long_int;
+            bufs = args[2].value.object;
             result = uv_fs_read(loop, &req, fd, bufs, 1, offset, fs_cb);
             break;
         case UV_FS_WRITE:
-            uv_buf_t *bufs = args[1].value.object;
-            int64_t offset = args[2].value.long_int;
+            bufs = args[1].value.object;
+            offset = args[2].value.long_int;
             result = uv_fs_write(loop, &req, fd, bufs, 1, offset, fs_cb);
             break;
         case UV_FS_UNKNOWN:
@@ -249,5 +262,5 @@ uv_file co_fs_open(const char *path, int flags, int mode)
     co_ht_group_t *wg = co_wait_group();
     int cid = co_uv(fs_init, uv_args);
     co_ht_result_t *wgr = co_wait(wg);
-    return (uv_file)co_group_result_get(wgr, cid).integer;
+    return (uv_file)co_group_get_result(wgr, cid).integer;
 }

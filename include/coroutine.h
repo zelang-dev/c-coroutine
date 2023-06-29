@@ -673,6 +673,11 @@ C_API void co_deferred2(co_routine_t *, defer_func2, void *, void *);
 C_API void co_deferred_run(co_routine_t *, size_t);
 C_API size_t co_deferred_count(const co_routine_t *);
 
+/* Allocate memory array of given count and size in current coroutine,
+will auto free on fuction exit/return, do not free! */
+C_API void *co_new_by(int count, size_t size);
+C_API void *co_calloc_full(co_routine_t *, int, size_t, defer_func);
+
 /* Allocate memory of given size in current coroutine,
 will auto free on fuction exit/return, do not free! */
 C_API void *co_new(size_t);
@@ -717,40 +722,24 @@ C_API unsigned int co_sleep(unsigned int ms);
 /* Return the unique id for the current coroutine. */
 C_API unsigned int co_id(void);
 
-C_API void coroutine_schedule(co_routine_t *);
-
-/* Create a new coroutine running func(arg) with stack size. */
-C_API int coroutine_create(co_callable_t, void *, unsigned int);
+/* Pause and reschedule current coroutine. */
+C_API void co_pause(void);
 
 /* The current coroutine will be scheduled again once all the
 other currently-ready coroutines have a chance to run. Returns
 the number of other tasks that ran while the current task was waiting. */
 C_API int coroutine_yield(void);
 
-/* Sets the current coroutine's name.*/
-C_API void coroutine_name(char *, ...);
-
 /* Returns the current coroutine's name. */
 C_API char *coroutine_get_name(void);
-
-/* Mark the current coroutine as a ``system`` coroutine. These are ignored for the
-purposes of deciding the program is done running */
-C_API void coroutine_system(void);
-
-/* Sets the current coroutine's state name.*/
-C_API void coroutine_state(char *, ...);
-
-/* Returns the current coroutine's state name. */
-C_API char *coroutine_get_state(void);
 
 /* Exit the current coroutine. If this is the last non-system coroutine,
 exit the entire program using the given exit status. */
 C_API void coroutine_exit(int);
 
+C_API void coroutine_schedule(co_routine_t *);
 C_API bool coroutine_active(void);
 C_API void coroutine_info(void);
-C_API void coroutine_loop(int);
-C_API void coroutine_interrupt();
 
 C_API void channel_print(channel_t *);
 C_API channel_t *channel_create(int, int);
@@ -816,10 +805,12 @@ All coroutines here behaves like regular functions, meaning they return values, 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API co_ht_group_t *co_wait_group(void);
 
-/* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
+/* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finished.
+Returns hast table of results, accessible by coroutine id. */
 C_API co_ht_result_t *co_wait(co_ht_group_t *);
 
-C_API value_t co_group_result_get(co_ht_result_t *, int);
+/* Returns results of the given completed coroutine id, value in union value_t storage format. */
+C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
 

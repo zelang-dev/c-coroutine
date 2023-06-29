@@ -8,16 +8,20 @@ void *worker(void *arg)
 
     co_sleep(1000);
     printf("Worker %d done\n", id);
-    return 0;
+
+    return (id == 4) ? (void *)32 : 0;
 }
 
 int co_main(int argc, char **argv)
 {
+    int cid[5];
     co_ht_group_t *wg = co_wait_group();
     for (int i = 1; i <= 5; i++)
     {
-        co_go(worker, &i);
+       cid[i-1] = co_go(worker, &i);
     }
-    co_wait(wg);
+    co_ht_result_t *wgr = co_wait(wg);
+
+    printf("\nWorker # %d returned: %d\n", cid[2], co_group_get_result(wgr, cid[2]).integer);
     return 0;
 }

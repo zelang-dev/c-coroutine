@@ -118,8 +118,12 @@ All coroutines here behaves like regular functions, meaning they return values, 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API co_ht_group_t *co_wait_group(void);
 
-/* Pauses current coroutine, and begin execution for given coroutine waitGroup object, will wait for all to finished. */
+/* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finished.
+Returns hast table of results, accessible by coroutine id. */
 C_API co_ht_result_t co_wait(co_ht_group_t *);
+
+/* Returns results of the given completed coroutine id, value in union value_t storage format. */
+C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *co_make(void);
@@ -165,8 +169,12 @@ Other tasks continue to run during this time. */
 C_API unsigned int co_sleep(unsigned int ms);
 
 /* Allocate memory of given size in current coroutine,
-will auto free on fuction exit/return, do not free! */
+will auto free on function exit/return, do not free! */
 C_API void *co_new(size_t);
+
+/* Allocate memory array of given count and size in current coroutine,
+will auto free on function exit/return, do not free! */
+C_API void *co_new_by(int count, size_t size);
 
 /* Defer execution of given function with argument,
 to when current coroutine exits/returns. */
@@ -176,12 +184,14 @@ C_API void co_defer(defer_func, void *);
 typedef union
 {
     int integer;
-    unsigned int u_integer;
+    signed int s_integer;
     long big_int;
+    long long long_int;
     unsigned long long max_int;
     float point;
     double precision;
     bool boolean;
+    unsigned char uchar;
     char *string;
     const char chars[512];
     char **array;
@@ -192,9 +202,7 @@ typedef union
 typedef struct co_value
 {
     value_t value;
-    unsigned int type;
-    size_t s_args;
-    size_t n_args;
+    enum value_types type;
 } co_value_t;
 
 /* Return an value in union type storage. */
