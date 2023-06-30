@@ -18,7 +18,7 @@ channel_t *channel_create(int elem_size, int bufsize)
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;
-    c->value = (co_value_t *)s;
+    c->tmp = (co_value_t *)s;
     c->select_ready = false;
     c->buf = (unsigned char *)(c + 1);
     return c;
@@ -42,7 +42,7 @@ void channel_free(channel_t *c)
     if (c->name != NULL)
         CO_FREE(c->name);
 
-    CO_FREE(c->value);
+    CO_FREE(c->tmp);
     CO_FREE(c->a_recv.a);
     CO_FREE(c->a_send.a);
     CO_FREE(c);
@@ -359,6 +359,6 @@ int co_send(channel_t *c, void *v)
 
 co_value_t *co_recv(channel_t *c)
 {
-    _channel_op(c, CHANNEL_RECV, c->value, 1);
-    return c->value;
+    _channel_op(c, CHANNEL_RECV, c->tmp, 1);
+    return c->tmp;
 }

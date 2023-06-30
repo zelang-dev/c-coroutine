@@ -58,7 +58,7 @@ C_API void co_poll_start(uv_poll_t *, int events, uv_poll_cb callback);
 /** @return int */
 C_API void co_timer_start(uv_timer_t *timer, uv_timer_cb callback, uint64_t timeout, uint64_t repeat);
 
-C_API int co_fs_open(const char *path, int flags, int mode);
+C_API uv_file co_fs_open(const char *path, int flags, int mode);
 
 /** @return int */
 C_API void co_fs_unlink(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb callback);

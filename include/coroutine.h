@@ -582,7 +582,7 @@ typedef struct channel_s
     unsigned char *buf;
     unsigned int nbuf;
     unsigned int off;
-    co_value_t *value;
+    co_value_t *tmp;
     msg_queue_t a_send;
     msg_queue_t a_recv;
     char *name;
