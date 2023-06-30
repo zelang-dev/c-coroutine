@@ -33,8 +33,10 @@ if(WIN32)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D CO_DEBUG")
 endif()
 
+option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
+
 add_subdirectory(libuv)
-target_link_libraries(coroutine PUBLIC uv)
+target_link_libraries(coroutine PUBLIC uv_a)
 
 if(CO_BUILD_TESTS)
     set(TARGET_LIST test_args test_timing example test_resume chan_3 go_channel go_sleep test_delay primes go_select go_wait_group co_call)
