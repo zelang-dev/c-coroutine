@@ -471,8 +471,7 @@ struct routine_s
     int wait_counter;
     co_hast_t *wait_group;
     int all_coroutine_slot;
-    /* custom event loop handle */
-    void *loop;
+    co_routine_t *uv_co;
     bool loop_active;
     void *user_data;
 #if defined(CO_USE_VALGRIND)

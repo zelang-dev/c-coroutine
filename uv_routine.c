@@ -62,7 +62,9 @@ void fs_cb(uv_fs_t *req)
 
     co->halt = true;
     co->loop_active = false;
-    co_result_set(co, &req->result);
+    co_result_set(co, (co_value_t *)uv_fs_get_result(req));
+    coroutine_schedule(co->uv_co);
+    co_switch(co->uv_co);
     co_deferred_free(co);
     if (uv_args != NULL)
     {
@@ -71,7 +73,6 @@ void fs_cb(uv_fs_t *req)
     }
 
     uv_fs_req_cleanup(req);
-    coroutine_schedule(co);
 }
 
 void *fs_init(void *uv_args)
@@ -226,7 +227,8 @@ void *fs_init(void *uv_args)
         return CO_ERROR;
     }
 
-    uv_req_set_data((uv_req_t *)req, uv_args);
+    fs->co = co_active();
+    uv_req_set_data((uv_req_t *)req, (void *)fs);
     return 0;
 }
 

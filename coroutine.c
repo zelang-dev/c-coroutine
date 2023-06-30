@@ -273,6 +273,7 @@ uv_loop_t *co_loop()
             handle->halt = false;
             handle->synced = false;
             handle->wait_active = false;
+            handle->loop_active = false;
             handle->args = args;
             handle->magic_number = CO_MAGIC_NUMBER;
         }
@@ -427,6 +428,7 @@ uv_loop_t *co_loop()
             handle->halt = false;
             handle->synced = false;
             handle->wait_active = false;
+            handle->loop_active = false;
             handle->args = args;
             handle->magic_number = CO_MAGIC_NUMBER;
         }
@@ -494,6 +496,7 @@ uv_loop_t *co_loop()
             co->halt = false;
             co->synced = false;
             co->wait_active = false;
+            co->loop_active = false;
             co->args = args;
             co->magic_number = CO_MAGIC_NUMBER;
         }
@@ -608,6 +611,7 @@ static const uint32_t co_swap_function[1024] = {
             co->halt = false;
             co->synced = false;
             co->wait_active = false;
+            co->loop_active = false;
             co->args = args;
             co->magic_number = CO_MAGIC_NUMBER;
         }
@@ -1248,6 +1252,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   {
       c->loop_active = false;
       t->loop_active = true;
+      t->uv_co = c;
   }
 
   return id;
@@ -1295,20 +1300,20 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
             {
                 if (pair->val != NULL)
                 {
-                    co_routine_t *found = (co_routine_t *)pair->val;
-                    if (!co_terminated(found))
+                    co_routine_t *co = (co_routine_t *)pair->val;
+                    if (!co_terminated(co))
                     {
-                        if (found->status == CO_NORMAL && !found->loop_active)
-                            coroutine_schedule(found);
+                        if ((co->status == CO_SUSPENDED && co->loop_active) || co->status == CO_NORMAL)
+                            coroutine_schedule(co);
 
                         coroutine_yield();
                     }
                     else
                     {
                         char str[20];
-                        ito_s(found->cid, 20, str);
-                        if (found->results != NULL)
-                            co_hash_put(wgr, str, &found->results);
+                        ito_s(co->cid, 20, str);
+                        if (co->results != NULL)
+                            co_hash_put(wgr, str, &co->results);
 
                         co_hash_delete(wg, pair->key);
                         --c->wait_counter;
@@ -1581,6 +1586,7 @@ static void coroutine_scheduler(void)
         {
             uv_loop_close(co_main_loop_handle);
             CO_FREE(co_main_loop_handle);
+            co_main_loop_handle = NULL;
         }
 #endif
         if (co_count > 0) {
