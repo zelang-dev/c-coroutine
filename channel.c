@@ -357,8 +357,8 @@ int co_send(channel_t *c, void *v)
     return _channel_op(c, CHANNEL_SEND, v, 1);
 }
 
-co_value_t *co_recv(channel_t *c)
+value_t co_recv(channel_t *c)
 {
     _channel_op(c, CHANNEL_RECV, c->tmp, 1);
-    return c->tmp;
+    return c->tmp->value;
 }

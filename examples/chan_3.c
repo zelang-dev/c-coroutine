@@ -7,7 +7,7 @@ void *co_2(void *arg)
     printf("co_2 start\n");
     for (int i = 0; i < 10; i++)
     {
-        printf("received: %lu\n", co_recv(c)->value.big_int);
+        printf("received: %lu\n", co_recv(c).big_int);
     }
     printf("co_2 end\n");
 

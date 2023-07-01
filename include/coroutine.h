@@ -710,7 +710,7 @@ C_API channel_t *co_make_buf(int);
 C_API int co_send(channel_t *, void *);
 
 /* Receive data from the channel. */
-C_API co_value_t *co_recv(channel_t *);
+C_API value_t co_recv(channel_t *);
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */

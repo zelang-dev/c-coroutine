@@ -10,7 +10,7 @@ void *prime_co(void *arg)
     int p, i;
     c = arg;
 
-    p = co_recv(c)->value.integer;
+    p = co_recv(c).integer;
     if (p > goal)
         exit(0);
     if (!quiet)
@@ -22,7 +22,7 @@ void *prime_co(void *arg)
     co_go(prime_co, nc);
     for (;;)
     {
-        i = co_recv(c)->value.integer;
+        i = co_recv(c).integer;
         if (i % p)
             co_send(nc, &i);
     }

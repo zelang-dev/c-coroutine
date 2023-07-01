@@ -136,7 +136,7 @@ C_API channel_t *co_make_buf(int);
 C_API int co_send(channel_t *, void *);
 
 /* Receive data from the channel. */
-C_API co_value_t *co_recv(channel_t *);
+C_API value_t *co_recv(channel_t *);
 
 /* The `for_select {` macro sets up a coroutine to wait on multiple channel operations.
 Must be closed out with `} select_end;`, and if no `select_case(channel)`, `select_case_if(channel)`,
@@ -148,7 +148,7 @@ for_select {
     select_case(channel) {
         co_send(channel, void *data);
         // Or
-        co_value_t *r = co_recv(channel);
+        value_t *r = co_recv(channel);
     // Or
     } select_case_if(channel) {
         // co_send(channel); || co_recv(channel);
