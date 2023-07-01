@@ -1315,6 +1315,9 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                         if (co->results != NULL)
                             co_hash_put(wgr, str, &co->results);
 
+                        if (co->loop_active)
+                            co_deferred_free(co);
+
                         co_hash_delete(wg, pair->key);
                         --c->wait_counter;
                     }
@@ -1600,6 +1603,12 @@ static void coroutine_scheduler(void)
 
       t = co_run_queue.head;
       coroutine_remove(&co_run_queue, t);
+      if (t->status == CO_EVENT)
+      {
+        --co_count;
+        continue;
+      }
+
       t->ready = 0;
       co_running = t;
       n_co_switched++;

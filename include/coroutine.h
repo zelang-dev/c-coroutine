@@ -396,7 +396,8 @@ typedef enum co_state
     CO_DEAD = 0, /* The coroutine is uninitialized or deleted. */
     CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
     CO_RUNNING,  /* The coroutine is active and running. */
-    CO_SUSPENDED /* The coroutine is suspended (in a startup, or it has not started running yet). */
+    CO_SUSPENDED, /* The coroutine is suspended (in a startup, or it has not started running yet). */
+    CO_EVENT /* The coroutine is in an Event Loop callback. */
 } co_state;
 
 typedef void *(*co_callable_t)(void *);
