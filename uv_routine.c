@@ -6,7 +6,7 @@ void fs_cb(uv_fs_t *req)
 {
     ssize_t result = uv_fs_get_result(req);
     uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
-    co_routine_t *co = uv_args->co;
+    co_routine_t *co = uv_args->context;
     if (result < 0)
     {
         fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
@@ -62,15 +62,9 @@ void fs_cb(uv_fs_t *req)
 
     co->halt = true;
     co_result_set(co, (co_value_t *)uv_fs_get_result(req));
-    co_switch(co->uv_co);
-    if (uv_args != NULL)
-    {
-        CO_FREE(uv_args->args);
-        CO_FREE(uv_args);
-    }
-
+    co_switch(co->context);
     uv_fs_req_cleanup(req);
-    co->status = CO_EVENT;
+    co->status = CO_EVENT_DEAD;
     coroutine_schedule(co);
     co_scheduler();
 }
@@ -227,7 +221,7 @@ void *fs_init(void *uv_args)
         return CO_ERROR;
     }
 
-    fs->co = co_active();
+    fs->context = co_active();
     uv_req_set_data((uv_req_t *)req, (void *)fs);
     return 0;
 }
@@ -237,8 +231,8 @@ uv_file co_fs_open(const char *path, int flags, int mode)
     co_value_t *args;
     uv_args_t *uv_args;
 
-    args = (co_value_t *)CO_CALLOC(3, sizeof(co_value_t));
-    uv_args = (uv_args_t *)CO_CALLOC(1, sizeof(uv_args_t));
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    args = (co_value_t *)co_new_by(3, sizeof(co_value_t));
 
     args[0].value.string = (char *)path;
     args[1].value.integer = flags;

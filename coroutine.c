@@ -83,16 +83,16 @@ static void co_done()
     if (!co_active()->loop_active)
     {
         co_active()->halt = true;
+        co_active()->status = CO_DEAD;
     }
 
-    co_active()->status = CO_DEAD;
     co_scheduler();
 }
 
 static void loop_awaitable(co_routine_t *co)
 {
     co->func(co->args);
-    co->status = CO_NORMAL;
+    co->status = CO_EVENT;
 }
 
 static void co_awaitable()
@@ -1252,7 +1252,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
   {
       c->loop_active = false;
       t->loop_active = true;
-      t->uv_co = c;
+      t->context = c;
   }
 
   return id;
@@ -1603,7 +1603,7 @@ static void coroutine_scheduler(void)
 
       t = co_run_queue.head;
       coroutine_remove(&co_run_queue, t);
-      if (t->status == CO_EVENT)
+      if (t->status == CO_EVENT_DEAD)
       {
         --co_count;
         continue;

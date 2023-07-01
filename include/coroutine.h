@@ -393,7 +393,8 @@ typedef struct defer_func_s
 /* Coroutine states. */
 typedef enum co_state
 {
-    CO_DEAD = 0, /* The coroutine is uninitialized or deleted. */
+    CO_EVENT_DEAD = -1, /* The coroutine has ended it's Event Loop routine, is uninitialized or deleted. */
+    CO_DEAD, /* The coroutine is uninitialized or deleted. */
     CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
     CO_RUNNING,  /* The coroutine is active and running. */
     CO_SUSPENDED, /* The coroutine is suspended (in a startup, or it has not started running yet). */
@@ -472,7 +473,7 @@ struct routine_s
     int wait_counter;
     co_hast_t *wait_group;
     int all_coroutine_slot;
-    co_routine_t *uv_co;
+    co_routine_t *context;
     bool loop_active;
     void *user_data;
 #if defined(CO_USE_VALGRIND)
@@ -542,7 +543,7 @@ typedef struct uv_args_s
 {
     /* allocated array of arguments */
     co_value_t *args;
-    co_routine_t *co;
+    co_routine_t *context;
 
     bool is_path;
     enum uv_fs_type fs_type;
