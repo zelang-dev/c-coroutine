@@ -1,12 +1,14 @@
 # c-coroutine
 
-**c-coroutine** is a cooperative multithreading library written in C89. This library was initially a rework/refactor and merge of [libco](https://github.com/higan-emu/libco) with [minicoro](https://github.com/edubart/minicoro). These two differ among many [coru](https://github.com/geky/coru), [libdill](https://github.com/sustrik/libdill), [libmill](https://github.com/sustrik/libmill), [libwire](https://github.com/baruch/libwire), [libcoro](https://github.com/semistrict/libcoro), [libcsp](https://github.com/shiyanhui/libcsp), [dyco-coroutine](https://github.com/piaodazhu/dyco-coroutine), in that Windows is supported, and not using **ucontext**. That was until I came across [libtask](https://swtch.com/libtask), where the design is the underpinning of GoLang, and made it Windows compatible [libtask](https://github.com/symplely/libtask).
+**c-coroutine** is a cooperative multithreading library written in C89. This library was initially a rework/refactor and merge of [libco](https://github.com/higan-emu/libco) with [minicoro](https://github.com/edubart/minicoro). These two differ among many [coru](https://github.com/geky/coru), [libdill](https://github.com/sustrik/libdill), [libmill](https://github.com/sustrik/libmill), [libwire](https://github.com/baruch/libwire), [libcoro](https://github.com/semistrict/libcoro), [libcsp](https://github.com/shiyanhui/libcsp), [dyco-coroutine](https://github.com/piaodazhu/dyco-coroutine), in that Windows is supported, and not using **ucontext**. That was until I came across [libtask](https://swtch.com/libtask), where the design is the underpinning of GoLang, and made it Windows compatible in an fork [symplely/libtask](https://github.com/symplely/libtask). **Libtask** has it's channel design origins from [Richard Beton's libcsp](https://libcsp.sourceforge.net/)
 
-This library is currently being build as fully `C` representation of GoLang `Go` **routine**. **PR** are welcome.
+_This library is currently being build as fully `C` representation of GoLang `Go` **routine**. **PR** are welcome._
 
-To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [coroutine](https://github.com/symplely/coroutine) library by way of `yield`.
+To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [symplely/coroutine](https://github.com/symplely/coroutine) library by way of `yield`.
 
 > "The role of the language, is to take care of the mechanics of the async pattern and provide a natural bridge to a language-specific implementation." -[Microsoft](https://learn.microsoft.com/en-us/archive/msdn-magazine/2018/june/c-effective-async-with-coroutines-and-c-winrt).
+
+You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly. This library incorporates [libuv](http://docs.libuv.org) in a way that make providing callbacks unnecessary, same as in [Using C++ Resumable Functions with Libuv](https://devblogs.microsoft.com/cppblog/using-ibuv-with-c-resumable-functions/). **Libuv** is handling any hardware or multi-threading CPU access. This not necessary for library usage, the setup can be replaced with some other Event Loop library, or just disabled.
 
 ## Table of Contents
 
@@ -28,13 +30,12 @@ The **libco** and **minicoro** library included _CPU_ backends for:
 
 * x86, amd64, PowerPC, PowerPC64 ELFv1, PowerPC64 ELFv2, ARM 32-bit,  ARM 64-bit (AArch64), POSIX platforms (setjmp), Windows platforms (fibers)
 
-You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly.
-
 In the following lists only _Windows and Linux_ targets been tested by **c-coroutine**, the others are reprints from **libco**. It is quite possible that this library will work on more processors, compilers and operating systems than those listed below.
 
-The "Overhead" is the cost of switching coroutines, as compared to an ordinary `C` function call.
+<details>
+<summary>The `Overhead` is the cost of switching coroutines, as compared to an ordinary `C` function call.</summary>
 
-## Target - x86
+### Target - x86
 
 * **Overhead:** ~5x
 * **Supported processor(s):** 32-bit x86
@@ -45,7 +46,7 @@ The "Overhead" is the cost of switching coroutines, as compared to an ordinary `
   * Linux
   * BSD
 
-## Target - amd64
+### Target - amd64
 
 * **Overhead:** ~10x (Windows), ~6x (all other platforms)
 * **Supported processor(s):** 64-bit amd64
@@ -56,7 +57,7 @@ The "Overhead" is the cost of switching coroutines, as compared to an ordinary `
   * Linux
   * BSD
 
-## Target - ppc
+### Target - ppc
 
 * **Overhead:** ~20x
 * **Supported processor(s):** 32-bit PowerPC, 64-bit PowerPC
@@ -70,7 +71,7 @@ The "Overhead" is the cost of switching coroutines, as compared to an ordinary `
 **Note:** this module contains compiler flags to enable/disable FPU and Altivec
 support.
 
-## Target - fiber
+### Target - fiber
 
 This uses Windows' "fibers" API.
 
@@ -80,7 +81,7 @@ This uses Windows' "fibers" API.
 * **Supported operating system(s):**
   * Windows
 
-## Target - sjlj
+### Target - sjlj
 
 This uses the C standard library's `setjump`/`longjmp` APIs.
 
@@ -93,7 +94,7 @@ This uses the C standard library's `setjump`/`longjmp` APIs.
   * BSD
   * Solaris
 
-## Target - ucontext
+### Target - ucontext
 
 This uses the POSIX "ucontext" API.
 
@@ -103,6 +104,8 @@ This uses the POSIX "ucontext" API.
 * **Supported operating system(s):**
   * Linux
   * BSD
+
+</details>
 
 ## Synopsis
 
