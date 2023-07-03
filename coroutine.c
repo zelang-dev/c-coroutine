@@ -1322,10 +1322,10 @@ CO_FORCE_INLINE int co_uv(co_callable_t fn, void *arg)
     return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
-co_hast_t *co_wait_group(void)
+co_ht_group_t *co_wait_group(void)
 {
     co_routine_t *c = co_active();
-    co_hast_t *wg = co_ht_group_init();
+    co_ht_group_t *wg = co_ht_group_init();
     co_defer(co_hash_free, wg);
     c->wait_active = true;
     c->wait_group = wg;
@@ -1378,16 +1378,11 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                                     co->status = CO_EVENT_DEAD;
                                     co->loop_active = true;
                                     co->halt = true;
+                                    coroutine_schedule(co);
                                 }
 
                                 co_hash_delete(wg, pair->key);
                                 --c->wait_counter;
-
-                                if (co->loop_active)
-                                {
-                                    co->status = CO_EVENT_DEAD;
-                                    coroutine_schedule(co);
-                                }
                             }
                         }
                     }
@@ -1397,6 +1392,11 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
         c->wait_active = false;
         c->wait_group = NULL;
         --co_count;
+        if (co->loop_active)
+        {
+            c->loop_active = false;
+            co->loop_active = false;
+        }
     }
 
     return wgr;
