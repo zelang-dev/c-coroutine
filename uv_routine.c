@@ -1,12 +1,27 @@
 #include "include/coroutine.h"
 
-static thread_local co_hast_t co_ht_loop_result;
+void *fs_init(void *);
+
+static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_type, size_t n_args, bool is_path)
+{
+    uv_args->args = args;
+    uv_args->fs_type = fs_type;
+    uv_args->n_args = n_args;
+    uv_args->is_path = is_path;
+
+    co_ht_group_t *wg = co_wait_group();
+    int cid = co_uv(fs_init, uv_args);
+    co_ht_result_t *wgr = co_wait(wg);
+    return co_group_get_result(wgr, cid);
+}
 
 void fs_cb(uv_fs_t *req)
 {
     ssize_t result = uv_fs_get_result(req);
     uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
     co_routine_t *co = uv_args->context;
+    bool override = false;
+
     if (result < 0)
     {
         fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
@@ -34,7 +49,6 @@ void fs_cb(uv_fs_t *req)
         case UV_FS_FTRUNCATE:
         case UV_FS_FDATASYNC:
         case UV_FS_FSYNC:
-            break;
         case UV_FS_OPEN:
             break;
         case UV_FS_SCANDIR:
@@ -43,6 +57,8 @@ void fs_cb(uv_fs_t *req)
         case UV_FS_STAT:
             break;
         case UV_FS_FSTAT:
+            override = true;
+            co_result_set(co, uv_fs_get_statbuf(req));
             break;
         case UV_FS_READLINK:
             break;
@@ -61,12 +77,10 @@ void fs_cb(uv_fs_t *req)
     }
 
     co->halt = true;
-    co_result_set(co, (co_value_t *)uv_fs_get_result(req));
+    if (!override)
+        co_result_set(co, (co_value_t *)uv_fs_get_result(req));
+
     co_switch(co->context);
-    uv_fs_req_cleanup(req);
-    co->status = CO_EVENT_DEAD;
-    coroutine_schedule(co);
-    co_scheduler();
 }
 
 void *fs_init(void *uv_args)
@@ -75,15 +89,20 @@ void *fs_init(void *uv_args)
     uv_loop_t *loop = co_loop();
     uv_args_t *fs = (uv_args_t *)uv_args;
     co_value_t *args = fs->args;
+    uv_uid_t uid, gid;
+    uv_file in_fd;
+    size_t length;
+    int64_t offset;
+    uv_buf_t *bufs;
+    const char *n_path;
+    double atime, mtime;
+    int flags, mode;
     int result = -4058;
 
+    co_defer(uv_fs_req_cleanup, req);
     if (fs->is_path)
     {
         const char *path = args[0].value.string;
-        const char *n_path;
-        int flags, mode;
-        double atime, mtime;
-        uv_uid_t uid, gid;
         switch (fs->fs_type)
         {
         case UV_FS_OPEN:
@@ -152,13 +171,6 @@ void *fs_init(void *uv_args)
     else
     {
         uv_file fd = args[0].value.integer;
-        uv_file in_fd;
-        int64_t offset;
-        int mode;
-        size_t length;
-        double atime, mtime;
-        uv_uid_t uid, gid;
-        uv_buf_t *bufs;
         switch (fs->fs_type)
         {
         case UV_FS_FSTAT:
@@ -238,13 +250,29 @@ uv_file co_fs_open(const char *path, int flags, int mode)
     args[1].value.integer = flags;
     args[2].value.integer = mode;
 
-    uv_args->args = args;
-    uv_args->fs_type = UV_FS_OPEN;
-    uv_args->n_args = 3;
-    uv_args->is_path = true;
+    return (uv_file)co_fs_init(uv_args, args, UV_FS_OPEN, 3, true).integer;
+}
 
-    co_ht_group_t *wg = co_wait_group();
-    int cid = co_uv(fs_init, uv_args);
-    co_ht_result_t *wgr = co_wait(wg);
-    return (uv_file)co_group_get_result(wgr, cid).integer;
+uv_stat_t *co_fs_fstat(uv_file fd)
+{
+    co_value_t *args;
+    uv_args_t *uv_args;
+
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    args = (co_value_t *)co_new_by(1, sizeof(co_value_t));
+
+    args[0].value.integer = fd;
+    return (uv_stat_t *)co_fs_init(uv_args, args, UV_FS_FSTAT, 1, false).object;
+}
+
+int co_fs_close(uv_file fd)
+{
+    co_value_t *args;
+    uv_args_t *uv_args;
+
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    args = (co_value_t *)co_new_by(1, sizeof(co_value_t));
+
+    args[0].value.integer = fd;
+    return co_fs_init(uv_args, args, UV_FS_CLOSE, 1, false).integer;
 }

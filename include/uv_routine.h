@@ -38,8 +38,14 @@ typedef union
     uv_random_cb randoms;
 } uv_routine_cb;
 
-/** @return void */
-C_API void co_close(uv_handle_t *, uv_close_cb callback);
+C_API uv_file co_fs_open(const char *, int, int);
+
+C_API uv_stat_t *co_fs_fstat(uv_file);
+
+C_API int co_fs_close(uv_file);
+
+C_API int co_close(uv_handle_t *);
+
 /** @return int */
 C_API void co_write(uv_write_t *, uv_stream_t *, uv_buf_t, int, uv_write_cb callback);
 
@@ -58,13 +64,10 @@ C_API void co_poll_start(uv_poll_t *, int events, uv_poll_cb callback);
 /** @return int */
 C_API void co_timer_start(uv_timer_t *timer, uv_timer_cb callback, uint64_t timeout, uint64_t repeat);
 
-C_API uv_file co_fs_open(const char *path, int flags, int mode);
 
 /** @return int */
 C_API void co_fs_unlink(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb callback);
 
-/** @return int */
-C_API void co_fs_close(uv_loop_t *, uv_fs_t *, uv_file file, uv_fs_cb callback);
 
 /** @return int */
 C_API void co_fs_read(uv_loop_t *, uv_fs_t *, uv_file file, uv_buf_t, int, int64_t offset, uv_fs_cb cb);
@@ -101,9 +104,6 @@ C_API void co_fs_closedir(uv_loop_t *, uv_fs_t *, uv_dir_t *dir, uv_fs_cb cb);
 
 /** @return int */
 C_API void co_fs_stat(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb cb);
-
-/** @return int */
-C_API void co_fs_fstat(uv_loop_t *, uv_fs_t *, uv_file file, uv_fs_cb cb);
 
 /** @return int */
 C_API void co_fs_rename(uv_loop_t *, uv_fs_t *, const char path, const char new_path, uv_fs_cb cb);
