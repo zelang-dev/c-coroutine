@@ -1368,7 +1368,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                             if (co->results != NULL)
                                 co_hash_put(wgr, str, &co->results);
 
-                            if (c->stack_base != NULL)
+                            if (co->stack_base != NULL)
                             {
                                 if (co->loop_active)
                                 {
@@ -1661,7 +1661,7 @@ static void coroutine_scheduler(void)
     for (;;)
     {
         coroutine_interrupt();
-        if (co_count <= 0 || !coroutine_active())
+        if (co_count == 0 || !coroutine_active())
         {
 #ifdef UV_H
             if (co_main_loop_handle != NULL)
@@ -1688,7 +1688,16 @@ static void coroutine_scheduler(void)
         if (t->status == CO_EVENT_DEAD)
         {
             --co_count;
-            continue;
+            if (coroutine_active())
+            {
+                t = co_run_queue.head;
+                coroutine_remove(&co_run_queue, t);
+            }
+
+            if (t->status == CO_EVENT_DEAD)
+            {
+                continue;
+            }
         }
 
         t->ready = 0;
