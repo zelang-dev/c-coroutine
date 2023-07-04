@@ -1350,6 +1350,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
     co_routine_t *co;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0))
     {
+        co_pause();
         wgr = co_ht_result_init();
         co_defer(co_hash_free, wgr);
         oa_pair *pair;
