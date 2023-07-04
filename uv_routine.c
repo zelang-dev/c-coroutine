@@ -81,6 +81,7 @@ void fs_cb(uv_fs_t *req)
         co_result_set(co, (co_value_t *)uv_fs_get_result(req));
 
     co_switch(co->context);
+    co_scheduler();
 }
 
 void *fs_init(void *uv_args)

@@ -775,8 +775,18 @@ void co_delete(co_routine_t *handle)
             handle->vg_stack_id = 0;
         }
 #endif
-        CO_FREE(handle);
-        handle->status = CO_DEAD;
+        if (handle->loop_active)
+        {
+            handle->status = CO_EVENT_DEAD;
+            handle->loop_active = false;
+            handle->synced = false;
+        }
+        else
+        {
+            CO_FREE(handle);
+            handle->status = CO_DEAD;
+            handle = NULL;
+        }
     }
 }
 
@@ -1363,27 +1373,15 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                         else
                         {
                             char str[20];
-                            int cid = co->cid;
-                            ito_s(cid, 20, str);
+                            ito_s(co->cid, 20, str);
                             if (co->results != NULL)
                                 co_hash_put(wgr, str, &co->results);
 
-                            if (co->stack_base != NULL)
-                            {
-                                if (co->loop_active)
-                                {
-                                    co_deferred_free(co);
-                                    co_routine_t *co = co_new_by(1, sizeof(co_routine_t));
-                                    co->cid = cid;
-                                    co->status = CO_EVENT_DEAD;
-                                    co->loop_active = true;
-                                    co->halt = true;
-                                    coroutine_schedule(co);
-                                }
+                            if (co->loop_active)
+                                co_deferred_free(co);
 
-                                co_hash_delete(wg, pair->key);
-                                --c->wait_counter;
-                            }
+                            co_hash_delete(wg, pair->key);
+                            --c->wait_counter;
                         }
                     }
                 }
@@ -1392,11 +1390,6 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
         c->wait_active = false;
         c->wait_group = NULL;
         --co_count;
-        if (co->loop_active)
-        {
-            c->loop_active = false;
-            co->loop_active = false;
-        }
     }
 
     return wgr;
@@ -1685,26 +1678,12 @@ static void coroutine_scheduler(void)
 
         t = co_run_queue.head;
         coroutine_remove(&co_run_queue, t);
-        if (t->status == CO_EVENT_DEAD)
-        {
-            --co_count;
-            if (coroutine_active())
-            {
-                t = co_run_queue.head;
-                coroutine_remove(&co_run_queue, t);
-            }
-
-            if (t->status == CO_EVENT_DEAD)
-            {
-                continue;
-            }
-        }
-
         t->ready = 0;
         co_running = t;
         n_co_switched++;
         CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid, t->name, t->status);
-        co_switch(t);
+        if (t->status != CO_EVENT_DEAD)
+            co_switch(t);
         CO_LOG("Back at coroutine scheduling");
         co_running = NULL;
         if (t->halt || t->exiting)
