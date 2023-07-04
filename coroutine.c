@@ -1653,7 +1653,6 @@ static void coroutine_scheduler(void)
 
     for (;;)
     {
-        coroutine_interrupt();
         if (co_count == 0 || !coroutine_active())
         {
 #ifdef UV_H
@@ -1682,6 +1681,7 @@ static void coroutine_scheduler(void)
         co_running = t;
         n_co_switched++;
         CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid, t->name, t->status);
+        coroutine_interrupt();
         if (t->status != CO_EVENT_DEAD)
             co_switch(t);
         CO_LOG("Back at coroutine scheduling");
