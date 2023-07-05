@@ -47,7 +47,7 @@ void oa_string_free(void *data, void *arg);
 void oa_string_print(const void *data);
 
 /* Probing functions */
-void oa_hash_lp_idx(oa_hash *htable, size_t *idx);
+static inline void oa_hash_lp_idx(oa_hash *htable, size_t *idx);
 
 enum oa_ret_ops
 {
@@ -57,8 +57,7 @@ enum oa_ret_ops
 };
 
 static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, const void *key, enum oa_ret_ops op);
-static inline void oa_hash_lp_idx(oa_hash *htable, size_t *idx);
-inline static void oa_hash_grow(oa_hash *htable);
+static inline void oa_hash_grow(oa_hash *htable);
 static inline bool oa_hash_should_grow(oa_hash *htable);
 static inline bool oa_hash_is_tombstone(oa_hash *htable, size_t idx);
 static inline void oa_hash_put_tombstone(oa_hash *htable, size_t idx);
@@ -331,17 +330,6 @@ static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, con
     return idx;
 }
 
-// Probing functions
-
-static inline void oa_hash_lp_idx(oa_hash *htable, size_t *idx)
-{
-    (*idx)++;
-    if ((*idx) == htable->capacity)
-    {
-        (*idx) = 0;
-    }
-}
-
 // Pair related
 
 oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *val)
@@ -359,8 +347,24 @@ oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *val)
     return p;
 }
 
-// String operations
+// Probing functions
+static inline void oa_hash_lp_idx(oa_hash *htable, size_t *idx)
+{
+    (*idx)++;
+    if ((*idx) == htable->capacity)
+    {
+        (*idx) = 0;
+    }
+}
 
+bool oa_string_eq(const void *data1, const void *data2, void *arg)
+{
+    const char *str1 = (const char *)data1;
+    const char *str2 = (const char *)data2;
+    return !(strcmp(str1, str2)) ? true : false;
+}
+
+// String operations
 static uint32_t oa_hash_fmix32(uint32_t h)
 {
     h ^= h >> 16;
@@ -400,13 +404,6 @@ void *oa_string_cp(const void *data, void *arg)
     strncpy(result, input, sizeof(*result) * input_length);
 #endif
     return result;
-}
-
-bool oa_string_eq(const void *data1, const void *data2, void *arg)
-{
-    const char *str1 = (const char *)data1;
-    const char *str2 = (const char *)data2;
-    return !(strcmp(str1, str2)) ? true : false;
 }
 
 bool oa_coroutine_eq(const void *data1, const void *data2, void *arg)

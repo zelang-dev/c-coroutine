@@ -127,13 +127,13 @@ C_API void co_fs_access(uv_loop_t *, uv_fs_t *, const char path, int mode, uv_fs
 C_API void co_fs_chmod(uv_loop_t *, uv_fs_t *, const char path, int mode, uv_fs_cb cb);
 
 /** @return int */
-C_API void co_fs_utime(uv_loop_t *, uv_fs_t *, const char path, double_t atime, double_t mtime, uv_fs_cb cb);
+C_API void co_fs_utime(uv_loop_t *, uv_fs_t *, const char path, double atime, double mtime, uv_fs_cb cb);
 
 /** @return int */
-C_API void co_fs_futime(uv_loop_t *, uv_fs_t *, uv_file file, double_t atime, double_t mtime, uv_fs_cb cb);
+C_API void co_fs_futime(uv_loop_t *, uv_fs_t *, uv_file file, double atime, double mtime, uv_fs_cb cb);
 
 /** @return int */
-C_API void co_fs_lutime(uv_loop_t *, uv_fs_t *, const char path, double_t atime, double_t mtime, uv_fs_cb cb);
+C_API void co_fs_lutime(uv_loop_t *, uv_fs_t *, const char path, double atime, double mtime, uv_fs_cb cb);
 
 /** @return int */
 C_API void co_fs_lstat(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb cb);
