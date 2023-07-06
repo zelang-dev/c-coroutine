@@ -862,7 +862,7 @@ co_routine_t *co_start(co_callable_t func, void *args)
 
 CO_FORCE_INLINE void co_suspend()
 {
-    co_suspend_set(NULL);
+    co_yielding(co_current());
 }
 
 CO_FORCE_INLINE void co_scheduler()
@@ -870,43 +870,16 @@ CO_FORCE_INLINE void co_scheduler()
     co_switch(co_main_handle);
 }
 
-void co_suspend_set(void *data)
+void co_yielding(co_routine_t *handle)
 {
     co_stack_check(0);
-    co_active()->yield_value = data;
-    co_switch(co_current());
-}
-
-void co_yielding(co_routine_t *handle, void *data)
-{
-    co_stack_check(0);
-    handle->yield_value = data;
     co_switch(handle);
 }
 
-void *co_yielding_get(co_routine_t *handle, void *data)
+CO_FORCE_INLINE void co_resuming(co_routine_t *handle)
 {
-    co_yielding(handle, data);
-    return handle->resume_value;
-}
-
-CO_FORCE_INLINE void *co_resuming(co_routine_t *handle)
-{
-    return co_resuming_set(handle, NULL);
-}
-
-void *co_resuming_set(co_routine_t *handle, void *data)
-{
-    if (co_terminated(handle))
-        return CO_ERROR;
-    handle->resume_value = data;
-    co_switch(handle);
-    return handle->yield_value;
-}
-
-CO_FORCE_INLINE value_t co_results(co_routine_t *co)
-{
-    return co_value(co->results);
+    if (!co_terminated(handle))
+        co_switch(handle);
 }
 
 CO_FORCE_INLINE bool co_terminated(co_routine_t *co)

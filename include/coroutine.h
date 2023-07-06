@@ -482,8 +482,6 @@ struct routine_s
     void *args;
     /* Coroutine result of function return/exit. */
     void *results;
-    void *yield_value;
-    void *resume_value;
     /* Used to check stack overflow. */
     size_t magic_number;
 };
@@ -628,9 +626,6 @@ C_API void co_switch(co_routine_t *);
 /* Check for coroutine completetion and return. */
 C_API bool co_terminated(co_routine_t *);
 
-/* Results from an coroutine function completetion and return. */
-C_API value_t co_results(co_routine_t *) ;
-
 C_API bool co_serializable(void);
 
 /* Return handle to previous coroutine. */
@@ -647,20 +642,10 @@ C_API void co_suspend(void);
 
 C_API void co_scheduler(void);
 
-/* Suspends the execution of current coroutine, and passing data. */
-C_API void co_suspend_set(void *data);
-
 /* Yield to specified coroutine, passing data. */
-C_API void co_yielding(co_routine_t *, void *);
+C_API void co_yielding(co_routine_t *);
 
-/* Yield to specified coroutine, passing and getting data. */
-C_API void *co_yielding_get(co_routine_t *, void *);
-
-/* Resume specified coroutine, returning data from co_yielding. */
-C_API void *co_resuming(co_routine_t *);
-
-/* Resume specified coroutine, sending and returning data from co_yielding. */
-C_API void *co_resuming_set(co_routine_t *, void *);
+C_API void co_resuming(co_routine_t *);
 
 /* Returns the status of the coroutine. */
 C_API co_state co_status(co_routine_t *);
