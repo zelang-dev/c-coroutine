@@ -32,10 +32,8 @@ The **libco** and **minicoro** library included _CPU_ backends for:
 
 * x86, amd64, PowerPC, PowerPC64 ELFv1, PowerPC64 ELFv2, ARM 32-bit,  ARM 64-bit (AArch64), POSIX platforms (setjmp), Windows platforms (fibers)
 
-In the following lists only _Windows and Linux_ targets been tested by **c-coroutine**, the others are reprints from **libco**. It is quite possible that this library will work on more processors, compilers and operating systems than those listed below.
-
 <details>
-<summary>The `Overhead` is the cost of switching coroutines, as compared to an ordinary `C` function call.</summary>
+<summary>The `Overhead` cost of switching coroutines, as compared to an ordinary `C` function call.</summary>
 
 ### Target - x86
 
