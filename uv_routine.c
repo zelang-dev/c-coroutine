@@ -80,7 +80,7 @@ void fs_cb(uv_fs_t *req)
     if (!override)
         co_result_set(co, (co_value_t *)uv_fs_get_result(req));
 
-    co_switch(co->context);
+    co_resuming(co->context);
     co_scheduler();
 }
 
