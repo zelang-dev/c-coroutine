@@ -50,12 +50,12 @@ void *co_entrypoint(void *args)
   printf("co_entrypoint(%d, %d)\n", param->x, param->y);
   int x = param->x;
   int y = param->y;
-  co_suspend();
+  co_switch(co_current());
   // co_arg::param_x will change here (due to co_switch(co_routine_t, int, int) call changing values),
   // however, param_x and param_y will persist as they are thread local
 
   printf("co_entrypoint(%d, %d)\n", x, y);
-  co_suspend();
+  co_switch(co_current());
 
   return 0;
 }

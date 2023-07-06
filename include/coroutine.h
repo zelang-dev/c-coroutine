@@ -140,7 +140,7 @@ Must also closed out with `select_break()`. */
 
 #ifdef CO_DEBUG
     #define CO_LOG(s) puts(s);
-    #define CO_INFO(s, ...) printf(s, __VA_ARGS__);
+    #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
 #else
     #define CO_LOG(s)
     #define CO_INFO(s, ...)

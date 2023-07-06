@@ -256,7 +256,7 @@ static int channel_proc(channel_co_t *a)
         a[i].x_msg = a;
     }
 
-    CO_INFO("processed ");
+    CO_LOG("processed ");
 
     n_can = 0;
     for (i = 0; i < n; i++) {
@@ -270,7 +270,7 @@ static int channel_proc(channel_co_t *a)
                 printf("%p", c);
 #endif
         if (channel_co_can_exec(&a[i])) {
-            CO_INFO("*");
+            CO_LOG("*");
             n_can++;
         }
     }

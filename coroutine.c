@@ -284,6 +284,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         handle->loop_active = false;
         handle->args = args;
         handle->magic_number = CO_MAGIC_NUMBER;
+        handle->stack_base = (unsigned char *)(handle + 1);
     }
 
     return handle;
@@ -444,6 +445,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         handle->loop_active = false;
         handle->args = args;
         handle->magic_number = CO_MAGIC_NUMBER;
+        handle->stack_base = (unsigned char *)(handle + 1);
     }
 
     return handle;
@@ -518,6 +520,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co->loop_active = false;
         co->args = args;
         co->magic_number = CO_MAGIC_NUMBER;
+        co->stack_base = (unsigned char *)(handle + 1);
     }
 
     return co;
@@ -638,6 +641,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co->loop_active = false;
         co->args = args;
         co->magic_number = CO_MAGIC_NUMBER;
+        co->stack_base = (unsigned char *)(handle + 1);
     }
 
     return co;
@@ -752,7 +756,6 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
         return (co_routine_t *)-1;
     }
 
-    co->stack_base = (unsigned char *)(co + 1);
     return co;
 }
 
@@ -784,8 +787,6 @@ void co_delete(co_routine_t *handle)
         else
         {
             CO_FREE(handle);
-            handle->status = CO_DEAD;
-            handle = NULL;
         }
     }
 }
@@ -856,7 +857,6 @@ co_routine_t *co_start(co_callable_t func, void *args)
         return (co_routine_t *)-1;
     }
 
-    co->stack_base = (unsigned char *)(co + 1);
     return co;
 }
 
@@ -1661,7 +1661,6 @@ static void coroutine_scheduler(void)
             {
                 uv_loop_close(co_main_loop_handle);
                 CO_FREE(co_main_loop_handle);
-                co_main_loop_handle = NULL;
             }
 #endif
             if (co_count > 0)
