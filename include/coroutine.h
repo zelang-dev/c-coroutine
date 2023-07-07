@@ -139,8 +139,9 @@ Must also closed out with `select_break()`. */
 #endif
 
 #ifdef CO_DEBUG
-    #define CO_LOG(s) puts(s);
+    #define CO_LOG(s) puts(s)
     #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
+    #define CO_HERE() fprintf(stderr, "%s:%d\n", __FILE__, __LINE__)
 #else
     #define CO_LOG(s)
     #define CO_INFO(s, ...)
@@ -363,6 +364,9 @@ Must also closed out with `select_break()`. */
 
 /* Number used only to assist checking for stack overflows. */
 #define CO_MAGIC_NUMBER 0x7E3CB1A9
+
+#define STR_LEN(str) (str), (sizeof(str)-1)
+#define UV_BUF_STATIC(lit) uv_buf_init((char *)STR_LEN(lit))
 
 #ifdef __cplusplus
 extern "C"
@@ -655,7 +659,7 @@ C_API void *co_user_data(co_routine_t *);
 
 C_API void co_deferred_free(co_routine_t *);
 
-/* Defer execution of given function with argument,
+/* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
 C_API void co_defer(defer_func, void *);
 C_API void co_deferred(co_routine_t *, defer_func, void *);
@@ -663,13 +667,13 @@ C_API void co_deferred2(co_routine_t *, defer_func2, void *, void *);
 C_API void co_deferred_run(co_routine_t *, size_t);
 C_API size_t co_deferred_count(const co_routine_t *);
 
-/* Allocate memory array of given count and size in current coroutine,
-will auto free on fuction exit/return, do not free! */
-C_API void *co_new_by(int count, size_t size);
+/* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
+will auto free `LIFO` on function exit/return, do not free! */
+C_API void *co_new_by(int, size_t);
 C_API void *co_calloc_full(co_routine_t *, int, size_t, defer_func);
 
-/* Allocate memory of given size in current coroutine,
-will auto free on fuction exit/return, do not free! */
+/* Call `CO_MALLOC` to allocate memory of given size in current coroutine,
+will auto free `LIFO` on function exit/return, do not free! */
 C_API void *co_new(size_t);
 C_API void *co_malloc(co_routine_t *, size_t);
 C_API void *co_malloc_full(co_routine_t *, size_t, defer_func);

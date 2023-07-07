@@ -171,15 +171,15 @@ C_API int co_go(co_callable_t, void *);
 Other tasks continue to run during this time. */
 C_API unsigned int co_sleep(unsigned int ms);
 
-/* Allocate memory of given size in current coroutine,
-will auto free on function exit/return, do not free! */
+/* Call `CO_MALLOC` to allocate memory of given size in current coroutine,
+will auto free `LIFO` on function exit/return, do not free! */
 C_API void *co_new(size_t);
 
-/* Allocate memory array of given count and size in current coroutine,
-will auto free on function exit/return, do not free! */
+/* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
+will auto free `LIFO` on function exit/return, do not free! */
 C_API void *co_new_by(int count, size_t size);
 
-/* Defer execution of given function with argument,
+/* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
 C_API void co_defer(defer_func, void *);
 

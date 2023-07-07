@@ -86,7 +86,7 @@ void fs_cb(uv_fs_t *req)
 
 void *fs_init(void *uv_args)
 {
-    uv_fs_t *req = CO_MALLOC(sizeof(uv_fs_t));
+    uv_fs_t *req = co_new_by(1, sizeof(uv_fs_t));
     uv_loop_t *loop = co_loop();
     uv_args_t *fs = (uv_args_t *)uv_args;
     co_value_t *args = fs->args;
