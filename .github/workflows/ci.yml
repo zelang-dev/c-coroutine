@@ -1,0 +1,68 @@
+name: windows & linux
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: amd64
+            flags: -O3 -fomit-frame-pointer
+          - target: x86
+            flags: -m32 -O3 -fomit-frame-pointer
+    steps:
+      - uses: actions/checkout@v3
+      - name: Prepare
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -q -y
+          sudo apt-get install -y gcc-multilib g++-multilib valgrind libc6-dbg libc6-dbg:i386
+      - name: cmake build & test example
+        run: |
+            mkdir build
+            cd build
+            cmake .. -D BUILD_TESTING=ON
+            cmake --build . --config Debug
+            ./chan_3
+            ./primes
+            ./test_delay 2
+            ./go_channel
+            ./go_sleep
+            ./go_select
+            ./go_wait_group
+            ./co_call_uv
+
+  build-windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: windows-2019
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, x86]
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - uses: actions/checkout@v3
+      - name: cmake build & test examples
+        run: |
+            mkdir build
+            cd build
+            cmake .. -D BUILD_TESTING=ON
+            cmake --build .
+            cd Debug
+            .\chan_3.exe
+            .\primes.exe
+            .\test_delay.exe 2
+            .\go_channel.exe
+            .\go_sleep.exe
+            .\go_select.exe
+            .\go_wait_group.exe
+            .\co_call_uv.exe
