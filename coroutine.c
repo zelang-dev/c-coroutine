@@ -838,28 +838,6 @@ value_t co_value(void *data)
     return ((co_value_t *)0)->value;
 }
 
-co_routine_t *co_start(co_callable_t func, void *args)
-{
-    size_t stack_size = CO_STACK_SIZE;
-    stack_size = _co_align_forward(stack_size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void *memory = CO_MALLOC(stack_size);
-    if (!memory)
-    {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        return CO_ERROR;
-    }
-
-    memset(memory, 0, stack_size);
-    co_routine_t *co = co_derive(memory, stack_size, func, args);
-    if (UNLIKELY(co_deferred_array_init(&co->defer) < 0))
-    {
-        CO_FREE(co);
-        return (co_routine_t *)-1;
-    }
-
-    return co;
-}
-
 CO_FORCE_INLINE void co_suspend()
 {
     co_yielding(co_current());

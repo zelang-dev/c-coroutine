@@ -635,9 +635,6 @@ C_API bool co_serializable(void);
 /* Return handle to previous coroutine. */
 C_API co_routine_t *co_current(void);
 
-/* Initialize and starts the coroutine passing any args. */
-C_API co_routine_t *co_start(co_callable_t, void *);
-
 /* Return the value in union storage type. */
 C_API value_t co_value(void *);
 
