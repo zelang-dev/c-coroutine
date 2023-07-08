@@ -449,7 +449,7 @@ func main() {
 }
 ```
 
-This **C** library version of it.
+This **C** library version of it, but with returning results.
 
 ```c
 #include "../include/coroutine.h"
@@ -462,20 +462,95 @@ void *worker(void *arg)
 
     co_sleep(1000);
     printf("Worker %d done\n", id);
+    if (id == 4)
+        return (void *)32;
+    else if (id == 3)
+        return (void *)"hello world\0";
+
     return 0;
 }
 
 int co_main(int argc, char **argv)
 {
-    co_hast_t *wg = co_wait_group();
+    int cid[5];
+    co_ht_group_t *wg = co_wait_group();
     for (int i = 1; i <= 5; i++)
     {
-        co_go(worker, &i);
+       cid[i-1] = co_go(worker, &i);
     }
-    co_wait(wg);
+    co_ht_result_t *wgr = co_wait(wg);
+
+    printf("\nWorker # %d returned: %d\n", cid[2], co_group_get_result(wgr, cid[2]).integer);
+    printf("\nWorker # %d returned: %s\n", cid[1], co_group_get_result(wgr, cid[1]).string);
     return 0;
 }
 ```
+
+<details>
+<summary>The above will output, and the same goes for all compile builds in `Debug` mode.</summary>
+
+```text
+Running coroutine id: 1 () status: 3
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 3
+Worker 2 starting
+Back at coroutine scheduling
+Running coroutine id: 3 () status: 3
+Worker 3 starting
+Back at coroutine scheduling
+Running coroutine id: 4 () status: 3
+Worker 4 starting
+Back at coroutine scheduling
+Running coroutine id: 5 () status: 3
+Worker 5 starting
+Back at coroutine scheduling
+Running coroutine id: 6 () status: 3
+Worker 6 starting
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 7 () status: 3
+Back at coroutine scheduling
+Running coroutine id: 6 () status: 1
+Worker 6 done
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 7 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 5 () status: 1
+Worker 5 done
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 7 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 () status: 1
+Worker 4 done
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 7 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 3 () status: 1
+Worker 3 done
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 7 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+Worker 2 done
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Worker # 4 returned: 32
+
+Worker # 3 returned: hello world
+Back at coroutine scheduling
+Coroutine scheduler exited
+```
+
+</details>
 
 see [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder.
 

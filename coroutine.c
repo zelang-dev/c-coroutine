@@ -24,8 +24,8 @@ thread_local int started_wait;
 thread_local int started_event;
 
 /* Exception handling with longjmp() */
-thread_local jmp_buf exception_buffer;
-thread_local int exception_status;
+jmp_buf exception_buffer;
+int exception_status;
 
 thread_local int exiting = 0;
 
@@ -33,10 +33,10 @@ thread_local int exiting = 0;
 thread_local int n_co_switched;
 
 /* track the number of coroutines used */
-thread_local int co_count;
+int co_count;
 
 /* record which coroutine is executing for scheduler */
-thread_local co_routine_t *co_running;
+co_routine_t *co_running;
 
 /* coroutines's FIFO scheduler queue */
 thread_local co_queue_t co_run_queue;

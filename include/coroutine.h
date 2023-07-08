@@ -192,33 +192,17 @@ Must also closed out with `select_break()`. */
 /* #define CO_NO_TIB */
 
 #if !defined(thread_local) /* User can override thread_local for obscure compilers */
-  #if !defined(CO_MP) /* Running in single-threaded environment */
+  #if defined(CO_NO_MP) /* Running in single-threaded environment */
     #define thread_local
   #else /* Running in multi-threaded environment */
-    #if defined(__STDC__) /* Compiling as C Language */
-      #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
-        #define thread_local __declspec(thread)
-      #elif __STDC_VERSION__ < 201112L /* If we are on C90/99 */
-        #if defined(__clang__) || defined(__GNUC__) /* Clang and GCC */
-          #define thread_local __thread
-        #else /* Otherwise, we ignore the directive (unless user provides their own) */
-          #define thread_local
-        #endif
-      #else /* C11 and newer define thread_local in threads.h */
+    #if __STDC_VERSION__ >= 201112 && !defined(__STDC_NO_THREADS__)
+      #define thread_local _Thread_local
+    #elif defined(_WIN32) && (defined(_MSC_VER) || defined(__ICL) ||  defined(__DMC__) ||  defined(__BORLANDC__))
+      #define thread_local __declspec(thread)
+    #elif defined(__GNUC__) || defined(__SUNPRO_C) || defined(__xlC__)
+      #define thread_local __thread
+    #else /* C11 and newer define thread_local in threads.h */
         #include <threads.h>
-      #endif
-    #elif defined(__cplusplus) /* Compiling as C++ Language */
-      #if __cplusplus < 201103L /* thread_local is a C++11 feature */
-        #if defined(_MSC_VER)
-          #define thread_local __declspec(thread)
-        #elif defined(__clang__) || defined(__GNUC__)
-          #define thread_local __thread
-        #else /* Otherwise, we ignore the directive (unless user provides their own) */
-          #define thread_local
-        #endif
-      #else /* In C++ >= 11, thread_local in a builtin keyword */
-        /* Don't do anything */
-      #endif
     #endif
   #endif
 #endif
@@ -287,34 +271,10 @@ Must also closed out with `select_break()`. */
   #endif /* = !defined(__STDC_VERSION__) && !defined(__cplusplus) */
 #endif
 
-#if defined (__OpenBSD__)
-  #if !defined(CO_MALLOC) || !defined(CO_FREE)
-    #include <unistd.h>
-    #include <sys/mman.h>
-
-    static void* malloc_obsd(size_t size) {
-      long pagesize = sysconf(_SC_PAGESIZE);
-      char* memory = (char*)mmap(NULL, size + pagesize, PROT_READ|PROT_WRITE, MAP_STACK|MAP_PRIVATE|MAP_ANON, -1, 0);
-      if (memory == MAP_FAILED) return NULL;
-      *(size_t*)memory = size + pagesize;
-      memory += pagesize;
-      return (void*)memory;
-    }
-
-    static void free_obsd(void *ptr) {
-      char* memory = (char*)ptr - sysconf(_SC_PAGESIZE);
-      munmap(memory, *(size_t*)memory);
-    }
-
-    #define CO_MALLOC malloc_obsd
-    #define CO_FREE   free_obsd
-  #endif
-#endif
-
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
   #include <stdlib.h>
   #define CO_MALLOC malloc
-  #define CO_FREE   free
+  #define CO_FREE free
   #define CO_REALLOC realloc
   #define CO_CALLOC calloc
 #endif
@@ -364,9 +324,6 @@ Must also closed out with `select_break()`. */
 
 /* Number used only to assist checking for stack overflows. */
 #define CO_MAGIC_NUMBER 0x7E3CB1A9
-
-#define STR_LEN(str) (str), (sizeof(str)-1)
-#define UV_BUF_STATIC(lit) uv_buf_init((char *)STR_LEN(lit))
 
 #ifdef __cplusplus
 extern "C"

@@ -15,7 +15,7 @@ void *prime_co(void *arg)
         exit(0);
     if (!quiet)
     {
-        printf(coroutine_get_name());
+        printf("%s ", coroutine_get_name());
         printf("%d\n", p);
     }
     nc = co_make_buf(buffer);
