@@ -453,8 +453,8 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
 #elif defined(__clang__) || defined(__GNUC__)
 #if defined(__arm__)
 #ifdef CO_MPROTECT
-#include <unistd.h>
-#include <sys/mman.h>
+    #include <unistd.h>
+    #include <sys/mman.h>
 #endif
 
 static const size_t co_swap_function[1024] = {
@@ -647,77 +647,21 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
     return co;
 }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-#define USE_NATIVE
-#include "ppc64v2.c"
+    #define USE_NATIVE
+    #include "ppc64v2.c"
 #elif defined(_ARCH_PPC) && !defined(__LITTLE_ENDIAN__)
-#define USE_NATIVE
-#include "ppc.c"
-#elif defined(_WIN32)
-#define USE_FIBER
+    #define USE_NATIVE
+    #include "ppc.c"
 #else
-#define USE_NATIVE
-#include "sjlj.c"
+    #define USE_NATIVE
+    #include "ucontext.c"
 #endif
-#elif defined(_MSC_VER)
-#define USE_FIBER
 #else
-#error "Unsupported processor, compiler or operating system"
+    #define USE_NATIVE
+    #include "ucontext.c"
 #endif
 
-#ifdef USE_FIBER
-#define WINVER 0x0400
-#define _WIN32_WINNT 0x0400
-#include <windows.h>
-
-static thread_local co_routine_t *co_active_ = NULL;
-static void __stdcall co_thunk(void *func)
-{
-    ((void (*)(void))func)();
-}
-
-co_routine_t *co_active(void)
-{
-    if (!co_active_)
-    {
-        ConvertThreadToFiber(0);
-        co_active_ = (co_routine_t *)GetCurrentFiber();
-    }
-    return co_active_;
-}
-
-co_routine_t *co_derive(void *memory, size_t heapsize, co_callable_t func, void *args)
-{
-    /* Windows fibers do not allow users to supply their own memory */
-    return CO_ERROR;
-}
-
-co_routine_t *co_create(size_t heapsize, co_callable_t func, void *args)
-{
-    if (!co_active_)
-    {
-        ConvertThreadToFiber(0);
-        co_active_ = (co_routine_t *)GetCurrentFiber();
-    }
-    return (co_routine_t *)CreateFiber(heapsize, co_thunk, (void *)func);
-}
-
-void co_delete(co_routine_t *thread)
-{
-    DeleteFiber((LPVOID)thread);
-    handle->status = CO_DEAD;
-}
-
-void co_switch(co_routine_t *thread)
-{
-    co_active_ = thread;
-    SwitchToFiber((LPVOID)thread);
-}
-
-bool co_serializable(void)
-{
-    return false;
-}
-#elif !defined(USE_NATIVE)
+#if !defined(USE_NATIVE)
 co_routine_t *co_active(void)
 {
     if (!co_active_handle)

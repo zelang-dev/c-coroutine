@@ -71,29 +71,6 @@ The **libco** and **minicoro** library included _CPU_ backends for:
 **Note:** this module contains compiler flags to enable/disable FPU and Altivec
 support.
 
-### Target - fiber
-
-This uses Windows' "fibers" API.
-
-* **Overhead:** ~15x
-* **Supported processor(s):** Processor independent
-* **Supported compiler(s):** any
-* **Supported operating system(s):**
-  * Windows
-
-### Target - sjlj
-
-This uses the C standard library's `setjump`/`longjmp` APIs.
-
-* **Overhead:** ~30x
-* **Supported processor(s):** Processor independent
-* **Supported compiler(s):** any
-* **Supported operating system(s):**
-  * Mac OS X
-  * Linux
-  * BSD
-  * Solaris
-
 ### Target - ucontext
 
 This uses the POSIX "ucontext" API.
@@ -104,6 +81,7 @@ This uses the POSIX "ucontext" API.
 * **Supported operating system(s):**
   * Linux
   * BSD
+  * Windows(Fibers) ~15x
 
 </details>
 
