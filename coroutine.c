@@ -1741,6 +1741,7 @@ void coroutine_info()
 static void coroutine_scheduler(void)
 {
     int i;
+    bool is_channel;
     co_routine_t *t;
 
     for (;;)
@@ -1771,7 +1772,11 @@ static void coroutine_scheduler(void)
         t->ready = 0;
         co_running = t;
         n_co_switched++;
-        CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid, t->name, t->status);
+        is_channel = (t->cid > co_id_generate || t->cid < 0);
+        CO_INFO("Running coroutine id: %d (%s) status: %d\n",
+                (is_channel ? -1 : t->cid),
+                ((t->name != NULL && t->cid > 0) ? t->name : !is_channel ? "" : "channel"),
+                t->status);
         coroutine_interrupt();
         if (t->status != CO_EVENT_DEAD)
             co_switch(t);
