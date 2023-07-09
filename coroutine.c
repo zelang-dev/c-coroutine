@@ -16,7 +16,7 @@ static int main_argc;
 static char **main_argv;
 
 /* coroutine unique id generator */
-thread_local int co_id_generate;
+thread_local int co_id_generate = 0;
 
 thread_local co_queue_t sleeping;
 thread_local int sleeping_counted;
@@ -105,7 +105,7 @@ static void co_awaitable()
     }
     else
     {
-        co->results = co->func(co->args);
+        co->results[0] = co->func(co->args);
         co->status = CO_NORMAL;
         co_deferred_free(co);
     }
@@ -245,21 +245,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co_init();
         co_swap = (void(fastcall *)(co_routine_t *, co_routine_t *))co_swap_function;
     }
-    if (!co_active_handle)
-        co_active_handle = co_active_buffer;
-    if (!co_main_handle)
-        co_main_handle = co_active_handle;
-#ifdef UV_H
-    if (!co_main_loop_handle)
-    {
-        co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
-        int r = uv_loop_init(co_main_loop_handle);
-        if (r)
-            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
-    }
-#endif
-    if (!co_current_handle)
-        co_current_handle = co_active();
 
     if ((handle = (co_routine_t *)memory))
     {
@@ -402,21 +387,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co_init();
         co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
     }
-    if (!co_active_handle)
-        co_active_handle = co_active_buffer;
-    if (!co_main_handle)
-        co_main_handle = co_active_handle;
-#ifdef UV_H
-    if (!co_main_loop_handle)
-    {
-        co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
-        int r = uv_loop_init(co_main_loop_handle);
-        if (r)
-            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
-    }
-#endif
-    if (!co_current_handle)
-        co_current_handle = co_active();
 
     if ((handle = (co_routine_t *)memory))
     {
@@ -482,21 +452,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co_init();
         co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
     }
-    if (!co_active_handle)
-        co_active_handle = co_active_buffer;
-    if (!co_main_handle)
-        co_main_handle = co_active_handle;
-#ifdef UV_H
-    if (!co_main_loop_handle)
-    {
-        co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
-        int r = uv_loop_init(co_main_loop_handle);
-        if (r)
-            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
-    }
-#endif
-    if (!co_current_handle)
-        co_current_handle = co_active();
 
     if ((handle = (size_t *)memory))
     {
@@ -596,21 +551,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co_init();
         co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
     }
-    if (!co_active_handle)
-        co_active_handle = co_active_buffer;
-    if (!co_main_handle)
-        co_main_handle = co_active_handle;
-#ifdef UV_H
-    if (!co_main_loop_handle)
-    {
-        co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
-        int r = uv_loop_init(co_main_loop_handle);
-        if (r)
-            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
-    }
-#endif
-    if (!co_current_handle)
-        co_current_handle = co_active();
 
     if ((handle = (size_t *)memory))
     {
@@ -647,11 +587,247 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
     return co;
 }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-    #define USE_NATIVE
-    #include "ppc64v2.c"
-#elif defined(_ARCH_PPC) && !defined(__LITTLE_ENDIAN__)
-    #define USE_NATIVE
-    #include "ppc.c"
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+#define ALIGN(p, x) ((void *)((uintptr_t)(p) & ~((x)-1)))
+
+#define MIN_STACK 0x10000lu
+#define MIN_STACK_FRAME 0x20lu
+#define STACK_ALIGN 0x10lu
+
+void swap_context(co_routine_t *read, co_routine_t *write);
+__asm__(
+    ".text\n"
+    ".align 4\n"
+    ".type swap_context @function\n"
+    "swap_context:\n"
+    ".cfi_startproc\n"
+
+    /* save GPRs */
+    "std 1, 8(4)\n"
+    "std 2, 16(4)\n"
+    "std 12, 96(4)\n"
+    "std 13, 104(4)\n"
+    "std 14, 112(4)\n"
+    "std 15, 120(4)\n"
+    "std 16, 128(4)\n"
+    "std 17, 136(4)\n"
+    "std 18, 144(4)\n"
+    "std 19, 152(4)\n"
+    "std 20, 160(4)\n"
+    "std 21, 168(4)\n"
+    "std 22, 176(4)\n"
+    "std 23, 184(4)\n"
+    "std 24, 192(4)\n"
+    "std 25, 200(4)\n"
+    "std 26, 208(4)\n"
+    "std 27, 216(4)\n"
+    "std 28, 224(4)\n"
+    "std 29, 232(4)\n"
+    "std 30, 240(4)\n"
+    "std 31, 248(4)\n"
+
+    /* save LR */
+    "mflr 5\n"
+    "std 5, 256(4)\n"
+
+    /* save CCR */
+    "mfcr 5\n"
+    "std 5, 264(4)\n"
+
+    /* save FPRs */
+    "stfd 14, 384(4)\n"
+    "stfd 15, 392(4)\n"
+    "stfd 16, 400(4)\n"
+    "stfd 17, 408(4)\n"
+    "stfd 18, 416(4)\n"
+    "stfd 19, 424(4)\n"
+    "stfd 20, 432(4)\n"
+    "stfd 21, 440(4)\n"
+    "stfd 22, 448(4)\n"
+    "stfd 23, 456(4)\n"
+    "stfd 24, 464(4)\n"
+    "stfd 25, 472(4)\n"
+    "stfd 26, 480(4)\n"
+    "stfd 27, 488(4)\n"
+    "stfd 28, 496(4)\n"
+    "stfd 29, 504(4)\n"
+    "stfd 30, 512(4)\n"
+    "stfd 31, 520(4)\n"
+
+#ifdef __ALTIVEC__
+    /* save VMX */
+    "li 5, 528\n"
+    "stvxl 20, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 21, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 22, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 23, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 24, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 25, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 26, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 27, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 28, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 29, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 30, 4, 5\n"
+    "addi 5, 5, 16\n"
+    "stvxl 31, 4, 5\n"
+    "addi 5, 5, 16\n"
+
+    /* save VRSAVE */
+    "mfvrsave 5\n"
+    "stw 5, 736(4)\n"
+#endif
+
+    /* restore GPRs */
+    "ld 1, 8(3)\n"
+    "ld 2, 16(3)\n"
+    "ld 12, 96(3)\n"
+    "ld 13, 104(3)\n"
+    "ld 14, 112(3)\n"
+    "ld 15, 120(3)\n"
+    "ld 16, 128(3)\n"
+    "ld 17, 136(3)\n"
+    "ld 18, 144(3)\n"
+    "ld 19, 152(3)\n"
+    "ld 20, 160(3)\n"
+    "ld 21, 168(3)\n"
+    "ld 22, 176(3)\n"
+    "ld 23, 184(3)\n"
+    "ld 24, 192(3)\n"
+    "ld 25, 200(3)\n"
+    "ld 26, 208(3)\n"
+    "ld 27, 216(3)\n"
+    "ld 28, 224(3)\n"
+    "ld 29, 232(3)\n"
+    "ld 30, 240(3)\n"
+    "ld 31, 248(3)\n"
+
+    /* restore LR */
+    "ld 5, 256(3)\n"
+    "mtlr 5\n"
+
+    /* restore CCR */
+    "ld 5, 264(3)\n"
+    "mtcr 5\n"
+
+    /* restore FPRs */
+    "lfd 14, 384(3)\n"
+    "lfd 15, 392(3)\n"
+    "lfd 16, 400(3)\n"
+    "lfd 17, 408(3)\n"
+    "lfd 18, 416(3)\n"
+    "lfd 19, 424(3)\n"
+    "lfd 20, 432(3)\n"
+    "lfd 21, 440(3)\n"
+    "lfd 22, 448(3)\n"
+    "lfd 23, 456(3)\n"
+    "lfd 24, 464(3)\n"
+    "lfd 25, 472(3)\n"
+    "lfd 26, 480(3)\n"
+    "lfd 27, 488(3)\n"
+    "lfd 28, 496(3)\n"
+    "lfd 29, 504(3)\n"
+    "lfd 30, 512(3)\n"
+    "lfd 31, 520(3)\n"
+
+#ifdef __ALTIVEC__
+    /* restore VMX */
+    "li 5, 528\n"
+    "lvxl 20, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 21, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 22, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 23, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 24, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 25, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 26, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 27, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 28, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 29, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 30, 3, 5\n"
+    "addi 5, 5, 16\n"
+    "lvxl 31, 3, 5\n"
+    "addi 5, 5, 16\n"
+
+    /* restore VRSAVE */
+    "lwz 5, 720(3)\n"
+    "mtvrsave 5\n"
+#endif
+
+    /* branch to LR */
+    "blr\n"
+
+    ".cfi_endproc\n"
+    ".size swap_context, .-swap_context\n");
+
+co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, void *args)
+{
+    uint8_t *sp;
+    co_routine_t *context = (co_routine_t *)memory;
+    if (!co_swap)
+    {
+        co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
+    }
+
+    /* save current context into new context to initialize it */
+    swap_context(context, context);
+
+    /* align stack */
+    sp = (uint8_t *)memory + size - STACK_ALIGN;
+    sp = (uint8_t *)ALIGN(sp, STACK_ALIGN);
+
+    /* write 0 for initial backchain */
+    *(uint64_t *)sp = 0;
+
+    /* create new frame with backchain */
+    sp -= MIN_STACK_FRAME;
+    *(uint64_t *)sp = (uint64_t)(sp + MIN_STACK_FRAME);
+
+    /* update context with new stack (r1) and func (r12, lr) */
+    context->gprs[1] = (uint64_t)sp;
+    context->gprs[12] = (uint64_t)co_func;
+    context->lr = (uint64_t)co_func;
+
+#ifdef CO_USE_VALGRIND
+    size_t stack_addr = _co_align_forward((size_t)context + sizeof(co_routine_t), 16);
+    context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+#endif
+    context->func = func;
+    context->status = CO_SUSPENDED;
+    context->stack_size = size;
+    context->halt = false;
+    context->synced = false;
+    context->wait_active = false;
+    context->loop_active = false;
+    context->args = args;
+    context->magic_number = CO_MAGIC_NUMBER;
+    context->stack_base = (unsigned char *)(context + 1);
+
+    return context;
+}
+
+bool co_serializable(void)
+{
+    return true;
+}
 #else
     #define USE_NATIVE
     #include "ucontext.c"
@@ -694,6 +870,26 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
 
     memset(memory, 0, size);
     co_routine_t *co = co_derive(memory, size, func, args);
+
+    if (!co_active_handle)
+        co_active_handle = co_active_buffer;
+
+    if (!co_main_handle)
+        co_main_handle = co_active_handle;
+
+#ifdef UV_H
+    if (!co_main_loop_handle)
+    {
+        co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
+        int r = uv_loop_init(co_main_loop_handle);
+        if (r)
+            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+    }
+#endif
+
+    if (!co_current_handle)
+        co_current_handle = co_active();
+
     if (UNLIKELY(co_deferred_array_init(&co->defer) < 0))
     {
         CO_FREE(co);
@@ -1301,7 +1497,7 @@ value_t co_group_get_result(co_ht_result_t *wg, int cid)
 
 void co_result_set(co_routine_t *co, void *data)
 {
-    co->results = data;
+    co->results[0] = data;
 }
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -1588,7 +1784,7 @@ static void coroutine_scheduler(void)
             i = t->all_coroutine_slot;
             all_coroutine[i] = all_coroutine[--n_all_coroutine];
             all_coroutine[i]->all_coroutine_slot = i;
-            if (!t->synced)
+            if (!t->synced && !t->channeled)
                 co_delete(t);
         }
     }

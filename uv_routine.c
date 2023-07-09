@@ -1,6 +1,6 @@
 #include "include/coroutine.h"
 
-void *fs_init(void *);
+static void *fs_init(void *);
 
 static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_type, size_t n_args, bool is_path)
 {
@@ -15,7 +15,7 @@ static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_ty
     return co_group_get_result(wgr, cid);
 }
 
-void fs_cb(uv_fs_t *req)
+static void fs_cb(uv_fs_t *req)
 {
     ssize_t result = uv_fs_get_result(req);
     uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
@@ -84,7 +84,7 @@ void fs_cb(uv_fs_t *req)
     co_scheduler();
 }
 
-void *fs_init(void *uv_args)
+static void *fs_init(void *uv_args)
 {
     uv_fs_t *req = co_new_by(1, sizeof(uv_fs_t));
     uv_loop_t *loop = co_loop();

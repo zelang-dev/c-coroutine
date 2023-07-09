@@ -2,23 +2,19 @@
 
 channel_t *channel_create(int elem_size, int bufsize)
 {
-    channel_t *c;
-    co_value_t *s;
+    channel_t *c = CO_CALLOC(1, sizeof(channel_t) + bufsize * elem_size);
+    co_value_t *s = CO_CALLOC(1, sizeof(co_value_t));
 
-    c = CO_MALLOC(sizeof *c + bufsize * elem_size);
-    s = CO_MALLOC(sizeof *s);
     if (c == NULL || s == NULL)
     {
         fprintf(stderr, "channel_create failed in file %s at line # %d", __FILE__, __LINE__);
         exit(1);
     }
-    memset(c, 0, sizeof(*c));
-    memset(s, 0, sizeof(s));
 
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;
-    c->tmp = (co_value_t *)s;
+    c->tmp = s;
     c->select_ready = false;
     c->buf = (unsigned char *)(c + 1);
     return c;
@@ -251,6 +247,7 @@ static int channel_proc(channel_co_t *a)
     can_block = a[i].op == CHANNEL_END;
 
     t = co_running;
+    t->channeled = true;
     for (i = 0; i < n; i++) {
         a[i].co = t;
         a[i].x_msg = a;
@@ -308,6 +305,7 @@ static int channel_proc(channel_co_t *a)
 
     a[0].c->select_ready = true;
     co_suspend();
+    t->channeled = false;
 
     /*
      * the guy who ran the op took care of dequeueing us

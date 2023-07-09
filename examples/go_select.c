@@ -28,6 +28,8 @@ void *func(void *args)
     }
     co_send(quit, 0);
 
+    channel_free(c);
+    channel_free(quit);
     return 0;
 }
 

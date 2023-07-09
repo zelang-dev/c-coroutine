@@ -149,11 +149,11 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (9 * 1024)
+    #define CO_STACK_SIZE (8 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
-    #define CO_MAIN_STACK (512 * 1024)
+    #define CO_MAIN_STACK (1024 * 1024)
 #endif
 
 #if defined(UV_H)
@@ -195,14 +195,30 @@ Must also closed out with `select_break()`. */
   #if defined(CO_NO_MP) /* Running in single-threaded environment */
     #define thread_local
   #else /* Running in multi-threaded environment */
-    #if __STDC_VERSION__ >= 201112 && !defined(__STDC_NO_THREADS__)
-      #define thread_local _Thread_local
-    #elif defined(_WIN32) && (defined(_MSC_VER) || defined(__ICL) ||  defined(__DMC__) ||  defined(__BORLANDC__))
-      #define thread_local __declspec(thread)
-    #elif defined(__GNUC__) || defined(__SUNPRO_C) || defined(__xlC__)
-      #define thread_local __thread
-    #else /* C11 and newer define thread_local in threads.h */
+    #if defined(__STDC__) /* Compiling as C Language */
+      #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
+        #define thread_local __declspec(thread)
+      #elif __STDC_VERSION__ < 201112L /* If we are on C90/99 */
+        #if defined(__clang__) || defined(__GNUC__) /* Clang and GCC */
+          #define thread_local __thread
+        #else /* Otherwise, we ignore the directive (unless user provides their own) */
+          #define thread_local
+        #endif
+      #else /* C11 and newer define thread_local in threads.h */
         #include <threads.h>
+      #endif
+    #elif defined(__cplusplus) /* Compiling as C++ Language */
+      #if __cplusplus < 201103L /* thread_local is a C++11 feature */
+        #if defined(_MSC_VER)
+          #define thread_local __declspec(thread)
+        #elif defined(__clang__) || defined(__GNUC__)
+          #define thread_local __thread
+        #else /* Otherwise, we ignore the directive (unless user provides their own) */
+          #define thread_local
+        #endif
+      #else /* In C++ >= 11, thread_local in a builtin keyword */
+        /* Don't do anything */
+      #endif
     #endif
   #endif
 #endif
@@ -407,6 +423,19 @@ struct routine_s
     float fs[12]; /* fs0-fs11 */
 #endif
 #endif /* __riscv_flen */
+#elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    uint64_t gprs[32];
+    uint64_t lr;
+    uint64_t ccr;
+
+    /* FPRs */
+    uint64_t fprs[32];
+
+#ifdef __ALTIVEC__
+    /* Altivec (VMX) */
+    uint64_t vmx[12 * 2];
+    uint32_t vrsave;
+#endif
 #endif
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void *stack_base;
@@ -425,6 +454,7 @@ struct routine_s
     size_t alarm_time;
     co_routine_t *next;
     co_routine_t *prev;
+    bool channeled;
     bool ready;
     bool system;
     bool exiting;
@@ -442,7 +472,7 @@ struct routine_s
 #endif
     void *args;
     /* Coroutine result of function return/exit. */
-    void *results;
+    void *results[3];
     /* Used to check stack overflow. */
     size_t magic_number;
 };
