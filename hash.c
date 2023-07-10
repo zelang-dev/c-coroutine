@@ -396,7 +396,7 @@ void *oa_string_cp(const void *data, void *arg)
     result = CO_CALLOC(1, copy_size);
     if (NULL == result)
     {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
 #if defined(_WIN32) || defined(_WIN64)
@@ -409,7 +409,7 @@ void *oa_string_cp(const void *data, void *arg)
 
 bool oa_coroutine_eq(const void *data1, const void *data2, void *arg)
 {
-    return memcmp(data1, data1, sizeof(co_active())) == 0 ? true : false;
+    return memcmp(data1, data2, sizeof(co_active())) == 0 ? true : false;
 }
 
 void *oa_coroutine_cp(const void *data, void *arg)
@@ -422,20 +422,20 @@ void *oa_value_cp(const void *data, void *arg)
 {
     co_value_t *input = (co_value_t *)data;
     co_value_t *result;
-    result = CO_MALLOC(sizeof(*result));
+    result = CO_CALLOC(1, sizeof(result));
     if (NULL == result)
     {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
 
-    memcpy(result, input, sizeof(*result));
+    memcpy(result, input, sizeof(result));
     return result;
 }
 
 bool oa_value_eq(const void *data1, const void *data2, void *arg)
 {
-    return memcmp(data1, data1, sizeof(co_value_t)) == 0 ? true : false;
+    return memcmp(data1, data2, sizeof(co_value_t)) == 0 ? true : false;
 }
 
 void oa_string_free(void *data, void *arg)
