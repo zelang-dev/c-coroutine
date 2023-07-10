@@ -392,16 +392,17 @@ void *oa_string_cp(const void *data, void *arg)
     const char *input = (const char *)data;
     size_t input_length = strlen(input) + 1;
     char *result;
-    result = CO_MALLOC(sizeof(*result) * input_length);
+    size_t copy_size = sizeof(result) * input_length;
+    result = CO_CALLOC(1, copy_size);
     if (NULL == result)
     {
         fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
 #if defined(_WIN32) || defined(_WIN64)
-    strcpy_s(result, sizeof(*result) * input_length, input);
+    strcpy_s(result, copy_size, input);
 #else
-    strncpy(result, input, sizeof(*result) * input_length);
+    strcpy(result, input);
 #endif
     return result;
 }
@@ -448,7 +449,7 @@ void oa_string_print(const void *data)
 }
 
 oa_key_ops oa_key_ops_string = {oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL};
-oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, co_delete, oa_coroutine_eq, NULL};
+oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, CO_DEFER(co_delete), oa_coroutine_eq, NULL};
 oa_val_ops oa_val_ops_value = {oa_value_cp, free, oa_value_eq, NULL};
 
 CO_FORCE_INLINE co_ht_group_t *co_ht_group_init()
