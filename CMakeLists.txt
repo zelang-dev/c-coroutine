@@ -18,6 +18,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BUILD_DIR}/lib)
 file(GLOB lib_files
     ${CMAKE_SOURCE_DIR}/coroutine.c
     ${CMAKE_SOURCE_DIR}/channel.c
+    ${CMAKE_SOURCE_DIR}/deferred_mm_array.c
     ${CMAKE_SOURCE_DIR}/hash.c
     ${CMAKE_SOURCE_DIR}/uv_routine.c
 )
