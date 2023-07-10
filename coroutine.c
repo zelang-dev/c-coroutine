@@ -33,10 +33,10 @@ thread_local int exiting = 0;
 thread_local int n_co_switched;
 
 /* track the number of coroutines used */
-int co_count;
+thread_local int co_count;
 
 /* record which coroutine is executing for scheduler */
-co_routine_t *co_running;
+thread_local co_routine_t *co_running;
 
 /* coroutines's FIFO scheduler queue */
 thread_local co_queue_t co_run_queue;
@@ -969,6 +969,11 @@ co_routine_t *co_current(void)
     return co_current_handle;
 }
 
+co_routine_t *co_coroutine(void)
+{
+    return co_running;
+}
+
 value_t co_value(void *data)
 {
     if (data)
@@ -1132,7 +1137,7 @@ void co_deferred_run(co_routine_t *coro, size_t generation)
     {
         defer_func_t *defer = &defers[i - 1];
 
-        defer->func(defer->data1, defer->data2);
+        defer->func(defer->data1);
     }
 
     array->elements = generation;
@@ -1179,11 +1184,6 @@ CO_FORCE_INLINE void co_defer(defer_func func, void *data)
 void co_deferred(co_routine_t *coro, defer_func func, void *data)
 {
     co_deferred_any(coro, func, data, NULL);
-}
-
-void co_deferred2(co_routine_t *coro, defer_func2 func, void *data1, void *data2)
-{
-    co_deferred_any(coro, func, data1, data2);
 }
 
 void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
@@ -1427,7 +1427,7 @@ co_ht_group_t *co_wait_group(void)
 {
     co_routine_t *c = co_active();
     co_ht_group_t *wg = co_ht_group_init();
-    co_defer(co_hash_free, wg);
+    co_defer(CO_DEFER(co_hash_free), wg);
     c->wait_active = true;
     c->wait_group = wg;
 
@@ -1443,7 +1443,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
     {
         co_pause();
         wgr = co_ht_result_init();
-        co_defer(co_hash_free, wgr);
+        co_defer(CO_DEFER(co_hash_free), wgr);
         oa_pair *pair;
         while (wg->size != 0)
         {
@@ -1455,9 +1455,13 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                     if (pair->val != NULL)
                     {
                         co = (co_routine_t *)pair->val;
-                        if (!co_terminated(co))
+                        if (co->loop_active && co->status == CO_EVENT)
                         {
-                            if ((co->status == CO_SUSPENDED && co->loop_active) || co->status == CO_NORMAL)
+                            coroutine_yield();
+                        }
+                        else if (!co_terminated(co))
+                        {
+                            if (co->status == CO_NORMAL)
                                 coroutine_schedule(co);
 
                             coroutine_yield();
@@ -1741,7 +1745,7 @@ void coroutine_info()
 static void coroutine_scheduler(void)
 {
     int i;
-    bool is_channel;
+    bool is_channel, is_loop_close;
     co_routine_t *t;
 
     for (;;)
@@ -1773,12 +1777,13 @@ static void coroutine_scheduler(void)
         co_running = t;
         n_co_switched++;
         is_channel = (t->cid > co_id_generate || t->cid < 0);
+        is_loop_close = (t->status > CO_EVENT || t->status < 0);
         CO_INFO("Running coroutine id: %d (%s) status: %d\n",
                 (is_channel ? -1 : t->cid),
                 ((t->name != NULL && t->cid > 0) ? t->name : !is_channel ? "" : "channel"),
                 t->status);
         coroutine_interrupt();
-        if (t->status != CO_EVENT_DEAD)
+        if (!is_loop_close && !t->halt)
             co_switch(t);
         CO_LOG("Back at coroutine scheduling");
         co_running = NULL;

@@ -358,11 +358,9 @@ typedef struct defer_s
 } defer_t;
 
 typedef void (*defer_func)(void *);
-typedef void (*defer_func2)(void *, ...);
-
 typedef struct defer_func_s
 {
-    defer_func2 func;
+    defer_func func;
     void *data1;
     void *data2;
 } defer_func_t;
@@ -547,9 +545,6 @@ typedef struct uv_args_s
     size_t n_args;
 } uv_args_t;
 
-C_API co_routine_t *co_running;
-C_API int co_count;
-
 C_API jmp_buf exception_buffer;
 C_API int exception_status;
 
@@ -622,6 +617,9 @@ C_API bool co_serializable(void);
 /* Return handle to previous coroutine. */
 C_API co_routine_t *co_current(void);
 
+/* Return coroutine executing for scheduler */
+C_API co_routine_t *co_coroutine(void);
+
 /* Return the value in union storage type. */
 C_API value_t co_value(void *);
 
@@ -647,7 +645,6 @@ C_API void co_deferred_free(co_routine_t *);
 to when current coroutine exits/returns. */
 C_API void co_defer(defer_func, void *);
 C_API void co_deferred(co_routine_t *, defer_func, void *);
-C_API void co_deferred2(co_routine_t *, defer_func2, void *, void *);
 C_API void co_deferred_run(co_routine_t *, size_t);
 C_API size_t co_deferred_count(const co_routine_t *);
 

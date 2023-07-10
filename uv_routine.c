@@ -100,7 +100,7 @@ static void *fs_init(void *uv_args)
     int flags, mode;
     int result = -4058;
 
-    co_defer(uv_fs_req_cleanup, req);
+    co_defer(CO_DEFER(uv_fs_req_cleanup), req);
     if (fs->is_path)
     {
         const char *path = args[0].value.string;

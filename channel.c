@@ -246,7 +246,7 @@ static int channel_proc(channel_co_t *a)
     n = i;
     can_block = a[i].op == CHANNEL_END;
 
-    t = co_running;
+    t = co_coroutine();
     t->channeled = true;
     for (i = 0; i < n; i++) {
         a[i].co = t;
