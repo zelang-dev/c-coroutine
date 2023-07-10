@@ -260,16 +260,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
         handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
 #endif
-        handle->func = func;
-        handle->status = CO_SUSPENDED;
-        handle->stack_size = size;
-        handle->halt = false;
-        handle->synced = false;
-        handle->wait_active = false;
-        handle->loop_active = false;
-        handle->args = args;
-        handle->magic_number = CO_MAGIC_NUMBER;
-        handle->stack_base = (unsigned char *)(handle + 1);
     }
 
     return handle;
@@ -406,16 +396,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
         handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
 #endif
-        handle->func = func;
-        handle->status = CO_SUSPENDED;
-        handle->stack_size = size;
-        handle->halt = false;
-        handle->synced = false;
-        handle->wait_active = false;
-        handle->loop_active = false;
-        handle->args = args;
-        handle->magic_number = CO_MAGIC_NUMBER;
-        handle->stack_base = (unsigned char *)(handle + 1);
     }
 
     return handle;
@@ -464,18 +444,8 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co = (co_routine_t *)handle;
 #ifdef CO_USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
-        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
 #endif
-        co->func = func;
-        co->status = CO_SUSPENDED;
-        co->stack_size = size;
-        co->halt = false;
-        co->synced = false;
-        co->wait_active = false;
-        co->loop_active = false;
-        co->args = args;
-        co->magic_number = CO_MAGIC_NUMBER;
-        co->stack_base = (unsigned char *)(handle + 1);
     }
 
     return co;
@@ -572,16 +542,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         size_t stack_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
         co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
 #endif
-        co->func = func;
-        co->status = CO_SUSPENDED;
-        co->stack_size = size;
-        co->halt = false;
-        co->synced = false;
-        co->wait_active = false;
-        co->loop_active = false;
-        co->args = args;
-        co->magic_number = CO_MAGIC_NUMBER;
-        co->stack_base = (unsigned char *)(handle + 1);
     }
 
     return co;
@@ -810,16 +770,6 @@ co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, voi
     size_t stack_addr = _co_align_forward((size_t)context + sizeof(co_routine_t), 16);
     context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
 #endif
-    context->func = func;
-    context->status = CO_SUSPENDED;
-    context->stack_size = size;
-    context->halt = false;
-    context->synced = false;
-    context->wait_active = false;
-    context->loop_active = false;
-    context->args = args;
-    context->magic_number = CO_MAGIC_NUMBER;
-    context->stack_base = (unsigned char *)(context + 1);
 
     return context;
 }
@@ -861,14 +811,13 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     }
 
     size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void *memory = CO_MALLOC(size);
+    void *memory = CO_CALLOC(1, size);
     if (!memory)
     {
         fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
         return CO_ERROR;
     }
 
-    memset(memory, 0, size);
     co_routine_t *co = co_derive(memory, size, func, args);
 
     if (!co_active_handle)
@@ -895,6 +844,17 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
         CO_FREE(co);
         return (co_routine_t *)-1;
     }
+
+    co->func = func;
+    co->status = CO_SUSPENDED;
+    co->stack_size = size;
+    co->halt = false;
+    co->synced = false;
+    co->wait_active = false;
+    co->loop_active = false;
+    co->args = args;
+    co->magic_number = CO_MAGIC_NUMBER;
+    co->stack_base = (unsigned char *)(co + 1);
 
     return co;
 }
