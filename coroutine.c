@@ -258,7 +258,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
 
 #ifdef CO_USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
-        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
 
@@ -394,7 +394,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
 
 #ifdef CO_USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
-        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
 
@@ -444,7 +444,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co = (co_routine_t *)handle;
 #ifdef CO_USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
-        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
 
@@ -540,7 +540,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co = (co_routine_t *)handle;
 #ifdef CO_USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
-        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
 
@@ -768,7 +768,7 @@ co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, voi
 
 #ifdef CO_USE_VALGRIND
     size_t stack_addr = _co_align_forward((size_t)context + sizeof(co_routine_t), 16);
-    context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + stack_size);
+    context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
     return context;
@@ -819,9 +819,8 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     }
 
     co_routine_t *co = co_derive(memory, size, func, args);
-
-    if (!co_active_handle)
-        co_active_handle = co_active_buffer;
+    if (!co_current_handle)
+        co_current_handle = co_active();
 
     if (!co_main_handle)
         co_main_handle = co_active_handle;
@@ -829,15 +828,12 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
 #ifdef UV_H
     if (!co_main_loop_handle)
     {
-        co_main_loop_handle = CO_MALLOC(sizeof(uv_loop_t));
+        co_main_loop_handle = CO_CALLOC(1, sizeof(uv_loop_t));
         int r = uv_loop_init(co_main_loop_handle);
         if (r)
             fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
     }
 #endif
-
-    if (!co_current_handle)
-        co_current_handle = co_active();
 
     if (UNLIKELY(co_deferred_array_init(&co->defer) < 0))
     {
@@ -848,6 +844,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     co->func = func;
     co->status = CO_SUSPENDED;
     co->stack_size = size;
+    co->channeled = false;
     co->halt = false;
     co->synced = false;
     co->wait_active = false;
