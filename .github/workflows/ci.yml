@@ -51,6 +51,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: actions/checkout@v3
       - name: cmake build & test examples
+        shell: cmd
         run: |
             mkdir build
             cd build
