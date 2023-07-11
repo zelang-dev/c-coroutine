@@ -150,7 +150,7 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (8 * 1024)
+    #define CO_STACK_SIZE (4 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
@@ -781,7 +781,7 @@ All coroutines here behaves like regular functions, meaning they return values, 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API co_ht_group_t *co_wait_group(void);
 
-/* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finished.
+/* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */
 C_API co_ht_result_t *co_wait(co_ht_group_t *);
 
