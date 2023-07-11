@@ -1373,11 +1373,11 @@ static void coroutine_scheduler(void)
         t->ready = 0;
         co_running = t;
         n_co_switched++;
-        is_loop_close = (t->status > CO_EVENT || t->status < 0);
         CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid,
                 ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"),
                 t->status);
         coroutine_interrupt();
+        is_loop_close = (t->status > CO_EVENT || t->status < 0);
         if (!is_loop_close && !t->halt)
             co_switch(t);
         CO_LOG("Back at coroutine scheduling");
