@@ -771,7 +771,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     void *memory = CO_CALLOC(1, size);
     if (!memory)
     {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
         return CO_ERROR;
     }
 
@@ -1056,11 +1056,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                     if (pair->val != NULL)
                     {
                         co = (co_routine_t *)pair->val;
-                        if (co->loop_active && co->status == CO_EVENT)
-                        {
-                            coroutine_yield();
-                        }
-                        else if (!co_terminated(co))
+                        if (!co_terminated(co))
                         {
                             if (co->status == CO_NORMAL)
                                 coroutine_schedule(co);
@@ -1346,7 +1342,7 @@ void coroutine_info()
 static void coroutine_scheduler(void)
 {
     int i;
-    bool is_channel, is_loop_close;
+    bool is_loop_close;
     co_routine_t *t;
 
     for (;;)
@@ -1377,11 +1373,9 @@ static void coroutine_scheduler(void)
         t->ready = 0;
         co_running = t;
         n_co_switched++;
-        is_channel = (t->cid > co_id_generate || t->cid < 0);
         is_loop_close = (t->status > CO_EVENT || t->status < 0);
-        CO_INFO("Running coroutine id: %d (%s) status: %d\n",
-                (is_channel ? -1 : t->cid),
-                ((t->name != NULL && t->cid > 0) ? t->name : !is_channel ? "" : "channel"),
+        CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid,
+                ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"),
                 t->status);
         coroutine_interrupt();
         if (!is_loop_close && !t->halt)
