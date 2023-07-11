@@ -138,11 +138,11 @@ inline static void oa_hash_grow(oa_hash *htable)
 
     htable->capacity = (uint32_t)new_capacity_64;
     htable->size = 0;
-    htable->buckets = CO_MALLOC(htable->capacity * sizeof(*(htable->buckets)));
+    htable->buckets = CO_CALLOC(1, htable->capacity * sizeof(*(htable->buckets)));
 
     if (NULL == htable->buckets)
     {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
 
@@ -335,10 +335,10 @@ static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, con
 oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *val)
 {
     oa_pair *p;
-    p = CO_MALLOC(sizeof(*p));
+    p = CO_CALLOC(1, sizeof(p));
     if (NULL == p)
     {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
+        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
     p->hash = hash;
@@ -421,15 +421,14 @@ void *oa_coroutine_cp(const void *data, void *arg)
 void *oa_value_cp(const void *data, void *arg)
 {
     co_value_t *input = (co_value_t *)data;
-    co_value_t *result;
-    result = CO_CALLOC(1, sizeof(result));
+    co_value_t *result = CO_CALLOC(1, sizeof(input));
     if (NULL == result)
     {
         fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
 
-    memcpy(result, input, sizeof(result));
+    memcpy(result, input, sizeof(input));
     return result;
 }
 
