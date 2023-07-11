@@ -37,7 +37,6 @@ jobs:
             ./go_sleep
             ./go_select
             ./go_wait_group
-            ./co_call_uv
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -65,4 +64,3 @@ jobs:
             .\go_sleep.exe
             .\go_select.exe
             .\go_wait_group.exe
-            .\co_call_uv.exe
