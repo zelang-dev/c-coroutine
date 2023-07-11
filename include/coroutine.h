@@ -141,10 +141,11 @@ Must also closed out with `select_break()`. */
 #ifdef CO_DEBUG
     #define CO_LOG(s) puts(s)
     #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
-    #define CO_HERE() fprintf(stderr, "%s:%d\n", __FILE__, __LINE__)
+    #define CO_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
 #else
     #define CO_LOG(s)
     #define CO_INFO(s, ...)
+    #define CO_HERE()
 #endif
 
 /* Stack size when creating a coroutine. */
