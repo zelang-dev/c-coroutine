@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, x86]
+        arch: [x64, Win32]
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -55,7 +55,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -D CMAKE_GENERATOR_PLATFORM=Win32 -D BUILD_TESTING=ON
+            cmake .. -D BUILD_TESTING=ON -A ${{ matrix.arch }}
             cmake --build . --config Debug
             cd Debug
             .\chan_3.exe
