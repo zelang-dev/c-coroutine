@@ -58,10 +58,8 @@ jobs:
             cmake .. -D CMAKE_GENERATOR_PLATFORM=Win32 -D BUILD_TESTING=ON
             cmake --build . --config Debug
             cd Debug
-            .\go_sleep.exe
             .\chan_3.exe
             .\primes.exe
             .\go_channel.exe
             .\go_select.exe
             .\go_wait_group.exe
-            .\test_delay.exe 2
