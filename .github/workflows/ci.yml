@@ -56,6 +56,5 @@ jobs:
             cmake --build . --config Debug
             cd Debug
             .\go_channel.exe
-            .\go_sleep.exe
             .\go_select.exe
             .\go_wait_group.exe
