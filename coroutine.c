@@ -845,7 +845,7 @@ void co_delete(co_routine_t *handle)
 
 void co_switch(co_routine_t *handle)
 {
-#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+#if defined(_M_X64) || defined(_M_IX86)
     register co_routine_t *co_previous_handle = co_active_handle;
 #else
     co_routine_t *co_previous_handle = co_active_handle;
