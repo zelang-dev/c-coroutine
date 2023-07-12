@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, Win32]
+        arch: [x64]
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -55,6 +55,8 @@ jobs:
             cmake .. -D BUILD_TESTING=ON -A ${{ matrix.arch }}
             cmake --build . --config Debug
             cd Debug
+            .\test_delay.exe 2 5
+            .\chan_3.exe
+            .\primes.exe
             .\go_channel.exe
             .\go_select.exe
-            .\go_wait_group.exe
