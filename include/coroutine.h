@@ -443,7 +443,7 @@ struct routine_s
 #endif
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void *stack_base;
-#if defined(_WIN32) && defined(_M_X64)
+#if defined(_WIN32) && (defined(_M_X64) || defined(_M_IX86))
     void *stack_limit;
 #endif
     /* Coroutine stack size. */
