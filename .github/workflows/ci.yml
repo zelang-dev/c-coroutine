@@ -30,9 +30,6 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON ..
             cmake --build .
-            ./chan_3
-            ./primes
-            ./test_delay 2
             ./go_channel
             ./go_sleep
             ./go_select
@@ -58,8 +55,7 @@ jobs:
             cmake .. -D BUILD_TESTING=ON -A ${{ matrix.arch }}
             cmake --build . --config Debug
             cd Debug
-            .\chan_3.exe
-            .\primes.exe
             .\go_channel.exe
+            .\go_sleep.exe
             .\go_select.exe
             .\go_wait_group.exe

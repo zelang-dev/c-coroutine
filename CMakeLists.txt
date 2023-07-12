@@ -40,7 +40,7 @@ add_subdirectory(libuv)
 target_link_libraries(coroutine PUBLIC uv_a)
 
 if(CO_BUILD_TESTS)
-    set(TARGET_LIST chan_3 go_channel go_sleep primes go_select go_wait_group co_call_uv)
+    set(TARGET_LIST test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group)
     foreach (TARGET ${TARGET_LIST})
         add_executable(${TARGET} examples/${TARGET}.c)
         target_link_libraries(${TARGET} coroutine)
