@@ -186,9 +186,9 @@ static void co_init(void)
 static void co_init(void)
 {
 #ifdef CO_MPROTECT
-    size_t addr = (size_t)co_swap_function;
-    size_t base = addr - (addr % sysconf(_SC_PAGESIZE));
-    size_t size = (addr - base) + sizeof co_swap_function;
+    unsigned long addr = (unsigned long)co_swap_function;
+    unsigned long base = addr - (addr % sysconf(_SC_PAGESIZE));
+    unsigned long size = (addr - base) + sizeof co_swap_function;
     mprotect((void *)base, size, PROT_READ | PROT_EXEC);
 #endif
 }
@@ -205,9 +205,9 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
 
     if ((handle = (co_routine_t *)memory))
     {
-        size_t stack_top = (size_t)handle + size;
+        unsigned long stack_top = (unsigned long)handle + size;
         stack_top -= 32;
-        stack_top &= ~((size_t)15);
+        stack_top &= ~((unsigned long)15);
         long *p = (long *)(stack_top); /* seek to top of stack */
         *--p = (long)co_done;          /* if func returns */
         *--p = (long)co_awaitable;     /* start of function */
@@ -845,7 +845,11 @@ void co_delete(co_routine_t *handle)
 
 void co_switch(co_routine_t *handle)
 {
+#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+    register co_routine_t *co_previous_handle = co_active_handle;
+#else
     co_routine_t *co_previous_handle = co_active_handle;
+#endif
     co_active_handle = handle;
     co_active_handle->status = CO_RUNNING;
     co_current_handle->status = CO_NORMAL;

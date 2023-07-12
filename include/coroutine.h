@@ -386,7 +386,12 @@ typedef co_hast_t co_ht_result_t;
 /* Coroutine context structure. */
 struct routine_s
 {
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(_WIN32) && defined(_M_IX86)
+    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
+    void *xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
+    void *fiber_storage;
+    void *dealloc_stack;
+#elif defined(__x86_64__) || defined(_M_X64)
 #ifdef _WIN32
     void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15, *rdi, *rsi;
     void *xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
@@ -509,7 +514,7 @@ typedef union
     signed int s_integer;
     long big_int;
     long long long_int;
-    unsigned long long max_int;
+    size_t max_int;
     float point;
     double precision;
     bool boolean;
@@ -754,7 +759,7 @@ typedef struct oa_pair_s {
 
 typedef struct oa_hash_s oa_hash;
 struct oa_hash_s {
-    size_t capacity;
+    int capacity;
     size_t size;
     oa_pair **buckets;
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx);
