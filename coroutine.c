@@ -408,7 +408,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
     return co;
 }
 #elif defined(__aarch64__)
-#include <stdint.h>
 static const uint32_t co_swap_function[1024] = {
     0x910003f0, /* mov x16,sp           */
     0xa9007830, /* stp x16,x30,[x1]     */
@@ -486,7 +485,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         size_t *p = (size_t *)(stack_top);
         handle[0] = (size_t)p;              /* x16 (stack pointer) */
         handle[1] = (size_t)co_func;        /* x30 (link register) */
-        handle[2] = (size_t)co_awaitable;   /* x19 (entry point) */
         handle[12] = (size_t)p;             /* x29 (frame pointer) */
 
 #if defined(_WIN32) && !defined(CO_NO_TIB)
