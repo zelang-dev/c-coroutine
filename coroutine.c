@@ -107,7 +107,8 @@ static void co_awaitable()
     {
         co->results[0] = co->func(co->args);
         co->status = CO_NORMAL;
-        co_deferred_free(co);
+        if (strcmp(co->name, "co_main") != 0)
+            co_deferred_free(co);
     }
 }
 
@@ -179,8 +180,8 @@ static void co_init(void)
 }
 #else
 #ifdef CO_MPROTECT
-#include <unistd.h>
-#include <sys/mman.h>
+    #include <unistd.h>
+    #include <sys/mman.h>
 #endif
 
 static void co_init(void)
