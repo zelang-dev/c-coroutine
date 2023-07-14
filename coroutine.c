@@ -105,7 +105,7 @@ static void co_awaitable()
     }
     else
     {
-        co->results[0] = co->func(co->args);
+        co_result_set(co, co->func(co->args));
         co->status = CO_NORMAL;
         if (strcmp(co->name, "co_main") != 0)
             co_deferred_free(co);
@@ -1298,7 +1298,7 @@ value_t co_group_get_result(co_ht_result_t *wg, int cid)
 
 void co_result_set(co_routine_t *co, void *data)
 {
-    co->results[0] = data;
+    co->results = data;
 }
 
 #if defined(_WIN32) || defined(_WIN64)

@@ -476,7 +476,7 @@ struct routine_s
 #endif
     void *args;
     /* Coroutine result of function return/exit. */
-    void *results[3];
+    void *results;
     /* Used to check stack overflow. */
     size_t magic_number;
 };
@@ -794,8 +794,6 @@ C_API co_ht_result_t *co_wait(co_ht_group_t *);
 C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
-
-C_API value_t co_result_get(int);
 
 /* Check for at least `n` bytes left on the stack. If not present, abort. */
 C_API void co_stack_check(int);

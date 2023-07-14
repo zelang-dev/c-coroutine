@@ -8,15 +8,15 @@ on:
 jobs:
   build:
     name: ${{ matrix.target }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: amd64
-            flags: -O3 -fomit-frame-pointer
+            flags: -m64
           - target: x86
-            flags: -m32 -O3 -fomit-frame-pointer
+            flags: -m32
     steps:
       - uses: actions/checkout@v3
       - name: Prepare
@@ -28,7 +28,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
             ./go_channel
             ./go_sleep
