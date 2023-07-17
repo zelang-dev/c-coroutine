@@ -6,6 +6,7 @@
 #endif
 
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
@@ -133,6 +134,18 @@ Must also closed out with `select_break()`. */
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
+    #define S_IRUSR S_IREAD  /* read, user */
+    #define S_IWUSR S_IWRITE /* write, user */
+    #define S_IXUSR 0 /* execute, user */
+    #define S_IRGRP 0 /* read, group */
+    #define S_IWGRP 0 /* write, group */
+    #define S_IXGRP 0 /* execute, group */
+    #define S_IROTH 0 /* read, others */
+    #define S_IWOTH 0 /* write, others */
+    #define S_IXOTH 0 /* execute, others */
+    #define S_IRWXU 0
+    #define S_IRWXG 0
+    #define S_IRWXO 0
     #if !defined(__cplusplus)
         #define __STDC__ 1
     #endif
@@ -150,7 +163,7 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (8 * 1024)
+    #define CO_STACK_SIZE (9 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK

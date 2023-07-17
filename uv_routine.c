@@ -71,7 +71,7 @@ static void fs_cb(uv_fs_t *req)
         case UV_FS_UNKNOWN:
         case UV_FS_CUSTOM:
         default:
-            fprintf(stderr, "type; %d not supported.", fs_type);
+            fprintf(stderr, "type; %d not supported.\n", fs_type);
             break;
         }
     }
@@ -165,7 +165,7 @@ static void *fs_init(void *uv_args)
         case UV_FS_UNKNOWN:
         case UV_FS_CUSTOM:
         default:
-            fprintf(stderr, "type; %d not supported.", fs->fs_type);
+            fprintf(stderr, "type; %d not supported.\n", fs->fs_type);
             break;
         }
     }
@@ -223,7 +223,7 @@ static void *fs_init(void *uv_args)
         case UV_FS_UNKNOWN:
         case UV_FS_CUSTOM:
         default:
-            fprintf(stderr, "type; %d not supported.", fs->fs_type);
+            fprintf(stderr, "type; %d not supported.\n", fs->fs_type);
             break;
         }
     }
