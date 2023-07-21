@@ -2,7 +2,7 @@
 #define C_COROUTINE_H
 
 #if defined(__GNUC__) && (!defined(_WIN32) || !defined(_WIN64))
-#define _GNU_SOURCE
+    #define _GNU_SOURCE
 #endif
 
 #include <errno.h>
@@ -16,93 +16,26 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #if !defined(_WIN32)
-#include <sys/time.h>
-#include <sys/resource.h> /* setrlimit() */
+    #include <sys/time.h>
+    #include <sys/resource.h> /* setrlimit() */
 #endif
+
 #include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
-#include "compat/unistd.h"
+    #include "compat/unistd.h"
 #else
-#include <unistd.h>
+    #include <unistd.h>
 #endif
 
-/* Exception handling can be added to C code using the<setjmp.h> library. */
-#include <setjmp.h>
-
-//This is the value to assign when there isn't an exception
-#ifndef C_ERROR_NONE
-#define C_ERROR_NONE    (0x5A5A5A5A)
-#endif
-
-//This is number of exception stacks to keep track of (one per task)
-#ifndef C_ERROR_NUM_ID
-//there is only the one stack by default
-#define C_ERROR_NUM_ID  (1)
-#endif
-
-//This is the method of getting the current exception stack index (0 if only one stack)
-#ifndef C_ERROR_GET_ID
-//use the first index always because there is only one anyway
-#define C_ERROR_GET_ID    (0)
-#endif
-
-//This is an optional special handler for when there is no global Catch
-#ifndef C_ERROR_NO_CATCH_HANDLER
-#define C_ERROR_NO_CATCH_HANDLER(id)
-#endif
-
-//The type to use to store the exception values.
-#ifndef C_ERROR_T
-#define C_ERROR_T         unsigned int
-#endif
-
-//exception frame structures
-typedef struct {
-  jmp_buf* pFrame;
-  C_ERROR_T volatile Exception;
-} C_ERROR_FRAME_T;
-
-//actual root frame storage (only one if single-tasking)
-extern volatile C_ERROR_FRAME_T CExceptionFrames[];
-
-//Try (see C file for explanation)
-#define try                                                     \
-    {                                                           \
-        jmp_buf *prevFrame, NewFrame;                           \
-        unsigned int _ID = co_active()->cid;                    \
-        prevFrame = CExceptionFrames[_ID].pFrame;               \
-        CExceptionFrames[_ID].pFrame = (jmp_buf*)(&NewFrame);   \
-        CExceptionFrames[_ID].Exception = C_ERROR_NONE;         \
-        if (setjmp(NewFrame) == 0) {                            \
-            if (1)
-
-#define catch(e)                                                \
-            else { }                                            \
-            CExceptionFrames[_ID].Exception = C_ERROR_NONE;     \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            e = CExceptionFrames[_ID].Exception;                \
-            (void)e;                                            \
-        }                                                       \
-        CExceptionFrames[_ID].pFrame = prevFrame;               \
-    }                                                           \
-    if (CExceptionFrames[co_active()->cid].Exception != C_ERROR_NONE)
-
-/* Exception codes */
-#define RangeError 1
-#define DivisionByZero 2
-#define OutOfMemory 3
+#include "exception.h"
 
 /* invalid address indicator */
 #define CO_ERROR ((void *)-1)
 
-/* The `for_select` macro sets up a coroutine to wait on multiple channel operations.
-Must be closed out with `select_end`, and if no `select_case(channel)`, `select_case_if(channel)`,
-`select_break` provided, an infinite loop is created.
+/* The `for_select` macro sets up a coroutine to wait on multiple channel
+operations. Must be closed out with `select_end`, and if no `select_case(channel)`, `select_case_if(channel)`, `select_break` provided, an infinite loop is created.
 
-This behaves same as GoLang `select {}` statement.
-*/
+This behaves same as GoLang `select {}` statement. */
 #define for_select       \
   bool ___##__FUNCTION__; \
   while (true)            \
@@ -146,9 +79,6 @@ Must also closed out with `select_break()`. */
     #define S_IRWXU 0
     #define S_IRWXG 0
     #define S_IRWXO 0
-    #if !defined(__cplusplus)
-        #define __STDC__ 1
-    #endif
 #endif
 
 #ifdef CO_DEBUG
@@ -564,9 +494,6 @@ typedef struct uv_args_s
     size_t n_args;
 } uv_args_t;
 
-C_API jmp_buf exception_buffer;
-C_API int exception_status;
-
 /*
  * channel communication
  */
@@ -814,9 +741,6 @@ C_API void co_stack_check(int);
 /* Write this function instead of main, this library provides its own main, the scheduler,
 which will call this function as an coroutine! */
 int co_main(int, char **);
-
-/* Throw an Error */
-C_API void panic(C_ERROR_T ExceptionID);
 
 #ifdef __cplusplus
 }

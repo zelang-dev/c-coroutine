@@ -24,11 +24,6 @@ thread_local co_queue_t sleeping;
 thread_local int sleeping_counted;
 thread_local int started_wait;
 thread_local int started_event;
-
-/* Exception handling with longjmp() */
-jmp_buf exception_buffer;
-int exception_status;
-
 thread_local int exiting = 0;
 
 /* number of other coroutine that ran while the current coroutine was waiting.*/
@@ -48,8 +43,6 @@ co_routine_t **all_coroutine;
 
 int n_all_coroutine;
 
-volatile C_ERROR_FRAME_T CExceptionFrames[C_ERROR_NUM_ID] = {{0}};
-
 int coroutine_loop(int);
 void coroutine_interrupt(void);
 
@@ -68,17 +61,6 @@ void coroutine_state(char *, ...);
 
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
-
-void throw(C_ERROR_T ExceptionID)
-{
-    unsigned int _ID = co_active()->cid;
-    CExceptionFrames[_ID].Exception = ExceptionID;
-    if (CExceptionFrames[_ID].pFrame)
-    {
-        longjmp(*CExceptionFrames[_ID].pFrame, 1);
-    }
-    C_ERROR_NO_CATCH_HANDLER(ExceptionID);
-}
 
 /* called only if co_routine_t func returns */
 static void co_done()

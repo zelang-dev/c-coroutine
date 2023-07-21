@@ -21,6 +21,7 @@ file(GLOB lib_files
     ${CMAKE_SOURCE_DIR}/deferred_mm_array.c
     ${CMAKE_SOURCE_DIR}/hash.c
     ${CMAKE_SOURCE_DIR}/uv_routine.c
+    ${CMAKE_SOURCE_DIR}/exception.c
 )
 
 add_library(coroutine STATIC ${lib_files})
@@ -40,7 +41,7 @@ add_subdirectory(libuv)
 target_link_libraries(coroutine PUBLIC uv_a)
 
 if(CO_BUILD_TESTS)
-    set(TARGET_LIST test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group)
+    set(TARGET_LIST test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group no_try no_try_protected try_protected try_unprotected try_finally try_rethrow try_signal)
     foreach (TARGET ${TARGET_LIST})
         add_executable(${TARGET} examples/${TARGET}.c)
         target_link_libraries(${TARGET} coroutine)
