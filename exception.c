@@ -1,5 +1,25 @@
 #include "include/coroutine.h"
 
+/* Some common exception */
+EX_EXCEPTION(invalid_type);
+EX_EXCEPTION(range_error);
+EX_EXCEPTION(division_by_zero);
+EX_EXCEPTION(out_of_memory);
+
+/* Some signal exception */
+EX_EXCEPTION(sig_abrt);
+EX_EXCEPTION(sig_alrm);
+EX_EXCEPTION(sig_bus);
+EX_EXCEPTION(sig_fpe);
+EX_EXCEPTION(sig_ill);
+EX_EXCEPTION(sig_quit);
+EX_EXCEPTION(sig_segv);
+EX_EXCEPTION(sig_term);
+EX_EXCEPTION(sig_hup);
+EX_EXCEPTION(sig_break);
+EX_EXCEPTION(sig_kill);
+EX_EXCEPTION(sig_winch);
+
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
 
@@ -112,7 +132,7 @@ static struct
 
 static void ex_handler(int sig)
 {
-    void (*old)(int) = signal(sig, ex_handler);
+    void (*old)(int) = ex_signaling(sig);
     const char *ex = 0;
     int i;
 
@@ -128,6 +148,22 @@ static void ex_handler(int sig)
                 sig, ex);
 
     ex_throw(ex, "unknown", 0, NULL);
+}
+
+void (*ex_signaling(int sig))(int)
+{
+#ifdef _WIN32
+    return signal(sig, ex_handler);
+#else
+    static struct sigaction sa;
+    // Setup the handler
+    sa.sa_handler = &ex_handler;
+    // Restart the system call, if at all possible
+    sa.sa_flags = SA_RESTART;
+    // Block every signal during the handler
+    sigfillset(&sa.sa_mask);
+    return sigaction(sig, &sa, NULL);
+#endif
 }
 
 void (*ex_signal(int sig, const char *ex))(int)
@@ -148,8 +184,7 @@ void (*ex_signal(int sig, const char *ex))(int)
         return SIG_ERR;
     }
 
-    old = signal(sig, ex_handler);
-
+    old = ex_signaling(sig);
     if (old == SIG_ERR)
         fprintf(stderr, "Coroutine-system, cannot install handler for signal no %d (%s)\n",
                 sig, ex);
@@ -183,12 +218,26 @@ void ex_signal_std(void)
     ex_signal(SIGILL, EX_NAME(sig_ill));
 #endif
 
-#if SIGINT
-    ex_signal(SIGINT, EX_NAME(sig_int));
+#if SIGBREAK
+    ex_signal(SIGBREAK, EX_NAME(sig_break));
 #endif
 
-#if SIGQUIT
-    ex_signal(SIGQUIT, EX_NAME(sig_quit));
+#if !defined(_WIN32)
+    #if SIGQUIT
+        ex_signal(SIGQUIT, EX_NAME(sig_quit));
+    #endif
+
+    #if SIGHUP
+        ex_signal(SIGHUP, EX_NAME(sig_hup));
+    #endif
+
+    #if SIGKILL
+        ex_signal(SIGKILL, EX_NAME(sig_kill));
+    #endif
+
+    #if SIGWINCH
+        ex_signal(SIGWINCH, EX_NAME(sig_winch));
+    #endif
 #endif
 
 #if SIGSEGV

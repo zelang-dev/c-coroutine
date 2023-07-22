@@ -1587,26 +1587,22 @@ static void *coroutine_main(void *v)
 }
 
 static volatile sig_atomic_t got_sigint = false;
-static volatile sig_atomic_t got_sighup = false;
+#ifdef SIGINFO
+static volatile sig_atomic_t got_siginfo = false;
+#endif
 static bool already_hooked_up = false;
 
 void handle_signal(int signal)
 {
     switch (signal)
     {
-#ifdef _WIN32
-    case SIGTERM:
-    case SIGABRT:
-    case SIGBREAK:
-#else
-    case SIGHUP:
-#endif
-        got_sighup = true;
-        break;
-    case SIGINT:
 #ifdef SIGINFO
     case SIGINFO:
+        coroutine_info();
+        got_siginfo = true;
+        break;
 #endif
+    case SIGINT:
         coroutine_info();
         got_sigint = true;
         break;
@@ -1622,8 +1618,6 @@ void signal_setup()
     already_hooked_up = true;
 #ifdef _WIN32
     signal(SIGINT, handle_signal);
-    signal(SIGTERM, handle_signal);
-    signal(SIGABRT, handle_signal);
 #else
     struct sigaction sa;
     // Setup the handler
@@ -1632,18 +1626,9 @@ void signal_setup()
     sa.sa_flags = SA_RESTART;
     // Block every signal during the handler
     sigfillset(&sa.sa_mask);
-    // Intercept SIGHUP and SIGINT
-    if (sigaction(SIGHUP, &sa, NULL) == -1)
-    {
-        fprintf(stderr, "Cannot install SIGHUP handler.");
-    }
     if (sigaction(SIGINT, &sa, NULL) == -1)
     {
         fprintf(stderr, "Cannot install SIGINT handler.");
-    }
-    if (sigaction(SIGQUIT, &sa, NULL) == -1)
-    {
-        fprintf(stderr, "Cannot install SIGQUIT handler.");
     }
 #ifdef SIGINFO
     if (sigaction(SIGINFO, &sa, NULL) == -1)
@@ -1660,8 +1645,6 @@ void signal_reset()
     {
 #ifdef _WIN32
         signal(SIGINT, SIG_DFL);
-        signal(SIGTERM, SIG_DFL);
-        signal(SIGABRT, SIG_DFL);
 #else
         struct sigaction sa;
         // Setup the sighub handler
@@ -1670,11 +1653,6 @@ void signal_reset()
         sa.sa_flags = SA_RESTART;
         // Block every signal during the handler
         sigfillset(&sa.sa_mask);
-        // Intercept SIGHUP and SIGINT
-        if (sigaction(SIGHUP, &sa, NULL) == -1)
-        {
-            fprintf(stderr, "Cannot uninstall SIGHUP handler.");
-        }
         if (sigaction(SIGINT, &sa, NULL) == -1)
         {
             fprintf(stderr, "Cannot uninstall SIGINT handler.");

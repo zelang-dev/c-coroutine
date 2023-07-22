@@ -65,7 +65,7 @@
 #endif
 
 #define EX_EXCEPTION(E) \
-    static const char EX_NAME(E)[] = EX_STR(E)
+    const char EX_NAME(E)[] = EX_STR(E)
 
 #define try                                   \
     {                                         \
@@ -141,27 +141,10 @@
 extern "C" {
 #endif
 
-/* Some common exception */
-EX_EXCEPTION(invalid_type);
-EX_EXCEPTION(range_error);
-EX_EXCEPTION(division_by_zero);
-EX_EXCEPTION(out_of_memory);
-
-/* Some signal exception */
-EX_EXCEPTION(sig_abrt);
-EX_EXCEPTION(sig_alrm);
-EX_EXCEPTION(sig_bus);
-EX_EXCEPTION(sig_fpe);
-EX_EXCEPTION(sig_ill);
-EX_EXCEPTION(sig_int);
-EX_EXCEPTION(sig_quit);
-EX_EXCEPTION(sig_segv);
-EX_EXCEPTION(sig_term);
-
 C_API void ex_throw(const char *, const char *, int, const char *);
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
-C_API void (*ex_signal(int, const char *))(int);
+C_API void (*ex_signaling(int sig))(int);
 C_API void ex_init(void);
 
 /* Convert signals into exceptions */
