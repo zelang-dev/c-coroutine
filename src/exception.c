@@ -17,7 +17,6 @@ EX_EXCEPTION(sig_segv);
 EX_EXCEPTION(sig_term);
 EX_EXCEPTION(sig_hup);
 EX_EXCEPTION(sig_break);
-EX_EXCEPTION(sig_kill);
 EX_EXCEPTION(sig_winch);
 
 static thread_local ex_context_t ex_context_buffer;
@@ -229,10 +228,6 @@ void ex_signal_std(void)
 
     #if SIGHUP
         ex_signal(SIGHUP, EX_NAME(sig_hup));
-    #endif
-
-    #if SIGKILL
-        ex_signal(SIGKILL, EX_NAME(sig_kill));
     #endif
 
     #if SIGWINCH
