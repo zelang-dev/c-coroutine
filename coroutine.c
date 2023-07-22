@@ -20,7 +20,7 @@ static char **main_argv;
 /* coroutine unique id generator */
 thread_local int co_id_generate = 0;
 
-thread_local co_queue_t sleeping;
+thread_local co_scheduler_t sleeping;
 thread_local int sleeping_counted;
 thread_local int started_wait;
 thread_local int started_event;
@@ -36,7 +36,7 @@ thread_local int co_count;
 thread_local co_routine_t *co_running;
 
 /* coroutines's FIFO scheduler queue */
-thread_local co_queue_t co_run_queue;
+thread_local co_scheduler_t co_run_queue;
 
 /* scheduler tracking for all coroutines */
 co_routine_t **all_coroutine;
@@ -1121,7 +1121,7 @@ void co_stack_check(int n)
 }
 
 /* Add coroutine to scheduler queue, appending. */
-static void coroutine_add(co_queue_t *l, co_routine_t *t)
+static void coroutine_add(co_scheduler_t *l, co_routine_t *t)
 {
     if (l->tail)
     {
@@ -1139,7 +1139,7 @@ static void coroutine_add(co_queue_t *l, co_routine_t *t)
 }
 
 /* Remove coroutine from scheduler queue. */
-static void coroutine_remove(co_queue_t *l, co_routine_t *t)
+static void coroutine_remove(co_scheduler_t *l, co_routine_t *t)
 {
     if (t->prev)
         t->prev->next = t->next;

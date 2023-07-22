@@ -425,11 +425,11 @@ struct routine_s
 };
 
 /* scheduler queue struct */
-typedef struct co_queue_s
+typedef struct co_scheduler_s
 {
     co_routine_t *head;
     co_routine_t *tail;
-} co_queue_t;
+} co_scheduler_t;
 
 enum value_types
 {
@@ -734,6 +734,47 @@ C_API co_ht_result_t *co_wait(co_ht_group_t *);
 C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
+
+typedef struct queue_s co_queue_t;
+typedef struct iterator_s co_iterator_t;
+typedef struct item_s co_item_t;
+
+struct item_s
+{
+    void *value;
+    co_item_t *previous;
+    co_item_t *next;
+};
+
+struct queue_s
+{
+    co_item_t *first_item;
+    co_item_t *last_item;
+    size_t length;
+};
+
+struct iterator_s
+{
+    co_queue_t *queue;
+    co_item_t *item;
+    bool forward;
+};
+
+C_API co_queue_t *queue_new(void);
+C_API void queue_free(co_queue_t *, void (*)(void *));
+C_API void queue_push(co_queue_t *, void *);
+C_API void *queue_pop(co_queue_t *);
+C_API void *queue_peek(co_queue_t *);
+C_API void *queue_peek_first(co_queue_t *);
+C_API void queue_shift(co_queue_t *, void *);
+C_API void *queue_unshift(co_queue_t *);
+C_API size_t queue_length(co_queue_t *);
+C_API void *queue_remove(co_queue_t *, void *);
+C_API co_iterator_t *co_iterator(co_queue_t *, bool);
+C_API co_iterator_t *co_iterator_next(co_iterator_t *);
+C_API void *co_iterator_value(co_iterator_t *);
+C_API co_iterator_t *co_iterator_remove(co_iterator_t *);
+C_API void co_iterator_free(co_iterator_t *);
 
 /* Check for at least `n` bytes left on the stack. If not present, abort. */
 C_API void co_stack_check(int);
