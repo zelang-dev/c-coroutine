@@ -1,4 +1,4 @@
-#include "include/coroutine.h"
+#include "../include/coroutine.h"
 
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
@@ -917,11 +917,11 @@ bool co_serializable(void)
 }
 #else
     #define USE_NATIVE
-    #include "ucontext.c"
+    #include "../ucontext.c"
 #endif
 #else
     #define USE_NATIVE
-    #include "ucontext.c"
+    #include "../ucontext.c"
 #endif
 
 #if !defined(USE_NATIVE)
