@@ -1242,7 +1242,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg)
                         co = (co_routine_t *)pair->val;
                         if (!co_terminated(co))
                         {
-                            if (co->status == CO_NORMAL)
+                            if (!co->loop_active && co->status == CO_NORMAL)
                                 coroutine_schedule(co);
 
                             coroutine_yield();
