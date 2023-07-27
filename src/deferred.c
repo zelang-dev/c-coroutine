@@ -53,7 +53,10 @@ void co_deferred_run(co_routine_t *coro, size_t generation)
     {
         defer_func_t *defer = &defers[i - 1];
 
-        defer->func(defer->data1);
+        if (defer->check != NULL)
+            coro->err_recovered = false;
+
+        defer->func(defer->data);
     }
 
     array->elements = generation;
@@ -73,7 +76,7 @@ void co_deferred_free(co_routine_t *coro)
     co_deferred_array_reset(&coro->defer);
 }
 
-static void co_deferred_any(co_routine_t *coro, defer_func func, void *data1, void *data2)
+static void co_deferred_any(co_routine_t *coro, defer_func func, void *data, void *check)
 {
     defer_func_t *defer;
 
@@ -87,14 +90,26 @@ static void co_deferred_any(co_routine_t *coro, defer_func func, void *data1, vo
     else
     {
         defer->func = func;
-        defer->data1 = data1;
-        defer->data2 = data2;
+        defer->data = data;
+        defer->check = check;
     }
 }
 
 CO_FORCE_INLINE void co_defer(defer_func func, void *data)
 {
     co_deferred(co_active(), func, data);
+}
+
+CO_FORCE_INLINE void co_defer_recover(defer_func func, void *data)
+{
+    co_deferred_any(co_active(), func, data, (void *)"err");
+}
+
+const char *co_recovered()
+{
+    co_routine_t *co = co_active();
+    co->err_recovered = true;
+    return (co->panic != NULL) ? co->panic : co->err;
 }
 
 void co_deferred(co_routine_t *coro, defer_func func, void *data)

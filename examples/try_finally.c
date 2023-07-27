@@ -1,7 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "../include/exception.h"
+#include "../include/coroutine.h"
 
 static int div_err(int a, int b)
 {
@@ -11,7 +8,7 @@ static int div_err(int a, int b)
     return a / b;
 }
 
-int main(void)
+int co_main(int argc, char **argv)
 {
     try
     {

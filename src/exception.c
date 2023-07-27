@@ -5,6 +5,7 @@ EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(division_by_zero);
 EX_EXCEPTION(out_of_memory);
+EX_EXCEPTION(panic);
 
 /* Some signal exception */
 EX_EXCEPTION(sig_abrt);
@@ -25,9 +26,10 @@ thread_local ex_context_t *ex_context = 0;
 static void ex_print(ex_context_t *exception, const char *message)
 {
 #ifndef CO_DEBUG
-    fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n", exception->ex, exception->function);
+    fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
+            (exception->co->panic != NULL) ? exception->co->panic : exception->ex, exception->function);
 #else
-    fprintf(stderr, "\n%s: %s\n", message, exception->ex);
+    fprintf(stderr, "\n%s: %s\n", message, (exception->co->panic != NULL) ? exception->co->panic : exception->ex);
     if (exception->file != NULL)
     {
         if (exception->function != NULL)
@@ -39,8 +41,6 @@ static void ex_print(ex_context_t *exception, const char *message)
             fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
         }
     }
-
-    fprintf(stderr, "The value of errno was %d.\n", exception->error_number);
 #endif
 
     (void)fflush(stderr);
@@ -91,7 +91,7 @@ void ex_terminate(void)
     }
 }
 
-void ex_throw(const char *exception, const char *file, int line, const char *function)
+void ex_throw(const char *exception, const char *file, int line, const char *function, const char *message)
 {
     ex_context_t *ctx = ex_context;
 
@@ -105,7 +105,10 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ctx->file = file;
     ctx->line = line;
     ctx->function = function;
-    ctx->error_number = errno;
+
+    ctx->co = co_active();
+    ctx->co->err = (void *)ctx->ex;
+    ctx->co->panic = message;
 
     if (ctx->unstack)
         ex_terminate();
@@ -146,7 +149,7 @@ static void ex_handler(int sig)
         fprintf(stderr, "Coroutine-system, cannot reinstall handler for signal no %d (%s)\n",
                 sig, ex);
 
-    ex_throw(ex, "unknown", 0, NULL);
+    ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
 void (*ex_signaling(int sig))(int)

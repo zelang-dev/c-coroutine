@@ -14,7 +14,7 @@ static void pfree(void *p)
     free(p);
 }
 
-int main(void)
+int co_main(int argc, char **argv)
 {
     char *p = 0;
     protected(p, pfree);

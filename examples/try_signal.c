@@ -1,8 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-#include "../include/exception.h"
+#include "../include/coroutine.h"
 
 static void pfree(void *p)
 {
@@ -10,7 +6,7 @@ static void pfree(void *p)
     free(p);
 }
 
-int main(void)
+int co_main(int argc, char **argv)
 {
     ex_signal_std();
 
