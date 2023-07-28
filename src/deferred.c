@@ -49,14 +49,30 @@ void co_deferred_run(co_routine_t *coro, size_t generation)
     defer_func_t *defers = array->base;
     size_t i;
 
-    for (i = array->elements; i != generation; i--)
+    if (strcmp(coro->name, "co_main") != 0)
     {
-        defer_func_t *defer = &defers[i - 1];
+        for (i = array->elements; i != generation; i--)
+        {
+            defer_func_t *defer = &defers[i - 1];
 
-        if (defer->check != NULL)
-            coro->err_recovered = false;
+            if (defer->check != NULL)
+                coro->err_recovered = false;
 
-        defer->func(defer->data);
+            defer->func(defer->data);
+            defer->data = NULL;
+        }
+    }
+
+    if (coro->err_protected && coro->err_allocated != NULL && coro->err != NULL)
+    {
+        if (!ex_context)
+            ex_init();
+
+        if (*coro->err_allocated->ptr != NULL)
+            coro->err_allocated->func(coro->err_allocated->ptr);
+
+        ex_context->stack = coro->err_allocated->next;
+        coro->err_protected = false;
     }
 
     array->elements = generation;

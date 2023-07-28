@@ -19,15 +19,14 @@ int co_main(int argc, char **argv)
     try
     {
         char *p = 0;
-        protected(p, pfree);
 
-        p = malloc(sizeof("p"));
+        p = co_malloc_full(co_active(), 3, pfree);
         if (p)
             strcpy(p, "p");
 
         free(p);
 
-        p = malloc(sizeof("p2")); /* still protected */
+        p = co_malloc_full(co_active(), 4, pfree); /* still protected */
         if (p)
             strcpy(p, "p2");
 
@@ -35,7 +34,6 @@ int co_main(int argc, char **argv)
         printf("never reached\n");
 
         free(p);
-        unprotected(p);
     }
     catch_any
     {

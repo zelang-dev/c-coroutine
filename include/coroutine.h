@@ -324,6 +324,8 @@ typedef enum co_state
 typedef void *(*co_callable_t)(void *);
 typedef struct routine_s co_routine_t;
 typedef struct oa_hash_s co_hast_t;
+typedef struct ex_ptr_s ex_ptr_t;
+typedef struct ex_context_s ex_context_t;
 typedef co_hast_t co_ht_group_t;
 typedef co_hast_t co_ht_result_t;
 
@@ -424,6 +426,8 @@ struct routine_s
     void *volatile err;
     const char *volatile panic;
     bool err_recovered;
+    bool err_protected;
+    ex_ptr_t *err_allocated;
     /* Used to check stack overflow. */
     size_t magic_number;
 };
@@ -891,6 +895,7 @@ C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API void (*ex_signaling(int sig))(int);
 C_API void ex_init(void);
+C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
 
 /* Convert signals into exceptions */
 C_API void ex_signal_std(void);
@@ -901,9 +906,6 @@ enum
     ex_throw_st,
     ex_catch_st
 };
-
-typedef struct ex_ptr_s ex_ptr_t;
-typedef struct ex_context_s ex_context_t;
 
 /* stack of protected pointer */
 struct ex_ptr_s
@@ -944,23 +946,12 @@ struct ex_context_s
 
 C_API thread_local ex_context_t *ex_context;
 
-static ex_ptr_t ex_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *))
-{
-  if (!ex_context) ex_init();
-  const_ptr->next = ex_context->stack;
-  const_ptr->func = func;
-  const_ptr->ptr = ptr;
-  ex_context->stack = const_ptr;
-  return *const_ptr;
-  (void)ex_ptr;
-}
-
 /* Protects dynamically allocated memory against exceptions.
 If the object pointed by `ptr` changes before `unprotected()`,
 the new object will be automatically protected.
 
 If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
-#define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_ptr(&EX_PNAME(ptr), &ptr, func)
+#define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_protect_ptr(&EX_PNAME(ptr), &ptr, func)
 
 /* Remove memory pointer protection, does not free the memory. */
 #define unprotected(p) (ex_context->stack = EX_PNAME(p).next)

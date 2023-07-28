@@ -5,7 +5,14 @@ void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
     void *ptr = CO_MALLOC(size);
 
     if (LIKELY(ptr))
+    {
+        if (coro->err_allocated == NULL)
+            coro->err_allocated = CO_MALLOC(sizeof(ex_ptr_t));
+
+        ex_protect_ptr(coro->err_allocated, ptr, func);
+        coro->err_protected = true;
         co_deferred(coro, func, ptr);
+    }
 
     return ptr;
 }
@@ -15,7 +22,14 @@ void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func
     void *ptr = CO_CALLOC(count, size);
 
     if (LIKELY(ptr))
+    {
+        if (coro->err_allocated == NULL)
+            coro->err_allocated = CO_CALLOC(1, sizeof(ex_ptr_t));
+
+        ex_protect_ptr(coro->err_allocated, ptr, func);
+        coro->err_protected = true;
         co_deferred(coro, func, ptr);
+    }
 
     return ptr;
 }

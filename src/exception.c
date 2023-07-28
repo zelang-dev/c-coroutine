@@ -46,17 +46,36 @@ static void ex_print(ex_context_t *exception, const char *message)
     (void)fflush(stderr);
 }
 
+ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *))
+{
+    if (!ex_context)
+        ex_init();
+
+    const_ptr->next = ex_context->stack;
+    const_ptr->func = func;
+    const_ptr->ptr = ptr;
+    ex_context->stack = const_ptr;
+    return *const_ptr;
+}
+
 static void unwind_stack(ex_context_t *ctx)
 {
     ex_ptr_t *p = ctx->stack;
 
     ctx->unstack = 1;
 
-    while (p)
+    if (ctx->co->err_protected)
     {
-        if (*p->ptr)
-            p->func(*p->ptr);
-        p = p->next;
+        co_deferred_free(ctx->co);
+    }
+    else
+    {
+        while (p)
+        {
+            if (*p->ptr)
+                p->func(*p->ptr);
+            p = p->next;
+        }
     }
 
     ctx->unstack = 0;

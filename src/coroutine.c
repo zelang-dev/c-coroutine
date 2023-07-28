@@ -91,8 +91,7 @@ static void co_awaitable()
     {
         co_result_set(co, co->func(co->args));
         co->status = CO_NORMAL;
-        if (strcmp(co->name, "co_main") != 0)
-            co_deferred_free(co);
+        co_deferred_free(co);
     }
 }
 
@@ -1020,6 +1019,9 @@ void co_delete(co_routine_t *handle)
         }
         else
         {
+            if (handle->err_allocated != NULL)
+                CO_FREE(handle->err_allocated);
+
             CO_FREE(handle);
         }
     }

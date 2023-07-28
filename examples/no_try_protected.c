@@ -17,16 +17,14 @@ static void pfree(void *p)
 int co_main(int argc, char **argv)
 {
     char *p = 0;
-    protected(p, pfree);
 
-    p = malloc(sizeof("p"));
+    p = co_new(3);
     if (p)
         strcpy(p, "p");
     div_err(1, 0);
     printf("never reached\n");
 
     free(p);
-    unprotected(p);
 
     return 0;
 }
