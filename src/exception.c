@@ -8,6 +8,7 @@ EX_EXCEPTION(out_of_memory);
 EX_EXCEPTION(panic);
 
 /* Some signal exception */
+EX_EXCEPTION(sig_int);
 EX_EXCEPTION(sig_abrt);
 EX_EXCEPTION(sig_alrm);
 EX_EXCEPTION(sig_bus);
@@ -22,6 +23,7 @@ EX_EXCEPTION(sig_winch);
 
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
+static volatile sig_atomic_t got_signal = false;
 
 static void ex_print(ex_context_t *exception, const char *message)
 {
@@ -151,9 +153,21 @@ static struct
     int sig;
 } ex_sig[max_ex_sig];
 
-static void ex_handler(int sig)
+void ex_handler(int sig)
 {
-    void (*old)(int) = ex_signaling(sig);
+    got_signal = true;
+#ifdef _WIN32
+    void (*old)(int) = signal(sig, ex_handler);
+#else
+    static struct sigaction sa;
+    // Setup the handler
+    sa.sa_handler = &ex_handler;
+    // Restart the system call, if at all possible
+    sa.sa_flags = SA_RESTART;
+    // Block every signal during the handler
+    sigfillset(&sa.sa_mask);
+    void (*old)(int) = sigaction(sig, &sa, NULL);
+#endif
     const char *ex = 0;
     int i;
 
@@ -168,23 +182,10 @@ static void ex_handler(int sig)
         fprintf(stderr, "Coroutine-system, cannot reinstall handler for signal no %d (%s)\n",
                 sig, ex);
 
-    ex_throw(ex, "unknown", 0, NULL, NULL);
-}
-
-void (*ex_signaling(int sig))(int)
-{
-#ifdef _WIN32
-    return signal(sig, ex_handler);
-#else
-    static struct sigaction sa;
-    // Setup the handler
-    sa.sa_handler = &ex_handler;
-    // Restart the system call, if at all possible
-    sa.sa_flags = SA_RESTART;
-    // Block every signal during the handler
-    sigfillset(&sa.sa_mask);
-    return sigaction(sig, &sa, NULL);
-#endif
+    if (sig == SIGINT)
+        coroutine_info();
+    else
+        ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
 void (*ex_signal(int sig, const char *ex))(int)
@@ -205,7 +206,18 @@ void (*ex_signal(int sig, const char *ex))(int)
         return SIG_ERR;
     }
 
-    old = ex_signaling(sig);
+#ifdef _WIN32
+    old = signal(sig, ex_handler);
+#else
+    static struct sigaction sa;
+    // Setup the handler
+    sa.sa_handler = &ex_handler;
+    // Restart the system call, if at all possible
+    sa.sa_flags = SA_RESTART;
+    // Block every signal during the handler
+    sigfillset(&sa.sa_mask);
+    old = sigaction(sig, &sa, NULL);
+#endif
     if (old == SIG_ERR)
         fprintf(stderr, "Coroutine-system, cannot install handler for signal no %d (%s)\n",
                 sig, ex);
@@ -215,8 +227,12 @@ void (*ex_signal(int sig, const char *ex))(int)
     return old;
 }
 
-void ex_signal_std(void)
+void ex_signal_setup(void)
 {
+#if SIGINT
+    ex_signal(SIGINT, EX_NAME(sig_int));
+#endif
+
 #if SIGABRT
     ex_signal(SIGABRT, EX_NAME(sig_abrt));
 #endif

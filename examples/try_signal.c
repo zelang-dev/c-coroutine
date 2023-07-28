@@ -8,14 +8,10 @@ static void pfree(void *p)
 
 int co_main(int argc, char **argv)
 {
-    ex_signal_std();
-
     try
     {
         char *p = 0;
-        protected(p, pfree);
-
-        p = malloc(sizeof("p"));
+        p = co_malloc_full(co_active(), 3, pfree);
         if (p)
             strcpy(p, "p");
 
@@ -23,7 +19,6 @@ int co_main(int argc, char **argv)
         printf("never reached\n");
 
         free(p);
-        unprotected(p);
     }
     catch (sig_segv)
     {

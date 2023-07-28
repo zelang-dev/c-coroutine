@@ -893,12 +893,11 @@ C_API void co_iterator_free(co_iterator_t *);
 C_API void ex_throw(const char *, const char *, int, const char *, const char *);
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
-C_API void (*ex_signaling(int sig))(int);
 C_API void ex_init(void);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
 
 /* Convert signals into exceptions */
-C_API void ex_signal_std(void);
+C_API void ex_signal_setup(void);
 
 enum
 {

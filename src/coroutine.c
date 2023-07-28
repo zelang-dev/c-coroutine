@@ -1588,94 +1588,11 @@ static void *coroutine_main(void *v)
     return 0;
 }
 
-static volatile sig_atomic_t got_sigint = false;
-#ifdef SIGINFO
-static volatile sig_atomic_t got_siginfo = false;
-#endif
-static bool already_hooked_up = false;
-
-void handle_signal(int signal)
-{
-    switch (signal)
-    {
-#ifdef SIGINFO
-    case SIGINFO:
-        coroutine_info();
-        got_siginfo = true;
-        break;
-#endif
-    case SIGINT:
-        coroutine_info();
-        got_sigint = true;
-        break;
-    }
-}
-
-void signal_setup()
-{
-    if (already_hooked_up)
-    {
-        fprintf(stderr,"Tried to hookup signal handlers more than once.");
-    }
-    already_hooked_up = true;
-#ifdef _WIN32
-    signal(SIGINT, handle_signal);
-#else
-    struct sigaction sa;
-    // Setup the handler
-    sa.sa_handler = &handle_signal;
-    // Restart the system call, if at all possible
-    sa.sa_flags = SA_RESTART;
-    // Block every signal during the handler
-    sigfillset(&sa.sa_mask);
-    if (sigaction(SIGINT, &sa, NULL) == -1)
-    {
-        fprintf(stderr, "Cannot install SIGINT handler.");
-    }
-#ifdef SIGINFO
-    if (sigaction(SIGINFO, &sa, NULL) == -1)
-    {
-        fprintf(stderr, "Cannot install SIGINFO handler.");
-    }
-#endif
-#endif
-}
-
-void signal_reset()
-{
-    if (already_hooked_up)
-    {
-#ifdef _WIN32
-        signal(SIGINT, SIG_DFL);
-#else
-        struct sigaction sa;
-        // Setup the sighub handler
-        sa.sa_handler = SIG_DFL;
-        // Restart the system call, if at all possible
-        sa.sa_flags = SA_RESTART;
-        // Block every signal during the handler
-        sigfillset(&sa.sa_mask);
-        if (sigaction(SIGINT, &sa, NULL) == -1)
-        {
-            fprintf(stderr, "Cannot uninstall SIGINT handler.");
-        }
-#ifdef SIGINFO
-        if (sigaction(SIGINFO, &sa, NULL) == -1)
-        {
-            fprintf(stderr, "Cannot uninstall SIGINFO handler.");
-        }
-#endif
-#endif
-
-        already_hooked_up = false;
-    }
-}
-
 int main(int argc, char **argv)
 {
     main_argc = argc;
     main_argv = argv;
-    signal_setup();
+    ex_signal_setup();
     coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
     coroutine_scheduler();
     fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");

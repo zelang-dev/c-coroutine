@@ -8,8 +8,6 @@ static void pfree(void *p)
 
 int co_main(int argc, char **argv)
 {
-    ex_signal_std();
-
     try
     {
         char *p = 0;
