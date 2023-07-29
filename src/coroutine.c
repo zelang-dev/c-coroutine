@@ -77,22 +77,37 @@ static void co_done()
 static void loop_awaitable(co_routine_t *co)
 {
     co->func(co->args);
-    co->status = CO_EVENT;
 }
 
 static void co_awaitable()
 {
     co_routine_t *co = co_active();
-    if (co->loop_active)
+    try
     {
-        loop_awaitable(co);
+        if (co->loop_active)
+        {
+            loop_awaitable(co);
+        }
+        else
+        {
+            co_result_set(co, co->func(co->args));
+            co_deferred_free(co);
+        }
     }
-    else
+    catch_any
     {
-        co_result_set(co, co->func(co->args));
-        co->status = CO_NORMAL;
         co_deferred_free(co);
+        if (!co->err_recovered)
+            rethrow();
     }
+    finally
+    {
+        if (co->loop_active)
+            co->status = CO_EVENT;
+        else
+            co->status = CO_NORMAL;
+    }
+    end_try;
 }
 
 static void co_func(co_routine_t handle)
@@ -1202,6 +1217,12 @@ CO_FORCE_INLINE int co_go(co_callable_t fn, void *arg)
     return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
+CO_FORCE_INLINE void co_execute(co_call_t fn, void *arg)
+{
+    coroutine_create((co_callable_t)fn, arg, CO_STACK_SIZE);
+    co_pause();
+}
+
 CO_FORCE_INLINE int co_uv(co_callable_t fn, void *arg)
 {
 
@@ -1562,7 +1583,7 @@ static void coroutine_scheduler(void)
         CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid,
                 ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"),
                 t->status);
-        coroutine_interrupt();
+       coroutine_interrupt();
         is_loop_close = (t->status > CO_EVENT || t->status < 0);
         if (!is_loop_close && !t->halt)
             co_switch(t);

@@ -121,7 +121,7 @@ CO_FORCE_INLINE void co_defer_recover(defer_func func, void *data)
     co_deferred_any(co_active(), func, data, (void *)"err");
 }
 
-const char *co_recovered()
+const char *co_recover()
 {
     co_routine_t *co = co_active();
     co->err_recovered = true;

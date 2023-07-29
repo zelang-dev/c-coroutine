@@ -6,6 +6,7 @@
 #endif
 
 #include <errno.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -26,8 +27,6 @@
 #else
     #include <unistd.h>
 #endif
-
-#include <setjmp.h>
 
 #if !defined(__cplusplus) && !defined(__STDC__)
     #define __STDC__ 1
@@ -321,6 +320,7 @@ typedef enum co_state
     CO_EVENT /* The coroutine is in an Event Loop callback. */
 } co_state;
 
+typedef void (*co_call_t)(void *);
 typedef void *(*co_callable_t)(void *);
 typedef struct routine_s co_routine_t;
 typedef struct oa_hash_s co_hast_t;
@@ -601,8 +601,11 @@ C_API void co_defer(defer_func, void *);
 C_API void co_deferred(co_routine_t *, defer_func, void *);
 C_API void co_deferred_run(co_routine_t *, size_t);
 C_API size_t co_deferred_count(const co_routine_t *);
+
+/* Same as `defer` but allows recover from an Error condition throw/panic,
+you must call `co_recover` to retrieve error message and mark Error condition handled. */
 C_API void co_defer_recover(defer_func, void *);
-C_API const char *co_recovered(void);
+C_API const char *co_recover(void);
 
 /* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
@@ -641,6 +644,9 @@ C_API value_t co_recv(channel_t *);
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
 C_API int co_go(co_callable_t, void *);
+
+/* Creates an coroutine of given function with argument, and immediately execute. */
+C_API void co_execute(co_call_t, void *);
 
 C_API uv_loop_t *co_loop(void);
 
@@ -873,6 +879,8 @@ C_API void co_iterator_free(co_iterator_t *);
 #define throw(E) \
     ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
 
+/* An macro that stops the ordinary flow of control and begins panicking,
+throws an exception of given message. */
 #define co_panic(message)                                                      \
     do                                                                         \
     {                                                                          \
@@ -894,6 +902,7 @@ C_API void ex_throw(const char *, const char *, int, const char *, const char *)
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API void ex_init(void);
+C_API void (*ex_signal(int sig, const char *ex))(int);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
 
 /* Convert signals into exceptions */

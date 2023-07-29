@@ -238,7 +238,7 @@ void (*ex_signal(int sig, const char *ex))(int)
         return SIG_ERR;
     }
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
     old = signal(sig, ex_handler);
 #else
     static struct sigaction sa;
@@ -261,55 +261,56 @@ void (*ex_signal(int sig, const char *ex))(int)
 
 void ex_signal_setup(void)
 {
-#if SIGINT
-    ex_signal(SIGINT, EX_NAME(sig_int));
+#ifdef SIGSEGV
+    ex_signal(SIGSEGV, EX_NAME(sig_segv));
 #endif
 
-#if SIGABRT
+#ifdef SIGABRT
     ex_signal(SIGABRT, EX_NAME(sig_abrt));
 #endif
 
-#if SIGALRM
+#ifdef SIGFPE
+    ex_signal(SIGFPE, EX_NAME(sig_fpe));
+#endif
+
+#ifdef SIGILL
+    ex_signal(SIGILL, EX_NAME(sig_ill));
+#endif
+
+#ifdef SIGBREAK
+    ex_signal(SIGBREAK, EX_NAME(sig_break));
+#endif
+
+#ifdef SIGINT
+    ex_signal(SIGINT, EX_NAME(sig_int));
+#endif
+
+#ifdef SIGTERM
+    ex_signal(SIGTERM, EX_NAME(sig_term));
+#endif
+
+#if !defined(_WIN32)
+    #ifdef SIGQUIT
+        ex_signal(SIGQUIT, EX_NAME(sig_quit));
+    #endif
+
+    #ifdef SIGHUP
+        ex_signal(SIGHUP, EX_NAME(sig_hup));
+    #endif
+
+    #ifdef SIGWINCH
+        ex_signal(SIGWINCH, EX_NAME(sig_winch));
+    #endif
+#endif
+
+#ifdef SIGALRM
     ex_signal(SIGALRM, EX_NAME(sig_alrm));
 #endif
 
-#if SIGBUS
+#ifdef SIGBUS
     ex_signal(SIGBUS, EX_NAME(sig_bus));
 #elif SIG_BUS
     ex_signal(SIG_BUS, EX_NAME(sig_bus));
 #endif
 
-#if SIGFPE
-    ex_signal(SIGFPE, EX_NAME(sig_fpe));
-#endif
-
-#if SIGILL
-    ex_signal(SIGILL, EX_NAME(sig_ill));
-#endif
-
-#if SIGBREAK
-    ex_signal(SIGBREAK, EX_NAME(sig_break));
-#endif
-
-#if !defined(_WIN32)
-    #if SIGQUIT
-        ex_signal(SIGQUIT, EX_NAME(sig_quit));
-    #endif
-
-    #if SIGHUP
-        ex_signal(SIGHUP, EX_NAME(sig_hup));
-    #endif
-
-    #if SIGWINCH
-        ex_signal(SIGWINCH, EX_NAME(sig_winch));
-    #endif
-#endif
-
-#if SIGSEGV
-    ex_signal(SIGSEGV, EX_NAME(sig_segv));
-#endif
-
-#if SIGTERM
-    ex_signal(SIGTERM, EX_NAME(sig_term));
-#endif
 }

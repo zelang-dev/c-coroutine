@@ -11,11 +11,7 @@ int co_main(int argc, char **argv)
     try
     {
         char *p = 0;
-        protected(p, pfree);
-
-        p = malloc(sizeof("p"));
-        if (p)
-            strcpy(p, "p");
+        p = co_malloc_full(co_active(), 3, pfree);
 
         int a = 1;
         int b = 0.00000;
@@ -23,7 +19,6 @@ int co_main(int argc, char **argv)
         printf("never reached %f\n", x);
 
         free(p);
-        unprotected(p);
     }
     catch (sig_fpe)
     {

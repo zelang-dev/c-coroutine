@@ -145,6 +145,9 @@ for_select {
 and add to schedular, same behavior as Go in golang. */
 C_API int co_go(co_callable_t, void *);
 
+/* Creates an coroutine of given function with argument, and immediately execute. */
+C_API void co_execute(co_call_t, void *);
+
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
 C_API unsigned int co_sleep(unsigned int ms);
@@ -160,6 +163,14 @@ C_API void *co_new_by(int count, size_t size);
 /* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
 C_API void co_defer(defer_func, void *);
+
+/* An macro that stops the ordinary flow of control and begins panicking,
+throws an exception of given message. */
+co_panic(message);
+
+/* Same as `defer` but allows recover from an Error condition throw/panic,
+you must call `co_recover` to retrieve error message and mark Error condition handled. */
+C_API void co_defer_recover(recover_func, void *);
 
 /* Generic simple union storage types. */
 typedef union
@@ -386,6 +397,79 @@ int co_main(int argc, char **argv)
     args[1] = quit;
     co_go(func, args);
     return fibonacci(c, quit);
+}
+```
+
+Another **Go** example from <https://www.developer.com/languages/go-error-handling-with-panic-recovery-and-defer/>
+
+```go
+package main
+
+import (
+ "fmt"
+ "log"
+)
+
+func main() {
+ divByZero()
+ fmt.Println("Although panicked. We recovered. We call mul() func")
+ fmt.Println("mul func result: ", mul(5, 10))
+}
+
+func div(x, y int) int {
+ return x / y
+}
+
+func mul(x, y int) int {
+ return x * y
+}
+
+func divByZero() {
+ defer func() {
+  if err := recover(); err != nil {
+   log.Println("panic occurred:", err)
+  }
+ }()
+ fmt.Println(div(1, 0))
+}
+```
+
+This **C** library version of it.
+
+```c
+#include "../include/coroutine.h"
+
+int div_err(int x, int y)
+{
+    if (y == 0)
+        co_panic("runtime error: integer divide by zero");
+    return x / y;
+}
+
+int mul(int x, int y)
+{
+    return x * y;
+}
+
+void func(void *arg)
+{
+    const char *err = co_recover();
+    if (NULL != err)
+        printf("panic occurred: %s\n", err);
+}
+
+void divByZero(void *arg)
+{
+    co_defer_recover(func, arg);
+    printf("%d", div_err(1, 0));
+}
+
+int co_main(int argc, char **argv)
+{
+    co_execute(divByZero, NULL);
+    printf("Although panicked. We recovered. We call mul() func\n");
+    printf("mul func result: %d\n", mul(5, 10));
+    return 0;
 }
 ```
 
