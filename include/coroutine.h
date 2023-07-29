@@ -953,6 +953,7 @@ struct ex_context_s
 };
 
 C_API thread_local ex_context_t *ex_context;
+C_API thread_local char ex_message[256];
 
 /* Protects dynamically allocated memory against exceptions.
 If the object pointed by `ptr` changes before `unprotected()`,
@@ -964,7 +965,7 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 /* Remove memory pointer protection, does not free the memory. */
 #define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
 
-/* Check for at least `n` bytes left on the stack. If not present, abort. */
+/* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
 /* Write this function instead of main, this library provides its own main, the scheduler,

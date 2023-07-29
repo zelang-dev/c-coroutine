@@ -964,10 +964,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
     void *memory = CO_CALLOC(1, size);
     if (!memory)
-    {
-        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        return CO_ERROR;
-    }
+        co_panic("calloc() failed");
 
     co_routine_t *co = co_derive(memory, size, func, args);
     if (!co_current_handle)
@@ -1132,8 +1129,8 @@ void co_stack_check(int n)
     t = co_running;
     if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER)
     {
-        fprintf(stderr, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
-        abort();
+        snprintf(ex_message, 256, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
+        co_panic(ex_message);
     }
 }
 
@@ -1183,10 +1180,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack)
     {
         all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[0]));
         if (all_coroutine == NULL)
-        {
-            fprintf(stderr, "realloc() failed in file %s at line # %d", __FILE__, __LINE__);
-            abort();
-        }
+            co_panic("realloc() failed");
     }
 
     t->all_coroutine_slot = n_all_coroutine;
@@ -1583,7 +1577,7 @@ static void coroutine_scheduler(void)
         CO_INFO("Running coroutine id: %d (%s) status: %d\n", t->cid,
                 ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"),
                 t->status);
-       coroutine_interrupt();
+        coroutine_interrupt();
         is_loop_close = (t->status > CO_EVENT || t->status < 0);
         if (!is_loop_close && !t->halt)
             co_switch(t);

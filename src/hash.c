@@ -71,10 +71,7 @@ oa_hash *oa_hash_new(
 
     htable = CO_MALLOC(sizeof(*htable));
     if (NULL == htable)
-    {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("malloc() failed");
 
     htable->size = 0;
     htable->capacity = OA_HASH_INIT_CAPACITY;
@@ -84,10 +81,7 @@ oa_hash *oa_hash_new(
 
     htable->buckets = CO_MALLOC(sizeof(*(htable->buckets)) * htable->capacity);
     if (NULL == htable->buckets)
-    {
-        fprintf(stderr, "malloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("malloc() failed");
 
     for (int i = 0; i < htable->capacity; i++)
     {
@@ -128,10 +122,7 @@ inline static void oa_hash_grow(oa_hash *htable)
 
     uint64_t new_capacity_64 = (uint64_t)htable->capacity * OA_HASH_GROWTH_FACTOR;
     if (new_capacity_64 > SIZE_MAX)
-    {
-        fprintf(stderr, "re-size overflow in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("re-size overflow");
 
     old_capacity = (uint32_t)htable->capacity;
     old_buckets = htable->buckets;
@@ -141,10 +132,7 @@ inline static void oa_hash_grow(oa_hash *htable)
     htable->buckets = CO_CALLOC(1, htable->capacity * sizeof(*(htable->buckets)));
 
     if (NULL == htable->buckets)
-    {
-        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("calloc() failed");
 
     for (int i = 0; i < htable->capacity; i++)
     {
@@ -337,10 +325,8 @@ oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *val)
     oa_pair *p;
     p = CO_CALLOC(1, sizeof(p));
     if (NULL == p)
-    {
-        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("calloc() failed");
+
     p->hash = hash;
     p->val = (void *)val;
     p->key = (void *)key;
@@ -395,10 +381,8 @@ void *oa_string_cp(const void *data, void *arg)
     size_t copy_size = sizeof(result) * input_length;
     result = CO_CALLOC(1, copy_size);
     if (NULL == result)
-    {
-        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("calloc() failed");
+
 #if defined(_WIN32) || defined(_WIN64)
     strcpy_s(result, copy_size, input);
 #else
@@ -422,10 +406,7 @@ void *oa_value_cp(const void *data, void *arg)
 {
     co_value_t *result = CO_CALLOC(1, sizeof(data));
     if (NULL == result)
-    {
-        fprintf(stderr, "calloc() failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
+        co_panic("calloc() failed");
 
     memcpy(result, data, sizeof(result));
     return result;

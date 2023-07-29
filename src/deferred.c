@@ -49,8 +49,7 @@ void co_deferred_run(co_routine_t *coro, size_t generation)
     defer_func_t *defers = array->base;
     size_t i;
 
-    if (coro->err == NULL)
-        coro->err_recovered = true;
+    coro->err_recovered = coro->err == NULL;
 
     if (strcmp(coro->name, "co_main") != 0)
     {

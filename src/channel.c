@@ -6,10 +6,7 @@ channel_t *channel_create(int elem_size, int bufsize)
     co_value_t *s = CO_CALLOC(1, sizeof(co_value_t));
 
     if (c == NULL || s == NULL)
-    {
-        fprintf(stderr, "channel_create failed in file %s at line # %d", __FILE__, __LINE__);
-        exit(1);
-    }
+        co_panic("channel_create failed");
 
     c->elem_size = elem_size;
     c->bufsize = bufsize;
@@ -122,8 +119,8 @@ static void channel_co_dequeue(channel_co_t *a)
     ar = channel_msg(a->c, a->op);
     if (ar == NULL)
     {
-        fprintf(stderr, "bad use of channel_co_dequeue op=%d\n", a->op);
-        abort();
+        snprintf(ex_message, 256, "bad use of channel_co_dequeue op=%d\n", a->op);
+        co_panic(ex_message);
     }
 
     for (i = 0; i < ar->n; i++)
@@ -132,8 +129,7 @@ static void channel_co_dequeue(channel_co_t *a)
             del_msg(ar, i);
             return;
         }
-    fprintf(stderr, "cannot find self in channel_co_dequeue\n");
-    abort();
+    co_panic("cannot find self in channel_co_dequeue");
 }
 
 static void channel_co_all_dequeue(channel_co_t *a)

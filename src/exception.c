@@ -55,6 +55,7 @@ EX_EXCEPTION(sig_winch);
 
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
+thread_local char ex_message[256] = {0};
 static volatile sig_atomic_t got_signal = false;
 
 static void ex_print(ex_context_t *exception, const char *message)
@@ -312,5 +313,4 @@ void ex_signal_setup(void)
 #elif SIG_BUS
     ex_signal(SIG_BUS, EX_NAME(sig_bus));
 #endif
-
 }
