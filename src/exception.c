@@ -35,7 +35,7 @@
 /* Some common exception */
 EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
-EX_EXCEPTION(division_by_zero);
+EX_EXCEPTION(divide_by_zero);
 EX_EXCEPTION(out_of_memory);
 EX_EXCEPTION(panic);
 
@@ -52,6 +52,26 @@ EX_EXCEPTION(sig_term);
 EX_EXCEPTION(sig_hup);
 EX_EXCEPTION(sig_break);
 EX_EXCEPTION(sig_winch);
+EX_EXCEPTION(access_violation);
+EX_EXCEPTION(array_bounds_exceeded);
+EX_EXCEPTION(breakpoint);
+EX_EXCEPTION(datatype_misalignment);
+EX_EXCEPTION(flt_denormal_operand);
+EX_EXCEPTION(flt_divide_by_zero);
+EX_EXCEPTION(flt_inexact_result);
+EX_EXCEPTION(flt_invalid_operation);
+EX_EXCEPTION(flt_overflow);
+EX_EXCEPTION(flt_stack_check);
+EX_EXCEPTION(flt_underflow);
+EX_EXCEPTION(illegal_instruction);
+EX_EXCEPTION(in_page_error);
+EX_EXCEPTION(int_divide_by_zero);
+EX_EXCEPTION(int_overflow);
+EX_EXCEPTION(invalid_disposition);
+EX_EXCEPTION(noncontinuable_exception);
+EX_EXCEPTION(priv_instruction);
+EX_EXCEPTION(single_step);
+EX_EXCEPTION(stack_overflow);
 
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
@@ -184,7 +204,46 @@ static struct
 {
     const char *ex;
     int sig;
+#ifdef _WIN32
+    DWORD w_sig;
+#endif
 } ex_sig[max_ex_sig];
+
+#ifdef _WIN32
+LONG WINAPI ex_handler_seh(EXCEPTION_POINTERS *ExceptionInfo)
+{
+    const char *ex = 0;
+    int i;
+    DWORD sig = ExceptionInfo->ExceptionRecord->ExceptionCode;
+    CO_HERE();
+    for (i = 0; i < max_ex_sig; i++)
+        if (ex_sig[i].w_sig == sig)
+        {
+            ex = ex_sig[i].ex;
+            break;
+        }
+
+    ex_throw(ex, "unknown", 0, NULL, NULL);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+void ex_signal_seh(DWORD sig, const char *ex)
+{
+    int i;
+
+    for (i = 0; i < max_ex_sig; i++)
+        if (!ex_sig[i].ex || ex_sig[i].w_sig == sig)
+            break;
+
+    if (i == max_ex_sig)
+        fprintf(stderr,
+                "Coroutine-system, cannot install exception handler for signal no %d (%s), "
+                "too many signal exception handlers installed (max %d)\n",
+                sig, ex, max_ex_sig);
+    else
+        ex_sig[i].ex = ex, ex_sig[i].sig = sig;
+}
+#endif
 
 void ex_handler(int sig)
 {
@@ -262,6 +321,38 @@ void (*ex_signal(int sig, const char *ex))(int)
 
 void ex_signal_setup(void)
 {
+#ifdef _WIN32
+    /*
+    EX_EXCEPTION(access_violation);
+    EX_EXCEPTION(array_bounds_exceeded);
+    EX_EXCEPTION(breakpoint);
+    EX_EXCEPTION(datatype_misalignment);
+    EX_EXCEPTION(flt_denormal_operand);
+    EX_EXCEPTION(flt_divide_by_zero);
+    EX_EXCEPTION(flt_inexact_result);
+    EX_EXCEPTION(flt_invalid_operation);
+    EX_EXCEPTION(flt_overflow);
+    EX_EXCEPTION(flt_stack_check);
+    EX_EXCEPTION(flt_underflow);
+    EX_EXCEPTION(illegal_instruction);
+    EX_EXCEPTION(in_page_error);
+    EX_EXCEPTION(int_divide_by_zero);
+    EX_EXCEPTION(int_overflow);
+    EX_EXCEPTION(invalid_disposition);
+    EX_EXCEPTION(noncontinuable_exception);
+    EX_EXCEPTION(priv_instruction);
+    EX_EXCEPTION(single_step);
+    EX_EXCEPTION(stack_overflow);
+    */
+    ex_signal_seh(EXCEPTION_ACCESS_VIOLATION, EX_NAME(sig_segv));
+    ex_signal_seh(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EX_NAME(array_bounds_exceeded));
+    ex_signal_seh(EXCEPTION_FLT_DIVIDE_BY_ZERO, EX_NAME(sig_fpe));
+    ex_signal_seh(EXCEPTION_INT_DIVIDE_BY_ZERO, EX_NAME(divide_by_zero));
+    ex_signal_seh(EXCEPTION_ILLEGAL_INSTRUCTION, EX_NAME(sig_ill));
+    ex_signal_seh(EXCEPTION_INT_OVERFLOW, EX_NAME(int_overflow));
+    ex_signal_seh(EXCEPTION_STACK_OVERFLOW, EX_NAME(stack_overflow));
+    SetUnhandledExceptionFilter(ex_handler_seh);
+#endif
 #ifdef SIGSEGV
     ex_signal(SIGSEGV, EX_NAME(sig_segv));
 #endif

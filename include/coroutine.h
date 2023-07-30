@@ -24,12 +24,9 @@
 #include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/unistd.h"
+    #include <imagehlp.h>
 #else
     #include <unistd.h>
-#endif
-
-#if !defined(__cplusplus) && !defined(__STDC__)
-    #define __STDC__ 1
 #endif
 
 /* invalid address indicator */
@@ -82,6 +79,9 @@ Must also closed out with `select_break()`. */
     #define S_IRWXU 0
     #define S_IRWXG 0
     #define S_IRWXO 0
+    #if !defined(__cplusplus)
+        #define __STDC__ 1
+    #endif
 #endif
 
 #ifdef CO_DEBUG
@@ -96,7 +96,7 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (9 * 1024)
+    #define CO_STACK_SIZE (64 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
@@ -139,9 +139,7 @@ Must also closed out with `select_break()`. */
 /* #define CO_NO_TIB */
 
 #if !defined(thread_local) /* User can override thread_local for obscure compilers */
-  #if defined(CO_NO_MP) /* Running in single-threaded environment */
-    #define thread_local
-  #else /* Running in multi-threaded environment */
+     /* Running in multi-threaded environment */
     #if defined(__STDC__) /* Compiling as C Language */
       #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
         #define thread_local __declspec(thread)
@@ -167,7 +165,6 @@ Must also closed out with `select_break()`. */
         /* Don't do anything */
       #endif
     #endif
-  #endif
 #endif
 
 #ifndef CO_FORCE_INLINE
