@@ -33,6 +33,7 @@
 */
 
 /* Some common exception */
+#define EXCEPTION_PANIC       0xE0000001
 EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(divide_by_zero);
@@ -183,7 +184,6 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ctx->co = co_active();
     ctx->co->err = (void *)ctx->ex;
     ctx->co->panic = message;
-
     if (ctx->unstack)
         ex_terminate();
 
@@ -192,6 +192,10 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     if (ctx == &ex_context_buffer)
         ex_terminate();
 
+#ifdef _WIN32
+    if(message != NULL)
+        RaiseException(EXCEPTION_PANIC, 0, 0, 0);
+#endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);
 }
 
@@ -240,6 +244,9 @@ int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
     {
         if (ex_sig[i].seh == code)
         {
+            ctx->state = ex_throw_st;
+            if (code == EXCEPTION_PANIC)
+                return EXCEPTION_EXECUTE_HANDLER;
             ctx->ex = ex_sig[i].ex;
             ctx->file = "unknown";
             ctx->line = 0;
@@ -247,13 +254,11 @@ int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
 
             ctx->co = co_active();
             ctx->co->err = (void *)ctx->ex;
-            ctx->state = ex_throw_st;
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }
 
     return EXCEPTION_CONTINUE_SEARCH;
-    // return EXCEPTION_CONTINUE_EXECUTION;
 }
 
 void ex_signal_seh(DWORD sig, const char *ex)
@@ -380,6 +385,8 @@ void ex_signal_setup(void)
     ex_signal_seh(EXCEPTION_ILLEGAL_INSTRUCTION, EX_NAME(sig_ill));
     ex_signal_seh(EXCEPTION_INT_OVERFLOW, EX_NAME(int_overflow));
     ex_signal_seh(EXCEPTION_STACK_OVERFLOW, EX_NAME(stack_overflow));
+
+    ex_signal_seh(EXCEPTION_PANIC, EX_NAME(panic));
 #endif
 #ifdef SIGSEGV
     ex_signal(SIGSEGV, EX_NAME(sig_segv));
