@@ -12,6 +12,8 @@ int co_main(int argc, char **argv)
     {
         char *p = 0;
         p = co_malloc_full(co_active(), 3, pfree);
+        if (p)
+            strcpy(p, "p");
 
         int a = 1;
         int b = 0.00000;

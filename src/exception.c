@@ -205,26 +205,55 @@ static struct
     const char *ex;
     int sig;
 #ifdef _WIN32
-    DWORD w_sig;
+    DWORD seh;
 #endif
 } ex_sig[max_ex_sig];
 
 #ifdef _WIN32
-LONG WINAPI ex_handler_seh(EXCEPTION_POINTERS *ExceptionInfo)
+int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
 {
     const char *ex = 0;
     int i;
-    DWORD sig = ExceptionInfo->ExceptionRecord->ExceptionCode;
-    CO_HERE();
-    for (i = 0; i < max_ex_sig; i++)
-        if (ex_sig[i].w_sig == sig)
-        {
-            ex = ex_sig[i].ex;
-            break;
-        }
 
-    ex_throw(ex, "unknown", 0, NULL, NULL);
-    return EXCEPTION_EXECUTE_HANDLER;
+    for (i = 0; i < max_ex_sig; i++)
+    {
+        if (ex_sig[i].ex == exception)
+            return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
+{
+    ex_context_t *ctx = ex_context;
+    if (!ctx)
+    {
+        ex_init();
+        ctx = ex_context;
+    }
+
+    const char *ex = 0;
+    int i;
+
+    for (i = 0; i < max_ex_sig; i++)
+    {
+        if (ex_sig[i].seh == code)
+        {
+            ctx->ex = ex_sig[i].ex;
+            ctx->file = "unknown";
+            ctx->line = 0;
+            ctx->function = NULL;
+
+            ctx->co = co_active();
+            ctx->co->err = (void *)ctx->ex;
+            ctx->state = ex_throw_st;
+            return EXCEPTION_EXECUTE_HANDLER;
+        }
+    }
+
+    return EXCEPTION_CONTINUE_SEARCH;
+    // return EXCEPTION_CONTINUE_EXECUTION;
 }
 
 void ex_signal_seh(DWORD sig, const char *ex)
@@ -232,7 +261,7 @@ void ex_signal_seh(DWORD sig, const char *ex)
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
-        if (!ex_sig[i].ex || ex_sig[i].w_sig == sig)
+        if (!ex_sig[i].ex || ex_sig[i].seh == sig)
             break;
 
     if (i == max_ex_sig)
@@ -241,7 +270,7 @@ void ex_signal_seh(DWORD sig, const char *ex)
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
     else
-        ex_sig[i].ex = ex, ex_sig[i].sig = sig;
+        ex_sig[i].ex = ex, ex_sig[i].seh = sig;
 }
 #endif
 
@@ -351,7 +380,6 @@ void ex_signal_setup(void)
     ex_signal_seh(EXCEPTION_ILLEGAL_INSTRUCTION, EX_NAME(sig_ill));
     ex_signal_seh(EXCEPTION_INT_OVERFLOW, EX_NAME(int_overflow));
     ex_signal_seh(EXCEPTION_STACK_OVERFLOW, EX_NAME(stack_overflow));
-    SetUnhandledExceptionFilter(ex_handler_seh);
 #endif
 #ifdef SIGSEGV
     ex_signal(SIGSEGV, EX_NAME(sig_segv));

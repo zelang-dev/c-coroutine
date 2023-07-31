@@ -24,7 +24,7 @@
 #include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/unistd.h"
-    #include <imagehlp.h>
+    #include <excpt.h>
 #else
     #include <unistd.h>
 #endif
@@ -96,7 +96,7 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (64 * 1024)
+    #define CO_STACK_SIZE (9 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
@@ -816,7 +816,54 @@ C_API void co_iterator_free(co_iterator_t *);
 #define EX_EXCEPTION(E) \
     const char EX_NAME(E)[] = EX_STR(E)
 
+#define rethrow() \
+    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, NULL)
+
+#ifdef _WIN32
 #define try                                   \
+    {                                         \
+        /* local context */                   \
+        ex_context_t ex_err;                  \
+        if (!ex_context)                      \
+            ex_init();                        \
+        ex_err.next = ex_context;             \
+        ex_err.stack = 0;                     \
+        ex_err.ex = 0;                        \
+        ex_err.unstack = 0;                   \
+        /* global context updated */          \
+        ex_context = &ex_err;                 \
+        /* save jump location */              \
+        ex_err.state = ex_setjmp(ex_err.buf); \
+    __try                                     \
+    {                                         \
+        if (ex_err.state == ex_try_st)        \
+        {                                     \
+            {
+
+#define catch_any                    \
+    }                                \
+    }                                \
+    }                                \
+    __except(catch_any_seh(GetExceptionCode(), GetExceptionInformation())) {\
+    if (ex_err.state == ex_throw_st) \
+    {                                \
+        {                            \
+            EX_MAKE();               \
+            ex_err.state = ex_catch_st;
+
+#define end_try                            \
+    }                                      \
+    }                                      \
+    if (ex_context == &ex_err)             \
+        /* global context updated */       \
+        ex_context = ex_err.next;          \
+    if ((ex_err.state & ex_throw_st) != 0) \
+        rethrow();                         \
+    }                                      \
+    }
+
+#else
+#define try                               \
     {                                         \
         /* local context */                   \
         ex_context_t ex_err;                  \
@@ -834,17 +881,6 @@ C_API void co_iterator_free(co_iterator_t *);
         {                                     \
             {
 
-#define catch(E)                        \
-    }                                   \
-    }                                   \
-    if (ex_err.state == ex_throw_st)    \
-    {                                   \
-        extern const char EX_NAME(E)[]; \
-        if (ex_err.ex == EX_NAME(E))    \
-        {                               \
-            EX_MAKE();                  \
-            ex_err.state = ex_catch_st;
-
 #define catch_any                    \
     }                                \
     }                                \
@@ -853,6 +889,17 @@ C_API void co_iterator_free(co_iterator_t *);
         {                            \
             EX_MAKE();               \
             ex_err.state = ex_catch_st;
+
+#define end_try                            \
+    }                                      \
+    }                                      \
+    if (ex_context == &ex_err)             \
+        /* global context updated */       \
+        ex_context = ex_err.next;          \
+    if ((ex_err.state & ex_throw_st) != 0) \
+        rethrow();                         \
+    }
+#endif
 
 #define finally                          \
     }                                    \
@@ -863,8 +910,16 @@ C_API void co_iterator_free(co_iterator_t *);
             /* global context updated */ \
             ex_context = ex_err.next;
 
-#define rethrow() \
-    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, NULL)
+#define catch(E)                        \
+    }                                   \
+    }                                   \
+    if (ex_err.state == ex_throw_st)    \
+    {                                   \
+        extern const char EX_NAME(E)[]; \
+        if (ex_err.ex == EX_NAME(E))    \
+        {                               \
+            EX_MAKE();                  \
+            ex_err.state = ex_catch_st;
 
 #define ex_throw_loc(E, F, L, C)           \
     do                                  \
@@ -885,22 +940,16 @@ throws an exception of given message. */
         ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message)); \
     } while (0)
 
-#define end_try                            \
-    }                                      \
-    }                                      \
-    if (ex_context == &ex_err)             \
-        /* global context updated */       \
-        ex_context = ex_err.next;          \
-    if ((ex_err.state & ex_throw_st) != 0) \
-        rethrow();                         \
-    }
-
 C_API void ex_throw(const char *, const char *, int, const char *, const char *);
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API void ex_init(void);
 C_API void (*ex_signal(int sig, const char *ex))(int);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
+#ifdef _WIN32
+C_API int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
+C_API int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
+#endif
 
 /* Convert signals into exceptions */
 C_API void ex_signal_setup(void);
