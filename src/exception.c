@@ -228,7 +228,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
+int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
 {
     ex_context_t *ctx = ex_context;
     if (!ctx)
@@ -240,13 +240,17 @@ int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
     const char *ex = 0;
     int i;
 
+    if (code == EXCEPTION_PANIC)
+    {
+        ctx->state = ex_throw_st;
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
     for (i = 0; i < max_ex_sig; i++)
     {
         if (ex_sig[i].seh == code)
         {
             ctx->state = ex_throw_st;
-            if (code == EXCEPTION_PANIC)
-                return EXCEPTION_EXECUTE_HANDLER;
             ctx->ex = ex_sig[i].ex;
             ctx->file = "unknown";
             ctx->line = 0;

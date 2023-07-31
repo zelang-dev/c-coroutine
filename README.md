@@ -441,8 +441,6 @@ This **C** library version of it.
 
 int div_err(int x, int y)
 {
-    if (y == 0)
-        co_panic("runtime error: integer divide by zero");
     return x / y;
 }
 

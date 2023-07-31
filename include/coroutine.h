@@ -844,7 +844,7 @@ C_API void co_iterator_free(co_iterator_t *);
     }                                \
     }                                \
     }                                \
-    __except(catch_any_seh(GetExceptionCode(), GetExceptionInformation())) {\
+    __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {\
     if (ex_err.state == ex_throw_st) \
     {                                \
         {                            \
@@ -948,7 +948,7 @@ C_API void (*ex_signal(int sig, const char *ex))(int);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
 #ifdef _WIN32
 C_API int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
-C_API int catch_any_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
+C_API int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
 #endif
 
 /* Convert signals into exceptions */
