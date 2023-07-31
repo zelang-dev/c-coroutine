@@ -74,11 +74,6 @@ static void co_done()
     co_scheduler();
 }
 
-static void loop_awaitable(co_routine_t *co)
-{
-    co->func(co->args);
-}
-
 static void co_awaitable()
 {
     co_routine_t *co = co_active();
@@ -86,7 +81,7 @@ static void co_awaitable()
     {
         if (co->loop_active)
         {
-            loop_awaitable(co);
+            co->func(co->args);
         }
         else
         {
