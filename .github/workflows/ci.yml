@@ -34,6 +34,11 @@ jobs:
             ./go_sleep
             ./go_select
             ./go_wait_group
+            ./go_panic
+            ./co_call_uv
+            ./test_delay 2 5
+            ./chan_3
+            ./primes
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -60,3 +65,7 @@ jobs:
             .\primes.exe
             .\go_channel.exe
             .\go_select.exe
+            .\go_sleep.exe
+            .\go_wait_group.exe
+            .\go_panic.exe
+            .\co_call_uv.exe

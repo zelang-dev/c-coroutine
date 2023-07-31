@@ -1056,19 +1056,12 @@ bool co_serializable(void)
 
 void *co_user_data(co_routine_t *co)
 {
-    if (co != NULL)
-    {
-        return co->user_data;
-    }
-    return NULL;
+    return (co != NULL) ? co->user_data : NULL;
 }
 
 co_state co_status(co_routine_t *co)
 {
-    if (co != NULL)
-        return co->status;
-
-    return CO_DEAD;
+    return (co != NULL) ? co->status : CO_DEAD;
 }
 
 co_routine_t *co_current(void)
@@ -1508,7 +1501,7 @@ void coroutine_exit(int val)
     exiting = val;
     co_running->exiting = true;
     co_deferred_free(co_running);
-    co_switch(co_main_handle);
+    co_scheduler();
 }
 
 void coroutine_info()
