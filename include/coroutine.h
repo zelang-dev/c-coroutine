@@ -23,11 +23,15 @@
 
 #include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
+    #include "compat/pthread.h"
     #include "compat/unistd.h"
     #include <excpt.h>
 #else
+    #include <pthread.h>
     #include <unistd.h>
 #endif
+
+#include <time.h>
 
 /* invalid address indicator */
 #define CO_ERROR ((void *)-1)
@@ -1010,6 +1014,40 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 
 /* Remove memory pointer protection, does not free the memory. */
 #define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
+
+typedef struct _future
+{
+    pthread_t thread;
+    pthread_attr_t attr;
+    void *(*func)(void *);
+    int id;
+} future;
+
+typedef struct _future_arg
+{
+    void *(*func)(void *);
+    void *arg;
+} future_arg;
+
+typedef struct _promise
+{
+    co_value_t *result;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    bool done;
+    int id;
+} promise;
+
+future *future_create(void *(*start_routine)(void *));
+void future_start(future *f, void *arg);
+void future_stop(future *f);
+void future_close(future *f);
+
+promise *promise_create();
+value_t promise_get(promise *p);
+void promise_set(promise *p, void *res);
+bool promise_done(promise *p);
+void promise_close(promise *p);
 
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);

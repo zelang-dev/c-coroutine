@@ -1,27 +1,14 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#if defined(_WIN64) || defined(_WIN32)
-#include "unistd.h"
-#else
-#include <unistd.h>
-#endif
-#include <stdbool.h>
-#include <time.h>
-#include <stdarg.h>
-#include <string.h>
-
-#include "future.h"
+#include "../include/coroutine.h"
 
 future *future_create(void *(*start_routine)(void *))
 {
-    future *f = malloc(sizeof(future));
+    future *f = CO_MALLOC(sizeof(future));
 
     pthread_attr_init(&f->attr);
     pthread_attr_setdetachstate(&f->attr, PTHREAD_CREATE_JOINABLE);
 
     f->func = start_routine;
-    srand(time(NULL));
+    srand((unsigned int)time(NULL));
     f->id = rand();
 
     return f;
@@ -29,20 +16,19 @@ future *future_create(void *(*start_routine)(void *))
 
 void *future_func_wrapper(void *arg)
 {
-    // msg("WRAP");
     future_arg *f = (future_arg *)arg;
     void *res = f->func(f->arg);
-    free(f);
-    // msg("WRAPPED");
+    CO_FREE(f);
     pthread_exit(res);
     return res;
 }
 void future_start(future *f, void *arg)
 {
-    future_arg *farg = malloc(sizeof(future_arg));
-    farg->func = f->func;
-    farg->arg = arg;
-    pthread_create(&f->thread, &f->attr, future_func_wrapper, farg);
+    future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
+    f_arg->func = f->func;
+    f_arg->arg = arg;
+    int r = pthread_create(&f->thread, &f->attr, future_func_wrapper, f_arg);
+    CO_INFO("thread started status(%d) future id(%d) \n", r, f->id);
 }
 
 void future_stop(future *f)
@@ -55,44 +41,46 @@ void future_close(future *f)
     void *status;
     int rc = pthread_join(f->thread, &status);
     pthread_attr_destroy(&f->attr);
-    free(f);
+    CO_FREE(f);
 }
 
 promise *promise_create()
 {
-    promise *p = malloc(sizeof(promise));
+    promise *p = CO_MALLOC(sizeof(promise));
+    p->result = CO_MALLOC(sizeof(co_value_t));
     pthread_mutex_init(&p->mutex, NULL);
     pthread_cond_init(&p->cond, NULL);
-    srand(time(NULL));
+    srand((unsigned int)time(NULL));
     p->id = rand();
-    msg("P(%d) created", p->id);
+    p->done = false;
+    CO_INFO("promise id(%d) created\n", p->id);
 
     return p;
 }
 
-void promise_set(promise *p, int res)
+void promise_set(promise *p, void *res)
 {
-    msg("P(%d) set LOCK", p->id);
+    CO_INFO("promise id(%d) set LOCK\n", p->id);
     pthread_mutex_lock(&p->mutex);
-    p->result = res;
+    p->result->value.object = res;
     p->done = true;
     pthread_cond_signal(&p->cond);
-    msg("P(%d) set UNLOCK", p->id);
+    CO_INFO("promise id(%d) set UNLOCK\n", p->id);
     pthread_mutex_unlock(&p->mutex);
 }
 
-int promise_get(promise *p)
+value_t promise_get(promise *p)
 {
-    msg("P(%d) get LOCK", p->id);
+    CO_INFO("promise id(%d) get LOCK\n", p->id);
     pthread_mutex_lock(&p->mutex);
     while (!p->done)
     {
-        msg("P(%d) get WAIT", p->id);
+        CO_INFO("promise id(%d) get WAIT\n", p->id);
         pthread_cond_wait(&p->cond, &p->mutex);
     }
-    msg("P(%d) get UNLOCK", p->id);
+    CO_INFO("promise id(%d) get UNLOCK\n", p->id);
     pthread_mutex_unlock(&p->mutex);
-    return p->result;
+    return p->result->value;
 }
 
 bool promise_done(promise *p)
@@ -107,5 +95,6 @@ void promise_close(promise *p)
 {
     pthread_mutex_destroy(&p->mutex);
     pthread_cond_destroy(&p->cond);
-    free(p);
+    CO_FREE(p->result);
+    CO_FREE(p);
 }
