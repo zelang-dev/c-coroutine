@@ -96,7 +96,7 @@ Must also closed out with `select_break()`. */
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (9 * 1024)
+    #define CO_STACK_SIZE (10 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK

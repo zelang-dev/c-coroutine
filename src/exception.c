@@ -73,6 +73,7 @@ EX_EXCEPTION(noncontinuable_exception);
 EX_EXCEPTION(priv_instruction);
 EX_EXCEPTION(single_step);
 EX_EXCEPTION(stack_overflow);
+EX_EXCEPTION(invalid_handle);
 
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
@@ -314,8 +315,8 @@ void ex_handler(int sig)
 
     if (sig == SIGINT)
         coroutine_info();
-    else
-        ex_throw(ex, "unknown", 0, NULL, NULL);
+
+    ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
 void (*ex_signal(int sig, const char *ex))(int)
@@ -360,28 +361,6 @@ void (*ex_signal(int sig, const char *ex))(int)
 void ex_signal_setup(void)
 {
 #ifdef _WIN32
-    /*
-    EX_EXCEPTION(access_violation);
-    EX_EXCEPTION(array_bounds_exceeded);
-    EX_EXCEPTION(breakpoint);
-    EX_EXCEPTION(datatype_misalignment);
-    EX_EXCEPTION(flt_denormal_operand);
-    EX_EXCEPTION(flt_divide_by_zero);
-    EX_EXCEPTION(flt_inexact_result);
-    EX_EXCEPTION(flt_invalid_operation);
-    EX_EXCEPTION(flt_overflow);
-    EX_EXCEPTION(flt_stack_check);
-    EX_EXCEPTION(flt_underflow);
-    EX_EXCEPTION(illegal_instruction);
-    EX_EXCEPTION(in_page_error);
-    EX_EXCEPTION(int_divide_by_zero);
-    EX_EXCEPTION(int_overflow);
-    EX_EXCEPTION(invalid_disposition);
-    EX_EXCEPTION(noncontinuable_exception);
-    EX_EXCEPTION(priv_instruction);
-    EX_EXCEPTION(single_step);
-    EX_EXCEPTION(stack_overflow);
-    */
     ex_signal_seh(EXCEPTION_ACCESS_VIOLATION, EX_NAME(sig_segv));
     ex_signal_seh(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EX_NAME(array_bounds_exceeded));
     ex_signal_seh(EXCEPTION_FLT_DIVIDE_BY_ZERO, EX_NAME(sig_fpe));
@@ -389,6 +368,7 @@ void ex_signal_setup(void)
     ex_signal_seh(EXCEPTION_ILLEGAL_INSTRUCTION, EX_NAME(sig_ill));
     ex_signal_seh(EXCEPTION_INT_OVERFLOW, EX_NAME(int_overflow));
     ex_signal_seh(EXCEPTION_STACK_OVERFLOW, EX_NAME(stack_overflow));
+    ex_signal_seh(EXCEPTION_INVALID_HANDLE, EX_NAME(invalid_handle));
 
     ex_signal_seh(EXCEPTION_PANIC, EX_NAME(panic));
 #endif
