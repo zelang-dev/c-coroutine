@@ -4,7 +4,7 @@
 
 _This library is currently being build as fully `C` representation of GoLang `Go` **routine**. **PR** are welcome._
 
-To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [symplely/coroutine](https://github.com/symplely/coroutine) library by way of `yield`.
+To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [symplely/coroutine](https://github.com/symplely/coroutine) library by way of `yield`. The same way **Python** usage evolved, see [A Journey to Python Async](https://dev.to/uponthesky/python-a-journey-to-python-async-1-intro-4mgj).
 
 > "The role of the language, is to take care of the mechanics of the async pattern and provide a natural bridge to a language-specific implementation." -[Microsoft](https://learn.microsoft.com/en-us/archive/msdn-magazine/2018/june/c-effective-async-with-coroutines-and-c-winrt).
 
@@ -105,15 +105,18 @@ C_API value_t co_async_get(future *);
 and execute others until future is ready, thread execution has ended. */
 C_API void co_async_wait(future *);
 
-/* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
+/* Creates/initialize the next series/collection of coroutine's created to be part of wait group,
+same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
-All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
+All coroutines here behaves like regular functions, meaning they return values, and indicate
+a terminated/finish status.
 
-The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
+The initialization ends when `co_wait()` is called, as such current coroutine will pause, and
+execution will begin for the group of coroutines, and wait for all to finished. */
 C_API co_ht_group_t *co_wait_group(void);
 
-/* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finished.
-Returns hast table of results, accessible by coroutine id. */
+/* Pauses current coroutine, and begin execution for given coroutine wait group object, will
+wait for all to finished. Returns hast table of results, accessible by coroutine id. */
 C_API co_ht_result_t co_wait(co_ht_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
