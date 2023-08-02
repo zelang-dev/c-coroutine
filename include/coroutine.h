@@ -1051,8 +1051,17 @@ C_API void promise_set(promise *, void *);
 C_API bool promise_done(promise *);
 C_API void promise_close(promise *);
 
+/* Calls fn (with args as arguments) in separated thread, returning without waiting
+for the execution of fn to complete. The value returned by fn can be accessed through
+ the future object returned (by calling `co_async_get()`). */
 C_API future *co_async(co_callable_t, void *);
+
+/* Returns the value of a promise, a future thread's shared object, If not ready this
+function blocks the calling thread and waits until it is ready. */
 C_API value_t co_async_get(future *);
+
+/* Waits for the future thread's state to change. this function pauses current coroutine
+and execute others until future is ready, thread execution has ended. */
 C_API void co_async_wait(future *);
 
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */

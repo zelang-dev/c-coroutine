@@ -8,7 +8,7 @@ To be clear, this is a programming paradigm on structuring your code. Which can 
 
 > "The role of the language, is to take care of the mechanics of the async pattern and provide a natural bridge to a language-specific implementation." -[Microsoft](https://learn.microsoft.com/en-us/archive/msdn-magazine/2018/june/c-effective-async-with-coroutines-and-c-winrt).
 
-You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly. This library incorporates [libuv](http://docs.libuv.org) in a way that make providing callbacks unnecessary, same as in [Using C++ Resumable Functions with Libuv](https://devblogs.microsoft.com/cppblog/using-ibuv-with-c-resumable-functions/). **Libuv** is handling any hardware or multi-threading CPU access. This not necessary for library usage, the setup can be replaced with some other Event Loop library, or just disabled.
+You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly. This library incorporates [libuv](http://docs.libuv.org) in a way that make providing callbacks unnecessary, same as in [Using C++ Resumable Functions with Libuv](https://devblogs.microsoft.com/cppblog/using-ibuv-with-c-resumable-functions/). **Libuv** is handling any hardware or multi-threading CPU access. This not necessary for library usage, the setup can be replaced with some other Event Loop library, or just disabled. There is a unmaintained [btrask/libasync](https://github.com/btrask/libasync) package tried combining **libco**, with **libuv** too, Linux only.
 
 Two videos covering things to keep in mind about concurrency, [Building Scalable Deployments with Multiple Goroutines](https://www.youtube.com/watch?v=LNNaxHYFhw8) and [Detecting and Fixing Unbound Concurrency Problems](https://www.youtube.com/watch?v=gggi4GIvgrg).
 
@@ -91,6 +91,19 @@ This uses the POSIX "ucontext" API.
 /* Write this function instead of main, this library provides its own main, the scheduler,
 which will call this function as an coroutine! */
 int co_main(int, char **);
+
+/* Calls fn (with args as arguments) in separated thread, returning without waiting
+for the execution of fn to complete. The value returned by fn can be accessed through
+ the future object returned (by calling `co_async_get()`). */
+C_API future *co_async(co_callable_t, void *);
+
+/* Returns the value of a promise, a future thread's shared object, If not ready this
+function blocks the calling thread and waits until it is ready. */
+C_API value_t co_async_get(future *);
+
+/* Waits for the future thread's state to change. this function pauses current coroutine
+and execute others until future is ready, thread execution has ended. */
+C_API void co_async_wait(future *);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
@@ -677,6 +690,87 @@ Coroutine scheduler exited
 ```
 
 </details>
+
+The `new C++` concurrency **thread** model by way of **future/promise** is also implemented with same like _semantics_.
+
+Original **C++ 20** example from <https://cplusplus.com/reference/future/future/wait/>
+
+<table>
+    <tr>
+        <th>C++ 20</th>
+        <th>C89</th>
+    </tr>
+    <tr>
+        <td>
+
+```c++
+// future::wait
+#include <iostream>       // std::cout
+#include <future>         // std::async, std::future
+#include <chrono>         // std::chrono::milliseconds
+
+// a non-optimized way of checking for prime numbers:
+bool is_prime (int x) {
+  for (int i=2; i<x; ++i) if (x%i==0) return false;
+  return true;
+}
+
+int main ()
+{
+  // call function asynchronously:
+  std::future<bool> fut = std::async (is_prime,194232491);
+
+  std::cout << "checking...\n";
+  fut.wait();
+
+  std::cout << "\n194232491 ";
+// guaranteed to be ready (and not block) after wait returns
+  if (fut.get())
+    std::cout << "is prime.\n";
+  else
+    std::cout << "is not prime.\n";
+
+  return 0;
+}
+```
+
+</td>
+<td>
+
+```c
+#include "../include/coroutine.h"
+
+// a non-optimized way of checking for prime numbers:
+void *is_prime(void *arg)
+{
+    int x = co_value(arg).integer;
+    for (int i = 2; i < x; ++i) if (x % i == 0) return (void *)false;
+    return (void *)true;
+}
+
+int co_main(int argc, char **argv)
+{
+    int prime = 194232491;
+    // call function asynchronously:
+    future *f = co_async(is_prime, &prime);
+    printf("checking...\n");
+    // Pause and run other coroutines until thread state changes.
+    co_async_wait(f);
+
+    printf("\n194232491 ");
+    // guaranteed to be ready (and not block) after wait returns
+    if (co_async_get(f).boolean)
+        printf("is prime!\n");
+    else
+        printf("is not prime.\n");
+
+    return 0;
+}
+```
+
+   </td>
+    </tr>
+</table>
 
 ### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
 
