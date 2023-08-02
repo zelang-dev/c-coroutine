@@ -201,13 +201,21 @@ typedef struct co_value
 C_API value_t co_value(void *);
 ```
 
-The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/symplely/c-coroutine/blob/main/coroutine.h) for additional.
+The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/symplely/c-coroutine/blob/main/include/coroutine.h) for additional.
 
 > Note: None of the functions above require passing/handling the underlying `co_routine_t` object/structure.
 
 ## Usage
 
-An **Go** example from <https://www.golinuxcloud.com/goroutines-golang/>
+Original **Go** example from <https://www.golinuxcloud.com/goroutines-golang/>
+
+<table>
+    <tr>
+        <th>GoLang</th>
+        <th>C89</th>
+    </tr>
+    <tr>
+        <td>
 
 ```go
 package main
@@ -233,11 +241,11 @@ func greetings(name string) {
   }
 }
 ```
-
-This **C** library version of it.
+</td>
+<td>
 
 ```c
-#include "../include/coroutine.h"
+# include "../include/coroutine.h"
 
 void *greetings(void *arg)
 {
@@ -261,7 +269,19 @@ int co_main(int argc, char **argv)
 }
 ```
 
-Another **Go** example from <https://www.programiz.com/golang/channel>
+   </td>
+    </tr>
+</table>
+
+Original **Go** example from <https://www.programiz.com/golang/channel>
+
+<table>
+    <tr>
+        <th>GoLang</th>
+        <th>C89</th>
+    </tr>
+    <tr>
+        <td>
 
 ```go
 package main
@@ -288,8 +308,8 @@ func sendData(ch chan string) {
 
 }
 ```
-
-This **C** library version of it.
+</td>
+<td>
 
 ```c
 #include "../include/coroutine.h"
@@ -319,7 +339,19 @@ int co_main(int argc, char **argv)
 }
 ```
 
-Another **Go** example from <https://go.dev/tour/concurrency/5>
+   </td>
+    </tr>
+</table>
+
+Original **Go** example from <https://go.dev/tour/concurrency/5>
+
+<table>
+    <tr>
+        <th>GoLang</th>
+        <th>C89</th>
+    </tr>
+    <tr>
+        <td>
 
 ```go
 package main
@@ -352,7 +384,8 @@ func main() {
 }
 ```
 
-This **C** library version of it.
+</td>
+<td>
 
 ```c
 #include "../include/coroutine.h"
@@ -361,17 +394,18 @@ int fibonacci(channel_t *c, channel_t *quit)
 {
     int x = 0;
     int y = 1;
-    select_if()
-        select_case(c)
+    for_select {
+        select_case(c) {
             co_send(c, &x);
+            unsigned long tmp = x + y;
             x = y;
-            y = x + y;
-        select_case_if(quit)
+            y = tmp;
+        } select_case_if(quit) {
             co_recv(quit);
             puts("quit");
             return 0;
-        select_break()
-    select_end()
+        } select_break;
+    } select_end;
 }
 
 void *func(void *args)
@@ -380,10 +414,12 @@ void *func(void *args)
     channel_t *quit = ((channel_t **)args)[1];
     for (int i = 0; i < 10; i++)
     {
-        printf("%d\n", co_recv(c)->value.integer);
+        printf("%d\n", co_recv(c).integer);
     }
     co_send(quit, 0);
 
+    channel_free(c);
+    channel_free(quit);
     return 0;
 }
 
@@ -400,7 +436,19 @@ int co_main(int argc, char **argv)
 }
 ```
 
-Another **Go** example from <https://www.developer.com/languages/go-error-handling-with-panic-recovery-and-defer/>
+   </td>
+    </tr>
+</table>
+
+Original **Go** example from <https://www.developer.com/languages/go-error-handling-with-panic-recovery-and-defer/>
+
+<table>
+    <tr>
+        <th>GoLang</th>
+        <th>C89</th>
+    </tr>
+    <tr>
+        <td>
 
 ```go
 package main
@@ -434,7 +482,8 @@ func divByZero() {
 }
 ```
 
-This **C** library version of it.
+</td>
+<td>
 
 ```c
 #include "../include/coroutine.h"
@@ -471,7 +520,19 @@ int co_main(int argc, char **argv)
 }
 ```
 
-Another **Go** example from <https://gobyexample.com/waitgroups>
+   </td>
+    </tr>
+</table>
+
+Original **Go** example from <https://gobyexample.com/waitgroups>
+
+<table>
+    <tr>
+        <th>GoLang</th>
+        <th>C89</th>
+    </tr>
+    <tr>
+        <td>
 
 ```go
 package main
@@ -509,7 +570,8 @@ func main() {
 }
 ```
 
-This **C** library version of it, but with returning results.
+</td>
+<td>
 
 ```c
 #include "../include/coroutine.h"
@@ -546,8 +608,12 @@ int co_main(int argc, char **argv)
 }
 ```
 
+   </td>
+    </tr>
+</table>
+
 <details>
-<summary>The above will output, and the same goes for all compile builds in `Debug` mode.</summary>
+<summary>The above outputting, the same goes for all compile builds in DEBUG mode.</summary>
 
 ```text
 Running coroutine id: 1 () status: 3
@@ -612,7 +678,7 @@ Coroutine scheduler exited
 
 </details>
 
-see [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder.
+### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
 
 ## Installation
 
