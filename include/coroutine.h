@@ -1040,19 +1040,20 @@ typedef struct _future_arg
     promise *value;
 } future_arg;
 
-future *future_create(co_callable_t);
-void future_start(future *, void *);
-void future_stop(future *);
-void future_close(future *);
+C_API future *future_create(co_callable_t);
+C_API void future_start(future *, void *);
+C_API void future_stop(future *);
+C_API void future_close(future *);
 
-promise *promise_create();
-value_t promise_get(promise *);
-void promise_set(promise *, void *);
-bool promise_done(promise *);
-void promise_close(promise *);
+C_API promise *promise_create();
+C_API value_t promise_get(promise *);
+C_API void promise_set(promise *, void *);
+C_API bool promise_done(promise *);
+C_API void promise_close(promise *);
 
-future *co_async(co_callable_t, void *);
-value_t co_async_get(future *p);
+C_API future *co_async(co_callable_t, void *);
+C_API value_t co_async_get(future *);
+C_API void co_async_wait(future *);
 
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);

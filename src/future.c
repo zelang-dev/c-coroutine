@@ -60,6 +60,16 @@ value_t co_async_get(future *f)
     return r;
 }
 
+void co_async_wait(future *f)
+{
+    bool is_done = false;
+    while (!is_done)
+    {
+        is_done = promise_done(f->value);
+        co_pause();
+    }
+}
+
 void future_start(future *f, void *arg)
 {
     future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
