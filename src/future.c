@@ -1,6 +1,6 @@
 #include "../include/coroutine.h"
 
-future *future_create(void *(*start_routine)(void *))
+future *future_create(co_callable_t start_routine)
 {
     future *f = CO_MALLOC(sizeof(future));
 
@@ -22,6 +22,44 @@ void *future_func_wrapper(void *arg)
     pthread_exit(res);
     return res;
 }
+
+void *future_wrapper(void *arg)
+{
+    future_arg *f = (future_arg *)arg;
+    void *res = f->func(f->arg);
+    promise_set(f->value, res);
+    CO_FREE(f);
+    pthread_exit(res);
+    return res;
+}
+
+async_start(future *f, promise *value, void *arg)
+{
+    future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
+    f_arg->func = f->func;
+    f_arg->arg = arg;
+    f_arg->value = value;
+    int r = pthread_create(&f->thread, &f->attr, future_wrapper, f_arg);
+    CO_INFO("thread started status(%d) future id(%d) \n", r, f->id);
+}
+
+future *co_async(co_callable_t func, void *args)
+{
+    future *f = future_create(func);
+    promise *p = promise_create();
+    f->value = p;
+    async_start(f, p, args);
+    return f;
+}
+
+value_t co_async_get(future *f)
+{
+    value_t r = promise_get(f->value);
+    promise_close(f->value);
+    future_close(f);
+    return r;
+}
+
 void future_start(future *f, void *arg)
 {
     future_arg *f_arg = CO_MALLOC(sizeof(future_arg));

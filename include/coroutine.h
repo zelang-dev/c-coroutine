@@ -1015,20 +1015,6 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 /* Remove memory pointer protection, does not free the memory. */
 #define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
 
-typedef struct _future
-{
-    pthread_t thread;
-    pthread_attr_t attr;
-    void *(*func)(void *);
-    int id;
-} future;
-
-typedef struct _future_arg
-{
-    void *(*func)(void *);
-    void *arg;
-} future_arg;
-
 typedef struct _promise
 {
     co_value_t *result;
@@ -1038,16 +1024,35 @@ typedef struct _promise
     int id;
 } promise;
 
-future *future_create(void *(*start_routine)(void *));
-void future_start(future *f, void *arg);
-void future_stop(future *f);
-void future_close(future *f);
+typedef struct _future
+{
+    pthread_t thread;
+    pthread_attr_t attr;
+    void *(*func)(void *);
+    int id;
+    promise *value;
+} future;
+
+typedef struct _future_arg
+{
+    void *(*func)(void *);
+    void *arg;
+    promise *value;
+} future_arg;
+
+future *future_create(co_callable_t);
+void future_start(future *, void *);
+void future_stop(future *);
+void future_close(future *);
 
 promise *promise_create();
-value_t promise_get(promise *p);
-void promise_set(promise *p, void *res);
-bool promise_done(promise *p);
-void promise_close(promise *p);
+value_t promise_get(promise *);
+void promise_set(promise *, void *);
+bool promise_done(promise *);
+void promise_close(promise *);
+
+future *co_async(co_callable_t, void *);
+value_t co_async_get(future *p);
 
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
