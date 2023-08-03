@@ -163,88 +163,6 @@ The above is the **main** and most likely functions to be used, see [coroutine.h
 
 ## Usage
 
-Original **C++ 20** example from <https://cplusplus.com/reference/future/future/wait/>
-
-<table>
-<tr>
-<th>C++ 20</th>
-<th>C89</th>
-</tr>
-<tr>
-<td>
-<pre><code>
-// future::wait
-#include <iostream>       // std::cout
-#include <future>         // std::async, std::future
-#include <chrono>         // std::chrono::milliseconds
-// a non-optimized way of checking for prime numbers:
-bool is_prime (int x) {
-  for (int i=2; i<x; ++i) if (x%i==0) return false;
-  return true;
-}
-
-int main ()
-{
-
-  // call function asynchronously:
-  std::future<bool> fut = std::async (is_prime,194232491);
-
-  std::cout << "checking...\n";
-  fut.wait();
-
-  std::cout << "\n194232491 ";
-  // guaranteed to be ready (and not block) after wait returns
-  if (fut.get())
-    std::cout << "is prime.\n";
-  else
-    std::cout << "is not prime.\n";
-
-  return 0;
-}
-</code></pre>
-</td>
-<td>
-<pre><code>
-#include "../include/coroutine.h"
-
-// a non-optimized way of checking for prime numbers:
-
-void *is_prime(void*arg)
-{
-    int x = co_value(arg).integer;
-    for (int i = 2; i < x; ++i)
-        if (x % i == 0) return (void *)false;
-
-    return (void*)true;
-}
-
-int co_main(int argc, char **argv)
-{
-    int prime = 194232491;
-    // call function asynchronously:
-    future *f = co_async(is_prime, &prime);
-    printf("checking...\n");
-
-    // Pause and run other coroutines
-    // until thread state changes.
-    co_async_wait(f);
-
-    printf("\n194232491 ");
-
-    // guaranteed to be ready (and not block)
-    // after wait returns
-    if (co_async_get(f).boolean)
-        printf("is prime!\n");
-    else
-        printf("is not prime.\n");
-
-    return 0;
-}
-</code></pre>
-</td>
-</tr>
-</table>
-
 Original **Go** example from <https://www.golinuxcloud.com/goroutines-golang/>
 
 <table>
@@ -280,8 +198,8 @@ func greetings(name string) {
 </code></pre>
 </td>
 <td>
-<p>
-#include "../include/coroutine.h"
+<pre><code>
+# include "../include/coroutine.h"
 
 void *greetings(void *arg)
 {
@@ -303,7 +221,7 @@ int co_main(int argc, char **argv)
     puts("End of main Goroutine");
     return 0;
 }
-</p>
+</code></pre>
 </td>
 </tr>
 </table>
@@ -317,7 +235,7 @@ Original **Go** example from <https://www.programiz.com/golang/channel>
 </tr>
 <tr>
 <td>
-<p>
+<pre><code>
 package main
 import "fmt"
 
@@ -341,10 +259,10 @@ func sendData(ch chan string) {
    fmt.Println("No receiver! Send Operation Blocked")
 
 }
-</p>
+</code></pre>
 </td>
 <td>
-<p>
+<pre><code>
 #include "../include/coroutine.h"
 
 void *sendData(void *arg)
@@ -370,7 +288,7 @@ int co_main(int argc, char **argv)
 
     return 0;
 }
-</p>
+</code></pre>
 </td>
 </tr>
 </table>
@@ -384,7 +302,7 @@ Original **Go** example from <https://go.dev/tour/concurrency/5>
 </tr>
 <tr>
 <td>
-
+<pre><code>
 package main
 
 import "fmt"
@@ -413,10 +331,10 @@ func main() {
     }()
     fibonacci(c, quit)
 }
-
+</code></pre>
 </td>
 <td>
-
+<pre><code>
 #include "../include/coroutine.h"
 
 int fibonacci(channel_t *c, channel_t *quit)
@@ -463,7 +381,7 @@ int co_main(int argc, char **argv)
     co_go(func, args);
     return fibonacci(c, quit);
 }
-
+</code></pre>
 </td>
 </tr>
 </table>
@@ -477,7 +395,7 @@ Original **Go** example from <https://www.developer.com/languages/go-error-handl
 </tr>
 <tr>
 <td>
-
+<pre><code>
 package main
 
 import (
@@ -507,10 +425,10 @@ func divByZero() {
  }()
  fmt.Println(div(1, 0))
 }
-
+</code></pre>
 </td>
 <td>
-
+<pre><code>
 #include "../include/coroutine.h"
 
 int div_err(int x, int y)
@@ -543,7 +461,7 @@ int co_main(int argc, char **argv)
     printf("mul func result: %d\n", mul(5, 10));
     return 0;
 }
-
+</code></pre>
 </td>
 </tr>
 </table>
@@ -557,7 +475,7 @@ Original **Go** example from <https://gobyexample.com/waitgroups>
 </tr>
 <tr>
 <td>
-
+<pre><code>
 package main
 
 import (
@@ -591,10 +509,10 @@ func main() {
     wg.Wait()
 
 }
-
+</code></pre>
 </td>
 <td>
-
+<pre><code>
 #include "../include/coroutine.h"
 
 void *worker(void *arg)
@@ -631,7 +549,7 @@ int co_main(int argc, char **argv)
            co_group_get_result(wgr, cid[1]).string);
     return 0;
 }
-
+</code></pre>
 </td>
 </tr>
 </table>
@@ -639,6 +557,7 @@ int co_main(int argc, char **argv)
 <details>
 <summary>The above outputting, the same goes for all compile builds in DEBUG mode.</summary>
 
+<pre>
 Running coroutine id: 1 () status: 3
 Back at coroutine scheduling
 Running coroutine id: 2 () status: 3
@@ -697,8 +616,89 @@ Worker # 4 returned: 32
 Worker # 3 returned: hello world
 Back at coroutine scheduling
 Coroutine scheduler exited
-
+</pre>
 </details>
+
+The `C++ 20` concurrency **thread** model by way of **future/promise** implemented with same like _semantics_.
+
+Original **C++ 20** example from <https://cplusplus.com/reference/future/future/wait/>
+
+<table>
+<tr>
+<th>C++ 20</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+<pre><code>
+// future::wait
+#include <iostream>       // std::cout
+#include <future>         // std::async, std::future
+#include <chrono>         // std::chrono::milliseconds
+
+// a non-optimized way of checking for prime numbers:
+bool is_prime (int x) {
+  for (int i=2; i<x; ++i) if (x%i==0) return false;
+  return true;
+}
+
+int main ()
+{
+  // call function asynchronously:
+  std::future<bool> fut = std::async (is_prime,194232491);
+
+  std::cout << "checking...\n";
+  fut.wait();
+
+  std::cout << "\n194232491 ";
+  // guaranteed to be ready (and not block) after wait returns
+  if (fut.get())
+    std::cout << "is prime.\n";
+  else
+    std::cout << "is not prime.\n";
+
+  return 0;
+}
+</code></pre>
+</td>
+<td>
+<pre><code>
+#include "../include/coroutine.h"
+
+// a non-optimized way of checking for prime numbers:
+void *is_prime(void *arg)
+{
+    int x = co_value(arg).integer;
+    for (int i = 2; i < x; ++i)
+        if (x % i == 0) return (void *)false;
+    return (void *)true;
+}
+
+int co_main(int argc, char **argv)
+{
+    int prime = 194232491;
+    // call function asynchronously:
+    future *f = co_async(is_prime, &prime);
+
+    printf("checking...\n");
+    // Pause and run other coroutines
+    // until thread state changes.
+    co_async_wait(f);
+
+    printf("\n194232491 ");
+    // guaranteed to be ready (and not block)
+    // after wait returns
+    if (co_async_get(f).boolean)
+        printf("is prime!\n");
+    else
+        printf("is not prime.\n");
+
+    return 0;
+}
+</code></pre>
+</td>
+</tr>
+</table>
 
 ### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
 
