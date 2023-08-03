@@ -163,8 +163,6 @@ The above is the **main** and most likely functions to be used, see [coroutine.h
 
 ## Usage
 
-The `new C++` concurrency **thread** model by way of **future/promise** is also implemented with same like _semantics_.
-
 Original **C++ 20** example from <https://cplusplus.com/reference/future/future/wait/>
 
 <table>
@@ -174,20 +172,29 @@ Original **C++ 20** example from <https://cplusplus.com/reference/future/future/
 </tr>
 <tr>
 <td>
-
+<p>
 // future::wait
+
 #include <iostream>       // std::cout
+
 #include <future>         // std::async, std::future
+
 #include <chrono>         // std::chrono::milliseconds
 
 // a non-optimized way of checking for prime numbers:
+
 bool is_prime (int x) {
+
   for (int i=2; i<x; ++i) if (x%i==0) return false;
+
   return true;
+
 }
 
 int main ()
+
 {
+
   // call function asynchronously:
   std::future<bool> fut = std::async (is_prime,194232491);
 
@@ -203,35 +210,48 @@ int main ()
 
   return 0;
 }
-
+</p>
 </td>
 <td>
-
+<p>
 #include "../include/coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
+
 void *is_prime(void*arg)
 {
     int x = co_value(arg).integer;
+
     for (int i = 2; i < x; ++i)
+
         if (x % i == 0) return (void *)false;
+
 return (void*)true;
+
 }
 
 int co_main(int argc, char **argv)
+
 {
     int prime = 194232491;
+
     // call function asynchronously:
+
     future *f = co_async(is_prime, &prime);
 
     printf("checking...\n");
+
     // Pause and run other coroutines
+
     // until thread state changes.
     co_async_wait(f);
 
     printf("\n194232491 ");
+
     // guaranteed to be ready (and not block)
+
     // after wait returns
+
     if (co_async_get(f).boolean)
         printf("is prime!\n");
     else
@@ -240,6 +260,7 @@ int co_main(int argc, char **argv)
     return 0;
 }
 
+</p>
 </td>
 </tr>
 </table>
@@ -253,7 +274,7 @@ Original **Go** example from <https://www.golinuxcloud.com/goroutines-golang/>
 </tr>
 <tr>
 <td>
-
+<p>
 package main
 
 import (
@@ -276,10 +297,10 @@ func greetings(name string) {
        time.Sleep(time.Millisecond)
   }
 }
-
+</p>
 </td>
 <td>
-
+<p>
 #include "../include/coroutine.h"
 
 void *greetings(void *arg)
@@ -302,7 +323,7 @@ int co_main(int argc, char **argv)
     puts("End of main Goroutine");
     return 0;
 }
-
+</p>
 </td>
 </tr>
 </table>
@@ -316,7 +337,7 @@ Original **Go** example from <https://www.programiz.com/golang/channel>
 </tr>
 <tr>
 <td>
-
+<p>
 package main
 import "fmt"
 
@@ -340,10 +361,10 @@ func sendData(ch chan string) {
    fmt.Println("No receiver! Send Operation Blocked")
 
 }
-
+</p>
 </td>
 <td>
-
+<p>
 #include "../include/coroutine.h"
 
 void *sendData(void *arg)
@@ -369,7 +390,7 @@ int co_main(int argc, char **argv)
 
     return 0;
 }
-
+</p>
 </td>
 </tr>
 </table>
