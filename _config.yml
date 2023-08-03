@@ -4,7 +4,7 @@ relative_links:
   enabled: true
   collections: true
 include:
-  - README.md
+  - INDEX.md
   - LICENSE.md
   - ISSUE_TEMPLATE.md
   - PULL_REQUEST_TEMPLATE.md
