@@ -650,7 +650,7 @@ Original **C++ 20** example from <https://cplusplus.com/reference/future/future/
     <tr>
         <td>
 
-```c++
+<code>
 // future::wait
 #include <iostream>       // std::cout
 #include <future>         // std::async, std::future
@@ -679,12 +679,12 @@ int main ()
 
   return 0;
 }
-```
+</code>
 
 </td>
 <td>
 
-```c
+<code>
 #include "../include/coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
@@ -717,7 +717,7 @@ int co_main(int argc, char **argv)
 
     return 0;
 }
-```
+</code>
 
    </td>
     </tr>
