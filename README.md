@@ -1,14 +1,16 @@
 # c-coroutine
 
-**c-coroutine** is a cooperative multithreading library written in C89. This library was initially a rework/refactor and merge of [libco](https://github.com/higan-emu/libco) with [minicoro](https://github.com/edubart/minicoro). These two differ among many [coru](https://github.com/geky/coru), [libdill](https://github.com/sustrik/libdill), [libmill](https://github.com/sustrik/libmill), [libwire](https://github.com/baruch/libwire), [libcoro](https://github.com/semistrict/libcoro), [libcsp](https://github.com/shiyanhui/libcsp), [dyco-coroutine](https://github.com/piaodazhu/dyco-coroutine), in that Windows is supported, and not using **ucontext**. That was until I came across [libtask](https://swtch.com/libtask), where the design is the underpinning of GoLang, and made it Windows compatible in an fork [symplely/libtask](https://github.com/symplely/libtask). **Libtask** has it's channel design origins from [Richard Beton's libcsp](https://libcsp.sourceforge.net/)
+**c-coroutine** is a cooperative multithreading library written in C89. Designed to be simple as possible in usage, but powerfully enough in execution, easily modifiable to any need. It incorporates most asynchronous patterns from various languages. They all the same behaviorally, just syntax layout differences.
+
+This library was initially a rework/refactor and merge of [libco](https://github.com/higan-emu/libco) with [minicoro](https://github.com/edubart/minicoro). These two differ among many [coru](https://github.com/geky/coru), [libdill](https://github.com/sustrik/libdill), [libmill](https://github.com/sustrik/libmill), [libwire](https://github.com/baruch/libwire), [libcoro](https://github.com/semistrict/libcoro), [libcsp](https://github.com/shiyanhui/libcsp), [dyco-coroutine](https://github.com/piaodazhu/dyco-coroutine), in that Windows is supported, and not using **ucontext**. That was until I came across [libtask](https://swtch.com/libtask), where the design is the underpinning of GoLang, and made it Windows compatible in an fork [symplely/libtask](https://github.com/symplely/libtask). **Libtask** has it's channel design origins from [Richard Beton's libcsp](https://libcsp.sourceforge.net/)
 
 _This library is currently being build as fully `C` representation of GoLang `Go` **routine**. **PR** are welcome._
 
-To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [symplely/coroutine](https://github.com/symplely/coroutine) library by way of `yield`. The same way **Python** usage evolved, see [A Journey to Python Async](https://dev.to/uponthesky/python-a-journey-to-python-async-1-intro-4mgj).
+To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [coroutine](https://symplely.github.io/coroutine/) library by way of `yield`. The same way **Python** usage evolved, see [A Journey to Python Async](https://dev.to/uponthesky/python-a-journey-to-python-async-1-intro-4mgj).
 
 > "The role of the language, is to take care of the mechanics of the async pattern and provide a natural bridge to a language-specific implementation." -[Microsoft](https://learn.microsoft.com/en-us/archive/msdn-magazine/2018/june/c-effective-async-with-coroutines-and-c-winrt).
 
-You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly. This library incorporates [libuv](http://docs.libuv.org) in a way that make providing callbacks unnecessary, same as in [Using C++ Resumable Functions with Libuv](https://devblogs.microsoft.com/cppblog/using-ibuv-with-c-resumable-functions/). **Libuv** is handling any hardware or multi-threading CPU access. This not necessary for library usage, the setup can be replaced with some other Event Loop library, or just disabled. There is a unmaintained [btrask/libasync](https://github.com/btrask/libasync) package tried combining **libco**, with **libuv** too, Linux only.
+You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly. This library incorporates [libuv](http://docs.libuv.org) in a way that make providing callbacks unnecessary, same as in [Using C++ Resumable Functions with Libuv](https://devblogs.microsoft.com/cppblog/using-ibuv-with-c-resumable-functions/). **Libuv** is handling any hardware or multi-threading CPU access. This not necessary for library usage, the setup can be replaced with some other Event Loop library, or just disabled. There is a unmaintained [libasync](https://github.com/btrask/libasync) package tried combining **libco**, with **libuv** too, Linux only.
 
 Two videos covering things to keep in mind about concurrency, [Building Scalable Deployments with Multiple Goroutines](https://www.youtube.com/watch?v=LNNaxHYFhw8) and [Detecting and Fixing Unbound Concurrency Problems](https://www.youtube.com/watch?v=gggi4GIvgrg).
 
@@ -18,72 +20,10 @@ Two videos covering things to keep in mind about concurrency, [Building Scalable
 * [Synopsis](#synopsis)
 * [Usage](#usage)
 * [Installation](#installation)
-* [Todo](#todo)
 * [Contributing](#contributing)
 * [License](#license)
 
 ## Introduction
-
-Although cooperative multithreading is limited to a single CPU core, it scales substantially better than preemptive multithreading.
-
-For applications that need 100,000 or more context switches per second, the kernel overhead involved in preemptive multithreading can end up becoming the bottleneck in the application. Coroutines can easily scale to 10,000,000 or more context switches per second. Ideal use cases include servers (HTTP, RDBMS) and emulators (CPU cores, etc.)
-
-The **libco** and **minicoro** library included _CPU_ backends for:
-
-* x86, amd64, PowerPC, PowerPC64 ELFv1, PowerPC64 ELFv2, ARM 32-bit,  ARM 64-bit (AArch64), POSIX platforms (setjmp), Windows platforms (fibers)
-
-<details>
-<summary>The `Overhead` cost of switching coroutines, as compared to an ordinary `C` function call.</summary>
-
-### Target - x86
-
-* **Overhead:** ~5x
-* **Supported processor(s):** 32-bit x86
-* **Supported compiler(s):** any
-* **Supported operating system(s):**
-  * Windows
-  * Mac OS X
-  * Linux
-  * BSD
-
-### Target - amd64
-
-* **Overhead:** ~10x (Windows), ~6x (all other platforms)
-* **Supported processor(s):** 64-bit amd64
-* **Supported compiler(s):** any
-* **Supported operating system(s):**
-  * Windows
-  * Mac OS X
-  * Linux
-  * BSD
-
-### Target - ppc
-
-* **Overhead:** ~20x
-* **Supported processor(s):** 32-bit PowerPC, 64-bit PowerPC
-* **Supported compiler(s):** GNU GCC
-* **Supported operating system(s):**
-  * Mac OS X
-  * Linux
-  * BSD
-  * Playstation 3
-
-**Note:** this module contains compiler flags to enable/disable FPU and Altivec
-support.
-
-### Target - ucontext
-
-This uses the POSIX "ucontext" API.
-
-* **Overhead:** **~300x**
-* **Supported processor(s):** Processor independent
-* **Supported compiler(s):** any
-* **Supported operating system(s):**
-  * Linux
-  * BSD
-  * Windows(Fibers) ~15x
-
-</details>
 
 ## Synopsis
 
@@ -618,8 +558,12 @@ int co_main(int argc, char **argv)
     }
     co_ht_result_t *wgr = co_wait(wg);
 
-    printf("\nWorker # %d returned: %d\n", cid[2], co_group_get_result(wgr, cid[2]).integer);
-    printf("\nWorker # %d returned: %s\n", cid[1], co_group_get_result(wgr, cid[1]).string);
+    printf("\nWorker # %d returned: %d\n",
+           cid[2],
+           co_group_get_result(wgr, cid[2]).integer);
+    printf("\nWorker # %d returned: %s\n",
+           cid[1],
+           co_group_get_result(wgr, cid[1]).string);
     return 0;
 }
 ```
@@ -727,7 +671,7 @@ int main ()
   fut.wait();
 
   std::cout << "\n194232491 ";
-// guaranteed to be ready (and not block) after wait returns
+  // guaranteed to be ready (and not block) after wait returns
   if (fut.get())
     std::cout << "is prime.\n";
   else
@@ -747,7 +691,8 @@ int main ()
 void *is_prime(void *arg)
 {
     int x = co_value(arg).integer;
-    for (int i = 2; i < x; ++i) if (x % i == 0) return (void *)false;
+    for (int i = 2; i < x; ++i)
+        if (x % i == 0) return (void *)false;
     return (void *)true;
 }
 
@@ -756,12 +701,15 @@ int co_main(int argc, char **argv)
     int prime = 194232491;
     // call function asynchronously:
     future *f = co_async(is_prime, &prime);
+
     printf("checking...\n");
-    // Pause and run other coroutines until thread state changes.
+    // Pause and run other coroutines
+    // until thread state changes.
     co_async_wait(f);
 
     printf("\n194232491 ");
-    // guaranteed to be ready (and not block) after wait returns
+    // guaranteed to be ready (and not block)
+    // after wait returns
     if (co_async_get(f).boolean)
         printf("is prime!\n");
     else
@@ -778,8 +726,6 @@ int co_main(int argc, char **argv)
 ### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
 
 ## Installation
-
-## Todo
 
 ## Contributing
 
