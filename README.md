@@ -166,12 +166,14 @@ The above is the **main** and most likely functions to be used, see [coroutine.h
 Original **Go** example from <https://www.golinuxcloud.com/goroutines-golang/>
 
 <table>
-    <tr>
-        <th>GoLang</th>
-        <th>C89</th>
-    </tr>
-    <tr>
-        <td>
+<tr>
+<th>GoLang</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+
+<p>
 
 ```go
 package main
@@ -197,8 +199,13 @@ func greetings(name string) {
   }
 }
 ```
+
+</p>
+
 </td>
 <td>
+
+<p>
 
 ```c
 # include "../include/coroutine.h"
@@ -225,19 +232,23 @@ int co_main(int argc, char **argv)
 }
 ```
 
-   </td>
-    </tr>
+</P>
+
+</td>
+</tr>
 </table>
 
 Original **Go** example from <https://www.programiz.com/golang/channel>
 
 <table>
-    <tr>
-        <th>GoLang</th>
-        <th>C89</th>
-    </tr>
-    <tr>
-        <td>
+<tr>
+<th>GoLang</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+
+<p>
 
 ```go
 package main
@@ -264,8 +275,13 @@ func sendData(ch chan string) {
 
 }
 ```
+
+</p>
+
 </td>
 <td>
+
+<p>
 
 ```c
 #include "../include/coroutine.h"
@@ -295,19 +311,23 @@ int co_main(int argc, char **argv)
 }
 ```
 
-   </td>
-    </tr>
+</p>
+
+</td>
+</tr>
 </table>
 
 Original **Go** example from <https://go.dev/tour/concurrency/5>
 
 <table>
-    <tr>
-        <th>GoLang</th>
-        <th>C89</th>
-    </tr>
-    <tr>
-        <td>
+<tr>
+<th>GoLang</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+
+<p>
 
 ```go
 package main
@@ -340,8 +360,12 @@ func main() {
 }
 ```
 
+</p>
+
 </td>
 <td>
+
+<p>
 
 ```c
 #include "../include/coroutine.h"
@@ -392,19 +416,23 @@ int co_main(int argc, char **argv)
 }
 ```
 
-   </td>
-    </tr>
+</p>
+
+</td>
+</tr>
 </table>
 
 Original **Go** example from <https://www.developer.com/languages/go-error-handling-with-panic-recovery-and-defer/>
 
 <table>
-    <tr>
-        <th>GoLang</th>
-        <th>C89</th>
-    </tr>
-    <tr>
-        <td>
+<tr>
+<th>GoLang</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+
+<p>
 
 ```go
 package main
@@ -438,8 +466,12 @@ func divByZero() {
 }
 ```
 
+</p>
+
 </td>
 <td>
+
+<p>
 
 ```c
 #include "../include/coroutine.h"
@@ -476,19 +508,23 @@ int co_main(int argc, char **argv)
 }
 ```
 
-   </td>
-    </tr>
+</p>
+
+</td>
+</tr>
 </table>
 
 Original **Go** example from <https://gobyexample.com/waitgroups>
 
 <table>
-    <tr>
-        <th>GoLang</th>
-        <th>C89</th>
-    </tr>
-    <tr>
-        <td>
+<tr>
+<th>GoLang</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+
+<p>
 
 ```go
 package main
@@ -526,8 +562,12 @@ func main() {
 }
 ```
 
+</p>
+
 </td>
 <td>
+
+<p>
 
 ```c
 #include "../include/coroutine.h"
@@ -568,12 +608,16 @@ int co_main(int argc, char **argv)
 }
 ```
 
-   </td>
-    </tr>
+</p>
+
+</td>
+</tr>
 </table>
 
 <details>
 <summary>The above outputting, the same goes for all compile builds in DEBUG mode.</summary>
+
+<p>
 
 ```text
 Running coroutine id: 1 () status: 3
@@ -636,6 +680,8 @@ Back at coroutine scheduling
 Coroutine scheduler exited
 ```
 
+</p>
+
 </details>
 
 The `new C++` concurrency **thread** model by way of **future/promise** is also implemented with same like _semantics_.
@@ -643,12 +689,14 @@ The `new C++` concurrency **thread** model by way of **future/promise** is also 
 Original **C++ 20** example from <https://cplusplus.com/reference/future/future/wait/>
 
 <table>
-    <tr>
-        <th>C++ 20</th>
-        <th>C89</th>
-    </tr>
-    <tr>
-        <td>
+<tr>
+<th>C++ 20</th>
+<th>C89</th>
+</tr>
+<tr>
+<td>
+
+<p>
 
 ```c++
 // future::wait
@@ -681,8 +729,12 @@ int main ()
 }
 ```
 
+</p>
+
 </td>
 <td>
+
+<p>
 
 ```c
 #include "../include/coroutine.h"
@@ -719,8 +771,10 @@ int co_main(int argc, char **argv)
 }
 ```
 
-   </td>
-    </tr>
+</p>
+
+</td>
+</tr>
 </table>
 
 ### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
