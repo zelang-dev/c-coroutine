@@ -172,27 +172,18 @@ Original **C++ 20** example from <https://cplusplus.com/reference/future/future/
 </tr>
 <tr>
 <td>
-<p>
+<pre><code>
 // future::wait
-
 #include <iostream>       // std::cout
-
 #include <future>         // std::async, std::future
-
 #include <chrono>         // std::chrono::milliseconds
-
 // a non-optimized way of checking for prime numbers:
-
 bool is_prime (int x) {
-
   for (int i=2; i<x; ++i) if (x%i==0) return false;
-
   return true;
-
 }
 
 int main ()
-
 {
 
   // call function asynchronously:
@@ -210,10 +201,10 @@ int main ()
 
   return 0;
 }
-</p>
+</code></pre>
 </td>
 <td>
-<p>
+<pre><code>
 #include "../include/coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
@@ -221,37 +212,27 @@ int main ()
 void *is_prime(void*arg)
 {
     int x = co_value(arg).integer;
-
     for (int i = 2; i < x; ++i)
-
         if (x % i == 0) return (void *)false;
 
-return (void*)true;
-
+    return (void*)true;
 }
 
 int co_main(int argc, char **argv)
-
 {
     int prime = 194232491;
-
     // call function asynchronously:
-
     future *f = co_async(is_prime, &prime);
-
     printf("checking...\n");
 
     // Pause and run other coroutines
-
     // until thread state changes.
     co_async_wait(f);
 
     printf("\n194232491 ");
 
     // guaranteed to be ready (and not block)
-
     // after wait returns
-
     if (co_async_get(f).boolean)
         printf("is prime!\n");
     else
@@ -259,8 +240,7 @@ int co_main(int argc, char **argv)
 
     return 0;
 }
-
-</p>
+</code></pre>
 </td>
 </tr>
 </table>
@@ -274,7 +254,7 @@ Original **Go** example from <https://www.golinuxcloud.com/goroutines-golang/>
 </tr>
 <tr>
 <td>
-<p>
+<pre><code>
 package main
 
 import (
@@ -297,7 +277,7 @@ func greetings(name string) {
        time.Sleep(time.Millisecond)
   }
 }
-</p>
+</code></pre>
 </td>
 <td>
 <p>
