@@ -632,9 +632,9 @@ Original **C++ 20** example from <https://cplusplus.com/reference/future/future/
 <td>
 <pre><code>
 // future::wait
-#include <iostream>       // std::cout
-#include <future>         // std::async, std::future
-#include <chrono>         // std::chrono::milliseconds
+#include <"iostream">       // std::cout
+#include <"future">         // std::async, std::future
+#include <"chrono">         // std::chrono::milliseconds
 
 // a non-optimized way of checking for prime numbers:
 bool is_prime (int x) {
@@ -645,7 +645,7 @@ bool is_prime (int x) {
 int main ()
 {
   // call function asynchronously:
-  std::future<bool> fut = std::async (is_prime,194232491);
+  std::future<"bool"> fut = std::async (is_prime,194232491);
 
   std::cout << "checking...\n";
   fut.wait();
