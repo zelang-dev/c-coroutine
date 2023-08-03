@@ -1,4 +1,9 @@
 #include "../include/coroutine.h"
+/*
+Small future and promise library in C with pthreads
+
+Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
+*/
 
 future *future_create(co_callable_t start_routine)
 {
