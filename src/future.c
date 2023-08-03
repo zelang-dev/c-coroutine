@@ -33,7 +33,7 @@ void *future_wrapper(void *arg)
     return res;
 }
 
-async_start(future *f, promise *value, void *arg)
+void async_start(future *f, promise *value, void *arg)
 {
     future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
     f_arg->func = f->func;
