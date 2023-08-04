@@ -15,11 +15,15 @@ set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BUILD_DIR}/lib)
 
+option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
+add_subdirectory(libuv)
+
 file(GLOB lib_files
     ${CMAKE_SOURCE_DIR}/src/*.c
 )
 
 add_library(coroutine STATIC ${lib_files})
+target_link_libraries(coroutine PUBLIC uv_a)
 
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D CO_DEBUG ")
@@ -30,15 +34,11 @@ endif()
 
 if(WIN32)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D CO_DEBUG")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D__PTW32_STATIC_LIB")
     add_definitions(-D__PTW32_STATIC_LIB)
     add_subdirectory(pthreads4w)
     target_link_libraries(coroutine PUBLIC libpthreadVSE3)
 endif()
-
-option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
-
-add_subdirectory(libuv)
-target_link_libraries(coroutine PUBLIC uv_a)
 
 if(CO_BUILD_TESTS)
     set(TARGET_LIST co_cpp_future_wait co_cpp_future test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group go_panic)
