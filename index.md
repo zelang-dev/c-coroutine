@@ -226,6 +226,111 @@ int co_main(int argc, char **argv)
 </tr>
 </table>
 
+<details>
+<summary>DEBUG build output</summary>
+
+<pre>
+Running coroutine id: 1 () status: 3
+Start of main Goroutine
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 3
+0 ==> John
+Back at coroutine scheduling
+Running coroutine id: 3 () status: 3
+0 ==> Mary
+Back at coroutine scheduling
+Running coroutine id: 4 () status: 3
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 2
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+...
+...
+...
+...
+...
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+1 ==> John
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 2
+Back at coroutine scheduling
+Running coroutine id: 3 () status: 1
+1 ==> Mary
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 2
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+...
+...
+...
+...
+...
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+2 ==> John
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 2
+Back at coroutine scheduling
+Running coroutine id: 3 () status: 1
+2 ==> Mary
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 2
+Back at coroutine scheduling
+...
+...
+...
+...
+...
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 4 (coroutine_wait) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+End of main Goroutine
+Back at coroutine scheduling
+Coroutine scheduler exited
+</pre>
+</details>
+
 Original **Go** example from <https://www.programiz.com/golang/channel>
 
 <table>
@@ -292,6 +397,28 @@ int co_main(int argc, char **argv)
 </td>
 </tr>
 </table>
+
+<details>
+<summary>DEBUG build output</summary>
+
+<pre>
+Running coroutine id: 1 () status: 3
+Running coroutine id: 1 () status: 3
+processed
+ r:0x558bd5a1aea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 3
+processed
+ s:0x558bd5a1aea0*
+ => s:0x558bd5a1aea0
+No receiver! Send Operation Blocked
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Received. Send Operation Successful
+Back at coroutine scheduling
+Coroutine scheduler exited
+</pre>
+</details>
 
 Original **Go** example from <https://go.dev/tour/concurrency/5>
 
@@ -386,6 +513,129 @@ int co_main(int argc, char **argv)
 </tr>
 </table>
 
+<details>
+<summary>DEBUG build output</summary>
+
+<pre>
+Running coroutine id: 1 () status: 3
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 3
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+0
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+1
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+1
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+2
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+3
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+5
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+8
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+13
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+21
+processed
+ r:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ s:0x55c241f9dea0*
+ => s:0x55c241f9dea0
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+34
+processed
+ s:0x55c241f9e110
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+processed
+ r:0x55c241f9e110*
+ => r:0x55c241f9e110
+quit
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 1
+Back at coroutine scheduling
+Coroutine scheduler exited
+
+</pre>
+</details>
+
 Original **Go** example from <https://www.developer.com/languages/go-error-handling-with-panic-recovery-and-defer/>
 
 <table>
@@ -465,6 +715,23 @@ int co_main(int argc, char **argv)
 </td>
 </tr>
 </table>
+
+<details>
+<summary>DEBUG build output</summary>
+
+<pre>
+Running coroutine id: 1 () status: 3
+Back at coroutine scheduling
+Running coroutine id: 2 () status: 3
+panic occurred: sig_ill
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Although panicked. We recovered. We call mul() func
+mul func result: 50
+Back at coroutine scheduling
+Coroutine scheduler exited
+</pre>
+</details>
 
 Original **Go** example from <https://gobyexample.com/waitgroups>
 
@@ -555,7 +822,7 @@ int co_main(int argc, char **argv)
 </table>
 
 <details>
-<summary>The above outputting, the same goes for all compile builds in DEBUG mode.</summary>
+<summary>DEBUG build output</summary>
 
 <pre>
 Running coroutine id: 1 () status: 3
@@ -699,6 +966,67 @@ int co_main(int argc, char **argv)
 </td>
 </tr>
 </table>
+
+<details>
+<summary>DEBUG build output</summary>
+
+<pre>
+Running coroutine id: 1 () status: 3
+promise id(2028660243) created
+thread started status(0) future id(2028660243)
+checking...
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+...
+...
+...
+...
+...
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+promise id(2028660243) set LOCK
+promise id(2028660243) set UNLOCK
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+Back at coroutine scheduling
+Running coroutine id: 1 (co_main) status: 1
+
+194232491 promise id(2028660243) get LOCK
+promise id(2028660243) get UNLOCK
+is prime!
+Back at coroutine scheduling
+Coroutine scheduler exited
+</pre>
+</details>
 
 ### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
 
