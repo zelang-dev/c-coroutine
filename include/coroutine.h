@@ -153,6 +153,8 @@ Must also closed out with `select_break()`. */
         #else /* Otherwise, we ignore the directive (unless user provides their own) */
           #define thread_local
         #endif
+      #elif __APPLE__ && __MACH__
+        #define thread_local __thread
       #else /* C11 and newer define thread_local in threads.h */
         #include <threads.h>
       #endif
