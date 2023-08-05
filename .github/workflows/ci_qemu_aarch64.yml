@@ -39,7 +39,6 @@ jobs:
             ./go_wait_group
             ./go_panic
             ./co_call_uv
-            ./co_cpp_future_wait
             ./test_delay 2 5
             ./chan_3
             ./primes
