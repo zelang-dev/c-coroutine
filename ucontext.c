@@ -31,7 +31,8 @@ co_routine_t *co_active(void) {
   return (co_routine_t *)co_running_handle;
 }
 
-co_routine_t *co_derive(void* memory, unsigned int heapsize, co_callable_t func, void *args) {
+co_routine_t *co_derive(void *memory, size_t heapsize, co_callable_t func, void *args)
+{
   if(!co_running_handle) co_running_handle = &co_primary;
   ucontext_t* thread = (ucontext_t*)memory;
   memory = (unsigned char*)memory + sizeof(ucontext_t);

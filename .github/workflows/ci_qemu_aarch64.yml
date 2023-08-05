@@ -1,4 +1,4 @@
-name: armv7, ppc64v2, riscv64, s390x
+name: aarch64
 
 on:
   pull_request:
@@ -13,14 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: arm
-            arch: armv7
-          - target: ppc64v2
-            arch: ppc64le
-          - target: riscv64
-            arch: riscv64
-          - target: s390x
-            arch: s390x
+          - target: aarch64
+            arch: aarch64
     steps:
       - uses: actions/checkout@v3
       - uses: uraimo/run-on-arch-action@v2
@@ -39,11 +33,13 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON ..
             cmake --build .
-            ./chan_3
-            ./primes
-            ./test_delay 2
             ./go_channel
             ./go_sleep
             ./go_select
             ./go_wait_group
+            ./go_panic
             ./co_call_uv
+            ./co_cpp_future_wait
+            ./test_delay 2 5
+            ./chan_3
+            ./primes
