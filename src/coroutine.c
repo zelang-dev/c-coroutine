@@ -678,8 +678,6 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
         co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
     }
 
-    ctx->s[0] = (void *)(ctx);
-    ctx->s[1] = (void *)(co_awaitable);
     ctx->pc = (void *)(co_awaitable);
     ctx->ra = (void *)(co_done);
     ctx->sp = (void *)((size_t)sp);
