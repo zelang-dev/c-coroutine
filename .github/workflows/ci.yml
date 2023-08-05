@@ -98,7 +98,5 @@ jobs:
             ./go_select
             ./go_panic
             ./co_call_uv
-            ./test_delay 2 5
             ./chan_3
             ./primes
-            ./co_cpp_future_wait

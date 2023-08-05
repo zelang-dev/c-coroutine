@@ -1,6 +1,6 @@
 # c-coroutine
 
-[![windows & linux & macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml)[![aarch64](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_aarch64.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_aarch64.yml)[![armv7, ppc64v2, riscv64, s390x](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg?event=workflow_run)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml)
+[![windows & linux & macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml)[![aarch64](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_aarch64.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_aarch64.yml)[![armv7, ppc64v2, riscv64, s390x ](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg?event=status)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml)
 
 **c-coroutine** is a cooperative multithreading library written in C89. Designed to be simple as possible in usage, but powerfully enough in execution, easily modifiable to any need. It incorporates most asynchronous patterns from various languages. They all the same behaviorally, just syntax layout differences.
 
