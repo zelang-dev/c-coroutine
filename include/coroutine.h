@@ -567,8 +567,6 @@ C_API void co_switch(co_routine_t *);
 /* Check for coroutine completetion and return. */
 C_API bool co_terminated(co_routine_t *);
 
-C_API bool co_serializable(void);
-
 /* Return handle to previous coroutine. */
 C_API co_routine_t *co_current(void);
 

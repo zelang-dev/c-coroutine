@@ -665,7 +665,7 @@ __asm__(
   ".size swap_context, .-swap_context\n"
 );
 
-co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
 {
     uint8_t *sp;
     /* align stack */
@@ -678,7 +678,7 @@ co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, voi
         co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
     }
 
-    ctx->s[0] = (void *)(co);
+    ctx->s[0] = (void *)(ctx);
     ctx->s[1] = (void *)(co_awaitable);
     ctx->pc = (void *)(co_awaitable);
     ctx->ra = (void *)(co_done);
@@ -884,7 +884,7 @@ __asm__(
     ".cfi_endproc\n"
     ".size swap_context, .-swap_context\n");
 
-co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
 {
     uint8_t *sp;
     co_routine_t *context = (co_routine_t *)memory;
@@ -918,11 +918,6 @@ co_routine_t *co_derive(void *memory, unsigned int size, co_callable_t func, voi
 #endif
 
     return context;
-}
-
-bool co_serializable(void)
-{
-    return true;
 }
 #else
     #define USE_NATIVE
@@ -1046,11 +1041,6 @@ void co_switch(co_routine_t *handle)
     co_current_handle->status = CO_NORMAL;
     co_current_handle = co_previous_handle;
     co_swap(co_active_handle, co_previous_handle);
-}
-
-bool co_serializable(void)
-{
-    return true;
 }
 #endif
 

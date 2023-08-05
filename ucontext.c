@@ -78,7 +78,3 @@ void co_switch(co_routine_t *handle) {
   co_running_handle = (ucontext_t*)handle;
   swapcontext(old_thread, co_running_handle);
 }
-
-bool co_serializable(void) {
-  return false;
-}
