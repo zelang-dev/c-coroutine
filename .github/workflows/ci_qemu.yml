@@ -1,4 +1,4 @@
-name: "armv7, ppc64v2, riscv64, s390x "
+name: ppc64v2, riscv64, s390x
 
 on:
   pull_request:
@@ -13,8 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: arm
-            arch: armv7
           - target: ppc64v2
             arch: ppc64le
           - target: riscv64

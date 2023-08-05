@@ -1,4 +1,4 @@
-name: aarch64
+name: armv7 & aarch64
 
 on:
   pull_request:
@@ -13,6 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: arm
+            arch: armv7
           - target: aarch64
             arch: aarch64
     steps:
@@ -39,7 +41,9 @@ jobs:
             ./go_channel
             ./go_sleep
             ./go_select
-            ./go_wait_group
+            if [ "${{ matrix.target }}" == "aarch64" ]; then
+                ./go_wait_group
+                ./go_panic
+            fi
             ./co_call_uv
-            ./go_panic
             ./co_cpp_future_wait
