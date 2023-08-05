@@ -25,4 +25,4 @@ jobs:
             ./go_channel
             ./go_select
             ./go_panic
-            ./co_cpp_future_wait.exe
+            ./co_cpp_future_wait
