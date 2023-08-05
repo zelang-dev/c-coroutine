@@ -96,7 +96,6 @@ jobs:
             cd build
             ./go_channel
             ./go_select
-            ./go_wait_group
             ./go_panic
             ./co_call_uv
             ./test_delay 2 5

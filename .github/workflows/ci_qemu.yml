@@ -1,4 +1,4 @@
-name: armv7, ppc64v2, riscv64, s390x
+name: "armv7, ppc64v2, riscv64, s390x "
 
 on:
   pull_request:
