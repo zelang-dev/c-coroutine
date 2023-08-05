@@ -29,7 +29,7 @@ if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D CO_DEBUG ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer ")
     find_package(Threads)
-    target_link_libraries(coroutine ${CMAKE_THREAD_LIBS_INIT} )
+    target_link_libraries(coroutine PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 if(WIN32)
