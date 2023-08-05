@@ -41,3 +41,5 @@ jobs:
             ./go_select
             ./go_wait_group
             ./co_call_uv
+            ./go_panic
+            ./co_cpp_future_wait
