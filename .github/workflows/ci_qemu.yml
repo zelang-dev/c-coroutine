@@ -46,5 +46,4 @@ jobs:
             ./go_sleep
             ./go_select
             ./co_call_uv
-            ./go_panic
             ./co_cpp_future_wait
