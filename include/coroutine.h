@@ -438,7 +438,6 @@ struct routine_s
     stack_t uc_stack;
     mcontext_t uc_mcontext;
     __sigset_t uc_sigmask;
-    struct _libc_fpstate __fpregs_mem;
 #endif
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void *stack_base;
