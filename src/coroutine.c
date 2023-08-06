@@ -917,10 +917,14 @@ co_routine_t *co_derive(void *memory, size_t size)
 #endif
     return context;
 }
+#else
+    #define USE_OTHER 1
 #endif
+#else
+    #define USE_OTHER 1
 #endif
 
-#if defined(USE_UCONTEXT) && defined(_WIN32)
+#if defined(USE_OTHER) && defined(_WIN32)
     int getcontext(ucontext_t *ucp)
     {
         int ret;
@@ -989,7 +993,7 @@ co_routine_t *co_derive(void *memory, size_t size)
     }
 #endif
 
-#if defined(USE_UCONTEXT) && !defined(USE_NATIVE)
+#if defined(USE_OTHER)
 co_routine_t *co_derive(void *memory, size_t size)
 {
     if (!co_active_handle)
@@ -997,7 +1001,6 @@ co_routine_t *co_derive(void *memory, size_t size)
 
     ucontext_t *thread = (ucontext_t *)memory;
     memory = (unsigned char *)memory + sizeof(co_routine_t);
-    size -= sizeof(co_routine_t);
     if ((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
     {
         thread->uc_link = (ucontext_t *)co_active_handle;
@@ -1105,10 +1108,12 @@ void co_delete(co_routine_t *handle)
         }
         else
         {
-#if defined(USE_UCONTEXT)
+#if defined(USE_OTHER)
             if (((ucontext_t *)handle)->uc_stack.ss_sp)
             {
+                CO_HERE();
                 CO_FREE(((ucontext_t *)handle)->uc_stack.ss_sp);
+                CO_HERE();
             }
 #endif
             if (handle->err_allocated != NULL)
