@@ -1,5 +1,12 @@
 #include "../include/coroutine.h"
 
+#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+#elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
+#elif defined(__clang__) || defined(__GNUC__)
+#else
+    #define USE_UCONTEXT 1
+#endif
+
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
 static thread_local co_routine_t co_active_buffer[4];
@@ -667,12 +674,14 @@ __asm__(
 
 co_routine_t *co_derive(void *memory, size_t size)
 {
+    size_t *handle;
+    co_routine_t *co;
     uint8_t *sp;
     /* align stack */
     sp = (uint8_t *)memory + size - STACK_ALIGN;
     sp = (uint8_t *)ALIGN(sp, STACK_ALIGN);
 
-    co_routine_t *handle = (co_routine_t *)memory;
+    handle = (size_t *)memory;
     if (!co_swap)
     {
         co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
@@ -681,20 +690,21 @@ co_routine_t *co_derive(void *memory, size_t size)
     size_t stack_top = (size_t)memory + size;
     stack_top &= ~((size_t)15);
     size_t *p = (size_t *)(stack_top);
-    handle[0] = (size_t)p;
-    handle[1] = (size_t)co_func;
-    handle[12] = (size_t)p;
+    handle[0] = (size_t *)p;
+    handle[1] = (size_t *)co_func;
+    handle[12] = (size_t *)p;
 
-    handle->pc = (void *)(co_awaitable);
-    handle->ra = (void *)(co_done);
-    handle->sp = (void *)((size_t)sp);
+    co = (co_routine_t *)handle;
+    co->pc = (void *)(co_awaitable);
+    co->ra = (void *)(co_done);
+    co->sp = (void *)((size_t)sp);
 
 #ifdef CO_USE_VALGRIND
     size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
-    handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+    co_active_handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
-    return handle;
+    return co;
 }
 
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
