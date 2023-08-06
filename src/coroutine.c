@@ -677,7 +677,7 @@ co_routine_t *co_derive(void *memory, size_t size)
         co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
     }
 
-    co = (co_routine_t *)memory;
+    co_routine_t *co = (co_routine_t *)memory;
     co->s[0] = (void *)sp;
     co->s[1] = (void *)(co_func);
     co->ra = (void *)(co_done);
