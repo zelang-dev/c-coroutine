@@ -105,7 +105,7 @@ static void co_awaitable()
     end_try;
 }
 
-static void co_func(co_routine_t handle)
+static void co_func()
 {
     co_awaitable();
     co_done(); /* called only if coroutine function returns */
@@ -1024,7 +1024,7 @@ co_routine_t *co_derive(void *memory, size_t heapsize)
     {
         if ((!getcontext((ucontext_t*)thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
         {
-            thread->uc_link = co_active_handle;
+            thread->uc_link = (ucontext_t *)co_active_handle;
             thread->uc_stack.ss_size = heapsize;
             makecontext((ucontext_t*)thread, co_func, 0);
         }
@@ -1158,7 +1158,7 @@ void co_switch(co_routine_t *handle)
 #if !defined(USE_UCONTEXT)
     co_swap(co_active_handle, co_previous_handle);
 #else
-    swapcontext(co_previous_handle, co_active_handle);
+    swapcontext((ucontext_t *)co_previous_handle, (ucontext_t *)co_active_handle);
 #endif
 }
 

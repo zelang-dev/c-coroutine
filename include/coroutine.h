@@ -352,7 +352,6 @@ typedef co_hast_t co_ht_result_t;
 
 #if defined(USE_UCONTEXT)
     #define _BSD_SOURCE
-    #define _XOPEN_SOURCE 500
     #if __APPLE__ && __MACH__
         #include <sys/ucontext.h>
     #elif defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
