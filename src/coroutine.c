@@ -989,7 +989,7 @@ co_routine_t *co_derive(void *memory, size_t size)
     }
 #endif
 
-#if defined(USE_UCONTEXT)
+#if defined(USE_UCONTEXT) && !defined(USE_NATIVE)
 co_routine_t *co_derive(void *memory, size_t size)
 {
     if (!co_active_handle)
@@ -998,18 +998,15 @@ co_routine_t *co_derive(void *memory, size_t size)
     ucontext_t *thread = (ucontext_t *)memory;
     memory = (unsigned char *)memory + sizeof(co_routine_t);
     size -= sizeof(co_routine_t);
-    if (thread)
+    if ((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
     {
-        if ((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
-        {
-            thread->uc_link = (ucontext_t *)co_active_handle;
-            thread->uc_stack.ss_size = size;
-            makecontext(thread, co_func, 0);
-        }
-        else
-        {
-            thread = (co_routine_t *)0;
-        }
+        thread->uc_link = (ucontext_t *)co_active_handle;
+        thread->uc_stack.ss_size = size;
+        makecontext(thread, co_func, 0);
+    }
+    else
+    {
+        co_panic("getcontext failed!");
     }
 
     return (co_routine_t *)thread;
