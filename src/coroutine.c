@@ -936,9 +936,7 @@ co_routine_t *co_derive(void *memory, size_t size)
 #endif
 #endif
 
-#if defined(USE_UCONTEXT)
-
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(USE_UCONTEXT) && defined(_WIN32)
     int getcontext(ucontext_t *ucp)
     {
         int ret;
@@ -1020,6 +1018,7 @@ co_routine_t *co_derive(void *memory, size_t size)
     }
 #endif
 
+#if defined(USE_UCONTEXT)
 co_routine_t *co_derive(void *memory, size_t heapsize)
 {
     if (!co_active_handle)
