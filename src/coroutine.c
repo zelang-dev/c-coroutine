@@ -462,6 +462,7 @@ static void co_init(void)
 #endif
 }
 #endif
+
 co_routine_t *co_derive(void *memory, size_t size)
 {
     size_t *handle;
@@ -496,7 +497,6 @@ co_routine_t *co_derive(void *memory, size_t size)
     return co;
 }
 #elif defined(__riscv)
-#define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define ALIGN(p, x) ((void *)((uintptr_t)(p) & ~((x)-1)))
 
 #define MIN_STACK 0x10000lu
@@ -667,34 +667,25 @@ __asm__(
 
 co_routine_t *co_derive(void *memory, size_t size)
 {
-    size_t *handle;
-    co_routine_t *co;
     uint8_t *sp;
     /* align stack */
     sp = (uint8_t *)memory + size - STACK_ALIGN;
     sp = (uint8_t *)ALIGN(sp, STACK_ALIGN);
 
-    handle = (size_t *)memory;
     if (!co_swap)
     {
         co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
     }
 
-    size_t stack_top = (size_t)memory + size;
-    stack_top &= ~((size_t)15);
-    size_t *p = (size_t *)(stack_top);
-    handle[0] = (size_t *)p;
-    handle[1] = (size_t *)co_func;
-    handle[12] = (size_t *)p;
-
-    co = (co_routine_t *)handle;
-    co->pc = (void *)(co_awaitable);
+    co = (co_routine_t *)memory;
+    co->s[0] = (void *)sp;
+    co->s[1] = (void *)(co_func);
     co->ra = (void *)(co_done);
     co->sp = (void *)((size_t)sp);
 
 #ifdef CO_USE_VALGRIND
     size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
-    co_active_handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+    co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
     return co;
@@ -1012,20 +1003,20 @@ co_routine_t *co_derive(void *memory, size_t size)
 #endif
 
 #if defined(USE_UCONTEXT)
-co_routine_t *co_derive(void *memory, size_t heapsize)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     if (!co_active_handle)
         co_active_handle = co_active_buffer;
 
     co_routine_t *thread = (co_routine_t *)memory;
     memory = (unsigned char *)memory + sizeof(co_routine_t);
-    heapsize -= sizeof(co_routine_t);
+    size -= sizeof(co_routine_t);
     if (thread)
     {
         if ((!getcontext((ucontext_t*)thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
         {
             thread->uc_link = (ucontext_t *)co_active_handle;
-            thread->uc_stack.ss_size = heapsize;
+            thread->uc_stack.ss_size = size;
             makecontext((ucontext_t*)thread, co_func, 0);
         }
         else

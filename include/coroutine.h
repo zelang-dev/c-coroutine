@@ -333,12 +333,18 @@ typedef co_hast_t co_ht_group_t;
 typedef co_hast_t co_ht_result_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+    #define USE_NATIVE 1
 #elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
+    #define USE_NATIVE 1
 #elif defined(__clang__) || defined(__GNUC__)
   #if defined(__arm__)
+    #define USE_NATIVE 1
   #elif defined(__aarch64__)
+    #define USE_NATIVE 1
   #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    #define USE_NATIVE 1
   #elif defined(_ARCH_PPC) && !defined(__LITTLE_ENDIAN__)
+    #define USE_NATIVE 1
   #elif defined(_WIN32)
     #define USE_UCONTEXT 1
   #else
