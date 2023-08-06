@@ -188,7 +188,7 @@ static void co_init(void)
 }
 #endif
 
-co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     co_routine_t *handle;
     if (!co_swap)
@@ -320,7 +320,7 @@ static void co_init(void)
 #endif
 }
 #endif
-co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     co_routine_t *handle;
     if (!co_swap)
@@ -374,7 +374,7 @@ static void co_init(void)
 #endif
 }
 
-co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     size_t *handle;
     co_routine_t *co;
@@ -462,7 +462,7 @@ static void co_init(void)
 #endif
 }
 #endif
-co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     size_t *handle;
     co_routine_t *co;
@@ -665,29 +665,36 @@ __asm__(
   ".size swap_context, .-swap_context\n"
 );
 
-co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     uint8_t *sp;
     /* align stack */
     sp = (uint8_t *)memory + size - STACK_ALIGN;
     sp = (uint8_t *)ALIGN(sp, STACK_ALIGN);
 
-    co_routine_t *ctx = (co_routine_t *)memory;
+    co_routine_t *handle = (co_routine_t *)memory;
     if (!co_swap)
     {
         co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
     }
 
-    ctx->pc = (void *)(co_awaitable);
-    ctx->ra = (void *)(co_done);
-    ctx->sp = (void *)((size_t)sp);
+    size_t stack_top = (size_t)memory + size;
+    stack_top &= ~((size_t)15);
+    size_t *p = (size_t *)(stack_top);
+    handle[0] = (size_t)p;
+    handle[1] = (size_t)co_func;
+    handle[12] = (size_t)p;
+
+    handle->pc = (void *)(co_awaitable);
+    handle->ra = (void *)(co_done);
+    handle->sp = (void *)((size_t)sp);
 
 #ifdef CO_USE_VALGRIND
-    size_t stack_addr = _co_align_forward((size_t)ctx + sizeof(co_routine_t), 16);
-    context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+    size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
+    handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
-    return ctx;
+    return handle;
 }
 
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
@@ -882,7 +889,7 @@ __asm__(
     ".cfi_endproc\n"
     ".size swap_context, .-swap_context\n");
 
-co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t size)
 {
     uint8_t *sp;
     co_routine_t *context = (co_routine_t *)memory;
@@ -1003,7 +1010,7 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
     }
 #endif
 
-co_routine_t *co_derive(void *memory, size_t heapsize, co_callable_t func, void *args)
+co_routine_t *co_derive(void *memory, size_t heapsize)
 {
     if (!co_active_handle)
         co_active_handle = co_active_buffer;
@@ -1056,7 +1063,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args)
     if (!memory)
         co_panic("calloc() failed");
 
-    co_routine_t *co = co_derive(memory, size, func, args);
+    co_routine_t *co = co_derive(memory, size);
     if (!co_current_handle)
         co_current_handle = co_active();
 

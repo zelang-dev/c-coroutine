@@ -338,7 +338,7 @@ typedef co_hast_t co_ht_result_t;
 #else
     #define _BSD_SOURCE
     #define _XOPEN_SOURCE 500
-    #define USE_UCONTEXT
+    #define USE_UCONTEXT 1
     #if __APPLE__ && __MACH__
         #include <sys/ucontext.h>
     #elif defined(_WIN32) || defined(_WIN64)
@@ -603,8 +603,8 @@ uv_loop_t *co_loop(void);
 /* Return handle to current coroutine. */
 C_API co_routine_t *co_active(void);
 
-/* Initializes new coroutine. */
-C_API co_routine_t *co_derive(void *, size_t, co_callable_t, void *);
+/* Initializes new coroutine, platform specific. */
+C_API co_routine_t *co_derive(void *, size_t);
 
 /* Create new coroutine. */
 C_API co_routine_t *co_create(size_t, co_callable_t, void *);
