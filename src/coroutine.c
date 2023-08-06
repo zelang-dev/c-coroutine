@@ -914,19 +914,121 @@ co_routine_t *co_derive(void *memory, size_t size, co_callable_t func, void *arg
     size_t stack_addr = _co_align_forward((size_t)context + sizeof(co_routine_t), 16);
     context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
-
     return context;
 }
-#else
-    #define USE_NATIVE
-    #include "../ucontext.c"
 #endif
-#else
-    #define USE_NATIVE
-    #include "../ucontext.c"
 #endif
 
-#if !defined(USE_NATIVE)
+#if defined(USE_UCONTEXT)
+
+#if defined(_WIN32) || defined(_WIN64)
+    int getcontext(ucontext_t *ucp)
+    {
+        int ret;
+
+        /* Retrieve the full machine context */
+        ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
+        ret = GetThreadContext(GetCurrentThread(), &ucp->uc_mcontext);
+
+        return (ret == 0) ? -1 : 0;
+    }
+
+    int setcontext(const ucontext_t *ucp)
+    {
+        int ret;
+
+        /* Restore the full machine context (already set) */
+        ret = SetThreadContext(GetCurrentThread(), &ucp->uc_mcontext);
+        return (ret == 0) ? -1 : 0;
+    }
+
+    int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...)
+    {
+        int i;
+        va_list ap;
+        char *sp;
+
+        /* Stack grows down */
+        sp = (char *)(size_t)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size;
+
+        /* Reserve stack space for the arguments (maximum possible: argc*(8 bytes per argument)) */
+        sp -= argc * 8;
+
+        if (sp < (char *)ucp->uc_stack.ss_sp)
+        {
+            /* errno = ENOMEM;*/
+            return -1;
+        }
+
+        /* Set the instruction and the stack pointer */
+    #if defined(_X86_)
+        ucp->uc_mcontext.Eip = (unsigned long long)func;
+        ucp->uc_mcontext.Esp = (unsigned long long)(sp - 4);
+    #else
+        ucp->uc_mcontext.Rip = (unsigned long long)func;
+        ucp->uc_mcontext.Rsp = (unsigned long long)(sp - 40);
+    #endif
+        /* Save/Restore the full machine context */
+        ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
+
+        /* Copy the arguments */
+        va_start(ap, argc);
+        for (i = 0; i < argc; i++)
+        {
+            memcpy(sp, ap, 8);
+            ap += 8;
+            sp += 8;
+        }
+        va_end(ap);
+
+        return 0;
+    }
+
+    int swapcontext(co_routine_t *oucp, const co_routine_t *ucp)
+    {
+        int ret;
+
+        if ((oucp == NULL) || (ucp == NULL))
+        {
+            /*errno = EINVAL;*/
+            return -1;
+        }
+
+        ret = getcontext((ucontext_t *)oucp);
+        if (ret == 0)
+        {
+            ret = setcontext((ucontext_t *)ucp);
+        }
+        return ret;
+    }
+#endif
+
+co_routine_t *co_derive(void *memory, size_t heapsize, co_callable_t func, void *args)
+{
+    if (!co_active_handle)
+        co_active_handle = co_active_buffer;
+
+    co_routine_t *thread = (co_routine_t *)memory;
+    memory = (unsigned char *)memory + sizeof(co_routine_t);
+    heapsize -= sizeof(co_routine_t);
+    if (thread)
+    {
+        if ((!getcontext((ucontext_t*)thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
+        {
+            thread->uc_link = co_active_handle;
+            thread->uc_stack.ss_size = heapsize;
+            makecontext((ucontext_t*)thread, co_func, 0);
+        }
+        else
+        {
+            thread = (co_routine_t *)0;
+        }
+    }
+
+    return thread;
+}
+#endif
+
 co_routine_t *co_active(void)
 {
     if (!co_active_handle)
@@ -1019,6 +1121,12 @@ void co_delete(co_routine_t *handle)
         }
         else
         {
+#if defined(USE_UCONTEXT)
+            if (handle->uc_stack.ss_sp)
+            {
+                CO_FREE(handle->uc_stack.ss_sp);
+            }
+#endif
             if (handle->err_allocated != NULL)
                 CO_FREE(handle->err_allocated);
 
@@ -1038,9 +1146,12 @@ void co_switch(co_routine_t *handle)
     co_active_handle->status = CO_RUNNING;
     co_current_handle->status = CO_NORMAL;
     co_current_handle = co_previous_handle;
+#if !defined(USE_UCONTEXT)
     co_swap(co_active_handle, co_previous_handle);
-}
+#else
+    swapcontext(co_previous_handle, co_active_handle);
 #endif
+}
 
 void *co_user_data(co_routine_t *co)
 {

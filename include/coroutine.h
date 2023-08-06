@@ -332,6 +332,49 @@ typedef struct ex_context_s ex_context_t;
 typedef co_hast_t co_ht_group_t;
 typedef co_hast_t co_ht_result_t;
 
+#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+#elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
+#elif defined(__clang__) || defined(__GNUC__)
+#else
+    #define _BSD_SOURCE
+    #define _XOPEN_SOURCE 500
+    #define USE_UCONTEXT
+    #if __APPLE__ && __MACH__
+        #include <sys/ucontext.h>
+    #elif defined(_WIN32) || defined(_WIN64)
+        #include <windows.h>
+        #if defined(_X86_)
+            #define DUMMYARGS
+        #else
+            #define DUMMYARGS long dummy0, long dummy1, long dummy2, long dummy3,
+        #endif
+
+        typedef struct __stack {
+            void *ss_sp;
+            size_t ss_size;
+            int ss_flags;
+        } stack_t;
+
+        typedef CONTEXT mcontext_t;
+        typedef unsigned long __sigset_t;
+
+        typedef struct __ucontext {
+            unsigned long int	uc_flags;
+            struct __ucontext	*uc_link;
+            stack_t				uc_stack;
+            mcontext_t			uc_mcontext;
+            __sigset_t			uc_sigmask;
+        } ucontext_t;
+
+        C_API int getcontext(ucontext_t *ucp);
+        C_API int setcontext(const ucontext_t *ucp);
+        C_API int makecontext(ucontext_t *, void (*)(), int, ...);
+        C_API int swapcontext(co_routine_t *, const co_routine_t *);
+    #else
+        #include <ucontext.h>
+    #endif
+#endif
+
 /* Coroutine context structure. */
 struct routine_s
 {
@@ -389,6 +432,13 @@ struct routine_s
     uint64_t vmx[12 * 2];
     uint32_t vrsave;
 #endif
+#else
+    unsigned long int uc_flags;
+    struct ucontext *uc_link;
+    stack_t uc_stack;
+    mcontext_t uc_mcontext;
+    __sigset_t uc_sigmask;
+    struct _libc_fpstate __fpregs_mem;
 #endif
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void *stack_base;
