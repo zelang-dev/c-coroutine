@@ -950,9 +950,6 @@ co_routine_t *co_derive(void *memory, size_t size)
         /* Stack grows down */
         sp = (char *)(size_t)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size;
 
-        /* Reserve stack space for the arguments (maximum possible: argc*(8 bytes per argument)) */
-        sp -= argc * 8;
-
         if (sp < (char *)ucp->uc_stack.ss_sp)
         {
             /* errno = ENOMEM;*/
@@ -961,24 +958,14 @@ co_routine_t *co_derive(void *memory, size_t size)
 
         /* Set the instruction and the stack pointer */
     #if defined(_X86_)
-        ucp->uc_mcontext.Eip = (unsigned long long)func;
+        ucp->uc_mcontext.Eip = (unsigned long long)co_func;
         ucp->uc_mcontext.Esp = (unsigned long long)(sp - 4);
     #else
-        ucp->uc_mcontext.Rip = (unsigned long long)func;
+        ucp->uc_mcontext.Rip = (unsigned long long)co_func;
         ucp->uc_mcontext.Rsp = (unsigned long long)(sp - 40);
     #endif
         /* Save/Restore the full machine context */
         ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
-
-        /* Copy the arguments */
-        va_start(ap, argc);
-        for (i = 0; i < argc; i++)
-        {
-            memcpy(sp, ap, 8);
-            ap += 8;
-            sp += 8;
-        }
-        va_end(ap);
 
         return 0;
     }
@@ -1008,16 +995,16 @@ co_routine_t *co_derive(void *memory, size_t size)
     if (!co_active_handle)
         co_active_handle = co_active_buffer;
 
-    co_routine_t *thread = (co_routine_t *)memory;
+    ucontext_t *thread = (ucontext_t *)memory;
     memory = (unsigned char *)memory + sizeof(co_routine_t);
     size -= sizeof(co_routine_t);
     if (thread)
     {
-        if ((!getcontext((ucontext_t*)thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
+        if ((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
         {
             thread->uc_link = (ucontext_t *)co_active_handle;
             thread->uc_stack.ss_size = size;
-            makecontext((ucontext_t*)thread, co_func, 0);
+            makecontext(thread, co_func, 0);
         }
         else
         {
@@ -1025,7 +1012,7 @@ co_routine_t *co_derive(void *memory, size_t size)
         }
     }
 
-    return thread;
+    return (co_routine_t *)thread;
 }
 #endif
 
@@ -1122,9 +1109,9 @@ void co_delete(co_routine_t *handle)
         else
         {
 #if defined(USE_UCONTEXT)
-            if (handle->uc_stack.ss_sp)
+            if (((ucontext_t *)handle)->uc_stack.ss_sp)
             {
-                CO_FREE(handle->uc_stack.ss_sp);
+                CO_FREE(((ucontext_t *)handle)->uc_stack.ss_sp);
             }
 #endif
             if (handle->err_allocated != NULL)
