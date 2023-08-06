@@ -335,13 +335,27 @@ typedef co_hast_t co_ht_result_t;
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
 #elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
 #elif defined(__clang__) || defined(__GNUC__)
+  #if defined(__arm__)
+  #elif defined(__aarch64__)
+  #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+  #elif defined(_ARCH_PPC) && !defined(__LITTLE_ENDIAN__)
+  #elif defined(_WIN32)
+    #define USE_UCONTEXT 1
+  #else
+    #define USE_UCONTEXT 1
+  #endif
+#elif defined(_MSC_VER)
+    #define USE_UCONTEXT 1
 #else
+    #define USE_UCONTEXT 1
+#endif
+
+#if defined(USE_UCONTEXT)
     #define _BSD_SOURCE
     #define _XOPEN_SOURCE 500
-    #define USE_UCONTEXT 1
     #if __APPLE__ && __MACH__
         #include <sys/ucontext.h>
-    #elif defined(_WIN32) || defined(_WIN64)
+    #elif defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
         #include <windows.h>
         #if defined(_X86_)
             #define DUMMYARGS

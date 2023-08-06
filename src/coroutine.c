@@ -1,12 +1,5 @@
 #include "../include/coroutine.h"
 
-#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
-#elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
-#elif defined(__clang__) || defined(__GNUC__)
-#else
-    #define USE_UCONTEXT 1
-#endif
-
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
 static thread_local co_routine_t co_active_buffer[4];
