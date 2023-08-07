@@ -497,13 +497,20 @@ co_routine_t *co_derive(void *memory, size_t size)
     return co;
 }
 #elif defined(__riscv)
-#define ALIGN(p, x) ((void *)((uintptr_t)(p) & ~((x)-1)))
-
-#define MIN_STACK 0x10000lu
-#define MIN_STACK_FRAME 0x20lu
-#define STACK_ALIGN 0x10lu
 
 int swap_context(co_routine_t *from, co_routine_t *to);
+
+__asm__(
+  ".text\n"
+  ".globl co_awaitable\n"
+  ".type co_awaitable @function\n"
+  ".hidden co_awaitable\n"
+  "co_awaitable:\n"
+  "  mv a0, s0\n"
+  "  jr s1\n"
+  ".size co_awaitable, .-co_awaitable\n"
+);
+
 __asm__(
   ".text\n"
   ".globl swap_context\n"
@@ -668,9 +675,7 @@ __asm__(
 co_routine_t *co_derive(void *memory, size_t size)
 {
     uint8_t *sp;
-    /* align stack */
-    sp = (uint8_t *)memory + size - STACK_ALIGN;
-    sp = (uint8_t *)ALIGN(sp, STACK_ALIGN);
+    sp = (uint8_t *)memory + size;
 
     if (!co_swap)
     {
@@ -682,7 +687,7 @@ co_routine_t *co_derive(void *memory, size_t size)
     co->s[1] = (void *)(co_func);
     co->pc = (void *)(co_awaitable);
     co->ra = (void *)(co_done);
-    co->sp = (void *)((size_t)sp + size);
+    co->sp = (void *)((size_t)sp);
 
 #ifdef CO_USE_VALGRIND
     size_t stack_addr = _co_align_forward((size_t)sp + sizeof(co_routine_t), 16);
@@ -1110,12 +1115,6 @@ void co_delete(co_routine_t *handle)
         }
         else
         {
-#if defined(USE_OTHER)
-            if (((ucontext_t *)handle)->uc_stack.ss_sp)
-            {
-              //  CO_FREE(((ucontext_t *)handle)->uc_stack.ss_sp);
-            }
-#endif
             if (handle->err_allocated != NULL)
                 CO_FREE(handle->err_allocated);
 
