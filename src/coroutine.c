@@ -502,17 +502,6 @@ int swap_context(co_routine_t *from, co_routine_t *to);
 
 __asm__(
   ".text\n"
-  ".globl co_awaitable\n"
-  ".type co_awaitable @function\n"
-  ".hidden co_awaitable\n"
-  "co_awaitable:\n"
-  "  mv a0, s0\n"
-  "  jr s1\n"
-  ".size co_awaitable, .-co_awaitable\n"
-);
-
-__asm__(
-  ".text\n"
   ".globl swap_context\n"
   ".type swap_context @function\n"
   ".hidden swap_context\n"
