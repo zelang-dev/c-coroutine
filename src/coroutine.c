@@ -678,13 +678,14 @@ co_routine_t *co_derive(void *memory, size_t size)
     }
 
     co_routine_t *co = (co_routine_t *)memory;
-    co->s[0] = (void *)sp;
+    co->s[0] = (void *)co;
     co->s[1] = (void *)(co_func);
+    co->pc = (void *)(co_awaitable);
     co->ra = (void *)(co_done);
-    co->sp = (void *)((size_t)sp);
+    co->sp = (void *)((size_t)sp + size);
 
 #ifdef CO_USE_VALGRIND
-    size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
+    size_t stack_addr = _co_align_forward((size_t)sp + sizeof(co_routine_t), 16);
     co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
@@ -1001,6 +1002,7 @@ co_routine_t *co_derive(void *memory, size_t size)
 
     ucontext_t *thread = (ucontext_t *)memory;
     memory = (unsigned char *)memory + sizeof(co_routine_t);
+    size -= sizeof(co_routine_t);
     if ((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory))
     {
         thread->uc_link = (ucontext_t *)co_active_handle;
