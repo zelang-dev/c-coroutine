@@ -1,6 +1,6 @@
 # c-coroutine
 
-[![windows & linux & macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml)[![macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci_macos.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_macos.yml)[![riscv64](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml)[![armv7, aarch64, ppc64le & s390x/ucontext](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_others.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_others.yml)
+[![windows & linux & macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml)[![macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci_macos.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_macos.yml)[![armv7, aarch64, ppc64le](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_others.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_others.yml)[![riscv64 & s390x by ucontext  .](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml)
 
 **c-coroutine** is a cooperative multithreading library written in C89. Designed to be simple as possible in usage, but powerfully enough in execution, easily modifiable to any need. It incorporates most asynchronous patterns from various languages. They all the same behaviorally, just syntax layout differences.
 
@@ -575,72 +575,6 @@ int co_main(int argc, char **argv)
 </td>
 </tr>
 </table>
-
-<details>
-<summary>The above outputting, the same goes for all compile builds in DEBUG mode.</summary>
-
-```text
-Running coroutine id: 1 () status: 3
-Back at coroutine scheduling
-Running coroutine id: 2 () status: 3
-Worker 2 starting
-Back at coroutine scheduling
-Running coroutine id: 3 () status: 3
-Worker 3 starting
-Back at coroutine scheduling
-Running coroutine id: 4 () status: 3
-Worker 4 starting
-Back at coroutine scheduling
-Running coroutine id: 5 () status: 3
-Worker 5 starting
-Back at coroutine scheduling
-Running coroutine id: 6 () status: 3
-Worker 6 starting
-Back at coroutine scheduling
-Running coroutine id: 1 (co_main) status: 1
-Back at coroutine scheduling
-Running coroutine id: 7 () status: 3
-Back at coroutine scheduling
-Running coroutine id: 6 () status: 1
-Worker 6 done
-Back at coroutine scheduling
-Running coroutine id: 1 (co_main) status: 1
-Back at coroutine scheduling
-Running coroutine id: 7 (coroutine_wait) status: 1
-Back at coroutine scheduling
-Running coroutine id: 5 () status: 1
-Worker 5 done
-Back at coroutine scheduling
-Running coroutine id: 1 (co_main) status: 1
-Back at coroutine scheduling
-Running coroutine id: 7 (coroutine_wait) status: 1
-Back at coroutine scheduling
-Running coroutine id: 4 () status: 1
-Worker 4 done
-Back at coroutine scheduling
-Running coroutine id: 1 (co_main) status: 1
-Back at coroutine scheduling
-Running coroutine id: 7 (coroutine_wait) status: 1
-Back at coroutine scheduling
-Running coroutine id: 3 () status: 1
-Worker 3 done
-Back at coroutine scheduling
-Running coroutine id: 1 (co_main) status: 1
-Back at coroutine scheduling
-Running coroutine id: 7 (coroutine_wait) status: 1
-Back at coroutine scheduling
-Running coroutine id: 2 () status: 1
-Worker 2 done
-Back at coroutine scheduling
-Running coroutine id: 1 (co_main) status: 1
-Worker # 4 returned: 32
-
-Worker # 3 returned: hello world
-Back at coroutine scheduling
-Coroutine scheduler exited
-```
-
-</details>
 
 The `C++ 20` concurrency **thread** model by way of **future/promise** implemented with same like _semantics_.
 
