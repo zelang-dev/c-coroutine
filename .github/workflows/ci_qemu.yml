@@ -1,4 +1,4 @@
-name: ppc64v2, riscv64, s390x
+name: riscv64
 
 on:
   pull_request:
@@ -13,12 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: ppc64v2
-            arch: ppc64le
           - target: riscv64
             arch: riscv64
-          - target: s390x
-            arch: s390x
     steps:
       - uses: actions/checkout@v3
       - uses: uraimo/run-on-arch-action@v2

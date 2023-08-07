@@ -1,4 +1,4 @@
-name: armv7 & aarch64
+name: armv7, aarch64, ppc64le & s390x/ucontext
 
 on:
   pull_request:
@@ -17,6 +17,10 @@ jobs:
             arch: armv7
           - target: aarch64
             arch: aarch64
+          - target: ppc64v2
+            arch: ppc64le
+          - target: s390x - ucontext
+            arch: s390x
     steps:
       - uses: actions/checkout@v3
       - uses: uraimo/run-on-arch-action@v2
@@ -41,7 +45,7 @@ jobs:
             ./go_channel
             ./go_sleep
             ./go_select
-            if [ "${{ matrix.target }}" == "aarch64" ]; then
+            if [ "${{ matrix.target }}" != "arm" ]; then
                 ./go_wait_group
                 ./go_panic
             fi
