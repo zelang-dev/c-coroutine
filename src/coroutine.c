@@ -498,7 +498,18 @@ co_routine_t *co_derive(void *memory, size_t size)
 }
 #elif defined(__riscv)
 
+void _co_wrap_main(void);
 int swap_context(co_routine_t *from, co_routine_t *to);
+
+__asm__(
+    ".text\n"
+    ".globl _co_wrap_main\n"
+    ".type _co_wrap_main @function\n"
+    ".hidden _co_wrap_main\n"
+    "_co_wrap_main:\n"
+    "  mv a0, s0\n"
+    "  jr s1\n"
+    ".size _co_wrap_main, .-_co_wrap_main\n");
 
 __asm__(
   ".text\n"
@@ -674,7 +685,7 @@ co_routine_t *co_derive(void *memory, size_t size)
     co_routine_t *co = (co_routine_t *)memory;
     co->s[0] = (void *)co;
     co->s[1] = (void *)(co_func);
-    co->pc = (void *)(co_awaitable);
+    co->pc = (void *)(_co_wrap_main);
     co->ra = (void *)(co_done);
     co->sp = (void *)((size_t)sp);
 
