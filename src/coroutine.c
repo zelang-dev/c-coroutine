@@ -1113,8 +1113,7 @@ void co_delete(co_routine_t *handle)
 #if defined(USE_OTHER)
             if (((ucontext_t *)handle)->uc_stack.ss_sp)
             {
-                CO_HERE();
-                CO_FREE(((ucontext_t *)handle)->uc_stack.ss_sp);
+              //  CO_FREE(((ucontext_t *)handle)->uc_stack.ss_sp);
                 CO_HERE();
             }
 #endif
