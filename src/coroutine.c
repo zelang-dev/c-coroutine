@@ -496,6 +496,7 @@ co_routine_t *co_derive(void *memory, size_t size)
 
     return co;
 }
+/*
 #elif defined(__riscv)
 int swap_context(co_routine_t *from, co_routine_t *to);
 __asm__(
@@ -518,7 +519,7 @@ __asm__(
     "  sd s10, 0x50(a0)\n"
     "  sd s11, 0x58(a0)\n"
     "  sd ra, 0x60(a0)\n"
-    "  sd ra, 0x68(a0)\n" /* pc */
+    "  sd ra, 0x68(a0)\n"
     "  sd sp, 0x70(a0)\n"
     #ifdef __riscv_flen
     #if __riscv_flen == 64
@@ -549,7 +550,7 @@ __asm__(
     #else
     #error "Unsupported RISC-V FLEN"
     #endif
-    #endif /* __riscv_flen */
+    #endif
     "  ld s0, 0x00(a1)\n"
     "  ld s1, 0x08(a1)\n"
     "  ld s2, 0x10(a1)\n"
@@ -563,7 +564,7 @@ __asm__(
     "  ld s10, 0x50(a1)\n"
     "  ld s11, 0x58(a1)\n"
     "  ld ra, 0x60(a1)\n"
-    "  ld a2, 0x68(a1)\n" /* pc */
+    "  ld a2, 0x68(a1)\n"
     "  ld sp, 0x70(a1)\n"
     "  jr a2\n"
   #elif __riscv_xlen == 32
@@ -580,7 +581,7 @@ __asm__(
     "  sw s10, 0x28(a0)\n"
     "  sw s11, 0x2c(a0)\n"
     "  sw ra, 0x30(a0)\n"
-    "  sw ra, 0x34(a0)\n" /* pc */
+    "  sw ra, 0x34(a0)\n"
     "  sw sp, 0x38(a0)\n"
     #ifdef __riscv_flen
     #if __riscv_flen == 64
@@ -636,7 +637,7 @@ __asm__(
     #else
     #error "Unsupported RISC-V FLEN"
     #endif
-    #endif /* __riscv_flen */
+    #endif
     "  lw s0, 0x00(a1)\n"
     "  lw s1, 0x04(a1)\n"
     "  lw s2, 0x08(a1)\n"
@@ -650,12 +651,12 @@ __asm__(
     "  lw s10, 0x28(a1)\n"
     "  lw s11, 0x2c(a1)\n"
     "  lw ra, 0x30(a1)\n"
-    "  lw a2, 0x34(a1)\n" /* pc */
+    "  lw a2, 0x34(a1)\n"
     "  lw sp, 0x38(a1)\n"
     "  jr a2\n"
   #else
     #error "Unsupported RISC-V XLEN"
-  #endif /* __riscv_xlen */
+  #endif
   ".size swap_context, .-swap_context\n"
 );
 
@@ -670,9 +671,6 @@ co_routine_t *co_derive(void *memory, size_t size)
     }
 
     co_routine_t *co = (co_routine_t *)memory;
-    /* save current context into new context to initialize it */
-    swap_context(co, co);
-
     co->s[0] = NULL;
     co->s[1] = (void *)(co_func);
     co->pc = (void *)(co_awaitable);
@@ -686,7 +684,7 @@ co_routine_t *co_derive(void *memory, size_t size)
 
     return co;
 }
-
+*/
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define ALIGN(p, x) ((void *)((uintptr_t)(p) & ~((x)-1)))

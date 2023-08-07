@@ -341,6 +341,10 @@ typedef co_hast_t co_ht_result_t;
     #define USE_NATIVE 1
   #elif defined(__aarch64__)
     #define USE_NATIVE 1
+/*
+  #elif defined(__riscv)
+    #define USE_NATIVE 1
+*/
   #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
     #define USE_NATIVE 1
   #elif defined(_ARCH_PPC) && !defined(__LITTLE_ENDIAN__)
@@ -426,18 +430,19 @@ struct routine_s
     void *sp;
     void *lr;
     void *d[8]; /* d8-d15 */
+/*
 #elif defined(__riscv)
-    void *s[12]; /* s0-s11 */
+    void *s[12];
     void *ra;
     void *pc;
     void *sp;
 #ifdef __riscv_flen
 #if __riscv_flen == 64
-    double fs[12]; /* fs0-fs11 */
+    double fs[12];
 #elif __riscv_flen == 32
-    float fs[12]; /* fs0-fs11 */
+    float fs[12];
 #endif
-#endif /* __riscv_flen */
+*/
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
     uint64_t gprs[32];
     uint64_t lr;
