@@ -341,14 +341,14 @@ void (*ex_signal(int sig, const char *ex))(int)
 #if defined(_WIN32) || defined(_WIN64)
     old = signal(sig, ex_handler);
 #else
-    static struct sigaction sa;
+    static struct sigaction sa, osa;
     // Setup the handler
-    sa.sa_handler = &ex_handler;
+    sa.sa_handler = ex_handler;
     // Restart the system call, if at all possible
     sa.sa_flags = SA_RESTART;
     // Block every signal during the handler
     sigfillset(&sa.sa_mask);
-    old = sigaction(sig, &sa, NULL);
+    old = sigaction(sig, &sa, &osa);
 #endif
     if (old == SIG_ERR)
         fprintf(stderr, "Coroutine-system, cannot install handler for signal no %d (%s)\n",
