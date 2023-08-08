@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 2.8...3.14)
 
 project(c-coroutine LANGUAGES C)
 
@@ -13,7 +13,7 @@ message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BUILD_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/coroutine-built")
 
 option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
 add_subdirectory(libuv)

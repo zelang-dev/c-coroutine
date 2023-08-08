@@ -64,8 +64,7 @@ jobs:
       - name: Run test examples
         shell: cmd
         run: |
-            cd build
-            cd Debug
+            cd build\Debug
             .\test_delay.exe 2 5
             .\chan_3.exe
             .\primes.exe
