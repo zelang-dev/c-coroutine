@@ -108,9 +108,9 @@ Must also closed out with `select_break()`. */
 #endif
 
 #if defined(UV_H)
-#define CO_EVENT_LOOP(h, m) uv_run(h, m)
+    #define CO_EVENT_LOOP(h, m) uv_run(h, m)
 #elif !defined(CO_EVENT_LOOP)
-#define CO_EVENT_LOOP(h, m)
+    #define CO_EVENT_LOOP(h, m)
 #endif
 
 /* Public API qualifier. */
@@ -343,13 +343,9 @@ typedef co_hast_t co_ht_result_t;
     #define USE_NATIVE 1
   #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
     #define USE_NATIVE 1
-  #elif defined(_WIN32)
-    #define USE_UCONTEXT 1
   #else
     #define USE_UCONTEXT 1
   #endif
-#elif defined(_MSC_VER)
-    #define USE_UCONTEXT 1
 #else
     #define USE_UCONTEXT 1
 #endif
@@ -531,9 +527,11 @@ typedef union
     const char chars[512];
     char **array;
     void *object;
-    co_callable_t function;
+    co_callable_t func;
 } value_t;
 
+/* Cast argument to union co_value_t storage type */
+#define co_args(x)		(co_value_t *)((x))
 typedef struct co_value
 {
     value_t value;

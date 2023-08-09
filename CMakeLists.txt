@@ -22,6 +22,8 @@ file(GLOB lib_files
     ${CMAKE_SOURCE_DIR}/src/*.c
 )
 
+add_definitions(-DCO_STACK_SIZE=10240)
+add_definitions(-DCO_MAIN_STACK=1048576)
 add_library(coroutine STATIC ${lib_files})
 target_link_libraries(coroutine PUBLIC uv_a)
 
