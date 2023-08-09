@@ -5,8 +5,7 @@ Small future and promise library in C with pthreads
 Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
 */
 
-future *future_create(co_callable_t start_routine)
-{
+future *future_create(co_callable_t start_routine) {
     future *f = CO_MALLOC(sizeof(future));
 
     pthread_attr_init(&f->attr);
@@ -19,8 +18,7 @@ future *future_create(co_callable_t start_routine)
     return f;
 }
 
-void *future_func_wrapper(void *arg)
-{
+void *future_func_wrapper(void *arg) {
     future_arg *f = (future_arg *)arg;
     void *res = f->func(f->arg);
     CO_FREE(f);
@@ -28,8 +26,7 @@ void *future_func_wrapper(void *arg)
     return res;
 }
 
-void *future_wrapper(void *arg)
-{
+void *future_wrapper(void *arg) {
     future_arg *f = (future_arg *)arg;
     void *res = f->func(f->arg);
     promise_set(f->value, res);
@@ -38,8 +35,7 @@ void *future_wrapper(void *arg)
     return res;
 }
 
-void async_start(future *f, promise *value, void *arg)
-{
+void async_start(future *f, promise *value, void *arg) {
     future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
@@ -48,8 +44,7 @@ void async_start(future *f, promise *value, void *arg)
     CO_INFO("thread started status(%d) future id(%d) \n", r, f->id);
 }
 
-future *co_async(co_callable_t func, void *args)
-{
+future *co_async(co_callable_t func, void *args) {
     future *f = future_create(func);
     promise *p = promise_create();
     f->value = p;
@@ -57,26 +52,22 @@ future *co_async(co_callable_t func, void *args)
     return f;
 }
 
-value_t co_async_get(future *f)
-{
+value_t co_async_get(future *f) {
     value_t r = promise_get(f->value);
     promise_close(f->value);
     future_close(f);
     return r;
 }
 
-void co_async_wait(future *f)
-{
+void co_async_wait(future *f) {
     bool is_done = false;
-    while (!is_done)
-    {
+    while (!is_done) {
         is_done = promise_done(f->value);
         co_pause();
     }
 }
 
-void future_start(future *f, void *arg)
-{
+void future_start(future *f, void *arg) {
     future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
@@ -84,21 +75,18 @@ void future_start(future *f, void *arg)
     CO_INFO("thread started status(%d) future id(%d) \n", r, f->id);
 }
 
-void future_stop(future *f)
-{
+void future_stop(future *f) {
     pthread_cancel(f->thread);
 }
 
-void future_close(future *f)
-{
+void future_close(future *f) {
     void *status;
     int rc = pthread_join(f->thread, &status);
     pthread_attr_destroy(&f->attr);
     CO_FREE(f);
 }
 
-promise *promise_create()
-{
+promise *promise_create() {
     promise *p = CO_MALLOC(sizeof(promise));
     p->result = CO_MALLOC(sizeof(co_value_t));
     pthread_mutex_init(&p->mutex, NULL);
@@ -111,8 +99,7 @@ promise *promise_create()
     return p;
 }
 
-void promise_set(promise *p, void *res)
-{
+void promise_set(promise *p, void *res) {
     CO_INFO("promise id(%d) set LOCK\n", p->id);
     pthread_mutex_lock(&p->mutex);
     p->result->value.object = res;
@@ -122,12 +109,10 @@ void promise_set(promise *p, void *res)
     pthread_mutex_unlock(&p->mutex);
 }
 
-value_t promise_get(promise *p)
-{
+value_t promise_get(promise *p) {
     CO_INFO("promise id(%d) get LOCK\n", p->id);
     pthread_mutex_lock(&p->mutex);
-    while (!p->done)
-    {
+    while (!p->done) {
         CO_INFO("promise id(%d) get WAIT\n", p->id);
         pthread_cond_wait(&p->cond, &p->mutex);
     }
@@ -136,16 +121,14 @@ value_t promise_get(promise *p)
     return p->result->value;
 }
 
-bool promise_done(promise *p)
-{
+bool promise_done(promise *p) {
     pthread_mutex_lock(&p->mutex);
     bool done = p->done;
     pthread_mutex_unlock(&p->mutex);
     return done;
 }
 
-void promise_close(promise *p)
-{
+void promise_close(promise *p) {
     pthread_mutex_destroy(&p->mutex);
     pthread_cond_destroy(&p->cond);
     CO_FREE(p->result);

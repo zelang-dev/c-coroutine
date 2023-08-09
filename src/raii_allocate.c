@@ -1,11 +1,9 @@
 #include "../include/coroutine.h"
 
-void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
-{
+void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func) {
     void *ptr = CO_MALLOC(size);
 
-    if (LIKELY(ptr))
-    {
+    if (LIKELY(ptr)) {
         if (coro->err_allocated == NULL)
             coro->err_allocated = CO_MALLOC(sizeof(ex_ptr_t));
 
@@ -17,12 +15,10 @@ void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func)
     return ptr;
 }
 
-void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func)
-{
+void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func) {
     void *ptr = CO_CALLOC(count, size);
 
-    if (LIKELY(ptr))
-    {
+    if (LIKELY(ptr)) {
         if (coro->err_allocated == NULL)
             coro->err_allocated = CO_CALLOC(1, sizeof(ex_ptr_t));
 
@@ -34,40 +30,34 @@ void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func
     return ptr;
 }
 
-CO_FORCE_INLINE void *co_new_by(int count, size_t size)
-{
+CO_FORCE_INLINE void *co_new_by(int count, size_t size) {
     return co_calloc_full(co_active(), count, size, CO_FREE);
 }
 
-CO_FORCE_INLINE void *co_new(size_t size)
-{
+CO_FORCE_INLINE void *co_new(size_t size) {
     return co_malloc_full(co_active(), size, CO_FREE);
 }
 
-void *co_malloc(co_routine_t *coro, size_t size)
-{
+void *co_malloc(co_routine_t *coro, size_t size) {
     return co_malloc_full(coro, size, CO_FREE);
 }
 
-char *co_strndup(co_routine_t *coro, const char *str, size_t max_len)
-{
+char *co_strndup(co_routine_t *coro, const char *str, size_t max_len) {
     const size_t len = strnlen(str, max_len) + 1;
     char *dup = co_memdup(coro, str, len);
 
     if (LIKELY(dup))
-        dup[len - 1] = '\0';
+        dup[ len - 1 ] = '\0';
 
     return dup;
 }
 
-char *co_strdup(co_routine_t *coro, const char *str)
-{
+char *co_strdup(co_routine_t *coro, const char *str) {
     return co_memdup(coro, str, strlen(str) + 1);
 }
 
 #if defined(_WIN32) || defined(_WIN64)
-int vasprintf(char **str_p, const char *fmt, va_list ap)
-{
+int vasprintf(char **str_p, const char *fmt, va_list ap) {
     va_list ap_copy;
     int formattedLength, actualLength;
     size_t requiredSize;
@@ -83,8 +73,7 @@ int vasprintf(char **str_p, const char *fmt, va_list ap)
     va_end(ap_copy);
 
     // bail out on error
-    if (formattedLength < 0)
-    {
+    if (formattedLength < 0) {
         return -1;
     }
 
@@ -93,8 +82,7 @@ int vasprintf(char **str_p, const char *fmt, va_list ap)
     *str_p = (char *)CO_MALLOC(requiredSize);
 
     // bail out on failed memory allocation
-    if (*str_p == NULL)
-    {
+    if (*str_p == NULL) {
         errno = ENOMEM;
         return -1;
     }
@@ -103,8 +91,7 @@ int vasprintf(char **str_p, const char *fmt, va_list ap)
     actualLength = vsnprintf_s(*str_p, requiredSize, requiredSize - 1, fmt, ap);
 
     // again, be paranoid
-    if (actualLength != formattedLength)
-    {
+    if (actualLength != formattedLength) {
         CO_FREE(*str_p);
         *str_p = NULL;
         errno = EOTHER;
@@ -114,8 +101,7 @@ int vasprintf(char **str_p, const char *fmt, va_list ap)
     return formattedLength;
 }
 
-int asprintf(char **str_p, const char *fmt, ...)
-{
+int asprintf(char **str_p, const char *fmt, ...) {
     int result;
 
     va_list ap;
@@ -127,8 +113,7 @@ int asprintf(char **str_p, const char *fmt, ...)
 }
 #endif
 
-char *co_printf(const char *fmt, ...)
-{
+char *co_printf(const char *fmt, ...) {
     va_list values;
     int len;
     char *tmp_str;
@@ -144,8 +129,7 @@ char *co_printf(const char *fmt, ...)
     return tmp_str;
 }
 
-void *co_memdup(co_routine_t *coro, const void *src, size_t len)
-{
+void *co_memdup(co_routine_t *coro, const void *src, size_t len) {
     void *ptr = co_malloc(coro, len);
 
     return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;

@@ -81,24 +81,19 @@ EX_EXCEPTION(invalid_handle);
 
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
-thread_local char ex_message[256] = {0};
+thread_local char ex_message[ 256 ] = { 0 };
 static volatile sig_atomic_t got_signal = false;
 
-static void ex_print(ex_context_t *exception, const char *message)
-{
+static void ex_print(ex_context_t *exception, const char *message) {
 #ifndef CO_DEBUG
     fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
             (exception->co->panic != NULL) ? exception->co->panic : exception->ex, exception->function);
 #else
     fprintf(stderr, "\n%s: %s\n", message, (exception->co->panic != NULL) ? exception->co->panic : exception->ex);
-    if (exception->file != NULL)
-    {
-        if (exception->function != NULL)
-        {
+    if (exception->file != NULL) {
+        if (exception->function != NULL) {
             fprintf(stderr, "    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
-        }
-        else
-        {
+        } else {
             fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
         }
     }
@@ -107,8 +102,7 @@ static void ex_print(ex_context_t *exception, const char *message)
     (void)fflush(stderr);
 }
 
-ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *))
-{
+ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
     if (!ex_context)
         ex_init();
 
@@ -119,20 +113,15 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *))
     return *const_ptr;
 }
 
-static void unwind_stack(ex_context_t *ctx)
-{
+static void unwind_stack(ex_context_t *ctx) {
     ex_ptr_t *p = ctx->stack;
 
     ctx->unstack = 1;
 
-    if (ctx->co->err_protected)
-    {
+    if (ctx->co->err_protected) {
         co_deferred_free(ctx->co);
-    }
-    else
-    {
-        while (p)
-        {
+    } else {
+        while (p) {
             if (*p->ptr)
                 p->func(*p->ptr);
             p = p->next;
@@ -143,40 +132,32 @@ static void unwind_stack(ex_context_t *ctx)
     ctx->stack = 0;
 }
 
-void ex_init(void)
-{
+void ex_init(void) {
     ex_context = &ex_context_buffer;
 }
 
-int ex_uncaught_exception(void)
-{
+int ex_uncaught_exception(void) {
     if (!ex_context)
         ex_init();
 
     return ex_context->unstack;
 }
 
-void ex_terminate(void)
-{
+void ex_terminate(void) {
     fflush(stdout);
-    if (ex_uncaught_exception())
-    {
+    if (ex_uncaught_exception()) {
         ex_print(ex_context, "Coroutine-system, exception during stack unwinding leading to an undefined behavior");
         abort();
-    }
-    else
-    {
+    } else {
         ex_print(ex_context, "Coroutine-system, exiting with uncaught exception");
         exit(EXIT_FAILURE);
     }
 }
 
-void ex_throw(const char *exception, const char *file, int line, const char *function, const char *message)
-{
+void ex_throw(const char *exception, const char *file, int line, const char *function, const char *message) {
     ex_context_t *ctx = ex_context;
 
-    if (!ctx)
-    {
+    if (!ctx) {
         ex_init();
         ctx = ex_context;
     }
@@ -198,46 +179,40 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
         ex_terminate();
 
 #ifdef _WIN32
-    if(message != NULL)
+    if (message != NULL)
         RaiseException(EXCEPTION_PANIC, 0, 0, 0);
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);
 }
 
-enum
-{
+enum {
     max_ex_sig = 32
 };
 
-static struct
-{
+static struct {
     const char *ex;
     int sig;
 #ifdef _WIN32
     DWORD seh;
 #endif
-} ex_sig[max_ex_sig];
+} ex_sig[ max_ex_sig ];
 
 #ifdef _WIN32
-int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
-{
+int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
     const char *ex = 0;
     int i;
 
-    for (i = 0; i < max_ex_sig; i++)
-    {
-        if (ex_sig[i].ex == exception)
+    for (i = 0; i < max_ex_sig; i++) {
+        if (ex_sig[ i ].ex == exception)
             return EXCEPTION_EXECUTE_HANDLER;
     }
 
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
-{
+int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     ex_context_t *ctx = ex_context;
-    if (!ctx)
-    {
+    if (!ctx) {
         ex_init();
         ctx = ex_context;
     }
@@ -245,18 +220,15 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
     const char *ex = 0;
     int i;
 
-    if (code == EXCEPTION_PANIC)
-    {
+    if (code == EXCEPTION_PANIC) {
         ctx->state = ex_throw_st;
         return EXCEPTION_EXECUTE_HANDLER;
     }
 
-    for (i = 0; i < max_ex_sig; i++)
-    {
-        if (ex_sig[i].seh == code)
-        {
+    for (i = 0; i < max_ex_sig; i++) {
+        if (ex_sig[ i ].seh == code) {
             ctx->state = ex_throw_st;
-            ctx->ex = ex_sig[i].ex;
+            ctx->ex = ex_sig[ i ].ex;
             ctx->file = "unknown";
             ctx->line = 0;
             ctx->function = NULL;
@@ -270,12 +242,11 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep)
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-void ex_signal_seh(DWORD sig, const char *ex)
-{
+void ex_signal_seh(DWORD sig, const char *ex) {
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
-        if (!ex_sig[i].ex || ex_sig[i].seh == sig)
+        if (!ex_sig[ i ].ex || ex_sig[ i ].seh == sig)
             break;
 
     if (i == max_ex_sig)
@@ -284,12 +255,11 @@ void ex_signal_seh(DWORD sig, const char *ex)
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
     else
-        ex_sig[i].ex = ex, ex_sig[i].seh = sig;
+        ex_sig[ i ].ex = ex, ex_sig[ i ].seh = sig;
 }
 #endif
 
-void ex_handler(int sig)
-{
+void ex_handler(int sig) {
     got_signal = true;
 #ifdef _WIN32
     void (*old)(int) = signal(sig, ex_handler);
@@ -307,9 +277,8 @@ void ex_handler(int sig)
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
-        if (ex_sig[i].sig == sig)
-        {
-            ex = ex_sig[i].ex;
+        if (ex_sig[ i ].sig == sig) {
+            ex = ex_sig[ i ].ex;
             break;
         }
 
@@ -323,17 +292,15 @@ void ex_handler(int sig)
     ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
-void (*ex_signal(int sig, const char *ex))(int)
-{
+void (*ex_signal(int sig, const char *ex))(int) {
     void (*old)(int);
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
-        if (!ex_sig[i].ex || ex_sig[i].sig == sig)
+        if (!ex_sig[ i ].ex || ex_sig[ i ].sig == sig)
             break;
 
-    if (i == max_ex_sig)
-    {
+    if (i == max_ex_sig) {
         fprintf(stderr,
                 "Coroutine-system, cannot install exception handler for signal no %d (%s), "
                 "too many signal exception handlers installed (max %d)\n",
@@ -357,13 +324,12 @@ void (*ex_signal(int sig, const char *ex))(int)
         fprintf(stderr, "Coroutine-system, cannot install handler for signal no %d (%s)\n",
                 sig, ex);
     else
-        ex_sig[i].ex = ex, ex_sig[i].sig = sig;
+        ex_sig[ i ].ex = ex, ex_sig[ i ].sig = sig;
 
     return old;
 }
 
-void ex_signal_setup(void)
-{
+void ex_signal_setup(void) {
 #ifdef _WIN32
     ex_signal_seh(EXCEPTION_ACCESS_VIOLATION, EX_NAME(sig_segv));
     ex_signal_seh(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EX_NAME(array_bounds_exceeded));
@@ -405,20 +371,20 @@ void ex_signal_setup(void)
 #endif
 
 #if !defined(_WIN32)
-    #ifdef SIGQUIT
-        ex_signal(SIGQUIT, EX_NAME(sig_quit));
-    #endif
+#ifdef SIGQUIT
+    ex_signal(SIGQUIT, EX_NAME(sig_quit));
+#endif
 
-    #ifdef SIGHUP
-        ex_signal(SIGHUP, EX_NAME(sig_hup));
-    #endif
+#ifdef SIGHUP
+    ex_signal(SIGHUP, EX_NAME(sig_hup));
+#endif
 
-    #ifdef SIGWINCH
-        ex_signal(SIGWINCH, EX_NAME(sig_winch));
-    #endif
-    #ifdef SIGTRAP
-        ex_signal(SIGTRAP, EX_NAME(sig_trap));
-    #endif
+#ifdef SIGWINCH
+    ex_signal(SIGWINCH, EX_NAME(sig_winch));
+#endif
+#ifdef SIGTRAP
+    ex_signal(SIGTRAP, EX_NAME(sig_trap));
+#endif
 #endif
 
 #ifdef SIGALRM
