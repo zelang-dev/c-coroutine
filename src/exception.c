@@ -1,3 +1,6 @@
+#if defined(__GNUC__) || !defined(_WIN32)
+#undef _FORTIFY_SOURCE
+#endif
 #include "../include/coroutine.h"
 /*
  o---------------------------------------------------------------------o
