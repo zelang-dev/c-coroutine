@@ -6,7 +6,7 @@ Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
 */
 
 future *future_create(co_callable_t start_routine) {
-    future *f = CO_MALLOC(sizeof(future));
+    future *f = CO_CALLOC(1, sizeof(future));
 
     pthread_attr_init(&f->attr);
     pthread_attr_setdetachstate(&f->attr, PTHREAD_CREATE_JOINABLE);
@@ -36,12 +36,12 @@ void *future_wrapper(void *arg) {
 }
 
 void async_start(future *f, promise *value, void *arg) {
-    future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
+    future_arg *f_arg = CO_CALLOC(1, sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
     f_arg->value = value;
     int r = pthread_create(&f->thread, &f->attr, future_wrapper, f_arg);
-    CO_INFO("thread #%lx started status(%d) future id(%d) \n", pthread_self(), r, f->id);
+    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", pthread_self(), f->thread, r, f->id);
 }
 
 future *co_async(co_callable_t func, void *args) {
@@ -68,11 +68,11 @@ void co_async_wait(future *f) {
 }
 
 void future_start(future *f, void *arg) {
-    future_arg *f_arg = CO_MALLOC(sizeof(future_arg));
+    future_arg *f_arg = CO_CALLOC(1, sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
     int r = pthread_create(&f->thread, &f->attr, future_func_wrapper, f_arg);
-    CO_INFO("thread #%lx started status(%d) future id(%d) \n", pthread_self(), r, f->id);
+    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", pthread_self(), f->thread, r, f->id);
 }
 
 void future_stop(future *f) {
@@ -87,8 +87,8 @@ void future_close(future *f) {
 }
 
 promise *promise_create() {
-    promise *p = CO_MALLOC(sizeof(promise));
-    p->result = CO_MALLOC(sizeof(co_value_t));
+    promise *p = CO_CALLOC(1, sizeof(promise));
+    p->result = CO_CALLOC(1, sizeof(co_value_t));
     pthread_mutex_init(&p->mutex, NULL);
     pthread_cond_init(&p->cond, NULL);
     srand((unsigned int)time(NULL));
