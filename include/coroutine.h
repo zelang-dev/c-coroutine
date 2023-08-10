@@ -22,6 +22,7 @@
 #endif
 
 #include "uv_routine.h"
+#include "reflect.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/unistd.h"
