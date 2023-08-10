@@ -1,6 +1,6 @@
 #include "../include/reflect.h"
 
-#include "reflect_test.h"
+#include "test_assert.h"
 
 #include <inttypes.h>
 
@@ -21,8 +21,8 @@ REFLECT_DEFINE_STRUCT(test_struct,
 
 static int assert_field(reflect_info_t* expected, reflect_info_t* actual)
 {
-    ASSERT_STREQ(expected->field_type, actual->field_type);
-    ASSERT_STREQ(expected->field_name, actual->field_name);
+    ASSERT_STR(expected->field_type, actual->field_type);
+    ASSERT_STR(expected->field_name, actual->field_name);
     ASSERT_UEQ(expected->size, actual->size);
     ASSERT_UEQ(expected->offset, actual->offset);
     ASSERT_EQ(expected->is_signed, actual->is_signed);
@@ -37,7 +37,7 @@ static int test_get_struct_info(void)
     reflect_type_t* info = reflect_get_test_struct_type_info();
 
     ASSERT_UEQ(7lu, info->fields_count);
-    ASSERT_STREQ("test_struct", info->name);
+    ASSERT_STR("test_struct", info->name);
     ASSERT_UEQ(sizeof(test_struct), info->size);
     size_t packed_size = sizeof(unsigned int) + sizeof(int64_t) + sizeof(char) +
             sizeof(base_struct) + sizeof(float) + sizeof(double) + sizeof(void*);
