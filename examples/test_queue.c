@@ -142,6 +142,10 @@ void test_queue_iterator() {
     iterator = co_iterator_next(iterator);
     ASSERT_NULL(iterator);
 
+    foreach(item in queue) {
+        printf("item value is %s\n", has(item));
+    }
+
     queue_free(queue, &_free_value);
 }
 

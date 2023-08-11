@@ -846,6 +846,15 @@ C_API void *co_iterator_value(co_iterator_t *);
 C_API co_iterator_t *co_iterator_remove(co_iterator_t *);
 C_API void co_iterator_free(co_iterator_t *);
 
+#define in ,
+#define has(i) co_iterator_value(i)
+#define foreach_xp(X, A) X A
+#define foreach_in(X, S) for(co_iterator_t \
+  *(X) = co_iterator((co_queue_t *)(S), true); \
+  X != NULL; \
+  X = co_iterator_next(X))
+#define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
+
 #define EX_CAT_(a, b) a ## b
 #define EX_CAT(a, b) EX_CAT_(a, b)
 
