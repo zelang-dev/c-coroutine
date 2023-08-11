@@ -57,4 +57,4 @@
     } \
   } while (0)
 
-#endif /* REFLECT_TEST_H_ */
+#endif

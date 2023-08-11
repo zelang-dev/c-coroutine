@@ -1,7 +1,6 @@
 #include "../include/coroutine.h"
 
-int fibonacci(channel_t *c, channel_t *quit)
-{
+int fibonacci(channel_t *c, channel_t *quit) {
     int x = 0;
     int y = 1;
     for_select {
@@ -18,12 +17,10 @@ int fibonacci(channel_t *c, channel_t *quit)
     } select_end;
 }
 
-void *func(void *args)
-{
+void *func(void *args) {
     channel_t *c = ((channel_t **)args)[0];
     channel_t *quit = ((channel_t **)args)[1];
-    for (int i = 0; i < 10; i++)
-    {
+    for (int i = 0; i < 10; i++) {
         printf("%d\n", co_recv(c).integer);
     }
     co_send(quit, 0);
@@ -33,8 +30,7 @@ void *func(void *args)
     return 0;
 }
 
-int co_main(int argc, char **argv)
-{
+int co_main(int argc, char **argv) {
     channel_t *args[2];
     channel_t *c = co_make();
     channel_t *quit = co_make();

@@ -1,15 +1,13 @@
 #include "../include/coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
-void *is_prime(void *arg)
-{
+void *is_prime(void *arg) {
     int x = co_value(arg).integer;
     for (int i = 2; i < x; ++i) if (x % i == 0) return (void *)false;
     return (void *)true;
 }
 
-int co_main(int argc, char **argv)
-{
+int co_main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
     future *f = co_async(is_prime, &prime);

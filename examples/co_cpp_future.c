@@ -1,7 +1,6 @@
 #include "../include/coroutine.h"
 
-void *is_prime(void *arg)
-{
+void *is_prime(void *arg) {
     int x = co_value(arg).integer;
     printf("Calculating. Please, wait...\n");
     for (int i = 2; i < x; ++i)
@@ -11,8 +10,7 @@ void *is_prime(void *arg)
     return (void *)true;
 }
 
-int co_main(int argc, char **argv)
-{
+int co_main(int argc, char **argv) {
     int prime = 313222313;
     future *f = co_async(is_prime, &prime);
     printf("Checking whether 313222313 is prime.\n");

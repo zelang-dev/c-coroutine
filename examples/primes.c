@@ -4,8 +4,7 @@ int quiet = 0;
 int goal = 0;
 int buffer = 0;
 
-void *prime_co(void *arg)
-{
+void *prime_co(void *arg) {
     channel_t *c, *nc;
     int p, i;
     c = arg;
@@ -13,15 +12,13 @@ void *prime_co(void *arg)
     p = co_recv(c).integer;
     if (p > goal)
         exit(0);
-    if (!quiet)
-    {
+    if (!quiet) {
         printf("%s ", coroutine_get_name());
         printf("%d\n", p);
     }
     nc = co_make_buf(buffer);
     co_go(prime_co, nc);
-    for (;;)
-    {
+    for (;;) {
         i = co_recv(c).integer;
         if (i % p)
             co_send(nc, &i);
@@ -30,8 +27,7 @@ void *prime_co(void *arg)
     return 0;
 }
 
-int co_main(int argc, char **argv)
-{
+int co_main(int argc, char **argv) {
     int i;
     channel_t *c;
 

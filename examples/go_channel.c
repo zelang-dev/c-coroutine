@@ -1,7 +1,6 @@
 #include "../include/coroutine.h"
 
-void *sendData(void *arg)
-{
+void *sendData(void *arg) {
     channel_t *ch = (channel_t *)arg;
 
     // data sent to the channel
@@ -11,8 +10,7 @@ void *sendData(void *arg)
     return 0;
 }
 
-int co_main(int argc, char **argv)
-{
+int co_main(int argc, char **argv) {
     // create channel
     channel_t *ch = co_make();
     co_defer(channel_free, ch);
