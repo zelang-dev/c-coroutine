@@ -891,18 +891,18 @@ void *is_prime(void *arg) {
 int co_main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future *f = co_async(is_prime, &prime);
+    future *fut = co_async(is_prime, &prime);
 
     printf("checking...\n");
     // Pause and run other coroutines
     // until thread state changes.
-    co_async_wait(f);
+    co_async_wait(fut);
 
     printf("\n194232491 ");
     // guaranteed to be ready (and not block)
     // after wait returns
-    if (co_async_get(f).boolean)
-        printf("is prime!\n");
+    if (co_async_get(fut).boolean)
+        printf("is prime.\n");
     else
         printf("is not prime.\n");
 

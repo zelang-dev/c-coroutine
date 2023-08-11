@@ -677,10 +677,6 @@ C_API char *co_printf(const char *, ...);
 C_API void *co_memdup(co_routine_t *, const void *, size_t);
 
 C_API int co_array_init(co_array_t *);
-C_API int co_array_reset(co_array_t *);
-C_API void *co_array_append(co_array_t *, size_t);
-C_API void co_array_sort(co_array_t *a, size_t, int (*cmp)(const void *a, const void *b));
-C_API co_array_t *co_array_new(co_routine_t *);
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *co_make(void);
