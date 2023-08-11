@@ -6,47 +6,47 @@ static char *_value_1 = "value1";
 static char *_value_2 = "value2";
 static char *_value_3 = "value3";
 
-void test_queue_create() {
+int test_queue_create() {
     co_queue_t *queue = queue_new();
     ASSERT_NOTNULL(queue);
     queue_free(queue, NULL);
 }
 
 
-void test_queue_free() {
+int test_queue_free() {
     co_queue_t *queue = queue_new();
     queue_free(queue, NULL);
     queue_free(NULL, NULL);
 }
 
 
-void test_queue_push_pop() {
+int test_queue_push_pop() {
     co_queue_t *queue;
     char *value;
 
     queue = queue_new();
     queue_push(queue, _value_1);
-    ASSERT_EQ(queue_length(queue), 1);
+    ASSERT_XEQ(queue_length(queue), 1);
     value = (char *)queue_pop(queue);
     ASSERT_PTR(value, _value_1);
-    ASSERT_EQ(queue_length(queue), 0);
+    ASSERT_XEQ(queue_length(queue), 0);
 
     queue_push(queue, _value_2);
-    ASSERT_EQ(queue_length(queue), 1);
+    ASSERT_XEQ(queue_length(queue), 1);
     queue_push(queue, _value_3);
-    ASSERT_EQ(queue_length(queue), 2);
+    ASSERT_XEQ(queue_length(queue), 2);
     value = (char *)queue_pop(queue);
     ASSERT_PTR(value, _value_3);
-    ASSERT_EQ(queue_length(queue), 1);
+    ASSERT_XEQ(queue_length(queue), 1);
     value = (char *)queue_pop(queue);
     ASSERT_PTR(value, _value_2);
-    ASSERT_EQ(queue_length(queue), 0);
+    ASSERT_XEQ(queue_length(queue), 0);
 
     queue_free(queue, NULL);
 }
 
 
-void test_queue_peek() {
+int test_queue_peek() {
     co_queue_t *queue;
 
     queue = queue_new();
@@ -69,33 +69,33 @@ void test_queue_peek() {
 }
 
 
-void test_queue_shift_unshift() {
+int test_queue_shift_unshift() {
     co_queue_t *queue;
     char *value;
 
     queue = queue_new();
     queue_shift(queue, _value_1);
-    ASSERT_EQ(queue_length(queue), 1);
+    ASSERT_XEQ(queue_length(queue), 1);
     value = (char *)queue_unshift(queue);
     ASSERT_PTR(value, _value_1);
-    ASSERT_EQ(queue_length(queue), 0);
+    ASSERT_XEQ(queue_length(queue), 0);
 
     queue_shift(queue, _value_2);
-    ASSERT_EQ(queue_length(queue), 1);
+    ASSERT_XEQ(queue_length(queue), 1);
     queue_shift(queue, _value_3);
-    ASSERT_EQ(queue_length(queue), 2);
+    ASSERT_XEQ(queue_length(queue), 2);
     value = (char *)queue_unshift(queue);
     ASSERT_PTR(value, _value_3);
-    ASSERT_EQ(queue_length(queue), 1);
+    ASSERT_XEQ(queue_length(queue), 1);
     value = (char *)queue_unshift(queue);
     ASSERT_PTR(value, _value_2);
-    ASSERT_EQ(queue_length(queue), 0);
+    ASSERT_XEQ(queue_length(queue), 0);
 
     queue_free(queue, NULL);
 }
 
 
-void test_queue_empty() {
+int test_queue_empty() {
     co_queue_t *queue;
 
     queue = queue_new();
@@ -109,7 +109,7 @@ void _free_value(void *value) {
     return;
 }
 
-void test_queue_iterator() {
+int test_queue_iterator() {
     co_queue_t *queue;
     co_iterator_t *iterator;
 
@@ -143,14 +143,14 @@ void test_queue_iterator() {
     ASSERT_NULL(iterator);
 
     foreach(item in queue) {
-        printf("item value is %s\n", has(item));
+        printf("item value is %s\n", (char *)has(item));
     }
 
     queue_free(queue, &_free_value);
 }
 
 
-void test_queue_shift_free() {
+int test_queue_shift_free() {
     co_queue_t *queue;
 
     queue = queue_new();
@@ -163,7 +163,7 @@ void test_queue_shift_free() {
 }
 
 
-void test_queue_remove_one() {
+int test_queue_remove_one() {
     co_queue_t *queue;
     co_iterator_t *iterator;
 
@@ -173,13 +173,13 @@ void test_queue_remove_one() {
     iterator = co_iterator(queue, true);
     iterator = co_iterator_remove(iterator);
     ASSERT_NULL(iterator);
-    ASSERT_EQ(queue_length(queue), 0);
+    ASSERT_XEQ(queue_length(queue), 0);
 
     queue_free(queue, NULL);
 }
 
 
-static void _verify_queue_values(co_queue_t *queue, int count, ...) {
+static int _verify_queue_values(co_queue_t *queue, int count, ...) {
     va_list values_list;
     void **values;
     int i;
@@ -187,7 +187,7 @@ static void _verify_queue_values(co_queue_t *queue, int count, ...) {
 
     values = (void **)malloc(count * sizeof(void *));
 
-    ASSERT_EQ(count, queue_length(queue));
+    ASSERT_XEQ(count, queue_length(queue));
 
     va_start(values_list, count);
     for (i = 0; i < count; i++)
@@ -213,7 +213,7 @@ static void _verify_queue_values(co_queue_t *queue, int count, ...) {
     free(values);
 }
 
-void test_queue_iterator_remove_first() {
+int test_queue_iterator_remove_first() {
     co_queue_t *queue;
     co_iterator_t *iterator;
 
@@ -232,7 +232,7 @@ void test_queue_iterator_remove_first() {
 }
 
 
-void test_queue_iterator_remove_middle() {
+int test_queue_iterator_remove_middle() {
     co_queue_t *queue;
     co_iterator_t *iterator;
 
@@ -252,7 +252,7 @@ void test_queue_iterator_remove_middle() {
 }
 
 
-void test_queue_iterator_remove_last() {
+int test_queue_iterator_remove_last() {
     co_queue_t *queue;
     co_iterator_t *iterator;
 
@@ -271,7 +271,7 @@ void test_queue_iterator_remove_last() {
 }
 
 
-void test_queue_remove_first() {
+int test_queue_remove_first() {
     co_queue_t *queue;
 
     queue = queue_new();
@@ -286,7 +286,7 @@ void test_queue_remove_first() {
     queue_free(queue, &_free_value);
 }
 
-void test_queue_remove_middle() {
+int test_queue_remove_middle() {
     co_queue_t *queue;
 
     queue = queue_new();
@@ -301,7 +301,7 @@ void test_queue_remove_middle() {
     queue_free(queue, &_free_value);
 }
 
-void test_queue_remove_last() {
+int test_queue_remove_last() {
     co_queue_t *queue;
 
     queue = queue_new();
@@ -316,7 +316,7 @@ void test_queue_remove_last() {
     queue_free(queue, &_free_value);
 }
 
-void test_queue_iterator_free() {
+int test_queue_iterator_free() {
     co_queue_t *queue;
     co_iterator_t *iterator;
 
