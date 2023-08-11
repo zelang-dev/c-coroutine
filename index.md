@@ -229,7 +229,7 @@ int co_main(int argc, char **argv)
 </table>
 
 <details>
-<summary>DEBUG build output</summary>
+<summary>DEBUG run output</summary>
 
 <pre>
 Thread #7f11090f11c0 running coroutine id: 1 () status: 3
@@ -358,7 +358,7 @@ int co_main(int argc, char **argv) {
 </table>
 
 <details>
-<summary>DEBUG build output</summary>
+<summary>DEBUG run output</summary>
 
 <pre>
 Thread #7f87171711c0 running coroutine id: 1 () status: 3
@@ -468,7 +468,7 @@ int co_main(int argc, char **argv) {
 </table>
 
 <details>
-<summary>DEBUG build output</summary>
+<summary>DEBUG run output</summary>
 
 <pre>
 Thread #7f2dadbb11c0 running coroutine id: 1 () status: 3
@@ -666,7 +666,7 @@ int co_main(int argc, char **argv) {
 </table>
 
 <details>
-<summary>DEBUG build output</summary>
+<summary>DEBUG run output</summary>
 
 <pre>
 Thread #7fd29c4011c0 running coroutine id: 1 () status: 3
@@ -769,7 +769,7 @@ int co_main(int argc, char **argv)
 </table>
 
 <details>
-<summary>DEBUG build output</summary>
+<summary>DEBUG run output</summary>
 
 <pre>
 Thread #7f48f6c211c0 running coroutine id: 1 () status: 3
@@ -914,10 +914,10 @@ int co_main(int argc, char **argv) {
 </table>
 
 <details>
-<summary>DEBUG build output</summary>
+<summary>DEBUG run output</summary>
 
 <pre>
-RThread #7fc61b3d11c0 running coroutine id: 1 () status: 3
+Thread #7fc61b3d11c0 running coroutine id: 1 () status: 3
 promise id(706099430) created in thread #7fc61b3d11c0
 thread #7fc61b3d11c0 created thread #7fc61b2b0700 with status(0) future id(706099430)
 checking...
