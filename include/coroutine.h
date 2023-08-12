@@ -23,6 +23,7 @@
 
 #include "uv_routine.h"
 #include "reflect.h"
+#include "map_macro.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/unistd.h"
@@ -836,23 +837,27 @@ C_API void queue_shift(co_queue_t *, void *);
 C_API void *queue_unshift(co_queue_t *);
 C_API size_t queue_length(co_queue_t *);
 C_API void *queue_remove(co_queue_t *, void *);
-C_API co_iterator_t *co_iterator(co_queue_t *, bool);
-C_API co_iterator_t *co_iterator_next(co_iterator_t *);
-C_API void *co_iterator_value(co_iterator_t *);
-C_API co_iterator_t *co_iterator_remove(co_iterator_t *);
-C_API void co_iterator_free(co_iterator_t *);
+C_API co_iterator_t *iterator_new(co_queue_t *, bool);
+C_API co_iterator_t *iterator_next(co_iterator_t *);
+C_API void *iterator_value(co_iterator_t *);
+C_API co_iterator_t *iterator_remove(co_iterator_t *);
+C_API void iterator_free(co_iterator_t *);
 
 #define in ,
-#define has(i) co_iterator_value(i)
+#define has(i) iterator_value(i)
 #define foreach_xp(X, A) X A
 #define foreach_in(X, S) for(co_iterator_t \
-  *(X) = co_iterator((co_queue_t *)(S), true); \
+  *(X) = iterator_new((co_queue_t *)(S), true); \
   X != NULL; \
-  X = co_iterator_next(X))
+  X = iterator_next(X))
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 
-#define EX_CAT_(a, b) a ## b
-#define EX_CAT(a, b) EX_CAT_(a, b)
+#define _Q_PUSH(q, item) queue_push(q, (item));
+
+#define map_queue(x, ...) co_queue_t *(x) = queue_new(); \
+    EVAL(MAP(_Q_PUSH, x, __VA_ARGS__))
+
+#define EX_CAT(a, b) CAT(a, b)
 
 #define EX_STR_(a) #a
 #define EX_STR(a) EX_STR_(a)

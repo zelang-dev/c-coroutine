@@ -118,28 +118,28 @@ int test_queue_iterator() {
     queue_push(queue, _value_2);
     queue_push(queue, _value_3);
 
-    iterator = co_iterator(queue, true);
+    iterator = iterator_new(queue, true);
     ASSERT_NOTNULL(iterator);
-    ASSERT_PTR(co_iterator_value(iterator), _value_1);
-    iterator = co_iterator_next(iterator);
+    ASSERT_PTR(iterator_value(iterator), _value_1);
+    iterator = iterator_next(iterator);
     ASSERT_NOTNULL(iterator);
-    ASSERT_PTR(co_iterator_value(iterator), _value_2);
-    iterator = co_iterator_next(iterator);
+    ASSERT_PTR(iterator_value(iterator), _value_2);
+    iterator = iterator_next(iterator);
     ASSERT_NOTNULL(iterator);
-    ASSERT_PTR(co_iterator_value(iterator), _value_3);
-    iterator = co_iterator_next(iterator);
+    ASSERT_PTR(iterator_value(iterator), _value_3);
+    iterator = iterator_next(iterator);
     ASSERT_NULL(iterator);
 
-    iterator = co_iterator(queue, false);
+    iterator = iterator_new(queue, false);
     ASSERT_NOTNULL(iterator);
-    ASSERT_PTR(co_iterator_value(iterator), _value_3);
-    iterator = co_iterator_next(iterator);
+    ASSERT_PTR(iterator_value(iterator), _value_3);
+    iterator = iterator_next(iterator);
     ASSERT_NOTNULL(iterator);
-    ASSERT_PTR(co_iterator_value(iterator), _value_2);
-    iterator = co_iterator_next(iterator);
+    ASSERT_PTR(iterator_value(iterator), _value_2);
+    iterator = iterator_next(iterator);
     ASSERT_NOTNULL(iterator);
-    ASSERT_PTR(co_iterator_value(iterator), _value_1);
-    iterator = co_iterator_next(iterator);
+    ASSERT_PTR(iterator_value(iterator), _value_1);
+    iterator = iterator_next(iterator);
     ASSERT_NULL(iterator);
 
     foreach(item in queue) {
@@ -170,8 +170,8 @@ int test_queue_remove_one() {
     queue = queue_new();
     queue_push(queue, _value_1);
 
-    iterator = co_iterator(queue, true);
-    iterator = co_iterator_remove(iterator);
+    iterator = iterator_new(queue, true);
+    iterator = iterator_remove(iterator);
     ASSERT_NULL(iterator);
     ASSERT_XEQ(queue_length(queue), 0);
 
@@ -194,19 +194,19 @@ static int _verify_queue_values(co_queue_t *queue, int count, ...) {
         values[ i ] = va_arg(values_list, void *);
     va_end(values_list);
 
-    iterator = co_iterator(queue, true);
+    iterator = iterator_new(queue, true);
     for (i = 0; i < count; i++) {
         ASSERT_NOTNULL(iterator);
-        ASSERT_PTR(values[ i ], co_iterator_value(iterator));
-        iterator = co_iterator_next(iterator);
+        ASSERT_PTR(values[ i ], iterator_value(iterator));
+        iterator = iterator_next(iterator);
     }
     ASSERT_NULL(iterator);
 
-    iterator = co_iterator(queue, false);
+    iterator = iterator_new(queue, false);
     for (i = count - 1; i >= 0; i--) {
         ASSERT_NOTNULL(iterator);
-        ASSERT_PTR(values[ i ], co_iterator_value(iterator));
-        iterator = co_iterator_next(iterator);
+        ASSERT_PTR(values[ i ], iterator_value(iterator));
+        iterator = iterator_next(iterator);
     }
     ASSERT_NULL(iterator);
 
@@ -222,9 +222,9 @@ int test_queue_iterator_remove_first() {
     queue_push(queue, _value_2);
     queue_push(queue, _value_3);
 
-    iterator = co_iterator(queue, true);
-    iterator = co_iterator_remove(iterator);
-    co_iterator_free(iterator);
+    iterator = iterator_new(queue, true);
+    iterator = iterator_remove(iterator);
+    iterator_free(iterator);
 
     _verify_queue_values(queue, 2, _value_2, _value_3);
 
@@ -241,10 +241,10 @@ int test_queue_iterator_remove_middle() {
     queue_push(queue, _value_2);
     queue_push(queue, _value_3);
 
-    iterator = co_iterator(queue, true);
-    iterator = co_iterator_next(iterator);
-    iterator = co_iterator_remove(iterator);
-    co_iterator_free(iterator);
+    iterator = iterator_new(queue, true);
+    iterator = iterator_next(iterator);
+    iterator = iterator_remove(iterator);
+    iterator_free(iterator);
 
     _verify_queue_values(queue, 2, _value_1, _value_3);
 
@@ -261,9 +261,9 @@ int test_queue_iterator_remove_last() {
     queue_push(queue, _value_2);
     queue_push(queue, _value_3);
 
-    iterator = co_iterator(queue, false);
-    iterator = co_iterator_remove(iterator);
-    co_iterator_free(iterator);
+    iterator = iterator_new(queue, false);
+    iterator = iterator_remove(iterator);
+    iterator_free(iterator);
 
     _verify_queue_values(queue, 2, _value_1, _value_2);
 
@@ -322,10 +322,10 @@ int test_queue_iterator_free() {
 
     queue = queue_new();
     queue_push(queue, _value_1);
-    iterator = co_iterator(queue, true);
+    iterator = iterator_new(queue, true);
 
-    co_iterator_free(iterator);
-    co_iterator_free(NULL);
+    iterator_free(iterator);
+    iterator_free(NULL);
 
     queue_free(queue, _free_value);
 }
@@ -354,6 +354,13 @@ static int test_queue(void) {
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
+
+    map_queue(items, _value_1, _value_2, _value_3);
+
+    foreach(item in items) {
+        printf("item value is %s\n", (char *)has(item));
+    }
+    queue_free(items, NULL);
 
     ASSERT_FUNC(test_queue());
 

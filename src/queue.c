@@ -148,7 +148,7 @@ void *queue_remove(co_queue_t *queue, void *value) {
     return NULL;
 }
 
-co_iterator_t *co_iterator(co_queue_t *queue, bool forward) {
+co_iterator_t *iterator_new(co_queue_t *queue, bool forward) {
     if (queue && queue->first_item) {
         co_iterator_t *iterator;
 
@@ -163,7 +163,7 @@ co_iterator_t *co_iterator(co_queue_t *queue, bool forward) {
     return NULL;
 }
 
-co_iterator_t *co_iterator_next(co_iterator_t *iterator) {
+co_iterator_t *iterator_next(co_iterator_t *iterator) {
     if (iterator) {
         co_item_t *item;
 
@@ -180,14 +180,14 @@ co_iterator_t *co_iterator_next(co_iterator_t *iterator) {
     return NULL;
 }
 
-void *co_iterator_value(co_iterator_t *iterator) {
+void *iterator_value(co_iterator_t *iterator) {
     if (iterator)
         return iterator->item->value;
 
     return NULL;
 }
 
-co_iterator_t *co_iterator_remove(co_iterator_t *iterator) {
+co_iterator_t *iterator_remove(co_iterator_t *iterator) {
     co_item_t *item;
 
     if (!iterator)
@@ -224,7 +224,7 @@ co_iterator_t *co_iterator_remove(co_iterator_t *iterator) {
     return iterator;
 }
 
-void co_iterator_free(co_iterator_t *iterator) {
+void iterator_free(co_iterator_t *iterator) {
     if (iterator)
         CO_FREE(iterator);
 }
