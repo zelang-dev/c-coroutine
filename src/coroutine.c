@@ -1311,7 +1311,7 @@ static void coroutine_scheduler(void) {
         t->ready = 0;
         co_running = t;
         n_co_switched++;
-        CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d\n", pthread_self(), t->cid,
+        CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d\n", co_async_self(), t->cid,
                 ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"),
                 t->status);
         coroutine_interrupt();

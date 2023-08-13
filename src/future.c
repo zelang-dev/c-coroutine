@@ -5,6 +5,14 @@ Small future and promise library in C with pthreads
 Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
 */
 
+static unsigned long thread_id(pthread_t thread) {
+#ifdef _WIN32
+    return (long *)thread.p;
+#else
+    return thread;
+#endif
+}
+
 future *future_create(co_callable_t start_routine) {
     future *f = CO_CALLOC(1, sizeof(future));
 
@@ -41,7 +49,7 @@ void async_start(future *f, promise *value, void *arg) {
     f_arg->arg = arg;
     f_arg->value = value;
     int r = pthread_create(&f->thread, &f->attr, future_wrapper, f_arg);
-    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", pthread_self(), f->thread, r, f->id);
+    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
 }
 
 future *co_async(co_callable_t func, void *args) {
@@ -59,6 +67,14 @@ value_t co_async_get(future *f) {
     return r;
 }
 
+CO_FORCE_INLINE unsigned long co_async_self() {
+#ifdef _WIN32
+    return (long)pthread_self().p;
+#else
+    return pthread_self();
+#endif
+}
+
 void co_async_wait(future *f) {
     bool is_done = false;
     while (!is_done) {
@@ -72,7 +88,7 @@ void future_start(future *f, void *arg) {
     f_arg->func = f->func;
     f_arg->arg = arg;
     int r = pthread_create(&f->thread, &f->attr, future_func_wrapper, f_arg);
-    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", pthread_self(), f->thread, r, f->id);
+    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
 }
 
 void future_stop(future *f) {
@@ -94,29 +110,29 @@ promise *promise_create() {
     srand((unsigned int)time(NULL));
     p->id = rand();
     p->done = false;
-    CO_INFO("promise id(%d) created in thread #%lx\n", p->id, pthread_self());
+    CO_INFO("promise id(%d) created in thread #%lx\n", p->id, co_async_self());
 
     return p;
 }
 
 void promise_set(promise *p, void *res) {
-    CO_INFO("promise id(%d) set LOCK in thread #%lx\n", p->id, pthread_self());
+    CO_INFO("promise id(%d) set LOCK in thread #%lx\n", p->id, co_async_self());
     pthread_mutex_lock(&p->mutex);
     p->result->value.object = res;
     p->done = true;
     pthread_cond_signal(&p->cond);
-    CO_INFO("promise id(%d) set UNLOCK in thread #%lx\n", p->id, pthread_self());
+    CO_INFO("promise id(%d) set UNLOCK in thread #%lx\n", p->id, co_async_self());
     pthread_mutex_unlock(&p->mutex);
 }
 
 value_t promise_get(promise *p) {
-    CO_INFO("promise id(%d) get LOCK in thread #%lx\n", p->id, pthread_self());
+    CO_INFO("promise id(%d) get LOCK in thread #%lx\n", p->id, co_async_self());
     pthread_mutex_lock(&p->mutex);
     while (!p->done) {
-        CO_INFO("promise id(%d) get WAIT in thread #%lx\n", p->id, pthread_self());
+        CO_INFO("promise id(%d) get WAIT in thread #%lx\n", p->id, co_async_self());
         pthread_cond_wait(&p->cond, &p->mutex);
     }
-    CO_INFO("promise id(%d) get UNLOCK in thread #%lx\n", p->id, pthread_self());
+    CO_INFO("promise id(%d) get UNLOCK in thread #%lx\n", p->id, co_async_self());
     pthread_mutex_unlock(&p->mutex);
     return p->result->value;
 }

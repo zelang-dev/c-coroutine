@@ -10,6 +10,7 @@ int test_queue_create() {
     co_queue_t *queue = queue_new();
     ASSERT_NOTNULL(queue);
     queue_free(queue, NULL);
+    return 0;
 }
 
 
@@ -17,6 +18,7 @@ int test_queue_free() {
     co_queue_t *queue = queue_new();
     queue_free(queue, NULL);
     queue_free(NULL, NULL);
+    return 0;
 }
 
 
@@ -43,6 +45,7 @@ int test_queue_push_pop() {
     ASSERT_XEQ(queue_length(queue), 0);
 
     queue_free(queue, NULL);
+    return 0;
 }
 
 
@@ -66,6 +69,7 @@ int test_queue_peek() {
     ASSERT_PTR(_value_1, queue_peek_first(queue));
 
     queue_free(queue, NULL);
+    return 0;
 }
 
 
@@ -92,6 +96,7 @@ int test_queue_shift_unshift() {
     ASSERT_XEQ(queue_length(queue), 0);
 
     queue_free(queue, NULL);
+    return 0;
 }
 
 
@@ -102,6 +107,7 @@ int test_queue_empty() {
     ASSERT_NULL(queue_pop(queue));
     ASSERT_NULL(queue_unshift(queue));
     queue_free(queue, NULL);
+    return 0;
 }
 
 
@@ -147,6 +153,7 @@ int test_queue_iterator() {
     }
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 
@@ -160,6 +167,7 @@ int test_queue_shift_free() {
     queue_shift(queue, _value_3);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 
@@ -176,6 +184,7 @@ int test_queue_remove_one() {
     ASSERT_XEQ(queue_length(queue), 0);
 
     queue_free(queue, NULL);
+    return 0;
 }
 
 
@@ -211,6 +220,7 @@ static int _verify_queue_values(co_queue_t *queue, int count, ...) {
     ASSERT_NULL(iterator);
 
     free(values);
+    return 0;
 }
 
 int test_queue_iterator_remove_first() {
@@ -229,6 +239,7 @@ int test_queue_iterator_remove_first() {
     _verify_queue_values(queue, 2, _value_2, _value_3);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 
@@ -249,6 +260,7 @@ int test_queue_iterator_remove_middle() {
     _verify_queue_values(queue, 2, _value_1, _value_3);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 
@@ -268,6 +280,7 @@ int test_queue_iterator_remove_last() {
     _verify_queue_values(queue, 2, _value_1, _value_2);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 
@@ -284,6 +297,7 @@ int test_queue_remove_first() {
     _verify_queue_values(queue, 2, _value_2, _value_3);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 int test_queue_remove_middle() {
@@ -299,6 +313,7 @@ int test_queue_remove_middle() {
     _verify_queue_values(queue, 2, _value_1, _value_3);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 int test_queue_remove_last() {
@@ -314,6 +329,7 @@ int test_queue_remove_last() {
     _verify_queue_values(queue, 2, _value_1, _value_2);
 
     queue_free(queue, &_free_value);
+    return 0;
 }
 
 int test_queue_iterator_free() {
@@ -328,6 +344,7 @@ int test_queue_iterator_free() {
     iterator_free(NULL);
 
     queue_free(queue, _free_value);
+    return 0;
 }
 
 static int test_queue(void) {

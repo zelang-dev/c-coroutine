@@ -30,6 +30,7 @@
     return 1; \
       } \
     PRINT_OK(" %s == %s\n", #expected, #actual); \
+    return 0; \
   } while (0)
 
 #define ASSERT_NEQ_(expected, actual, cmp, print_op) do { \
@@ -41,6 +42,7 @@
     return 1; \
       } \
     PRINT_OK(" %s != %s\n", #expected, #actual); \
+    return 0; \
   } while (0)
 
 #define ASSERT_STR(expected, actual) ASSERT_EQ_(expected, actual, strcmp(expected, actual) == 0, "%s")

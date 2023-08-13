@@ -1127,6 +1127,8 @@ C_API value_t co_async_get(future *);
 and execute others until future is ready, thread execution has ended. */
 C_API void co_async_wait(future *);
 
+C_API unsigned long co_async_self(void);
+
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
