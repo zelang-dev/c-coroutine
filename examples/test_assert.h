@@ -30,7 +30,6 @@
     return 1; \
       } \
     PRINT_OK(" %s == %s\n", #expected, #actual); \
-    return 0; \
   } while (0)
 
 #define ASSERT_NEQ_(expected, actual, cmp, print_op) do { \
@@ -42,12 +41,11 @@
     return 1; \
       } \
     PRINT_OK(" %s != %s\n", #expected, #actual); \
-    return 0; \
   } while (0)
 
 #define ASSERT_STR(expected, actual) ASSERT_EQ_(expected, actual, strcmp(expected, actual) == 0, "%s")
 #define ASSERT_PTR(expected, actual) ASSERT_EQ_(expected, actual, memcmp(expected, actual, sizeof(actual)) == 0, "%p")
-#define ASSERT_UEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%lu")
+#define ASSERT_UEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%zu")
 #define ASSERT_EQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%d")
 #define ASSERT_XEQ(expected, actual) ASSERT_EQ_((int)(expected), (int)(actual), expected == actual, "%d")
 #define ASSERT_NULL(actual) ASSERT_EQ_(NULL, actual, NULL == actual, "%p")

@@ -110,14 +110,6 @@ static CO_FORCE_INLINE int co_deferred_array_init(defer_t *array) {
     return co_array_init((co_array_t *)array);
 }
 
-static CO_FORCE_INLINE void ito_s(int cid, int len, char *str) {
-#if defined(_WIN32) || defined(_WIN64)
-    sprintf_s(str, len, "%d", cid);
-#else
-    snprintf(str, len, "%d", cid);
-#endif
-}
-
 uv_loop_t *co_loop() {
     if (co_main_loop_handle != NULL)
         return co_main_loop_handle;
@@ -979,7 +971,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack) {
 
     if (c->wait_active && c->wait_group != NULL) {
         char str[ 20 ];
-        ito_s(id, 20, str);
+        snprintf(str, 20, "%d", id);
         t->synced = true;
         co_hash_put(c->wait_group, str, t);
         c->wait_counter++;
@@ -1042,7 +1034,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
                             coroutine_yield();
                         } else {
                             char str[ 20 ];
-                            ito_s(co->cid, 20, str);
+                            snprintf(str, 20, "%d", co->cid);
                             if (co->results != NULL)
                                 co_hash_put(wgr, str, &co->results);
 
@@ -1066,7 +1058,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
 
 value_t co_group_get_result(co_ht_result_t *wg, int cid) {
     char str[ 20 ];
-    ito_s(cid, 20, str);
+    snprintf(str, 20, "%d", cid);
     co_value_t *data = (co_value_t *)co_hash_get(wg, str);
     return data->value;
 }

@@ -36,7 +36,7 @@ static int test_get_struct_info(void)
 {
     reflect_type_t* info = reflect_get_test_struct_type_info();
 
-    ASSERT_UEQ(7lu, info->fields_count);
+    ASSERT_UEQ((size_t)7, info->fields_count);
     ASSERT_STR("test_struct", info->name);
     ASSERT_UEQ(sizeof(test_struct), info->size);
     size_t packed_size = sizeof(unsigned int) + sizeof(int64_t) + sizeof(char) +
