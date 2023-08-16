@@ -38,6 +38,7 @@ void map_free(map_t *array) {
         array->first = next;
     }
 
+    CO_FREE(array->dict);
     CO_FREE(array);
 }
 
