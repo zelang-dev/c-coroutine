@@ -117,6 +117,11 @@ uv_loop_t *co_loop() {
     return uv_default_loop();
 }
 
+const char *co_itoa(int number) {
+    snprintf(co_active()->scrape, 20, "%d", number);
+    return co_active()->scrape;
+}
+
 #ifdef CO_MPROTECT
 alignas(4096)
 #else
@@ -1025,18 +1030,16 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
             for (int i = 0; i < wg->capacity; i++) {
                 pair = wg->buckets[ i ];
                 if (NULL != pair) {
-                    if (pair->val != NULL) {
-                        co = (co_routine_t *)pair->val;
+                    if (pair->value != NULL) {
+                        co = (co_routine_t *)pair->value;
                         if (!co_terminated(co)) {
                             if (!co->loop_active && co->status == CO_NORMAL)
                                 coroutine_schedule(co);
 
                             coroutine_yield();
                         } else {
-                            char str[ 20 ];
-                            snprintf(str, 20, "%d", co->cid);
                             if (co->results != NULL)
-                                co_hash_put(wgr, str, &co->results);
+                                co_hash_put(wgr, co_itoa(co->cid), &co->results);
 
                             if (co->loop_active)
                                 co_deferred_free(co);
@@ -1057,9 +1060,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
 }
 
 value_t co_group_get_result(co_ht_result_t *wg, int cid) {
-    char str[ 20 ];
-    snprintf(str, 20, "%d", cid);
-    co_value_t *data = (co_value_t *)co_hash_get(wg, str);
+    co_value_t *data = (co_value_t *)co_hash_get(wg, co_itoa(cid));
     return data->value;
 }
 
@@ -1259,7 +1260,7 @@ void coroutine_info() {
     co_routine_t *t;
     char *extra;
 
-    puts("coroutine list:");
+    fprintf(stderr, "coroutine list:\n");
     for (i = 0; i < n_all_coroutine; i++) {
         t = all_coroutine[ i ];
         if (t == co_running)

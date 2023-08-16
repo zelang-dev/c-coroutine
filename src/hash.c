@@ -28,16 +28,17 @@ Code associated with the following article:
 https://www.andreinc.net/2021/10/02/implementing-hash-tables-in-c-part-1
 
 */
+
 oa_hash *oa_hash_new(oa_key_ops key_ops, oa_val_ops val_ops, void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx));
 oa_hash *oa_hash_new_lp(oa_key_ops key_ops, oa_val_ops val_ops);
 void oa_hash_free(oa_hash *htable);
-void oa_hash_put(oa_hash *htable, const void *key, const void *val);
+void *oa_hash_put(oa_hash *htable, const void *key, const void *value);
 void *oa_hash_get(oa_hash *htable, const void *key);
 void oa_hash_delete(oa_hash *htable, const void *key);
 void oa_hash_print(oa_hash *htable, void (*print_key)(const void *k), void (*print_val)(const void *v));
 
 // Pair related
-oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *val);
+oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *value);
 
 // String operations
 uint32_t oa_string_hash(const void *data, void *arg);
@@ -96,10 +97,11 @@ void oa_hash_free(oa_hash *htable) {
     for (int i = 0; i < htable->capacity; i++) {
         if (NULL != htable->buckets[ i ]) {
             htable->key_ops.free(htable->buckets[ i ]->key, htable->key_ops.arg);
-            if (htable->buckets[ i ]->val != NULL)
-                htable->val_ops.free(htable->buckets[ i ]->val);
+            if (htable->buckets[ i ]->value != NULL)
+                htable->val_ops.free(htable->buckets[ i ]->value);
         }
-        CO_FREE(htable->buckets[ i ]);
+        if (htable->buckets[ i ] != NULL)
+            CO_FREE(htable->buckets[ i ]);
     }
     if (htable->buckets != NULL)
         CO_FREE(htable->buckets);
@@ -133,9 +135,9 @@ inline static void oa_hash_grow(oa_hash *htable) {
     for (size_t i = 0; i < old_capacity; i++) {
         crt_pair = old_buckets[ i ];
         if (NULL != crt_pair && !oa_hash_is_tombstone(htable, i)) {
-            oa_hash_put(htable, crt_pair->key, crt_pair->val);
+            oa_hash_put(htable, crt_pair->key, crt_pair->value);
             htable->key_ops.free(crt_pair->key, htable->key_ops.arg);
-            htable->val_ops.free(crt_pair->val);
+            htable->val_ops.free(crt_pair->value);
             CO_FREE(crt_pair);
         }
     }
@@ -147,7 +149,7 @@ inline static bool oa_hash_should_grow(oa_hash *htable) {
     return (htable->size / htable->capacity) > OA_HASH_LOAD_FACTOR;
 }
 
-void oa_hash_put(oa_hash *htable, const void *key, const void *val) {
+void *oa_hash_put(oa_hash *htable, const void *key, const void *value) {
 
     if (oa_hash_should_grow(htable)) {
         oa_hash_grow(htable);
@@ -161,7 +163,7 @@ void oa_hash_put(oa_hash *htable, const void *key, const void *val) {
         htable->buckets[ idx ] = oa_pair_new(
             hash_val,
             htable->key_ops.cp(key, htable->key_ops.arg),
-            htable->val_ops.cp(val, htable->val_ops.arg));
+            htable->val_ops.cp(value, htable->val_ops.arg));
     } else {
         // // Probing for the next good index
         idx = oa_hash_getidx(htable, idx, hash_val, key, PUT);
@@ -170,20 +172,22 @@ void oa_hash_put(oa_hash *htable, const void *key, const void *val) {
             htable->buckets[ idx ] = oa_pair_new(
                 hash_val,
                 htable->key_ops.cp(key, htable->key_ops.arg),
-                htable->val_ops.cp(val, htable->val_ops.arg));
+                htable->val_ops.cp(value, htable->val_ops.arg));
         } else {
             // Update the existing value
             // Free the old values
-            htable->val_ops.free(htable->buckets[ idx ]->val);
+            htable->val_ops.free(htable->buckets[ idx ]->value);
             htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
             // Update the new values
-            htable->buckets[ idx ]->val = htable->val_ops.cp(val, htable->val_ops.arg);
+            htable->buckets[ idx ]->value = htable->val_ops.cp(value, htable->val_ops.arg);
             htable->buckets[ idx ]->key = htable->val_ops.cp(key, htable->key_ops.arg);
             htable->buckets[ idx ]->hash = hash_val;
             --htable->size;
         }
     }
+
     htable->size++;
+    return htable->buckets[ idx ]->value;
 }
 
 inline static bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
@@ -191,7 +195,7 @@ inline static bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
         return false;
     }
     if (NULL == htable->buckets[ idx ]->key &&
-        NULL == htable->buckets[ idx ]->val &&
+        NULL == htable->buckets[ idx ]->value &&
         0 == htable->buckets[ idx ]->key) {
         return true;
     }
@@ -202,7 +206,7 @@ inline static void oa_hash_put_tombstone(oa_hash *htable, size_t idx) {
     if (NULL != htable->buckets[ idx ]) {
         htable->buckets[ idx ]->hash = 0;
         htable->buckets[ idx ]->key = NULL;
-        htable->buckets[ idx ]->val = NULL;
+        htable->buckets[ idx ]->value = NULL;
     }
 }
 
@@ -216,7 +220,7 @@ void *oa_hash_get(oa_hash *htable, const void *key) {
 
     idx = oa_hash_getidx(htable, idx, hash_val, key, GET);
 
-    return (NULL == htable->buckets[ idx ]) ? NULL : htable->buckets[ idx ]->val;
+    return (NULL == htable->buckets[ idx ]) ? NULL : htable->buckets[ idx ]->value;
 }
 
 void oa_hash_delete(oa_hash *htable, const void *key) {
@@ -232,7 +236,7 @@ void oa_hash_delete(oa_hash *htable, const void *key) {
         return;
     }
 
-    htable->val_ops.free(htable->buckets[ idx ]->val);
+    htable->val_ops.free(htable->buckets[ idx ]->value);
     htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
     --htable->size;
 
@@ -257,7 +261,7 @@ void oa_hash_print(oa_hash *htable, void (*print_key)(const void *k), void (*pri
                 printf("\t\thash=%" PRIu32 ", key=", pair->hash);
                 print_key(pair->key);
                 printf(", value=");
-                print_val(pair->val);
+                print_val(pair->value);
             }
         }
         printf("\n");
@@ -280,14 +284,14 @@ static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, con
 
 // Pair related
 
-oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *val) {
+oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *value) {
     oa_pair *p;
     p = CO_CALLOC(1, sizeof(p));
     if (NULL == p)
         co_panic("calloc() failed");
 
     p->hash = hash;
-    p->val = (void *)val;
+    p->value = (void *)value;
     p->key = (void *)key;
     return p;
 }
@@ -373,24 +377,30 @@ void oa_string_print(const void *data) {
     printf("%s", (const char *)data);
 }
 
+void oa_map_free(void *data) {}
 oa_key_ops oa_key_ops_string = { oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_struct = { oa_coroutine_cp, CO_DEFER(co_delete), oa_coroutine_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
+oa_val_ops oa_val_ops_map = { oa_value_cp, oa_map_free, oa_value_eq, NULL };
 
 CO_FORCE_INLINE co_ht_group_t *co_ht_group_init() {
     return (co_ht_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE co_ht_group_t *co_ht_result_init() {
-    return (co_ht_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
+CO_FORCE_INLINE co_ht_result_t *co_ht_result_init() {
+    return (co_ht_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
+}
+
+CO_FORCE_INLINE co_ht_map_t *co_ht_map_init() {
+    return (co_ht_map_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_map, oa_hash_lp_idx);
 }
 
 CO_FORCE_INLINE void co_hash_free(co_hast_t *htable) {
     oa_hash_free(htable);
 }
 
-CO_FORCE_INLINE void co_hash_put(co_hast_t *htable, const void *key, const void *val) {
-    oa_hash_put(htable, key, val);
+CO_FORCE_INLINE void *co_hash_put(co_hast_t *htable, const void *key, const void *value) {
+    return oa_hash_put(htable, key, value);
 }
 
 CO_FORCE_INLINE void *co_hash_get(co_hast_t *htable, const void *key) {

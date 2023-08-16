@@ -23,7 +23,6 @@
 
 #include "uv_routine.h"
 #include "reflect.h"
-#include "map_macro.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/unistd.h"
@@ -333,6 +332,7 @@ typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
 typedef co_hast_t co_ht_group_t;
 typedef co_hast_t co_ht_result_t;
+typedef co_hast_t co_ht_map_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
     #define USE_NATIVE 1
@@ -452,8 +452,9 @@ struct routine_s
     co_state status;
     co_callable_t func;
     defer_t defer;
-	char name[128];
-	char state[128];
+	char name[64];
+	char state[64];
+    char scrape[20];
     /* unique coroutine id */
     int cid;
     size_t alarm_time;
@@ -761,7 +762,7 @@ typedef struct oa_val_ops_s {
 typedef struct oa_pair_s {
     uint32_t hash;
     void *key;
-    void *val;
+    void *value;
 } oa_pair;
 
 typedef struct oa_hash_s oa_hash;
@@ -775,7 +776,7 @@ struct oa_hash_s {
 };
 
 C_API void co_hash_free(co_hast_t *);
-C_API void co_hash_put(co_hast_t *, const void *, const void *);
+C_API void *co_hash_put(co_hast_t *, const void *, const void *);
 C_API void *co_hash_get(co_hast_t *, const void *);
 C_API void co_hash_delete(co_hast_t *, const void *);
 C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
@@ -785,6 +786,8 @@ C_API co_ht_group_t *co_ht_group_init(void);
 
 /* Creates a new wait group results hash table. */
 C_API co_ht_result_t *co_ht_result_init(void);
+
+C_API co_ht_map_t *co_ht_map_init(void);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
@@ -802,62 +805,66 @@ C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
 
-typedef struct queue_s co_queue_t;
-typedef struct iterator_s co_iterator_t;
-typedef struct item_s co_item_t;
+typedef enum iter_type {
+    ITER_ARRAY,
+    ITER_HASH
+} iter_type;
 
-struct item_s
-{
+typedef void (*map_value_cb)(void *);
+typedef void (*map_value_dtor)(void *);
+typedef struct map_iterator_s map_iter_t;
+typedef struct array_s array_item_t;
+struct array_s {
     void *value;
-    co_item_t *previous;
-    co_item_t *next;
+    array_item_t *previous;
+    array_item_t *next;
+    int indic;
 };
 
-struct queue_s
-{
-    co_item_t *first_item;
-    co_item_t *last_item;
+typedef struct map_s {
+    array_item_t *first;
+    array_item_t *last;
+    co_ht_map_t *dict;
+    map_value_dtor dtor;
+    int indices;
     size_t length;
-};
+    iter_type type;
+} map_t;
 
-struct iterator_s
+struct map_iterator_s
 {
-    co_queue_t *queue;
-    co_item_t *item;
+    map_t *array;
+    array_item_t *item;
     bool forward;
 };
 
-C_API co_queue_t *queue_new(void);
-C_API void queue_free(co_queue_t *, void (*)(void *));
-C_API void queue_push(co_queue_t *, void *);
-C_API void *queue_pop(co_queue_t *);
-C_API void *queue_peek(co_queue_t *);
-C_API void *queue_peek_first(co_queue_t *);
-C_API void queue_shift(co_queue_t *, void *);
-C_API void *queue_unshift(co_queue_t *);
-C_API size_t queue_length(co_queue_t *);
-C_API void *queue_remove(co_queue_t *, void *);
-C_API co_iterator_t *iterator_new(co_queue_t *, bool);
-C_API co_iterator_t *iterator_next(co_iterator_t *);
-C_API void *iterator_value(co_iterator_t *);
-C_API co_iterator_t *iterator_remove(co_iterator_t *);
-C_API void iterator_free(co_iterator_t *);
+C_API map_t *map_new(map_value_dtor);
+C_API map_t *map(map_value_dtor dtor, int n_args, ...);
+C_API void map_free(map_t *);
+C_API int map_push(map_t *, void *);
+C_API void *map_pop(map_t *);
+C_API void map_shift(map_t *, void *);
+C_API void *map_unshift(map_t *);
+C_API size_t map_count(map_t *);
+C_API void *map_remove(map_t *, void *);
+C_API void map_put(map_t *, const char *key, void *value);
+C_API void *map_get(map_t *, const char *key);
+C_API map_iter_t *iter_new(map_t *, bool);
+C_API map_iter_t *iter_next(map_iter_t *);
+C_API void *iter_value(map_iter_t *);
+C_API map_iter_t *iter_remove(map_iter_t *);
+C_API void iter_free(map_iter_t *);
 
 #define in ,
-#define has(i) iterator_value(i)
+#define has(i) iter_value(i)
 #define foreach_xp(X, A) X A
-#define foreach_in(X, S) for(co_iterator_t \
-  *(X) = iterator_new((co_queue_t *)(S), true); \
+#define foreach_in(X, S) for(map_iter_t \
+  *(X) = iter_new((map_t *)(S), true); \
   X != NULL; \
-  X = iterator_next(X))
+  X = iter_next(X))
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 
-#define _Q_PUSH(q, item) queue_push(q, (item));
-
-#define map_queue(x, ...) co_queue_t *(x) = queue_new(); \
-    EVAL(MAP(_Q_PUSH, x, __VA_ARGS__))
-
-#define EX_CAT(a, b) CAT(a, b)
+#define EX_CAT(a, b) a ## b
 
 #define EX_STR_(a) #a
 #define EX_STR(a) EX_STR_(a)
@@ -1131,6 +1138,8 @@ C_API unsigned long co_async_self(void);
 
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
+
+C_API const char *co_itoa(int);
 
 /* Write this function instead of main, this library provides its own main, the scheduler,
 which will call this function as an coroutine! */
