@@ -99,13 +99,19 @@ void oa_hash_free(oa_hash *htable) {
             htable->key_ops.free(htable->buckets[ i ]->key, htable->key_ops.arg);
             if (htable->buckets[ i ]->value != NULL)
                 htable->val_ops.free(htable->buckets[ i ]->value);
+
+            htable->buckets[ i ]->value = NULL;
         }
         if (htable->buckets[ i ] != NULL)
             CO_FREE(htable->buckets[ i ]);
+
+        htable->buckets[ i ] = NULL;
     }
+
     if (htable->buckets != NULL)
         CO_FREE(htable->buckets);
 
+    htable->buckets = NULL;
     CO_FREE(htable);
 }
 
