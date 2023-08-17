@@ -87,6 +87,7 @@ void map_free(map_t *array) {
         if (array->dtor)
             array->dtor(array->head->value);
 
+        co_hash_delete(array->dict, array->head->key);
         next = array->head->next;
         CO_FREE(array->head);
         array->head = next;

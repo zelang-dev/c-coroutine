@@ -325,21 +325,7 @@ int test_map_remove_last() {
 
 int test_map_iter_free() {
     map_t *list;
-    slice_t *part;
     map_iter_t *iterator;
-
-    list = map(&_free_value, 3, "__1", "__2", "__3");
-    foreach(item in list) {
-        printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
-    }
-    map_free(list);
-
-    list = map(&_free_value, 4, "John", "Paul", "George", "Ringo");
-    part = slice(list, 0, 2);
-    foreach(item in part) {
-        printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
-    }
-    map_free(list);
 
     list = map_new(_free_value);
     map_push(list, _value_1);
@@ -349,6 +335,33 @@ int test_map_iter_free() {
     iter_free(NULL);
 
     map_free(list);
+    return 0;
+}
+
+int test_map_slice_foreach() {
+    map_t *list;
+    slice_t *part;
+    int i = 0;
+
+    list = map(&_free_value, 3, "__1", "__2", "__3");
+    foreach(item in list) {
+        printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
+        ASSERT_STR(indic(item), co_itoa(i));
+        i++;
+    }
+    map_free(list);
+
+    list = map(CO_FREE, 4, "John", "Paul", "George", "Ringo");
+    part = slice(list, 0, 2);
+    ASSERT_NOTNULL(part);
+    i = 0;
+    foreach(item in part) {
+        printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
+        ASSERT_STR(indic(item), co_itoa(i));
+        i++;
+    }
+    map_free(list);
+
     return 0;
 }
 
@@ -369,6 +382,7 @@ static int test_list(void) {
     test_map_remove_middle();
     test_map_remove_last();
     test_map_iter_free();
+    test_map_slice_foreach();
 
     return 1;
 }

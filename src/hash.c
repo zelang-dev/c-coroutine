@@ -242,7 +242,10 @@ void oa_hash_delete(oa_hash *htable, const void *key) {
         return;
     }
 
-    htable->val_ops.free(htable->buckets[ idx ]->value);
+    if (htable->buckets[ idx ]->value != NULL) {
+        htable->val_ops.free(htable->buckets[ idx ]->value);
+    }
+
     htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
     --htable->size;
 
