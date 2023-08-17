@@ -845,9 +845,11 @@ typedef struct map_s {
     map_value_dtor dtor;
     int indices;
     size_t length;
+    void *slice;
     enum value_types type;
 } map_t;
 
+typedef map_t slice_t;
 struct map_iterator_s
 {
     map_t *array;
@@ -856,7 +858,7 @@ struct map_iterator_s
 };
 
 C_API map_t *map_new(map_value_dtor);
-C_API map_t *map(map_value_dtor dtor, int n_args, ...);
+C_API map_t *map(map_value_dtor, int, ...);
 C_API void map_free(map_t *);
 C_API int map_push(map_t *, void *);
 C_API void *map_pop(map_t *);
@@ -864,12 +866,13 @@ C_API void map_shift(map_t *, void *);
 C_API void *map_unshift(map_t *);
 C_API size_t map_count(map_t *);
 C_API void *map_remove(map_t *, void *);
-C_API void map_put(map_t *, const char *key, void *value);
-C_API void *map_get(map_t *, const char *key);
+C_API void map_put(map_t *, const char *, void *);
+C_API void *map_get(map_t *, const char *);
+C_API slice_t *slice(map_t *, int , int );
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
 C_API void *iter_value(map_iter_t *);
-C_API const char *iter_key(map_iter_t *iterator);
+C_API const char *iter_key(map_iter_t *);
 C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);
 

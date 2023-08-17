@@ -1,5 +1,59 @@
 #include "../include/coroutine.h"
 
+static void slice_free(slice_t *array) {
+    array_item_t *next;
+
+    if (!array)
+        return;
+
+    while (array->head) {
+        CO_FREE((void *)array->head->key);
+        next = array->head->next;
+        CO_FREE(array->head);
+        array->head = next;
+    }
+
+    CO_FREE(array);
+}
+
+static void slice_set(slice_t *array, const char *key, void *value) {
+    array_item_t *item;
+
+    item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
+    item->key = CO_CALLOC(1, sizeof(key));
+
+#if defined(_WIN32) || defined(_WIN64)
+    strcpy_s((char *)item->key, sizeof(item->key), key);
+#else
+    strcpy((char *)item->key, key);
+#endif
+    item->value = value;
+    item->prev = array->tail;
+    item->next = NULL;
+
+    array->tail = item;
+    array->length++;
+
+    if (!array->head)
+        array->head = item;
+    else
+        item->prev->next = item;
+}
+
+slice_t *slice(map_t *array, int start, int end) {
+    slice_t *slice = (slice_t *)CO_CALLOC(1, sizeof(slice_t));
+
+    for (int i = start; i < end; i++) {
+        const char *key = co_itoa(i);
+        slice_set(slice, key, map_get(array, key));
+    }
+
+    array->slice = slice;
+    slice->dict = array->dict;
+
+    return slice;
+}
+
 map_t *map_new(map_value_dtor dtor) {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
     array->indices = -9999999;
@@ -39,6 +93,9 @@ void map_free(map_t *array) {
     }
 
     CO_FREE(array->dict);
+    if (array->slice != NULL)
+        slice_free(array->slice);
+
     CO_FREE(array);
 }
 

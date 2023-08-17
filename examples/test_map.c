@@ -325,10 +325,18 @@ int test_map_remove_last() {
 
 int test_map_iter_free() {
     map_t *list;
+    slice_t *part;
     map_iter_t *iterator;
 
     list = map(&_free_value, 3, "__1", "__2", "__3");
     foreach(item in list) {
+        printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
+    }
+    map_free(list);
+
+    list = map(&_free_value, 4, "John", "Paul", "George", "Ringo");
+    part = slice(list, 0, 2);
+    foreach(item in part) {
         printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
     }
     map_free(list);
