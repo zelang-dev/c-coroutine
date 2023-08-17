@@ -193,7 +193,7 @@ void *oa_hash_put(oa_hash *htable, const void *key, const void *value) {
     }
 
     htable->size++;
-    return htable->buckets[ idx ]->value;
+    return htable->buckets[ idx ];
 }
 
 inline static bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
@@ -384,6 +384,7 @@ void oa_string_print(const void *data) {
 }
 
 void oa_map_free(void *data) {}
+
 oa_key_ops oa_key_ops_string = { oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_struct = { oa_coroutine_cp, CO_DEFER(co_delete), oa_coroutine_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };

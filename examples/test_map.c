@@ -132,19 +132,18 @@ int test_map_iterator() {
     iterator = iter_new(list, false);
     ASSERT_NOTNULL(iterator);
     ASSERT_PTR(iter_value(iterator), _value_3);
+    ASSERT_STR(iter_key(iterator), "2");
     iterator = iter_next(iterator);
     ASSERT_NOTNULL(iterator);
     ASSERT_PTR(iter_value(iterator), _value_2);
+    ASSERT_STR(iter_key(iterator), "1");
     iterator = iter_next(iterator);
     ASSERT_NOTNULL(iterator);
     ASSERT_PTR(iter_value(iterator), _value_1);
+    ASSERT_STR(iter_key(iterator), "0");
     iterator = iter_next(iterator);
     ASSERT_NULL(iterator);
 
-    foreach(item in list) {
-        printf("item value is %s\n", (char *)has(item));
-    }
-    map_free(list);
     return 0;
 }
 
@@ -327,6 +326,12 @@ int test_map_remove_last() {
 int test_map_iter_free() {
     map_t *list;
     map_iter_t *iterator;
+
+    list = map(&_free_value, 3, "__1", "__2", "__3");
+    foreach(item in list) {
+        printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
+    }
+    map_free(list);
 
     list = map_new(_free_value);
     map_push(list, _value_1);

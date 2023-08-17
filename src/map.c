@@ -29,13 +29,13 @@ void map_free(map_t *array) {
     if (!array)
         return;
 
-    while (array->first) {
+    while (array->head) {
         if (array->dtor)
-            array->dtor(array->first->value);
+            array->dtor(array->head->value);
 
-        next = array->first->next;
-        CO_FREE(array->first);
-        array->first = next;
+        next = array->head->next;
+        CO_FREE(array->head);
+        array->head = next;
     }
 
     CO_FREE(array->dict);
@@ -44,6 +44,7 @@ void map_free(map_t *array) {
 
 int map_push(map_t *array, void *value) {
     array_item_t *item;
+    oa_pair *kv;
 
     if (array->indices == -9999999)
         array->indices = 0;
@@ -52,17 +53,19 @@ int map_push(map_t *array, void *value) {
 
     item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
     item->indic = array->indices;
-    item->value = co_hash_put(array->dict, co_itoa(item->indic), value);
-    item->previous = array->last;
+    kv = (oa_pair *)co_hash_put(array->dict, co_itoa(item->indic), value);
+    item->key = kv->key;
+    item->value = kv->value;
+    item->prev = array->tail;
     item->next = NULL;
 
-    array->last = item;
+    array->tail = item;
     array->length++;
 
-    if (!array->first)
-        array->first = item;
+    if (!array->head)
+        array->head = item;
     else
-        item->previous->next = item;
+        item->prev->next = item;
 
     return item->indic;
 }
@@ -71,15 +74,15 @@ void *map_pop(map_t *array) {
     void *value;
     array_item_t *item;
 
-    if (!array || !array->last)
+    if (!array || !array->tail)
         return NULL;
 
-    item = array->last;
-    array->last = array->last->previous;
+    item = array->tail;
+    array->tail = array->tail->prev;
     array->length--;
 
     if (array->length == 0)
-        array->first = NULL;
+        array->head = NULL;
 
     value = item->value;
     co_hash_delete(array->dict, co_itoa(item->indic));
@@ -90,6 +93,7 @@ void *map_pop(map_t *array) {
 
 void map_shift(map_t *array, void *value) {
     array_item_t *item;
+    oa_pair *kv;
 
     if (!array)
         return;
@@ -100,38 +104,39 @@ void map_shift(map_t *array, void *value) {
         array->indices++;
 
     item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
-    item->previous = NULL;
-    item->next = array->first;
-    item->value = value;
-    if (array->first == NULL)
+    item->prev = NULL;
+    item->next = array->head;
+    if (array->head == NULL)
         item->indic = 0;
     else
         item->indic = --item->next->indic;
 
-    array->first = item;
+    array->head = item;
     array->length++;
 
-    if (!array->last)
-        array->last = item;
+    if (!array->tail)
+        array->tail = item;
     else
-        item->next->previous = item;
+        item->next->prev = item;
 
-    co_hash_put(array->dict, co_itoa(item->indic), value);
+    kv = (oa_pair *)co_hash_put(array->dict, co_itoa(item->indic), value);
+    item->key = kv->key;
+    item->value = kv->value;
 }
 
 void *map_unshift(map_t *array) {
     void *value;
     array_item_t *item;
 
-    if (!array || !array->first)
+    if (!array || !array->head)
         return NULL;
 
-    item = array->first;
-    array->first = array->first->next;
+    item = array->head;
+    array->head = array->head->next;
     array->length--;
 
     if (array->length == 0)
-        array->last = NULL;
+        array->tail = NULL;
 
     value = item->value;
     co_hash_delete(array->dict, co_itoa(item->indic));
@@ -153,17 +158,17 @@ void *map_remove(map_t *array, void *value) {
     if (!array)
         return NULL;
 
-    for (item = array->first; item != NULL; item = item->next) {
+    for (item = array->head; item != NULL; item = item->next) {
         if (memcmp(item->value, value, sizeof(item->value)) == 0) {
-            if (item->previous)
-                item->previous->next = item->next;
+            if (item->prev)
+                item->prev->next = item->next;
             else
-                array->first = item->next;
+                array->head = item->next;
 
             if (item->next)
-                item->next->previous = item->previous;
+                item->next->prev = item->prev;
             else
-                array->last = item->previous;
+                array->tail = item->prev;
 
             co_hash_delete(array->dict, co_itoa(item->indic));
             array->length--;
@@ -181,6 +186,7 @@ void *map_get(map_t *array, const char *key) {
 
 void map_put(map_t *array, const char *key, void *value) {
     array_item_t *item;
+    oa_pair *kv;
     void *has = co_hash_get(array->dict, key);
     if (has == NULL) {
         if (array->indices == -9999999)
@@ -190,21 +196,25 @@ void map_put(map_t *array, const char *key, void *value) {
 
         item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
         item->indic = array->indices;
-        item->value = co_hash_put(array->dict, key, value);
-        item->previous = array->last;
+        kv = (oa_pair *)co_hash_put(array->dict, key, value);
+        item->key = kv->key;
+        item->value = kv->value;
+        item->prev = array->tail;
         item->next = NULL;
 
-        array->last = item;
+        array->tail = item;
         array->length++;
 
-        if (!array->first)
-            array->first = item;
+        if (!array->head)
+            array->head = item;
         else
-            item->previous->next = item;
+            item->prev->next = item;
     } else {
-        for (item = array->first; item; item = item->next) {
+        for (item = array->head; item; item = item->next) {
             if (memcmp(item->value, has, sizeof(item->value)) == 0) {
-                item->value = co_hash_put(array->dict, key, value);
+                kv = (oa_pair *)co_hash_put(array->dict, key, value);
+                item->key = kv->key;
+                item->value = kv->value;
                 break;
             }
         }
@@ -213,12 +223,12 @@ void map_put(map_t *array, const char *key, void *value) {
 
 map_iter_t *iter_new(map_t *array, bool forward) {
 
-    if (array && array->first) {
+    if (array && array->head) {
         map_iter_t *iterator;
 
         iterator = (map_iter_t *)CO_MALLOC(sizeof(map_iter_t));
         iterator->array = array;
-        iterator->item = forward ? array->first : array->last;
+        iterator->item = forward ? array->head : array->tail;
         iterator->forward = forward;
 
         return iterator;
@@ -231,7 +241,7 @@ map_iter_t *iter_next(map_iter_t *iterator) {
     if (iterator) {
         array_item_t *item;
 
-        item = iterator->forward ? iterator->item->next : iterator->item->previous;
+        item = iterator->forward ? iterator->item->next : iterator->item->prev;
         if (item) {
             iterator->item = item;
             return iterator;
@@ -251,28 +261,35 @@ void *iter_value(map_iter_t *iterator) {
     return NULL;
 }
 
+const char *iter_key(map_iter_t *iterator) {
+    if (iterator)
+        return iterator->item->key;
+
+    return NULL;
+}
+
 map_iter_t *iter_remove(map_iter_t *iterator) {
     array_item_t *item;
 
     if (!iterator)
         return NULL;
 
-    item = iterator->forward ? iterator->array->first : iterator->array->last;
+    item = iterator->forward ? iterator->array->head : iterator->array->tail;
     while (item) {
         if (iterator->item == item) {
-            if (iterator->array->first == item)
-                iterator->array->first = item->next;
+            if (iterator->array->head == item)
+                iterator->array->head = item->next;
             else
-                item->previous->next = item->next;
+                item->prev->next = item->next;
 
-            if (iterator->array->last == item)
-                iterator->array->last = item->previous;
+            if (iterator->array->tail == item)
+                iterator->array->tail = item->prev;
             else
-                item->next->previous = item->previous;
+                item->next->prev = item->prev;
 
             iterator->array->length--;
 
-            iterator->item = iterator->forward ? item->next : item->previous;
+            iterator->item = iterator->forward ? item->next : item->prev;
             CO_FREE(item);
             if (iterator->item) {
                 return iterator;
@@ -282,7 +299,7 @@ map_iter_t *iter_remove(map_iter_t *iterator) {
             }
         }
 
-        item = iterator->forward ? item->next : item->previous;
+        item = iterator->forward ? item->next : item->prev;
     }
 
     return iterator;

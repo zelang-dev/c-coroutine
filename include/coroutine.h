@@ -805,30 +805,47 @@ C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
 
-typedef enum iter_type {
-    ITER_ARRAY,
-    ITER_HASH
-} iter_type;
-
-typedef void (*map_value_cb)(void *);
+typedef void (*func_t)(co_value_t *);
 typedef void (*map_value_dtor)(void *);
 typedef struct map_iterator_s map_iter_t;
 typedef struct array_s array_item_t;
+typedef union {
+    int integer;
+    signed int s_integer;
+    long big_int;
+    long long long_int;
+    size_t max_int;
+    float point;
+    double precision;
+    bool boolean;
+    unsigned char uchar;
+    char *string;
+    char **array;
+    void *object;
+    func_t func;
+} map_value;
+
+typedef struct map_value_s {
+    map_value value;
+    enum value_types type;
+} map_value_t;
+
 struct array_s {
     void *value;
-    array_item_t *previous;
+    array_item_t *prev;
     array_item_t *next;
     int indic;
+    const char *key;
 };
 
 typedef struct map_s {
-    array_item_t *first;
-    array_item_t *last;
+    array_item_t *head;
+    array_item_t *tail;
     co_ht_map_t *dict;
     map_value_dtor dtor;
     int indices;
     size_t length;
-    iter_type type;
+    enum value_types type;
 } map_t;
 
 struct map_iterator_s
@@ -852,11 +869,13 @@ C_API void *map_get(map_t *, const char *key);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
 C_API void *iter_value(map_iter_t *);
+C_API const char *iter_key(map_iter_t *iterator);
 C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);
 
 #define in ,
 #define has(i) iter_value(i)
+#define indic(i) iter_key(i)
 #define foreach_xp(X, A) X A
 #define foreach_in(X, S) for(map_iter_t \
   *(X) = iter_new((map_t *)(S), true); \
