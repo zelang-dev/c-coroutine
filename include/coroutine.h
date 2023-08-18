@@ -808,7 +808,7 @@ C_API void co_result_set(co_routine_t *, void *);
 typedef void (*func_t)(co_value_t *);
 typedef void (*map_value_dtor)(void *);
 typedef struct map_iterator_s map_iter_t;
-typedef struct array_s array_item_t;
+typedef struct array_item_s array_item_t;
 typedef union {
     int integer;
     signed int s_integer;
@@ -825,12 +825,17 @@ typedef union {
     func_t func;
 } map_value;
 
+enum map_data_type {
+    MAP_ARRAY,
+    MAP_HASH
+};
+
 typedef struct map_value_s {
     map_value value;
     enum value_types type;
 } map_value_t;
 
-struct array_s {
+struct array_item_s {
     void *value;
     array_item_t *prev;
     array_item_t *next;
@@ -846,10 +851,12 @@ typedef struct map_s {
     int indices;
     size_t length;
     void *slice;
+    enum map_data_type as;
     enum value_types type;
 } map_t;
 
 typedef map_t slice_t;
+typedef map_t array_t;
 struct map_iterator_s
 {
     map_t *array;
@@ -868,7 +875,8 @@ C_API size_t map_count(map_t *);
 C_API void *map_remove(map_t *, void *);
 C_API void map_put(map_t *, const char *, void *);
 C_API void *map_get(map_t *, const char *);
-C_API slice_t *slice(map_t *, int , int );
+C_API array_t *array(map_value_dtor, int, ...);
+C_API slice_t *slice(array_t *, int, int);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
 C_API void *iter_value(map_iter_t *);
@@ -877,6 +885,7 @@ C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);
 
 #define in ,
+#define kv(key, value) key, value
 #define has(i) iter_value(i)
 #define indic(i) iter_key(i)
 #define foreach_xp(X, A) X A

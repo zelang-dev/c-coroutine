@@ -40,7 +40,7 @@ static void slice_set(slice_t *array, const char *key, void *value) {
         item->prev->next = item;
 }
 
-slice_t *slice(map_t *array, int start, int end) {
+slice_t *slice(array_t *array, int start, int end) {
     slice_t *slice = (slice_t *)CO_CALLOC(1, sizeof(slice_t));
 
     for (int i = start; i < end; i++) {
@@ -62,6 +62,22 @@ map_t *map_new(map_value_dtor dtor) {
     return array;
 }
 
+array_t *array(map_value_dtor dtor, int n_args, ...) {
+    array_t *array = map_new(dtor);
+    va_list argp;
+    void *p;
+
+    va_start(argp, n_args);
+    for (int i = 0; i < n_args; i++) {
+        p = va_arg(argp, void *);
+        map_push(array, p);
+    }
+    va_end(argp);
+
+    array->as = MAP_ARRAY;
+    return array;
+}
+
 map_t *map(map_value_dtor dtor, int n_args, ...) {
     map_t *array = map_new(dtor);
     va_list argp;
@@ -74,6 +90,7 @@ map_t *map(map_value_dtor dtor, int n_args, ...) {
     }
     va_end(argp);
 
+    array->as = MAP_HASH;
     return array;
 }
 

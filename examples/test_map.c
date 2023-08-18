@@ -339,11 +339,11 @@ int test_map_iter_free() {
 }
 
 int test_map_slice_foreach() {
-    map_t *list;
+    array_t *list;
     slice_t *part;
     int i = 0;
 
-    list = map(CO_FREE, 3, "__1", "__2", "__3");
+    list = array(CO_FREE, 3, "__1", "__2", "__3");
     range(item in list) {
         printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
         ASSERT_STR(indic(item), co_itoa(i));
