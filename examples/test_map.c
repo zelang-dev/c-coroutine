@@ -22,12 +22,12 @@ int test_map_free() {
 
 int test_map_push_pop() {
     map_t *list;
-    char *value;
+    const char *value;
 
     list = map_new(NULL);
     map_push(list, _value_1);
     ASSERT_XEQ(map_count(list), 1);
-    value = (char *)map_pop(list);
+    value = map_pop(list)->value.chars;
     ASSERT_PTR(value, _value_1);
     ASSERT_XEQ(map_count(list), 0);
 
@@ -35,10 +35,10 @@ int test_map_push_pop() {
     ASSERT_XEQ(map_count(list), 1);
     map_push(list, _value_3);
     ASSERT_XEQ(map_count(list), 2);
-    value = (char *)map_pop(list);
+    value = map_pop(list)->value.chars;
     ASSERT_PTR(value, _value_3);
     ASSERT_XEQ(map_count(list), 1);
-    value = (char *)map_pop(list);
+    value = map_pop(list)->value.chars;
     ASSERT_PTR(value, _value_2);
     ASSERT_XEQ(map_count(list), 0);
 
@@ -48,12 +48,12 @@ int test_map_push_pop() {
 
 int test_map_shift_unshift() {
     map_t *list;
-    char *value;
+    const char *value;
 
     list = map_new(NULL);
     map_shift(list, _value_1);
     ASSERT_XEQ(map_count(list), 1);
-    value = (char *)map_unshift(list);
+    value = map_unshift(list)->value.chars;
     ASSERT_PTR(value, _value_1);
     ASSERT_XEQ(map_count(list), 0);
 
@@ -61,10 +61,10 @@ int test_map_shift_unshift() {
     ASSERT_XEQ(map_count(list), 1);
     map_shift(list, _value_3);
     ASSERT_XEQ(map_count(list), 2);
-    value = (char *)map_unshift(list);
+    value = map_unshift(list)->value.chars;
     ASSERT_PTR(value, _value_3);
     ASSERT_XEQ(map_count(list), 1);
-    value = (char *)map_unshift(list);
+    value = map_unshift(list)->value.chars;
     ASSERT_PTR(value, _value_2);
     ASSERT_XEQ(map_count(list), 0);
 
