@@ -805,7 +805,8 @@ C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
 
-typedef void (*func_t)(co_value_t *);
+typedef struct map_value_s map_value_t;
+typedef void (*func_t)(map_value_t *);
 typedef void (*map_value_dtor)(void *);
 typedef struct map_iterator_s map_iter_t;
 typedef struct array_item_s array_item_t;
@@ -820,6 +821,7 @@ typedef union {
     bool boolean;
     unsigned char uchar;
     char *string;
+    const char chars[64];
     char **array;
     void *object;
     func_t func;
@@ -830,13 +832,13 @@ enum map_data_type {
     MAP_HASH
 };
 
-typedef struct map_value_s {
+struct map_value_s {
     map_value value;
     enum value_types type;
-} map_value_t;
+};
 
 struct array_item_s {
-    void *value;
+    map_value_t *value;
     array_item_t *prev;
     array_item_t *next;
     int indic;
@@ -866,20 +868,22 @@ struct map_iterator_s
 
 C_API map_t *map_new(map_value_dtor);
 C_API map_t *map(map_value_dtor, int, ...);
+C_API map_t *map_by(map_value_dtor, int, ...);
 C_API void map_free(map_t *);
 C_API int map_push(map_t *, void *);
-C_API void *map_pop(map_t *);
+C_API map_value_t *map_pop(map_t *);
 C_API void map_shift(map_t *, void *);
-C_API void *map_unshift(map_t *);
+C_API map_value_t *map_unshift(map_t *);
 C_API size_t map_count(map_t *);
 C_API void *map_remove(map_t *, void *);
 C_API void map_put(map_t *, const char *, void *);
-C_API void *map_get(map_t *, const char *);
+C_API map_value_t *map_get(map_t *, const char *);
 C_API array_t *array(map_value_dtor, int, ...);
+C_API array_t *array_by(map_value_dtor, int, ...);
 C_API slice_t *slice(array_t *, int, int);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
-C_API void *iter_value(map_iter_t *);
+C_API map_value iter_value(map_iter_t *);
 C_API const char *iter_key(map_iter_t *);
 C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);

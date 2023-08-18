@@ -41,6 +41,9 @@ static void slice_set(slice_t *array, const char *key, void *value) {
 }
 
 slice_t *slice(array_t *array, int start, int end) {
+    if (array->as != MAP_ARRAY)
+        co_panic("slice() only accept `array` type!");
+
     slice_t *slice = (slice_t *)CO_CALLOC(1, sizeof(slice_t));
 
     for (int i = start; i < end; i++) {
@@ -78,15 +81,49 @@ array_t *array(map_value_dtor dtor, int n_args, ...) {
     return array;
 }
 
-map_t *map(map_value_dtor dtor, int n_args, ...) {
-    map_t *array = map_new(dtor);
+array_t *array_by(map_value_dtor dtor, int n_args, ...) {
+    array_t *array = map_new(dtor);
     va_list argp;
-    void *p;
 
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
+        size_t p = va_arg(argp, size_t);
+        map_push(array, &p);
+    }
+    va_end(argp);
+
+    array->as = MAP_ARRAY;
+    return array;
+}
+
+map_t *map_by(map_value_dtor dtor, int n_of_Pairs, ...) {
+    map_t *array = map_new(dtor);
+    va_list argp;
+    const char *k;
+
+    va_start(argp, n_of_Pairs);
+    for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
+        k = va_arg(argp, char *);
+        size_t p = va_arg(argp, size_t);
+        map_put(array, k, &p);
+    }
+    va_end(argp);
+
+    array->as = MAP_HASH;
+    return array;
+}
+
+map_t *map(map_value_dtor dtor, int n_of_Pairs, ...) {
+    map_t *array = map_new(dtor);
+    va_list argp;
+    map_value_t *p;
+    const char *k;
+
+    va_start(argp, n_of_Pairs);
+    for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
+        k = va_arg(argp, char *);
         p = va_arg(argp, void *);
-        map_push(array, p);
+        map_put(array, k, (map_value_t *)p);
     }
     va_end(argp);
 
@@ -145,8 +182,8 @@ int map_push(map_t *array, void *value) {
     return item->indic;
 }
 
-void *map_pop(map_t *array) {
-    void *value;
+map_value_t *map_pop(map_t *array) {
+    map_value_t *value;
     array_item_t *item;
 
     if (!array || !array->tail)
@@ -199,8 +236,8 @@ void map_shift(map_t *array, void *value) {
     item->value = kv->value;
 }
 
-void *map_unshift(map_t *array) {
-    void *value;
+map_value_t *map_unshift(map_t *array) {
+    map_value_t *value;
     array_item_t *item;
 
     if (!array || !array->head)
@@ -255,8 +292,8 @@ void *map_remove(map_t *array, void *value) {
     return NULL;
 }
 
-void *map_get(map_t *array, const char *key) {
-    return co_hash_get(array->dict, key);
+map_value_t *map_get(map_t *array, const char *key) {
+    return (map_value_t *)co_hash_get(array->dict, key);
 }
 
 void map_put(map_t *array, const char *key, void *value) {
@@ -329,11 +366,11 @@ map_iter_t *iter_next(map_iter_t *iterator) {
     return NULL;
 }
 
-void *iter_value(map_iter_t *iterator) {
+map_value iter_value(map_iter_t *iterator) {
     if (iterator)
-        return iterator->item->value;
+        return iterator->item->value->value;
 
-    return NULL;
+    return ((map_value_t *)NULL)->value;
 }
 
 const char *iter_key(map_iter_t *iterator) {
