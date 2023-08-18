@@ -885,6 +885,7 @@ C_API void iter_free(map_iter_t *);
   X != NULL; \
   X = iter_next(X))
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
+#define range(...) foreach(__VA_ARGS__)
 
 #define EX_CAT(a, b) a ## b
 

@@ -343,8 +343,8 @@ int test_map_slice_foreach() {
     slice_t *part;
     int i = 0;
 
-    list = map(&_free_value, 3, "__1", "__2", "__3");
-    foreach(item in list) {
+    list = map(CO_FREE, 3, "__1", "__2", "__3");
+    range(item in list) {
         printf("item key is %s, and value is %s\n", indic(item), (char *)has(item));
         ASSERT_STR(indic(item), co_itoa(i));
         i++;
