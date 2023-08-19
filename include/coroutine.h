@@ -500,13 +500,15 @@ enum value_types
     CO_NULL = -1,
     CO_INT,
     CO_SINT,
-    CO_LONG,
+    CO_SLONG,
+    CO_ULONG,
     CO_LLONG,
-    CO_MAX,
+    CO_MAXSIZE,
     CO_FLOAT,
     CO_DOUBLE,
     CO_BOOL,
     CO_UCHAR,
+    CO_UCHAR_P,
     CO_STRING,
     CO_CCHAR,
     CO_ARRAY,
@@ -518,14 +520,16 @@ enum value_types
 typedef union
 {
     int integer;
-    signed int s_integer;
-    long big_int;
-    long long long_int;
-    size_t max_int;
+    signed int s_int;
+    signed long s_long;
+    unsigned long u_long;
+    long long long_long;
+    size_t max_size;
     float point;
     double precision;
     bool boolean;
     unsigned char uchar;
+    unsigned char *uchar_ptr;
     char *string;
     const char chars[512];
     char **array;
@@ -812,14 +816,16 @@ typedef struct map_iterator_s map_iter_t;
 typedef struct array_item_s array_item_t;
 typedef union {
     int integer;
-    signed int s_integer;
-    long big_int;
-    long long long_int;
-    size_t max_int;
+    signed int s_int;
+    signed long s_long;
+    unsigned long u_long;
+    long long long_long;
+    size_t max_size;
     float point;
     double precision;
     bool boolean;
     unsigned char uchar;
+    unsigned char *uchar_ptr;
     char *string;
     const char chars[64];
     char **array;

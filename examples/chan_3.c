@@ -5,7 +5,7 @@ void *co_2(void *arg) {
 
     printf("co_2 start\n");
     for (int i = 0; i < 10; i++) {
-        printf("received: %lu\n", co_recv(c).big_int);
+        printf("received: %lu\n", co_recv(c).u_long);
     }
     printf("co_2 end\n");
 

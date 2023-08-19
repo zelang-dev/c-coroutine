@@ -134,19 +134,21 @@ C_API void co_defer_recover(recover_func, void *);
 typedef union
 {
     int integer;
-    signed int s_integer;
-    long big_int;
-    long long long_int;
-    unsigned long long max_int;
+    signed int s_int;
+    signed long s_long;
+    unsigned long u_long;
+    long long long_long;
+    size_t max_size;
     float point;
     double precision;
     bool boolean;
     unsigned char uchar;
+    unsigned char *uchar_ptr;
     char *string;
     const char chars[512];
     char **array;
     void *object;
-    co_callable_t function;
+    co_callable_t func;
 } value_t;
 
 typedef struct co_value

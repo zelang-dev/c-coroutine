@@ -167,8 +167,8 @@ static void *fs_init(void *uv_args) {
                 break;
             case UV_FS_SENDFILE:
                 in_fd = args[ 1 ].value.integer;
-                offset = args[ 2 ].value.long_int;
-                length = args[ 3 ].value.max_int;
+                offset = args[ 2 ].value.long_long;
+                length = args[ 3 ].value.max_size;
                 result = uv_fs_sendfile(loop, req, fd, in_fd, offset, length, fs_cb);
                 break;
             case UV_FS_CLOSE:
@@ -181,7 +181,7 @@ static void *fs_init(void *uv_args) {
                 result = uv_fs_fdatasync(loop, req, fd, fs_cb);
                 break;
             case UV_FS_FTRUNCATE:
-                offset = args[ 1 ].value.long_int;
+                offset = args[ 1 ].value.long_long;
                 result = uv_fs_ftruncate(loop, req, fd, offset, fs_cb);
                 break;
             case UV_FS_FCHMOD:
@@ -199,13 +199,13 @@ static void *fs_init(void *uv_args) {
                 result = uv_fs_fchown(loop, req, fd, uid, gid, fs_cb);
                 break;
             case UV_FS_READ:
-                offset = args[ 1 ].value.long_int;
+                offset = args[ 1 ].value.long_long;
                 bufs = args[ 2 ].value.object;
                 result = uv_fs_read(loop, req, fd, bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_WRITE:
                 bufs = args[ 1 ].value.object;
-                offset = args[ 2 ].value.long_int;
+                offset = args[ 2 ].value.long_long;
                 result = uv_fs_write(loop, req, fd, bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_UNKNOWN:
