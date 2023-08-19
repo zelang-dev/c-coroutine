@@ -13,7 +13,7 @@ void *delay_co(void *arg) {
 
 int co_main(int argc, char **argv) {
     int i, n;
-    c = co_make();
+    c = channel();
 
     n = 0;
     for (i = 1; i < argc; i++) {

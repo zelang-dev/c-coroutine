@@ -16,11 +16,11 @@ channel_t *channel_create(int elem_size, int bufsize) {
     return c;
 }
 
-CO_FORCE_INLINE channel_t *co_make() {
+CO_FORCE_INLINE channel_t *channel() {
     return channel_create(sizeof(co_value_t), 0);
 }
 
-CO_FORCE_INLINE channel_t *co_make_buf(int elem_count) {
+CO_FORCE_INLINE channel_t *channel_buf(int elem_count) {
     return channel_create(sizeof(co_value_t), elem_count);
 }
 

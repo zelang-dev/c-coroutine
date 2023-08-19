@@ -65,11 +65,11 @@ C_API co_ht_result_t co_wait(co_ht_group_t *);
 C_API value_t co_group_get_result(co_ht_result_t *, int);
 
 /* Creates an unbuffered channel, similar to golang channels. */
-C_API channel_t *co_make(void);
+C_API channel_t *channel(void);
 
 /* Creates an buffered channel of given element count,
 similar to golang channels. */
-C_API channel_t *co_make_buf(int);
+C_API channel_t *channel_buf(int);
 
 /* Send data to the channel. */
 C_API int co_send(channel_t *, void *);
@@ -290,7 +290,7 @@ void *sendData(void *arg)
 int co_main(int argc, char **argv)
 {
     // create channel
-    channel_t *ch = co_make();
+    channel_t *ch = channel();
 
     // function call with goroutine
     co_go(sendData, ch);
@@ -374,22 +374,23 @@ void *func(void *args)
 {
     channel_t *c = ((channel_t **)args)[0];
     channel_t *quit = ((channel_t **)args)[1];
+    co_defer(channel_free, c);
+    co_defer(channel_free, quit);
+
     for (int i = 0; i < 10; i++)
     {
         printf("%d\n", co_recv(c).integer);
     }
     co_send(quit, 0);
 
-    channel_free(c);
-    channel_free(quit);
     return 0;
 }
 
 int co_main(int argc, char **argv)
 {
     channel_t *args[2];
-    channel_t *c = co_make();
-    channel_t *quit = co_make();
+    channel_t *c = channel();
+    channel_t *quit = channel();
 
     args[0] = c;
     args[1] = quit;

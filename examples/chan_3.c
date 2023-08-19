@@ -13,7 +13,7 @@ void *co_2(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    channel_t *c = co_make_buf(3);
+    channel_t *c = channel_buf(3);
     int s;
 
     co_go(co_2, (void *)c);

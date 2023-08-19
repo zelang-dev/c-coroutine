@@ -16,7 +16,7 @@ void *prime_co(void *arg) {
         printf("%s ", coroutine_get_name());
         printf("%d\n", p);
     }
-    nc = co_make_buf(buffer);
+    nc = channel_buf(buffer);
     co_go(prime_co, nc);
     for (;;) {
         i = co_recv(c).integer;
@@ -37,7 +37,7 @@ int co_main(int argc, char **argv) {
         goal = 100;
     printf("goal=%d\n", goal);
 
-    c = co_make_buf(buffer);
+    c = channel_buf(buffer);
     co_go(prime_co, c);
     for (i = 2;; i++)
         co_send(c, &i);

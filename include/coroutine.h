@@ -685,11 +685,11 @@ C_API void *co_memdup(co_routine_t *, const void *, size_t);
 C_API int co_array_init(co_array_t *);
 
 /* Creates an unbuffered channel, similar to golang channels. */
-C_API channel_t *co_make(void);
+C_API channel_t *channel(void);
 
 /* Creates an buffered channel of given element count,
 similar to golang channels. */
-C_API channel_t *co_make_buf(int);
+C_API channel_t *channel_buf(int);
 
 /* Send data to the channel. */
 C_API int co_send(channel_t *, void *);
