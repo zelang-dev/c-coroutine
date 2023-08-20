@@ -65,6 +65,14 @@ map_t *map_new(map_value_dtor dtor) {
     return array;
 }
 
+map_t *map_init() {
+    map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
+    array->indices = -9999999;
+    array->dtor = NULL;
+    array->dict = co_ht_map_by_init();
+    return array;
+}
+
 array_t *array(map_value_dtor dtor, int n_args, ...) {
     array_t *array = map_new(dtor);
     va_list argp;
@@ -81,13 +89,23 @@ array_t *array(map_value_dtor dtor, int n_args, ...) {
     return array;
 }
 
-array_t *array_by(map_value_dtor dtor, int n_args, ...) {
-    array_t *array = map_new(dtor);
+array_t *range(int start, int stop) {
+    array_t *array = map_init();
+    for (int i = start; i < stop; i++) {
+        map_push(array, &i);
+    }
+
+    array->as = MAP_ARRAY;
+    return array;
+}
+
+array_t *array_by(int n_args, ...) {
+    array_t *array = map_init();
     va_list argp;
 
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
-        size_t p = va_arg(argp, size_t);
+        long long p = va_arg(argp, size_t);
         map_push(array, &p);
     }
     va_end(argp);
@@ -96,15 +114,15 @@ array_t *array_by(map_value_dtor dtor, int n_args, ...) {
     return array;
 }
 
-map_t *map_by(map_value_dtor dtor, int n_of_Pairs, ...) {
-    map_t *array = map_new(dtor);
+map_t *map_by(int n_of_Pairs, ...) {
+    map_t *array = map_init();
     va_list argp;
     const char *k;
 
     va_start(argp, n_of_Pairs);
     for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
-        size_t p = va_arg(argp, size_t);
+        long long p = va_arg(argp, size_t);
         map_put(array, k, &p);
     }
     va_end(argp);

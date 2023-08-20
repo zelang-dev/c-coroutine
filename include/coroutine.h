@@ -793,6 +793,8 @@ C_API co_ht_result_t *co_ht_result_init(void);
 
 C_API co_ht_map_t *co_ht_map_init(void);
 
+C_API co_ht_map_t *co_ht_map_by_init(void);
+
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
@@ -873,8 +875,9 @@ struct map_iterator_s
 };
 
 C_API map_t *map_new(map_value_dtor);
+C_API map_t *map_init(void);
 C_API map_t *map(map_value_dtor, int, ...);
-C_API map_t *map_by(map_value_dtor, int, ...);
+C_API map_t *map_by(int, ...);
 C_API void map_free(map_t *);
 C_API int map_push(map_t *, void *);
 C_API map_value_t *map_pop(map_t *);
@@ -884,8 +887,9 @@ C_API size_t map_count(map_t *);
 C_API void *map_remove(map_t *, void *);
 C_API void map_put(map_t *, const char *, void *);
 C_API map_value_t *map_get(map_t *, const char *);
+C_API array_t *range(int, int);
 C_API array_t *array(map_value_dtor, int, ...);
-C_API array_t *array_by(map_value_dtor, int, ...);
+C_API array_t *array_by(int, ...);
 C_API slice_t *slice(array_t *, int, int);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
@@ -903,8 +907,12 @@ C_API void iter_free(map_iter_t *);
   *(X) = iter_new((map_t *)(S), true); \
   X != NULL; \
   X = iter_next(X))
+#define reverse_in(X, S) for(map_iter_t \
+  *(X) = iter_new((map_t *)(S), false); \
+  X != NULL; \
+  X = iter_next(X))
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
-#define range(...) foreach(__VA_ARGS__)
+#define reverse(...) foreach_xp(reverse_in, (__VA_ARGS__))
 
 #define EX_CAT(a, b) a ## b
 

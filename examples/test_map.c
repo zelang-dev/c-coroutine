@@ -272,7 +272,7 @@ int test_map_iter_free() {
     return 0;
 }
 
-int test_map_get() {
+int test_map_get_reverse() {
     map_t *list;
     int index1 = 1;
     int index2 = 2;
@@ -288,7 +288,7 @@ int test_map_get() {
 
     map_put(list, "__2_", &index4);
     index4 = 99;
-    range(item in list) {
+    reverse(item in list) {
         printf("item key is %s, and value is %d\n", indic(item), has(item).integer);
     }
 
@@ -330,8 +330,8 @@ int test_array_iterator() {
 
     map_free(list);
 
-    list = map_by(CO_FREE, 3, kv("__1_", 1), kv("__2_", 2), kv("__3_", 3));
-    range(item in list) {
+    list = map_by(3, kv("__1_", 1), kv("__2_", 2), kv("__3_", 3));
+    foreach(item in list) {
         printf("key is %s, value is %d\n", indic(item), has(item).integer);
     }
 
@@ -342,13 +342,13 @@ int test_array_iterator() {
 int test_array_slice_foreach() {
     array_t *list;
     slice_t *part;
-    int i = 0;
+    int i = 5;
 
-    list = array_by(CO_FREE, 6, 18, 6, 10, 1, 99, 8888888);
-    range(item in list) {
+    list = array_by(6, 18, 6, 10, 1, 99, 8888888);
+    reverse(item in list) {
         printf("key: %s, value: %d\n", indic(item), has(item).integer);
         ASSERT_STR(indic(item), co_itoa(i));
-        i++;
+        i--;
     }
     map_free(list);
 
@@ -360,6 +360,19 @@ int test_array_slice_foreach() {
         printf("item key is %s, and value is %s\n", indic(item), iter_value(item).chars);
         ASSERT_STR(indic(item), co_itoa(i));
         i++;
+    }
+    map_free(list);
+
+    return 0;
+}
+
+int test_array_range() {
+    array_t *list;
+    int i = 9;
+    reverse(item in list = range(0, 10)) {
+        printf("range key: %s, range value: %d\n", indic(item), has(item).integer);
+        ASSERT_STR(indic(item), co_itoa(i));
+        i--;
     }
     map_free(list);
 
@@ -381,9 +394,10 @@ static int test_list(void) {
     test_map_remove_middle();
     test_map_remove_last();
     test_map_iter_free();
-    test_map_get();
+    test_map_get_reverse();
     test_array_iterator();
     test_array_slice_foreach();
+    test_array_range();
 
     return 1;
 }
