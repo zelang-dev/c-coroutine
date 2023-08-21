@@ -91,6 +91,8 @@ array_t *array(map_value_dtor dtor, int n_args, ...) {
 
 array_t *range(int start, int stop) {
     array_t *array = map_init();
+
+    array->type = CO_LLONG;
     for (int i = start; i < stop; i++) {
         map_push(array, &i);
     }
@@ -103,6 +105,7 @@ array_t *array_by(int n_args, ...) {
     array_t *array = map_init();
     va_list argp;
 
+    array->type = CO_LLONG;
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
         long long p = va_arg(argp, size_t);
@@ -119,11 +122,12 @@ map_t *map_by(int n_of_Pairs, ...) {
     va_list argp;
     const char *k;
 
+    array->type = CO_LLONG;
     va_start(argp, n_of_Pairs);
     for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
         long long p = va_arg(argp, size_t);
-        map_put(array, k, &p);
+        array_put(array, k, p);
     }
     va_end(argp);
 
@@ -312,6 +316,10 @@ void *map_remove(map_t *array, void *value) {
 
 map_value_t *map_get(map_t *array, const char *key) {
     return (map_value_t *)co_hash_get(array->dict, key);
+}
+
+void array_put(map_t *array, const char *key, long long value) {
+    map_put(array, key, &value);
 }
 
 void map_put(map_t *array, const char *key, void *value) {

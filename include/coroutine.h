@@ -836,7 +836,7 @@ typedef union {
 } map_value;
 
 enum map_data_type {
-    MAP_ARRAY,
+    MAP_ARRAY = CO_ARRAY,
     MAP_HASH
 };
 
@@ -890,6 +890,7 @@ C_API map_value_t *map_get(map_t *, const char *);
 C_API array_t *range(int, int);
 C_API array_t *array(map_value_dtor, int, ...);
 C_API array_t *array_by(int, ...);
+C_API void array_put(map_t *array, const char *, long long value);
 C_API slice_t *slice(array_t *, int, int);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);

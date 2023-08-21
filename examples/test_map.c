@@ -374,6 +374,11 @@ int test_array_range() {
         ASSERT_STR(indic(item), co_itoa(i));
         i--;
     }
+
+    array_put(list, co_itoa(10), 1000);
+    foreach(item in list) {
+        printf("%s => %d\n", indic(item), has(item).integer);
+    }
     map_free(list);
 
     return 0;
