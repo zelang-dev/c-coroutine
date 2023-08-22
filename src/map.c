@@ -135,6 +135,48 @@ map_t *map_by(int n_of_Pairs, ...) {
     return array;
 }
 
+map_t *map_format(map_value_dtor dtor, char *description, ...) {
+    map_t *array = map_new(dtor);
+    va_list argp;
+    const char *k;
+    long long i;
+    char c, *s;
+    void *p;
+
+    va_start(argp, description);
+    while (*description) {
+        k = va_arg(argp, char *);
+        switch (*description++) {
+            case 'i':
+                // integer argument
+                i = va_arg(argp, size_t);
+                array_put(array, k, i);
+                break;
+            case 'c':
+                // character argument
+                c = (char) va_arg(argp, int);
+                array_put(array, k, c);
+                break;
+            case 's':
+                // string argument
+                s = va_arg(argp, char *);
+                map_put(array, k, s);
+                break;
+            case 'p':
+                // void pointer (any arbitrary pointer) argument
+                p = va_arg(argp, void *);
+                map_put(array, k, p);
+                break;
+            default:
+                break;
+        }
+    }
+    va_end(argp);
+
+    array->as = MAP_HASH;
+    return array;
+}
+
 map_t *map(map_value_dtor dtor, int n_of_Pairs, ...) {
     map_t *array = map_new(dtor);
     va_list argp;
