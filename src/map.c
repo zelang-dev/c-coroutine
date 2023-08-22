@@ -135,7 +135,7 @@ map_t *map_by(int n_of_Pairs, ...) {
     return array;
 }
 
-map_t *map_format(map_value_dtor dtor, char *description, ...) {
+map_t *map_for(map_value_dtor dtor, char *desc, ...) {
     map_t *array = map_new(dtor);
     va_list argp;
     const char *k;
@@ -143,10 +143,10 @@ map_t *map_format(map_value_dtor dtor, char *description, ...) {
     char c, *s;
     void *p;
 
-    va_start(argp, description);
-    while (*description) {
+    va_start(argp, desc);
+    while (*desc) {
         k = va_arg(argp, char *);
-        switch (*description++) {
+        switch (*desc++) {
             case 'i':
                 // integer argument
                 i = va_arg(argp, size_t);

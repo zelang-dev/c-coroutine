@@ -879,6 +879,7 @@ C_API map_t *map_new(map_value_dtor);
 C_API map_t *map_init(void);
 C_API map_t *map(map_value_dtor, int, ...);
 C_API map_t *map_by(int, ...);
+C_API map_t *map_for(map_value_dtor dtor, char *desc, ...);
 C_API void map_free(map_t *);
 C_API int map_push(map_t *, void *);
 C_API map_value_t *map_pop(map_t *);
