@@ -59,7 +59,7 @@ slice_t *slice(array_t *array, int start, int end) {
 
 map_t *map_new(map_value_dtor dtor) {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
-    array->indices = -9999999;
+    array->started = false;
     array->dtor = dtor;
     array->dict = co_ht_map_init();
     return array;
@@ -67,7 +67,7 @@ map_t *map_new(map_value_dtor dtor) {
 
 map_t *map_init() {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
-    array->indices = -9999999;
+    array->started = false;
     array->dtor = NULL;
     array->dict = co_ht_map_by_init();
     return array;
@@ -180,10 +180,12 @@ int map_push(map_t *array, void *value) {
     array_item_t *item;
     oa_pair *kv;
 
-    if (array->indices == -9999999)
+    if (!array->started) {
+        array->started = true;
         array->indices = 0;
-    else
+    } else {
         array->indices++;
+    }
 
     item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
     item->indic = array->indices;
@@ -232,10 +234,12 @@ void map_shift(map_t *array, void *value) {
     if (!array)
         return;
 
-    if (array->indices == -9999999)
+    if (!array->started) {
+        array->started = true;
         array->indices = 0;
-    else
+    } else {
         array->indices++;
+    }
 
     item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
     item->prev = NULL;
@@ -327,10 +331,12 @@ void map_put(map_t *array, const char *key, void *value) {
     oa_pair *kv;
     void *has = co_hash_get(array->dict, key);
     if (has == NULL) {
-        if (array->indices == -9999999)
+        if (!array->started) {
+            array->started = true;
             array->indices = 0;
-        else
+        } else {
             array->indices++;
+        }
 
         item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
         item->indic = array->indices;

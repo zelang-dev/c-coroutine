@@ -863,6 +863,7 @@ typedef struct map_s {
     void *slice;
     enum map_data_type as;
     enum value_types type;
+    bool started;
 } map_t;
 
 typedef map_t slice_t;
