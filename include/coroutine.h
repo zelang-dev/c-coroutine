@@ -454,7 +454,7 @@ struct routine_s
     defer_t defer;
 	char name[64];
 	char state[64];
-    char scrape[20];
+    char scrape[32];
     /* unique coroutine id */
     int cid;
     size_t alarm_time;
@@ -1190,7 +1190,7 @@ C_API unsigned long co_async_self(void);
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
-C_API const char *co_itoa(int);
+C_API const char *co_itoa(long long number);
 
 /* Write this function instead of main, this library provides its own main, the scheduler,
 which will call this function as an coroutine! */

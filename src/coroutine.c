@@ -117,8 +117,8 @@ uv_loop_t *co_loop() {
     return uv_default_loop();
 }
 
-const char *co_itoa(int number) {
-    snprintf(co_active()->scrape, 20, "%d", number);
+const char *co_itoa(long long number) {
+    snprintf(co_active()->scrape, 32, "%lld", number);
     return co_active()->scrape;
 }
 
