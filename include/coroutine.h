@@ -677,9 +677,9 @@ will auto free `LIFO` on function exit/return, do not free! */
 C_API void *co_new(size_t);
 C_API void *co_malloc(co_routine_t *, size_t);
 C_API void *co_malloc_full(co_routine_t *, size_t, defer_func);
-C_API char *co_strdup(co_routine_t *, const char *);
-C_API char *co_strndup(co_routine_t *, const char *, size_t);
-C_API char *co_printf(const char *, ...);
+C_API char *co_strdup(const char *);
+C_API char *co_strndup(const char *, size_t);
+C_API char *co_sprintf(const char *, ...);
 C_API void *co_memdup(co_routine_t *, const void *, size_t);
 
 C_API int co_array_init(co_array_t *);

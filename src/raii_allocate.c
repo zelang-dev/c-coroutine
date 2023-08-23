@@ -42,9 +42,9 @@ void *co_malloc(co_routine_t *coro, size_t size) {
     return co_malloc_full(coro, size, CO_FREE);
 }
 
-char *co_strndup(co_routine_t *coro, const char *str, size_t max_len) {
+char *co_strndup(const char *str, size_t max_len) {
     const size_t len = strnlen(str, max_len) + 1;
-    char *dup = co_memdup(coro, str, len);
+    char *dup = co_memdup(co_active(), str, len);
 
     if (LIKELY(dup))
         dup[ len - 1 ] = '\0';
@@ -52,8 +52,8 @@ char *co_strndup(co_routine_t *coro, const char *str, size_t max_len) {
     return dup;
 }
 
-char *co_strdup(co_routine_t *coro, const char *str) {
-    return co_memdup(coro, str, strlen(str) + 1);
+char *co_strdup(const char *str) {
+    return co_memdup(co_active(), str, strlen(str) + 1);
 }
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -113,7 +113,7 @@ int asprintf(char **str_p, const char *fmt, ...) {
 }
 #endif
 
-char *co_printf(const char *fmt, ...) {
+char *co_sprintf(const char *fmt, ...) {
     va_list values;
     int len;
     char *tmp_str;
