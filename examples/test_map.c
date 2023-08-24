@@ -330,7 +330,7 @@ int test_array_iterator() {
 
     map_free(list);
 
-    list = map_by(3, kv("__1_", 1), kv("__2_", 2), kv("__3_", 3));
+    list = map_long(3, kv("__1_", 1), kv("__2_", 2), kv("__3_", 3));
     foreach(item in list) {
         printf("key is %s, value is %d\n", indic(item), has(item).integer);
     }
@@ -344,7 +344,7 @@ int test_array_slice_foreach() {
     slice_t *part;
     int i = 5;
 
-    list = array_by(6, 18, 6, 10, 1, 99, 8888888);
+    list = array_long(6, 18, 6, 10, 1, 99, 8888888);
     reverse(item in list) {
         printf("key: %s, value: %d\n", indic(item), has(item).integer);
         ASSERT_STR(indic(item), co_itoa(i));
@@ -375,7 +375,7 @@ int test_array_range() {
         i--;
     }
 
-    array_put(list, co_itoa(10), 1000);
+    array_put_long(list, co_itoa(10), 1000);
     foreach(item in list) {
         printf("%s => %d\n", indic(item), has(item).integer);
     }

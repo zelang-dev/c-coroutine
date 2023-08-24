@@ -65,11 +65,19 @@ map_t *map_new(map_value_dtor dtor) {
     return array;
 }
 
-map_t *map_init() {
+map_t *map_long_init() {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
     array->started = false;
     array->dtor = NULL;
-    array->dict = co_ht_map_by_init();
+    array->dict = co_ht_map_long_init();
+    return array;
+}
+
+map_t *map_string_init() {
+    map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
+    array->started = false;
+    array->dtor = NULL;
+    array->dict = co_ht_map_string_init();
     return array;
 }
 
@@ -90,7 +98,7 @@ array_t *array(map_value_dtor dtor, int n_args, ...) {
 }
 
 array_t *range(int start, int stop) {
-    array_t *array = map_init();
+    array_t *array = map_long_init();
 
     array->type = CO_LLONG;
     for (int i = start; i < stop; i++) {
@@ -101,14 +109,15 @@ array_t *range(int start, int stop) {
     return array;
 }
 
-array_t *array_by(int n_args, ...) {
-    array_t *array = map_init();
+array_t *array_long(int n_args, ...) {
+    array_t *array = map_long_init();
     va_list argp;
+    long long p;
 
     array->type = CO_LLONG;
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
-        long long p = va_arg(argp, size_t);
+        p = va_arg(argp, size_t);
         map_push(array, &p);
     }
     va_end(argp);
@@ -117,17 +126,54 @@ array_t *array_by(int n_args, ...) {
     return array;
 }
 
-map_t *map_by(int n_of_Pairs, ...) {
-    map_t *array = map_init();
+array_t *array_str(int n_args, ...) {
+    array_t *array = map_string_init();
+    va_list argp;
+    char *s;
+
+    array->type = CO_STRING;
+    va_start(argp, n_args);
+    for (int i = 0; i < n_args; i++) {
+        s = va_arg(argp, char *);
+        map_push(array, s);
+    }
+    va_end(argp);
+
+    array->as = MAP_ARRAY;
+    return array;
+}
+
+map_t *map_long(int n_of_Pairs, ...) {
+    map_t *array = map_long_init();
     va_list argp;
     const char *k;
+    long long p;
 
     array->type = CO_LLONG;
     va_start(argp, n_of_Pairs);
     for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
-        long long p = va_arg(argp, size_t);
-        array_put(array, k, p);
+        p = va_arg(argp, size_t);
+        map_put(array, k, &p);
+    }
+    va_end(argp);
+
+    array->as = MAP_HASH;
+    return array;
+}
+
+map_t *map_str(int n_of_Pairs, ...) {
+    map_t *array = map_string_init();
+    va_list argp;
+    const char *k;
+    char *s;
+
+    array->type = CO_STRING;
+    va_start(argp, n_of_Pairs);
+    for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
+        k = va_arg(argp, char *);
+        s = va_arg(argp, char *);
+        map_put(array, k, s);
     }
     va_end(argp);
 
@@ -143,6 +189,7 @@ map_t *map_for(map_value_dtor dtor, char *desc, ...) {
     char c, *s;
     void *p;
 
+    array->type = CO_NULL;
     va_start(argp, desc);
     while (*desc) {
         k = va_arg(argp, char *);
@@ -150,12 +197,12 @@ map_t *map_for(map_value_dtor dtor, char *desc, ...) {
             case 'i':
                 // integer argument
                 i = va_arg(argp, size_t);
-                array_put(array, k, i);
+                array_put_long(array, k, i);
                 break;
             case 'c':
                 // character argument
-                c = (char) va_arg(argp, int);
-                array_put(array, k, c);
+                c = (char)va_arg(argp, int);
+                array_put_long(array, k, c);
                 break;
             case 's':
                 // string argument
@@ -183,6 +230,7 @@ map_t *map(map_value_dtor dtor, int n_of_Pairs, ...) {
     map_value_t *p;
     const char *k;
 
+    array->type = CO_OBJ;
     va_start(argp, n_of_Pairs);
     for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
@@ -364,8 +412,12 @@ map_value_t *map_get(map_t *array, const char *key) {
     return (map_value_t *)co_hash_get(array->dict, key);
 }
 
-void array_put(map_t *array, const char *key, long long value) {
+void array_put_long(map_t *array, const char *key, long long value) {
     map_put(array, key, &value);
+}
+
+void array_put_str(map_t *array, const char *key, const char *value) {
+    map_put(array, key, (char *)value);
 }
 
 void map_put(map_t *array, const char *key, void *value) {

@@ -793,7 +793,9 @@ C_API co_ht_result_t *co_ht_result_init(void);
 
 C_API co_ht_map_t *co_ht_map_init(void);
 
-C_API co_ht_map_t *co_ht_map_by_init(void);
+C_API co_ht_map_t *co_ht_map_long_init(void);
+
+C_API co_ht_map_t *co_ht_map_string_init(void);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
@@ -876,9 +878,11 @@ struct map_iterator_s
 };
 
 C_API map_t *map_new(map_value_dtor);
-C_API map_t *map_init(void);
+C_API map_t *map_long_init(void);
+C_API map_t *map_string_init(void);
 C_API map_t *map(map_value_dtor, int, ...);
-C_API map_t *map_by(int, ...);
+C_API map_t *map_long(int, ...);
+C_API map_t *map_str(int, ...);
 C_API map_t *map_for(map_value_dtor dtor, char *desc, ...);
 C_API void map_free(map_t *);
 C_API int map_push(map_t *, void *);
@@ -891,8 +895,10 @@ C_API void map_put(map_t *, const char *, void *);
 C_API map_value_t *map_get(map_t *, const char *);
 C_API array_t *range(int, int);
 C_API array_t *array(map_value_dtor, int, ...);
-C_API array_t *array_by(int, ...);
-C_API void array_put(map_t *array, const char *, long long value);
+C_API array_t *array_long(int, ...);
+C_API array_t *array_str(int, ...);
+C_API void array_put_long(map_t *, const char *, long long value);
+C_API void array_put_str(map_t *, const char *, const char *);
 C_API slice_t *slice(array_t *, int, int);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
