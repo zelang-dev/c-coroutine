@@ -147,7 +147,7 @@ void co_deferred_run(co_routine_t *coro, size_t generation) {
 
     coro->err_recovered = coro->err == NULL;
 
-    if (strcmp(coro->name, "co_main") != 0) {
+  //  if (strcmp(coro->name, "co_main") != 0) {
         for (i = array->elements; i != generation; i--) {
             defer_func_t *defer = &defers[ i - 1 ];
 
@@ -157,7 +157,7 @@ void co_deferred_run(co_routine_t *coro, size_t generation) {
             defer->func(defer->data);
             defer->data = NULL;
         }
-    }
+ //   }
 
     if (coro->err_protected && coro->err_allocated != NULL && coro->err != NULL) {
         if (!ex_context)

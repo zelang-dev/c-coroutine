@@ -822,6 +822,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args) {
     co->halt = false;
     co->synced = false;
     co->wait_active = false;
+    co->wait_group = NULL;
     co->loop_active = false;
     co->args = args;
     co->magic_number = CO_MAGIC_NUMBER;

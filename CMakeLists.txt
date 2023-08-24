@@ -28,7 +28,7 @@ add_library(coroutine STATIC ${lib_files})
 target_link_libraries(coroutine PUBLIC uv_a)
 
 if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D CO_DEBUG ")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D CO_DEBUG -D CO_USE_VALGRIND ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer ")
     find_package(Threads)
     target_link_libraries(coroutine PUBLIC ${CMAKE_THREAD_LIBS_INIT})
