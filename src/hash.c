@@ -102,8 +102,6 @@ void oa_hash_free(oa_hash *htable) {
 
             htable->buckets[ i ]->value = NULL;
         }
-        if (htable->buckets[ i ] != NULL)
-            CO_FREE(htable->buckets[ i ]);
 
         htable->buckets[ i ] = NULL;
     }
