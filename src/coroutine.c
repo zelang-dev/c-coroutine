@@ -825,6 +825,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args) {
     co->wait_group = NULL;
     co->loop_active = false;
     co->args = args;
+    co->results = NULL;
     co->magic_number = CO_MAGIC_NUMBER;
     co->stack_base = (unsigned char *)(co + 1);
 
@@ -976,10 +977,8 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack) {
     coroutine_schedule(t);
 
     if (c->wait_active && c->wait_group != NULL) {
-        char str[ 20 ];
-        snprintf(str, 20, "%d", id);
         t->synced = true;
-        co_hash_put(c->wait_group, str, t);
+        co_hash_put(c->wait_group, co_itoa(id), t);
         c->wait_counter++;
     }
 
@@ -1060,10 +1059,10 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
 }
 
 value_t co_group_get_result(co_ht_result_t *wgr, int cid) {
-    co_value_t *data = (co_value_t *)co_hash_get(wgr, co_itoa(cid));
-    void *res = co_new_by(1, sizeof(data));
+    void *data = co_hash_get(wgr, co_itoa(cid));
+    void *res = co_new_by(1, (sizeof(data) + sizeof(co_value_t) + 1));
     memcpy(res, data, sizeof(data));
-    co_deferred(co_active(), co_hash_free, wgr);
+    co_deferred(co_active(), CO_DEFER(co_hash_free), wgr);
     return ((co_value_t *)res)->value;
 }
 
@@ -1293,6 +1292,13 @@ static void coroutine_scheduler(void) {
                 CO_FREE(co_main_loop_handle);
             }
 #endif
+            if (n_all_coroutine) {
+                for (int i = 0; i < n_all_coroutine; i++)
+                    CO_FREE(all_coroutine[ n_all_coroutine - i ]);
+
+                CO_FREE(all_coroutine);
+            }
+
             if (co_count > 0) {
                 fprintf(stderr, "No runnable coroutines! %d stalled\n", co_count);
                 exit(1);

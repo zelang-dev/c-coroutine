@@ -259,7 +259,7 @@ void map_free(map_t *array) {
         array->head = next;
     }
 
-    CO_FREE(array->dict);
+    co_hash_free(array->dict);
     if (array->slice != NULL)
         slice_free(array->slice);
 

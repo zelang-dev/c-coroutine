@@ -153,7 +153,8 @@ void co_deferred_run(co_routine_t *coro, size_t generation) {
         if (coro->err != NULL && defer->check != NULL)
             coro->err_recovered = false;
 
-        defer->func(defer->data);
+        if (defer->data != NULL)
+            defer->func(defer->data);
         defer->data = NULL;
     }
 
@@ -169,6 +170,10 @@ void co_deferred_run(co_routine_t *coro, size_t generation) {
     }
 
     array->elements = generation;
+    if (coro->err_allocated != NULL){
+        CO_FREE(coro->err_allocated);
+        coro->err_allocated = NULL;
+    }
 }
 
 size_t co_deferred_count(const co_routine_t *coro) {

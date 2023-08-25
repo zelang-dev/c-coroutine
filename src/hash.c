@@ -68,9 +68,9 @@ oa_hash *oa_hash_new(
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx)) {
     oa_hash *htable;
 
-    htable = CO_MALLOC(sizeof(*htable));
+    htable = CO_CALLOC(1, sizeof(oa_hash));
     if (NULL == htable)
-        co_panic("malloc() failed");
+        co_panic("calloc() failed");
 
     htable->size = 0;
     htable->capacity = OA_HASH_INIT_CAPACITY;
@@ -78,9 +78,9 @@ oa_hash *oa_hash_new(
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
 
-    htable->buckets = CO_MALLOC(sizeof(*(htable->buckets)) * htable->capacity);
+    htable->buckets = CO_CALLOC(1, sizeof(*(htable->buckets)) * htable->capacity);
     if (NULL == htable->buckets)
-        co_panic("malloc() failed");
+        co_panic("calloc() failed");
 
     for (int i = 0; i < htable->capacity; i++) {
         htable->buckets[ i ] = NULL;
@@ -103,6 +103,7 @@ void oa_hash_free(oa_hash *htable) {
             htable->buckets[ i ]->value = NULL;
         }
 
+        CO_FREE(htable->buckets[ i ]);
         htable->buckets[ i ] = NULL;
     }
 
@@ -240,11 +241,12 @@ void oa_hash_delete(oa_hash *htable, const void *key) {
         return;
     }
 
-    if (htable->buckets[ idx ]->value != NULL) {
+    if (&htable->buckets[ idx ]->value != NULL) {
         htable->val_ops.free(htable->buckets[ idx ]->value);
     }
 
-    htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
+    if (&htable->buckets[ idx ]->key != NULL)
+        htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
     --htable->size;
 
     oa_hash_put_tombstone(htable, idx);
@@ -293,7 +295,7 @@ static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, con
 
 oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *value) {
     oa_pair *p;
-    p = CO_CALLOC(1, sizeof(p));
+    p = CO_CALLOC(1, sizeof(p) + sizeof(co_value_t) + 1);
     if (NULL == p)
         co_panic("calloc() failed");
 
@@ -342,7 +344,7 @@ void *oa_string_cp(const void *data, void *arg) {
     size_t input_length = strlen(input) + 1;
     char *result;
     size_t copy_size = sizeof(result) * input_length;
-    result = CO_CALLOC(1, copy_size);
+    result = CO_CALLOC(1, copy_size + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
@@ -364,11 +366,11 @@ void *oa_coroutine_cp(const void *data, void *arg) {
 }
 
 void *oa_value_cp(const void *data, void *arg) {
-    co_value_t *result = CO_CALLOC(1, sizeof(data));
+    co_value_t *result = CO_CALLOC(1, sizeof(data) + sizeof(co_value_t) + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
-    memcpy(result, data, sizeof(result));
+    memcpy(result, data, sizeof(data));
     return result;
 }
 
@@ -387,11 +389,11 @@ void oa_string_print(const void *data) {
 void oa_map_free(void *data) {}
 
 void *oa_map_cp(const void *data, void *arg) {
-    map_value_t *result = CO_CALLOC(1, sizeof(data));
+    map_value_t *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t) + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
-    memcpy(result, data, sizeof(result));
+    memcpy(result, data, sizeof(data));
     return result;
 }
 
@@ -400,11 +402,11 @@ bool oa_map_eq(const void *data1, const void *data2, void *arg) {
 }
 
 void *oa_map_cp_long(const void *data, void *arg) {
-    long long *result = CO_CALLOC(1, sizeof(data));
+    long long *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t) + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
-    memcpy(result, data, sizeof(result));
+    memcpy(result, data, sizeof(data));
     return result;
 }
 
