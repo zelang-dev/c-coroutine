@@ -790,7 +790,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args) {
     }
 
     size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void *memory = CO_CALLOC(1, size);
+    void *memory = CO_CALLOC(1, size + sizeof(channel_t) + sizeof(co_value_t));
     if (!memory)
         co_panic("calloc() failed");
 
