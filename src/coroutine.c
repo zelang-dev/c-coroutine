@@ -1023,6 +1023,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_pause();
         wgr = co_ht_result_init();
+        co_deferred(c, CO_DEFER(co_hash_free), wgr);
         oa_pair *pair;
         while (wg->size != 0) {
             for (int i = 0; i < wg->capacity; i++) {
@@ -1059,11 +1060,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
 }
 
 value_t co_group_get_result(co_ht_result_t *wgr, int cid) {
-    void *data = co_hash_get(wgr, co_itoa(cid));
-    void *res = co_new_by(1, (sizeof(data) + sizeof(co_value_t) + 1));
-    memcpy(res, data, sizeof(data));
-    co_deferred(co_active(), CO_DEFER(co_hash_free), wgr);
-    return ((co_value_t *)res)->value;
+    return ((co_value_t *)co_hash_get(wgr, co_itoa(cid)))->value;
 }
 
 void co_result_set(co_routine_t *co, void *data) {
@@ -1294,7 +1291,7 @@ static void coroutine_scheduler(void) {
 #endif
             if (n_all_coroutine) {
                 for (int i = 0; i < n_all_coroutine; i++)
-                    CO_FREE(all_coroutine[ n_all_coroutine - i ]);
+                    co_delete(all_coroutine[ n_all_coroutine - i ]);
 
                 CO_FREE(all_coroutine);
             }
