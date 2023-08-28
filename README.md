@@ -55,14 +55,14 @@ a terminated/finish status.
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and
 execution will begin for the group of coroutines, and wait for all to finished. */
-C_API co_ht_group_t *co_wait_group(void);
+C_API wait_group_t *co_wait_group(void);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will
 wait for all to finished. Returns hast table of results, accessible by coroutine id. */
-C_API co_ht_result_t co_wait(co_ht_group_t *);
+C_API wait_result_t co_wait(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
-C_API value_t co_group_get_result(co_ht_result_t *, int);
+C_API value_t co_group_get_result(wait_result_t *, int);
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *channel(void);
@@ -374,8 +374,6 @@ void *func(void *args)
 {
     channel_t *c = ((channel_t **)args)[0];
     channel_t *quit = ((channel_t **)args)[1];
-    co_defer(channel_free, c);
-    co_defer(channel_free, quit);
 
     for (int i = 0; i < 10; i++)
     {
@@ -558,12 +556,12 @@ void *worker(void *arg)
 int co_main(int argc, char **argv)
 {
     int cid[5];
-    co_ht_group_t *wg = co_wait_group();
+    wait_group_t *wg = co_wait_group();
     for (int i = 1; i <= 5; i++)
     {
        cid[i-1] = co_go(worker, &i);
     }
-    co_ht_result_t *wgr = co_wait(wg);
+    wait_result_t *wgr = co_wait(wg);
 
     printf("\nWorker # %d returned: %d\n",
            cid[2],

@@ -361,8 +361,11 @@ bool oa_coroutine_eq(const void *data1, const void *data2, void *arg) {
 }
 
 void *oa_coroutine_cp(const void *data, void *arg) {
-    co_routine_t *input = (co_routine_t *)data;
-    return input;
+    return (co_routine_t *)data;
+}
+
+void *oa_channel_cp(const void *data, void *arg) {
+    return (channel_t *)data;
 }
 
 void *oa_value_cp(const void *data, void *arg) {
@@ -397,10 +400,6 @@ void *oa_map_cp(const void *data, void *arg) {
     return result;
 }
 
-bool oa_map_eq(const void *data1, const void *data2, void *arg) {
-    return memcmp(data1, data2, sizeof(data2)) == 0 ? true : false;
-}
-
 void *oa_map_cp_long(const void *data, void *arg) {
     long long *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t) + 1);
     if (NULL == result)
@@ -410,23 +409,24 @@ void *oa_map_cp_long(const void *data, void *arg) {
     return result;
 }
 
-bool oa_map_eq_long(const void *data1, const void *data2, void *arg) {
-    return memcmp(data1, data2, sizeof(data2)) == 0 ? true : false;
-}
-
 oa_key_ops oa_key_ops_string = { oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL };
+oa_val_ops oa_val_ops_struct = { oa_coroutine_cp, CO_DEFER(co_delete), oa_value_eq, NULL };
 oa_val_ops oa_val_ops_string = { oa_string_cp, CO_FREE, oa_string_eq, NULL };
-oa_val_ops oa_val_ops_struct = { oa_coroutine_cp, CO_DEFER(co_delete), oa_coroutine_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
-oa_val_ops oa_val_ops_map = { oa_map_cp, oa_map_free, oa_map_eq, NULL };
-oa_val_ops oa_val_ops_map_long = { oa_map_cp_long, CO_FREE, oa_map_eq_long, NULL };
+oa_val_ops oa_val_ops_map_long = { oa_map_cp_long, CO_FREE, oa_value_eq, NULL };
+oa_val_ops oa_val_ops_map = { oa_map_cp, oa_map_free, oa_value_eq, NULL };
+oa_val_ops oa_val_ops_channel = { oa_channel_cp, oa_map_free, oa_value_eq, NULL };
 
-CO_FORCE_INLINE co_ht_group_t *co_ht_group_init() {
-    return (co_ht_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
+CO_FORCE_INLINE wait_group_t *co_ht_group_init() {
+    return (wait_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE co_ht_result_t *co_ht_result_init() {
-    return (co_ht_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
+CO_FORCE_INLINE wait_result_t *co_ht_result_init() {
+    return (wait_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
+}
+
+CO_FORCE_INLINE co_ht_map_t *co_ht_channel_init() {
+    return (co_ht_map_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
 }
 
 CO_FORCE_INLINE co_ht_map_t *co_ht_map_init() {

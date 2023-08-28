@@ -13,6 +13,8 @@ channel_t *channel_create(int elem_size, int bufsize) {
     c->tmp = s;
     c->select_ready = false;
     c->buf = (unsigned char *)(c + 1);
+
+    gc_channel(c);
     return c;
 }
 

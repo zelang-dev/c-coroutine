@@ -8,9 +8,9 @@ static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_ty
     uv_args->n_args = n_args;
     uv_args->is_path = is_path;
 
-    co_ht_group_t *wg = co_wait_group();
+    wait_group_t *wg = co_wait_group();
     int cid = co_uv(fs_init, uv_args);
-    co_ht_result_t *wgr = co_wait(wg);
+    wait_result_t *wgr = co_wait(wg);
     return co_group_get_result(wgr, cid);
 }
 

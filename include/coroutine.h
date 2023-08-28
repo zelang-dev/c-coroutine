@@ -330,8 +330,8 @@ typedef struct routine_s co_routine_t;
 typedef struct oa_hash_s co_hast_t;
 typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
-typedef co_hast_t co_ht_group_t;
-typedef co_hast_t co_ht_result_t;
+typedef co_hast_t wait_group_t;
+typedef co_hast_t wait_result_t;
 typedef co_hast_t co_ht_map_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
@@ -786,10 +786,12 @@ C_API void co_hash_delete(co_hast_t *, const void *);
 C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
 
 /* Creates a new wait group coroutine hash table. */
-C_API co_ht_group_t *co_ht_group_init(void);
+C_API wait_group_t *co_ht_group_init(void);
 
 /* Creates a new wait group results hash table. */
-C_API co_ht_result_t *co_ht_result_init(void);
+C_API wait_result_t *co_ht_result_init(void);
+
+C_API co_ht_map_t *co_ht_channel_init(void);
 
 C_API co_ht_map_t *co_ht_map_init(void);
 
@@ -802,14 +804,14 @@ C_API co_ht_map_t *co_ht_map_string_init(void);
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
-C_API co_ht_group_t *co_wait_group(void);
+C_API wait_group_t *co_wait_group(void);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */
-C_API co_ht_result_t *co_wait(co_ht_group_t *);
+C_API wait_result_t *co_wait(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
-C_API value_t co_group_get_result(co_ht_result_t *, int);
+C_API value_t co_group_get_result(wait_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void *);
 
@@ -855,7 +857,8 @@ struct array_item_s {
     const char *key;
 };
 
-typedef struct map_s {
+typedef struct map_s
+{
     array_item_t *head;
     array_item_t *tail;
     co_ht_map_t *dict;
@@ -1199,6 +1202,10 @@ C_API unsigned long co_async_self(void);
 C_API void co_stack_check(int);
 
 C_API const char *co_itoa(long long number);
+
+C_API void gc_coroutine(co_routine_t *);
+C_API void gc_channel(channel_t *);
+C_API map_t *gc_channel_list(void);
 
 /* Write this function instead of main, this library provides its own main, the scheduler,
 which will call this function as an coroutine! */

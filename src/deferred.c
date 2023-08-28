@@ -153,8 +153,7 @@ void co_deferred_run(co_routine_t *coro, size_t generation) {
         if (coro->err != NULL && defer->check != NULL)
             coro->err_recovered = false;
 
-        if (defer->data != NULL)
-            defer->func(defer->data);
+        defer->func(defer->data);
         defer->data = NULL;
     }
 

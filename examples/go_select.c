@@ -20,8 +20,6 @@ int fibonacci(channel_t *c, channel_t *quit) {
 void *func(void *args) {
     channel_t *c = ((channel_t **)args)[0];
     channel_t *quit = ((channel_t **)args)[ 1 ];
-    co_defer(channel_free, c);
-    co_defer(channel_free, quit);
 
     for (int i = 0; i < 10; i++) {
         printf("%d\n", co_recv(c).integer);

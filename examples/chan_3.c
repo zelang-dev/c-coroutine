@@ -1,7 +1,6 @@
 #include "../include/coroutine.h"
 void *co_2(void *arg) {
     channel_t *c = (channel_t *)arg;
-    co_defer(channel_free, c);
 
     printf("co_2 start\n");
     for (int i = 0; i < 10; i++) {

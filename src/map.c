@@ -224,18 +224,18 @@ map_t *map_for(map_value_dtor dtor, char *desc, ...) {
     return array;
 }
 
-map_t *map(map_value_dtor dtor, int n_of_Pairs, ...) {
+map_t *map(map_value_dtor dtor, int n_of_pairs, ...) {
     map_t *array = map_new(dtor);
     va_list argp;
-    map_value_t *p;
+    void *p;
     const char *k;
 
     array->type = CO_OBJ;
-    va_start(argp, n_of_Pairs);
-    for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
+    va_start(argp, n_of_pairs);
+    for (int i = 0; i < (n_of_pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
         p = va_arg(argp, void *);
-        map_put(array, k, (map_value_t *)p);
+        map_put(array, k, p);
     }
     va_end(argp);
 
@@ -387,7 +387,8 @@ void *map_remove(map_t *array, void *value) {
         return NULL;
 
     for (item = array->head; item != NULL; item = item->next) {
-        if (memcmp(item->value, value, sizeof(item->value)) == 0) {
+        if (memcmp(item->value, value, sizeof(value)) == 0) {
+            co_hash_delete(array->dict, co_itoa(item->indic));
             if (item->prev)
                 item->prev->next = item->next;
             else
@@ -398,7 +399,6 @@ void *map_remove(map_t *array, void *value) {
             else
                 array->tail = item->prev;
 
-            co_hash_delete(array->dict, co_itoa(item->indic));
             array->length--;
 
             return value;
@@ -449,7 +449,7 @@ void map_put(map_t *array, const char *key, void *value) {
             item->prev->next = item;
     } else {
         for (item = array->head; item; item = item->next) {
-            if (memcmp(item->value, has, sizeof(item->value)) == 0) {
+            if (memcmp(item->value, has, sizeof(has)) == 0) {
                 kv = (oa_pair *)co_hash_put(array->dict, key, value);
                 item->key = kv->key;
                 item->value = kv->value;

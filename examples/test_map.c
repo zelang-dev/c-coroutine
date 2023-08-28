@@ -409,8 +409,6 @@ static int test_list(void) {
 }
 
 int co_main(int argc, char **argv) {
-    (void)argc;
-    (void)argv;
 
     ASSERT_FUNC(test_list());
 

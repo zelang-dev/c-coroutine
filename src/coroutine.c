@@ -14,6 +14,9 @@ static void(fastcall *co_swap)(co_routine_t *, co_routine_t *) = 0;
 
 static thread_local uv_loop_t *co_main_loop_handle = NULL;
 
+static thread_local wait_group_t *coroutine_list = NULL;
+static thread_local map_t *channel_list = NULL;
+
 static int main_argc;
 static char **main_argv;
 
@@ -817,7 +820,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args) {
 
     co->func = func;
     co->status = CO_SUSPENDED;
-    co->stack_size = size;
+    co->stack_size = size + sizeof(channel_t) + sizeof(co_value_t);
     co->channeled = false;
     co->halt = false;
     co->synced = false;
@@ -865,8 +868,8 @@ void co_switch(co_routine_t *handle) {
 #endif
     co_active_handle = handle;
     co_active_handle->status = CO_RUNNING;
-    co_current_handle->status = CO_NORMAL;
     co_current_handle = co_previous_handle;
+    co_current_handle->status = CO_NORMAL;
 #if !defined(USE_UCONTEXT)
     co_swap(co_active_handle, co_previous_handle);
 #else
@@ -1007,18 +1010,18 @@ CO_FORCE_INLINE int co_uv(co_callable_t fn, void *arg) {
     return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
-co_ht_group_t *co_wait_group(void) {
+wait_group_t *co_wait_group(void) {
     co_routine_t *c = co_active();
-    co_ht_group_t *wg = co_ht_group_init();
+    wait_group_t *wg = co_ht_group_init();
     c->wait_active = true;
     c->wait_group = wg;
 
     return wg;
 }
 
-co_ht_result_t *co_wait(co_ht_group_t *wg) {
+wait_result_t *co_wait(wait_group_t *wg) {
     co_routine_t *c = co_active();
-    co_ht_result_t *wgr = NULL;
+    wait_result_t *wgr = NULL;
     co_routine_t *co;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_pause();
@@ -1059,7 +1062,7 @@ co_ht_result_t *co_wait(co_ht_group_t *wg) {
     return wgr;
 }
 
-value_t co_group_get_result(co_ht_result_t *wgr, int cid) {
+value_t co_group_get_result(wait_result_t *wgr, int cid) {
     return ((co_value_t *)co_hash_get(wgr, co_itoa(cid)))->value;
 }
 
@@ -1289,13 +1292,19 @@ static void coroutine_scheduler(void) {
                 CO_FREE(co_main_loop_handle);
             }
 #endif
+            if (coroutine_list)
+                co_hash_free(coroutine_list);
+
+            if (channel_list)
+                map_free(channel_list);
+
+
             if (n_all_coroutine) {
                 for (int i = 0; i < n_all_coroutine; i++)
                     co_delete(all_coroutine[ n_all_coroutine - i ]);
-
-                CO_FREE(all_coroutine);
             }
 
+            CO_FREE(all_coroutine);
             if (co_count > 0) {
                 fprintf(stderr, "No runnable coroutines! %d stalled\n", co_count);
                 exit(1);
@@ -1325,8 +1334,11 @@ static void coroutine_scheduler(void) {
             i = t->all_coroutine_slot;
             all_coroutine[ i ] = all_coroutine[ --n_all_coroutine ];
             all_coroutine[ i ]->all_coroutine_slot = i;
-            if (!t->synced && !t->channeled)
+            if (!t->synced && !t->channeled) {
                 co_delete(t);
+            } else if (t->channeled) {
+                gc_coroutine(t);
+            }
         }
     }
 }
@@ -1345,4 +1357,25 @@ int main(int argc, char **argv) {
     coroutine_scheduler();
     fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
     return exiting;
+}
+
+void gc_coroutine(co_routine_t *co) {
+    if (!coroutine_list)
+        coroutine_list = co_ht_group_init();
+    co_hash_put(coroutine_list, co_itoa(co->cid), co);
+}
+
+void gc_channel(channel_t *ch) {
+    if (!channel_list) {
+        channel_list = (map_t *)CO_CALLOC(1, sizeof(map_t));
+        channel_list->started = false;
+        channel_list->dtor = CO_DEFER(channel_free);
+        channel_list->dict = co_ht_channel_init();
+    }
+
+    map_push(channel_list, ch);
+}
+
+map_t *gc_channel_list() {
+    return channel_list;
 }
