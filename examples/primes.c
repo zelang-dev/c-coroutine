@@ -11,7 +11,7 @@ void *prime_co(void *arg) {
 
     p = co_recv(c).integer;
     if (p > goal)
-        exit(0);
+        return 0;
     if (!quiet) {
         printf("%s ", coroutine_get_name());
         printf("%d\n", p);

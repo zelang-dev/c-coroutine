@@ -1292,16 +1292,21 @@ static void coroutine_scheduler(void) {
                 CO_FREE(co_main_loop_handle);
             }
 #endif
-            if (coroutine_list)
-                co_hash_free(coroutine_list);
-
             if (channel_list)
                 map_free(channel_list);
 
+            if (coroutine_list)
+                co_hash_free(coroutine_list);
 
             if (n_all_coroutine) {
-                for (int i = 0; i < n_all_coroutine; i++)
-                    co_delete(all_coroutine[ n_all_coroutine - i ]);
+                if (co_count)
+                    n_all_coroutine--;
+
+                for (int i = 0; i < (n_all_coroutine + (co_count != 0)); i++) {
+                    t = all_coroutine[ n_all_coroutine - i ];
+                    if (t)
+                        CO_FREE(t);
+                }
             }
 
             CO_FREE(all_coroutine);
