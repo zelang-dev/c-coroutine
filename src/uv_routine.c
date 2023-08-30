@@ -95,7 +95,7 @@ static void *fs_init(void *uv_args) {
 
     co_defer(CO_DEFER(uv_fs_req_cleanup), req);
     if (fs->is_path) {
-        const char *path = args[ 0 ].value.string;
+        const char *path = args[ 0 ].value.char_ptr;
         switch (fs->fs_type) {
             case UV_FS_OPEN:
                 flags = args[ 1 ].value.integer;
@@ -110,7 +110,7 @@ static void *fs_init(void *uv_args) {
                 result = uv_fs_mkdir(loop, req, path, mode, fs_cb);
                 break;
             case UV_FS_RENAME:
-                n_path = args[ 1 ].value.string;
+                n_path = args[ 1 ].value.char_ptr;
                 result = uv_fs_rename(loop, req, path, n_path, fs_cb);
                 break;
             case UV_FS_CHMOD:
@@ -128,11 +128,11 @@ static void *fs_init(void *uv_args) {
                 result = uv_fs_chown(loop, req, path, uid, gid, fs_cb);
                 break;
             case UV_FS_LINK:
-                n_path = args[ 1 ].value.string;
+                n_path = args[ 1 ].value.char_ptr;
                 result = uv_fs_link(loop, req, path, n_path, fs_cb);
                 break;
             case UV_FS_SYMLINK:
-                n_path = args[ 1 ].value.string;
+                n_path = args[ 1 ].value.char_ptr;
                 flags = args[ 2 ].value.integer;
                 result = uv_fs_symlink(loop, req, path, n_path, flags, fs_cb);
                 break;
@@ -140,7 +140,7 @@ static void *fs_init(void *uv_args) {
                 result = uv_fs_rmdir(loop, req, path, fs_cb);
                 break;
             case UV_FS_FSTAT:
-                n_path = args[ 1 ].value.string;
+                n_path = args[ 1 ].value.char_ptr;
                 result = uv_fs_lstat(loop, req, path, fs_cb);
                 break;
             case UV_FS_STAT:
@@ -233,7 +233,7 @@ uv_file co_fs_open(const char *path, int flags, int mode) {
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     args = (co_value_t *)co_new_by(3, sizeof(co_value_t));
 
-    args[ 0 ].value.string = (char *)path;
+    args[ 0 ].value.char_ptr = (char *)path;
     args[ 1 ].value.integer = flags;
     args[ 2 ].value.integer = mode;
 

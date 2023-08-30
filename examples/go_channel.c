@@ -17,7 +17,7 @@ int co_main(int argc, char **argv) {
     // function call with goroutine
     co_go(sendData, ch);
     // receive channel data
-    printf("%s\n", co_recv(ch).chars);
+    printf("%s\n", co_recv(ch).str);
 
     return 0;
 }

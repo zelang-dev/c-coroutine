@@ -66,9 +66,7 @@ oa_hash *oa_hash_new(
     oa_key_ops key_ops,
     oa_val_ops val_ops,
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx)) {
-    oa_hash *htable;
-
-    htable = CO_CALLOC(1, sizeof(oa_hash));
+    oa_hash *htable = CO_CALLOC(1, sizeof(*htable));
     if (NULL == htable)
         co_panic("calloc() failed");
 
@@ -195,6 +193,37 @@ void *oa_hash_put(oa_hash *htable, const void *key, const void *value) {
     return htable->buckets[ idx ];
 }
 
+void *oa_hash_replace(oa_hash *htable, const void *key, const void *value) {
+
+    if (oa_hash_should_grow(htable)) {
+        oa_hash_grow(htable);
+    }
+
+    uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
+    size_t idx = hash_val % htable->capacity;
+
+    // // Probing for the next good index
+    idx = oa_hash_getidx(htable, idx, hash_val, key, PUT);
+
+    if (NULL == htable->buckets[ idx ]) {
+        htable->buckets[ idx ] = oa_pair_new(
+            hash_val,
+            htable->key_ops.cp(key, htable->key_ops.arg),
+            htable->val_ops.cp(value, htable->val_ops.arg));
+    } else {
+        // Update the new values
+        memcpy(htable->buckets[ idx ]->value, value, sizeof(htable->buckets[ idx ]->value));
+        memcpy(htable->buckets[ idx ]->key, key, sizeof(htable->buckets[ idx ]->key));
+        htable->buckets[ idx ]->hash = hash_val;
+        --htable->size;
+
+    }
+
+    htable->size++;
+
+    return htable->buckets[ idx ];
+}
+
 inline static bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
     if (NULL == htable->buckets[ idx ]) {
         return false;
@@ -241,12 +270,8 @@ void oa_hash_delete(oa_hash *htable, const void *key) {
         return;
     }
 
-    if (&htable->buckets[ idx ]->value != NULL) {
-        htable->val_ops.free(htable->buckets[ idx ]->value);
-    }
-
-    if (&htable->buckets[ idx ]->key != NULL)
-        htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
+    htable->val_ops.free(htable->buckets[ idx ]->value);
+    htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
     --htable->size;
 
     oa_hash_put_tombstone(htable, idx);
@@ -294,8 +319,7 @@ static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, con
 // Pair related
 
 oa_pair *oa_pair_new(uint32_t hash, const void *key, const void *value) {
-    oa_pair *p;
-    p = CO_CALLOC(1, sizeof(p) + sizeof(co_value_t) + 1);
+    oa_pair *p = CO_CALLOC(1, sizeof(*p) + sizeof(key) + sizeof(value) + 2);
     if (NULL == p)
         co_panic("calloc() failed");
 
@@ -342,14 +366,12 @@ uint32_t oa_string_hash(const void *data, void *arg) {
 void *oa_string_cp(const void *data, void *arg) {
     const char *input = (const char *)data;
     size_t input_length = strlen(input) + 1;
-    char *result;
-    size_t copy_size = sizeof(result) * input_length;
-    result = CO_CALLOC(1, copy_size + 1);
+    char *result = CO_CALLOC(1, sizeof(*result) * input_length + sizeof(co_value_t) + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
 #if defined(_WIN32) || defined(_WIN64)
-    strcpy_s(result, copy_size, input);
+    strcpy_s(result, input_length, input);
 #else
     strcpy(result, input);
 #endif
@@ -401,7 +423,7 @@ void *oa_map_cp(const void *data, void *arg) {
 }
 
 void *oa_map_cp_long(const void *data, void *arg) {
-    long long *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t) + 1);
+    long long *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t));
     if (NULL == result)
         co_panic("calloc() failed");
 
@@ -447,6 +469,10 @@ CO_FORCE_INLINE void co_hash_free(co_hast_t *htable) {
 
 CO_FORCE_INLINE void *co_hash_put(co_hast_t *htable, const void *key, const void *value) {
     return oa_hash_put(htable, key, value);
+}
+
+CO_FORCE_INLINE void *co_hash_replace(co_hast_t *htable, const void *key, const void *value) {
+    return oa_hash_replace(htable, key, value);
 }
 
 CO_FORCE_INLINE void *co_hash_get(co_hast_t *htable, const void *key) {

@@ -145,7 +145,7 @@ typedef union
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *string;
-    const char chars[512];
+    const char str[512];
     char **array;
     void *object;
     co_callable_t func;
@@ -210,7 +210,7 @@ func greetings(name string) {
 
 void *greetings(void *arg)
 {
-    const char *name = co_value(arg).chars;
+    const char *name = co_value(arg).str;
     for (int i = 0; i < 3; i++)
     {
         printf("%d ==> %s\n", i, name);
@@ -295,7 +295,7 @@ int co_main(int argc, char **argv)
     // function call with goroutine
     co_go(sendData, ch);
     // receive channel data
-    printf("%s\n", co_recv(ch)->value.chars);
+    printf("%s\n", co_recv(ch)->value.str);
 
     return 0;
 }

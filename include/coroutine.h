@@ -509,8 +509,8 @@ enum value_types
     CO_BOOL,
     CO_UCHAR,
     CO_UCHAR_P,
+    CO_CHAR_P,
     CO_STRING,
-    CO_CCHAR,
     CO_ARRAY,
     CO_OBJ,
     CO_FUNC
@@ -530,8 +530,8 @@ typedef union
     bool boolean;
     unsigned char uchar;
     unsigned char *uchar_ptr;
-    char *string;
-    const char chars[512];
+    char *char_ptr;
+    const char str[512];
     char **array;
     void *object;
     co_callable_t func;
@@ -781,6 +781,7 @@ struct oa_hash_s {
 
 C_API void co_hash_free(co_hast_t *);
 C_API void *co_hash_put(co_hast_t *, const void *, const void *);
+C_API void *co_hash_replace(co_hast_t *, const void *, const void *);
 C_API void *co_hash_get(co_hast_t *, const void *);
 C_API void co_hash_delete(co_hast_t *, const void *);
 C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
@@ -832,8 +833,8 @@ typedef union {
     bool boolean;
     unsigned char uchar;
     unsigned char *uchar_ptr;
-    char *string;
-    const char chars[64];
+    char *char_ptr;
+    const char str[64];
     char **array;
     void *object;
     func_t func;
@@ -853,25 +854,29 @@ struct array_item_s {
     map_value_t *value;
     array_item_t *prev;
     array_item_t *next;
-    int indic;
+    long long indic;
     const char *key;
 };
 
-typedef struct map_s
+typedef struct map_s map_t;
+typedef map_t slice_t;
+struct map_s
 {
     array_item_t *head;
     array_item_t *tail;
     co_ht_map_t *dict;
     map_value_dtor dtor;
-    int indices;
+    long long indices;
     size_t length;
-    void *slice;
+    int no_slices;
+    slice_t **slice;
+    map_t *self;
     enum map_data_type as;
     enum value_types type;
     bool started;
-} map_t;
+    bool sliced;
+};
 
-typedef map_t slice_t;
 typedef map_t array_t;
 struct map_iterator_s
 {
@@ -896,22 +901,28 @@ C_API size_t map_count(map_t *);
 C_API void *map_remove(map_t *, void *);
 C_API void map_put(map_t *, const char *, void *);
 C_API map_value_t *map_get(map_t *, const char *);
-C_API array_t *range(int, int);
-C_API array_t *array(map_value_dtor, int, ...);
-C_API array_t *array_long(int, ...);
-C_API array_t *array_str(int, ...);
+C_API array_t *range(int start, int stop);
+C_API array_t *array(map_value_dtor, int n_args, ...);
+C_API array_t *array_long(int n_args, ...);
+C_API array_t *array_str(int n_args, ...);
 C_API void array_put_long(map_t *, const char *, long long value);
 C_API void array_put_str(map_t *, const char *, const char *);
-C_API slice_t *slice(array_t *, int, int);
+C_API slice_t *slice(array_t *, long long start, long long end);
+C_API const char *slice_find(map_t *array, long long index);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
 C_API map_value iter_value(map_iter_t *);
 C_API const char *iter_key(map_iter_t *);
 C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);
+C_API void println(int n_of_maps, ...);
+
+#define $(list, index) map_get((list), slice_find((list), index))->value
+#define $$(list, index, value) map_put((list), slice_find((list), index), (value))
 
 #define in ,
-#define kv(key, value) key, value
+#define array_free map_free
+#define kv(key, value) (key), (value)
 #define has(i) iter_value(i)
 #define indic(i) iter_key(i)
 #define foreach_xp(X, A) X A
@@ -925,6 +936,7 @@ C_API void iter_free(map_iter_t *);
   X = iter_next(X))
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 #define reverse(...) foreach_xp(reverse_in, (__VA_ARGS__))
+#define ranging(...) foreach(__VA_ARGS__)
 
 #define EX_CAT(a, b) a ## b
 

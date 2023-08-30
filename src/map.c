@@ -1,32 +1,67 @@
 #include "../include/coroutine.h"
 
-static void slice_free(slice_t *array) {
+void println(int n_of_maps, ...) {
+    va_list argp;
+    void *list;
+    int type;
+
+    va_start(argp, n_of_maps);
+    for (int i = 0; i < n_of_maps; i++) {
+        list = va_arg(argp, void *);
+        type = ((map_t *)list)->type;
+        foreach(item in list) {
+            if (type == CO_LLONG)
+                printf("%lld ", has(item).long_long);
+            else if (type == CO_STRING)
+                printf("%s ", has(item).str);
+            else if (type == CO_OBJ)
+                printf("%p ", has(item).object);
+            else if (type == CO_BOOL)
+                printf(has(item).boolean ? "true " : "false ");
+        }
+    }
+    va_end(argp);
+    puts("");
+}
+
+static void slice_free(array_t *array) {
     array_item_t *next;
+    slice_t *each;
 
     if (!array)
         return;
 
-    while (array->head) {
-        CO_FREE((void *)array->head->key);
-        next = array->head->next;
-        CO_FREE(array->head);
-        array->head = next;
+    for (int i = 0; i <= array->no_slices; i++) {
+        each = array->slice[ array->no_slices - i ];
+        if (each) {
+            while (each->head) {
+                CO_FREE((void *)each->head->key);
+                next = each->head->next;
+                CO_FREE(each->head);
+                each->head = next;
+            }
+            CO_FREE(each);
+        }
     }
 
-    CO_FREE(array);
+    CO_FREE(array->slice);
 }
 
-static void slice_set(slice_t *array, const char *key, void *value) {
-    array_item_t *item;
-
-    item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
-    item->key = CO_CALLOC(1, sizeof(key));
+static void slice_set(slice_t *array, const char *key, map_value_t *value, long long index) {
+    array_item_t *item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
+    size_t copy_size = strlen(key) + 1;
+    char *result = (char *)CO_CALLOC(1, copy_size + 1);
+    if (NULL == result)
+        co_panic("calloc() failed");
 
 #if defined(_WIN32) || defined(_WIN64)
-    strcpy_s((char *)item->key, sizeof(item->key), key);
+    strcpy_s(result, copy_size, key);
 #else
-    strcpy((char *)item->key, key);
+    strcpy(result, key);
 #endif
+
+    item->indic = index;
+    item->key = result;
     item->value = value;
     item->prev = array->tail;
     item->next = NULL;
@@ -40,21 +75,50 @@ static void slice_set(slice_t *array, const char *key, void *value) {
         item->prev->next = item;
 }
 
-slice_t *slice(array_t *array, int start, int end) {
+slice_t *slice(array_t *array, long long start, long long end) {
     if (array->as != MAP_ARRAY)
         co_panic("slice() only accept `array` type!");
 
-    slice_t *slice = (slice_t *)CO_CALLOC(1, sizeof(slice_t));
-
-    for (int i = start; i < end; i++) {
-        const char *key = co_itoa(i);
-        slice_set(slice, key, map_get(array, key));
+    if (array->no_slices % 64 == 0) {
+        array->slice = CO_REALLOC(array->slice, (array->no_slices + 64) * sizeof(array->slice[ 0 ]));
+        if (array->slice == NULL)
+            co_panic("realloc() failed");
     }
 
-    array->slice = slice;
+    slice_t *slice = (slice_t *)CO_CALLOC(1, sizeof(slice_t));
+    long long index = 0;
+    for (long long i = start; i < end; i++) {
+        const char *key = co_itoa(i);
+        slice_set(slice, key, map_get(array, key), index);
+        index++;
+    }
+
+    slice->sliced = true;
+    slice->type = array->type;
     slice->dict = array->dict;
+    slice->self = array;
+    array->slice[ array->no_slices++ ] = slice;
+    array->slice[ array->no_slices ] = NULL;
 
     return slice;
+}
+
+const char *slice_find(map_t *array, long long index) {
+    array_item_t *item;
+
+    if (!array)
+        return NULL;
+
+    if (!array->sliced)
+        return co_itoa(index);
+
+    for (item = array->head; item != NULL; item = item->next) {
+        if (item->indic == index) {
+            return item->key;
+        }
+    }
+
+    return NULL;
 }
 
 map_t *map_new(map_value_dtor dtor) {
@@ -86,6 +150,7 @@ array_t *array(map_value_dtor dtor, int n_args, ...) {
     va_list argp;
     void *p;
 
+    array->no_slices = 0;
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
         p = va_arg(argp, void *);
@@ -100,6 +165,7 @@ array_t *array(map_value_dtor dtor, int n_args, ...) {
 array_t *range(int start, int stop) {
     array_t *array = map_long_init();
 
+    array->no_slices = 0;
     array->type = CO_LLONG;
     for (int i = start; i < stop; i++) {
         map_push(array, &i);
@@ -114,10 +180,11 @@ array_t *array_long(int n_args, ...) {
     va_list argp;
     long long p;
 
+    array->no_slices = 0;
     array->type = CO_LLONG;
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
-        p = va_arg(argp, size_t);
+        p = va_arg(argp, long long);
         map_push(array, &p);
     }
     va_end(argp);
@@ -131,6 +198,7 @@ array_t *array_str(int n_args, ...) {
     va_list argp;
     char *s;
 
+    array->no_slices = 0;
     array->type = CO_STRING;
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
@@ -143,17 +211,17 @@ array_t *array_str(int n_args, ...) {
     return array;
 }
 
-map_t *map_long(int n_of_Pairs, ...) {
+map_t *map_long(int n_of_pairs, ...) {
     map_t *array = map_long_init();
     va_list argp;
     const char *k;
     long long p;
 
     array->type = CO_LLONG;
-    va_start(argp, n_of_Pairs);
-    for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
+    va_start(argp, n_of_pairs);
+    for (int i = 0; i < (n_of_pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
-        p = va_arg(argp, size_t);
+        p = va_arg(argp, long long);
         map_put(array, k, &p);
     }
     va_end(argp);
@@ -162,15 +230,15 @@ map_t *map_long(int n_of_Pairs, ...) {
     return array;
 }
 
-map_t *map_str(int n_of_Pairs, ...) {
+map_t *map_str(int n_of_pairs, ...) {
     map_t *array = map_string_init();
     va_list argp;
     const char *k;
     char *s;
 
     array->type = CO_STRING;
-    va_start(argp, n_of_Pairs);
-    for (int i = 0; i < (n_of_Pairs * 2); i = i + 2) {
+    va_start(argp, n_of_pairs);
+    for (int i = 0; i < (n_of_pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
         s = va_arg(argp, char *);
         map_put(array, k, s);
@@ -253,7 +321,6 @@ void map_free(map_t *array) {
         if (array->dtor)
             array->dtor(array->head->value);
 
-        co_hash_delete(array->dict, array->head->key);
         next = array->head->next;
         CO_FREE(array->head);
         array->head = next;
@@ -261,7 +328,7 @@ void map_free(map_t *array) {
 
     co_hash_free(array->dict);
     if (array->slice != NULL)
-        slice_free(array->slice);
+        slice_free(array);
 
     CO_FREE(array);
 }
@@ -293,7 +360,7 @@ int map_push(map_t *array, void *value) {
     else
         item->prev->next = item;
 
-    return item->indic;
+    return (int)item->indic;
 }
 
 map_value_t *map_pop(map_t *array) {
@@ -450,9 +517,14 @@ void map_put(map_t *array, const char *key, void *value) {
     } else {
         for (item = array->head; item; item = item->next) {
             if (memcmp(item->value, has, sizeof(has)) == 0) {
-                kv = (oa_pair *)co_hash_put(array->dict, key, value);
-                item->key = kv->key;
-                item->value = kv->value;
+                if (array->sliced) {
+                    co_hash_replace(array->dict, key, value);
+                } else {
+                    kv = (oa_pair *)co_hash_put(array->dict, key, value);
+                    item->key = kv->key;
+                    item->value = kv->value;
+                }
+
                 break;
             }
         }
@@ -460,11 +532,10 @@ void map_put(map_t *array, const char *key, void *value) {
 }
 
 map_iter_t *iter_new(map_t *array, bool forward) {
-
     if (array && array->head) {
         map_iter_t *iterator;
 
-        iterator = (map_iter_t *)CO_MALLOC(sizeof(map_iter_t));
+        iterator = (map_iter_t *)CO_CALLOC(1, sizeof(map_iter_t));
         iterator->array = array;
         iterator->item = forward ? array->head : array->tail;
         iterator->forward = forward;
