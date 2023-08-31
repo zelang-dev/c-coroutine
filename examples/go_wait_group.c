@@ -1,7 +1,7 @@
 #include "../include/coroutine.h"
 
 void *worker(void *arg) {
-    // int id = co_value(arg).integer;
+    // int id = c_int(arg);
     int id = co_id();
     printf("Worker %d starting\n", id);
 

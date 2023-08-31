@@ -947,6 +947,27 @@ C_API void println(int n_of_maps, ...);
 #define reverse(...) foreach_xp(reverse_in, (__VA_ARGS__))
 #define ranging(...) foreach(__VA_ARGS__)
 
+#define c_int(data) co_value((data)).integer
+#define c_long(data) co_value((data)).s_long
+#define c_int64(data) co_value((data)).long_long
+#define c_unsigned_int(data) co_value((data)).u_int
+#define c_unsigned_long(data) co_value((data)).u_long
+#define c_size_t(data) co_value((data)).max_size
+#define c_const_char(data) co_value((data)).str
+#define c_char(data) co_value((data)).schar
+#define c_char_ptr(data) co_value((data)).char_ptr
+#define c_bool(data) co_value((data)).boolean
+#define c_float(data) co_value((data)).point
+#define c_double(data) co_value((data)).precision
+#define c_unsigned_char(data) co_value((data)).uchar
+#define c_char_ptr_ptr(data) co_value((data)).array
+#define c_unsigned_char_ptr(data) co_value((data)).uchar_ptr
+#define c_short(data) co_value((data)).s_short
+#define c_unsigned_short(data) co_value((data)).u_short
+#define c_void_ptr(data) co_value((data)).object
+#define c_callable(data) co_value((data)).func
+#define c_cast_ptr(type, data) (type *)co_value((data)).object
+
 #define EX_CAT(a, b) a ## b
 
 #define EX_STR_(a) #a

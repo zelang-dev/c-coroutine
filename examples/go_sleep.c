@@ -2,7 +2,7 @@
 #include "../include/coroutine.h"
 
 void *greetings(void *arg) {
-    const char *name = co_value(arg).str;
+    const char *name = c_const_char(arg);
     for (int i = 0; i < 3; i++) {
         printf("%d ==> %s\n", i, name);
         co_sleep(1);

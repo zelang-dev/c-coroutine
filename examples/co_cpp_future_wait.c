@@ -2,7 +2,7 @@
 
 // a non-optimized way of checking for prime numbers:
 void *is_prime(void *arg) {
-    int x = co_value(arg).integer;
+    int x = c_int(arg);
     for (int i = 2; i < x; ++i) if (x % i == 0) return (void *)false;
     return (void *)true;
 }
