@@ -12,7 +12,7 @@ int co_main(int argc, char **argv) {
     b = slice(names, 1, 3);
     println(2, a, b);
 
-    $$(b, 0, "XXX");
+    $$(b, 0, "XXXX");
     println(2, a, b);
 
     println(1, names);

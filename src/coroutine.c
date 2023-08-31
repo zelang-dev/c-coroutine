@@ -120,7 +120,7 @@ uv_loop_t *co_loop() {
     return uv_default_loop();
 }
 
-const char *co_itoa(long long number) {
+const char *co_itoa(int64_t number) {
     snprintf(co_active()->scrape, 32, "%lld", number);
     return co_active()->scrape;
 }
@@ -310,13 +310,13 @@ co_routine_t *co_derive(void *memory, size_t size) {
         size_t stack_top = (size_t)handle + size;
         stack_top -= 32;
         stack_top &= ~((size_t)15);
-        long long *p = (long long *)(stack_top); /* seek to top of stack */
-        *--p = (long long)co_done;               /* if coroutine returns */
-        *--p = (long long)co_awaitable;
-        *(long long *)handle = (long long)p;                  /* stack pointer */
+        int64_t *p = (int64_t *)(stack_top); /* seek to top of stack */
+        *--p = (int64_t)co_done;               /* if coroutine returns */
+        *--p = (int64_t)co_awaitable;
+        *(int64_t *)handle = (int64_t)p;                  /* stack pointer */
 #if defined(_WIN32) && !defined(CO_NO_TIB)
-        ((long long *)handle)[ 30 ] = (long long)handle + size; /* stack base */
-        ((long long *)handle)[ 31 ] = (long long)handle;        /* stack limit */
+        ((int64_t *)handle)[ 30 ] = (int64_t)handle + size; /* stack base */
+        ((int64_t *)handle)[ 31 ] = (int64_t)handle;        /* stack limit */
 #endif
 
 #ifdef CO_USE_VALGRIND

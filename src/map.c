@@ -47,7 +47,7 @@ static void slice_free(array_t *array) {
     CO_FREE(array->slice);
 }
 
-static void slice_set(slice_t *array, const char *key, map_value_t *value, long long index) {
+static void slice_set(slice_t *array, const char *key, map_value_t *value, int64_t index) {
     array_item_t *item = (array_item_t *)CO_CALLOC(1, sizeof(array_item_t));
     size_t copy_size = strlen(key) + 1;
     char *result = (char *)CO_CALLOC(1, copy_size + 1);
@@ -75,7 +75,7 @@ static void slice_set(slice_t *array, const char *key, map_value_t *value, long 
         item->prev->next = item;
 }
 
-slice_t *slice(array_t *array, long long start, long long end) {
+slice_t *slice(array_t *array, int64_t start, int64_t end) {
     if (array->as != MAP_ARRAY)
         co_panic("slice() only accept `array` type!");
 
@@ -86,8 +86,8 @@ slice_t *slice(array_t *array, long long start, long long end) {
     }
 
     slice_t *slice = (slice_t *)CO_CALLOC(1, sizeof(slice_t));
-    long long index = 0;
-    for (long long i = start; i < end; i++) {
+    int64_t index = 0;
+    for (int64_t i = start; i < end; i++) {
         const char *key = co_itoa(i);
         slice_set(slice, key, map_get(array, key), index);
         index++;
@@ -96,14 +96,13 @@ slice_t *slice(array_t *array, long long start, long long end) {
     slice->sliced = true;
     slice->type = array->type;
     slice->dict = array->dict;
-    slice->self = array;
     array->slice[ array->no_slices++ ] = slice;
     array->slice[ array->no_slices ] = NULL;
 
     return slice;
 }
 
-const char *slice_find(map_t *array, long long index) {
+const char *slice_find(map_t *array, int64_t index) {
     array_item_t *item;
 
     if (!array)
@@ -178,13 +177,13 @@ array_t *range(int start, int stop) {
 array_t *array_long(int n_args, ...) {
     array_t *array = map_long_init();
     va_list argp;
-    long long p;
+    int64_t p;
 
     array->no_slices = 0;
     array->type = CO_LLONG;
     va_start(argp, n_args);
     for (int i = 0; i < n_args; i++) {
-        p = va_arg(argp, long long);
+        p = va_arg(argp, int64_t);
         map_push(array, &p);
     }
     va_end(argp);
@@ -215,13 +214,13 @@ map_t *map_long(int n_of_pairs, ...) {
     map_t *array = map_long_init();
     va_list argp;
     const char *k;
-    long long p;
+    int64_t p;
 
     array->type = CO_LLONG;
     va_start(argp, n_of_pairs);
     for (int i = 0; i < (n_of_pairs * 2); i = i + 2) {
         k = va_arg(argp, char *);
-        p = va_arg(argp, long long);
+        p = va_arg(argp, int64_t);
         map_put(array, k, &p);
     }
     va_end(argp);
@@ -253,7 +252,7 @@ map_t *map_for(map_value_dtor dtor, char *desc, ...) {
     map_t *array = map_new(dtor);
     va_list argp;
     const char *k;
-    long long i;
+    int64_t i;
     char c, *s;
     void *p;
 
@@ -479,7 +478,7 @@ map_value_t *map_get(map_t *array, const char *key) {
     return (map_value_t *)co_hash_get(array->dict, key);
 }
 
-void array_put_long(map_t *array, const char *key, long long value) {
+void array_put_long(map_t *array, const char *key, int64_t value) {
     map_put(array, key, &value);
 }
 

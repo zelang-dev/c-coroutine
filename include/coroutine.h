@@ -499,7 +499,7 @@ enum value_types
 {
     CO_NULL = -1,
     CO_INT,
-    CO_SINT,
+    CO_UINT,
     CO_SLONG,
     CO_ULONG,
     CO_LLONG,
@@ -507,11 +507,15 @@ enum value_types
     CO_FLOAT,
     CO_DOUBLE,
     CO_BOOL,
+    CO_SHORT,
+    CO_USHORT,
+    CO_CHAR,
     CO_UCHAR,
     CO_UCHAR_P,
     CO_CHAR_P,
     CO_STRING,
     CO_ARRAY,
+    CO_HASH,
     CO_OBJ,
     CO_FUNC
 };
@@ -520,7 +524,7 @@ enum value_types
 typedef union
 {
     int integer;
-    signed int s_int;
+    unsigned int u_int;
     signed long s_long;
     unsigned long u_long;
     long long long_long;
@@ -528,6 +532,9 @@ typedef union
     float point;
     double precision;
     bool boolean;
+    signed short s_short;
+    unsigned short u_short;
+    signed char schar;
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
@@ -823,7 +830,7 @@ typedef struct map_iterator_s map_iter_t;
 typedef struct array_item_s array_item_t;
 typedef union {
     int integer;
-    signed int s_int;
+    unsigned int u_int;
     signed long s_long;
     unsigned long u_long;
     long long long_long;
@@ -831,6 +838,9 @@ typedef union {
     float point;
     double precision;
     bool boolean;
+    signed short s_short;
+    unsigned short u_short;
+    signed char schar;
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
@@ -854,7 +864,7 @@ struct array_item_s {
     map_value_t *value;
     array_item_t *prev;
     array_item_t *next;
-    long long indic;
+    int64_t indic;
     const char *key;
 };
 
@@ -866,11 +876,10 @@ struct map_s
     array_item_t *tail;
     co_ht_map_t *dict;
     map_value_dtor dtor;
-    long long indices;
+    int64_t indices;
     size_t length;
     int no_slices;
     slice_t **slice;
-    map_t *self;
     enum map_data_type as;
     enum value_types type;
     bool started;
@@ -905,10 +914,10 @@ C_API array_t *range(int start, int stop);
 C_API array_t *array(map_value_dtor, int n_args, ...);
 C_API array_t *array_long(int n_args, ...);
 C_API array_t *array_str(int n_args, ...);
-C_API void array_put_long(map_t *, const char *, long long value);
+C_API void array_put_long(map_t *, const char *, int64_t value);
 C_API void array_put_str(map_t *, const char *, const char *);
-C_API slice_t *slice(array_t *, long long start, long long end);
-C_API const char *slice_find(map_t *array, long long index);
+C_API slice_t *slice(array_t *, int64_t start, int64_t end);
+C_API const char *slice_find(map_t *array, int64_t index);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
 C_API map_value iter_value(map_iter_t *);
@@ -1213,7 +1222,7 @@ C_API unsigned long co_async_self(void);
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
-C_API const char *co_itoa(long long number);
+C_API const char *co_itoa(int64_t number);
 
 C_API void gc_coroutine(co_routine_t *);
 C_API void gc_channel(channel_t *);

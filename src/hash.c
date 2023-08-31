@@ -216,11 +216,9 @@ void *oa_hash_replace(oa_hash *htable, const void *key, const void *value) {
         memcpy(htable->buckets[ idx ]->key, key, sizeof(htable->buckets[ idx ]->key));
         htable->buckets[ idx ]->hash = hash_val;
         --htable->size;
-
     }
 
     htable->size++;
-
     return htable->buckets[ idx ];
 }
 
@@ -423,7 +421,7 @@ void *oa_map_cp(const void *data, void *arg) {
 }
 
 void *oa_map_cp_long(const void *data, void *arg) {
-    long long *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t));
+    int64_t *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t));
     if (NULL == result)
         co_panic("calloc() failed");
 
