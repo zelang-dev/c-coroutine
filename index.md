@@ -134,7 +134,7 @@ C_API void co_defer_recover(recover_func, void *);
 typedef union
 {
     int integer;
-    signed int s_int;
+    unsigned int u_int;
     signed long s_long;
     unsigned long u_long;
     long long long_long;
@@ -142,9 +142,12 @@ typedef union
     float point;
     double precision;
     bool boolean;
+    signed short s_short;
+    unsigned short u_short;
+    signed char schar;
     unsigned char uchar;
     unsigned char *uchar_ptr;
-    char *string;
+    char *char_ptr;
     const char str[512];
     char **array;
     void *object;
@@ -207,7 +210,7 @@ func greetings(name string) {
 
 void *greetings(void *arg)
 {
-    const char *name = co_value(arg).str;
+    const char *name = c_const_char(arg);
     for (int i = 0; i < 3; i++)
     {
         printf("%d ==> %s\n", i, name);
@@ -733,7 +736,7 @@ func main() {
 #include "../include/coroutine.h"
 
 void *worker(void *arg) {
-    // int id = co_value(arg).integer;
+    // int id = c_int(arg);
     int id = co_id();
     printf("Worker %d starting\n", id);
 
@@ -883,7 +886,7 @@ int main ()
 
 // a non-optimized way of checking for prime numbers:
 void *is_prime(void *arg) {
-    int x = co_value(arg).integer;
+    int x = c_int(arg);
     for (int i = 2; i < x; ++i)
         if (x % i == 0) return (void *)false;
     return (void *)true;
