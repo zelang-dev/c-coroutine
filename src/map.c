@@ -465,6 +465,7 @@ void *map_remove(map_t *array, void *value) {
             else
                 array->tail = item->prev;
 
+            CO_FREE(item);
             array->length--;
 
             return value;
