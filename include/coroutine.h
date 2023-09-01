@@ -105,7 +105,11 @@ Must also closed out with `select_break()`. */
 #endif
 
 #ifndef CO_MAIN_STACK
-    #define CO_MAIN_STACK (1024 * 1024)
+    #define CO_MAIN_STACK (64 * 1024)
+#endif
+
+#ifndef CO_SCRAPE_SIZE
+    #define CO_SCRAPE_SIZE (2 * 64)
 #endif
 
 #if defined(UV_H)
@@ -391,17 +395,16 @@ typedef co_hast_t co_ht_map_t;
 #endif
 
 /* Coroutine context structure. */
-struct routine_s
-{
+struct routine_s {
 #if defined(_WIN32) && defined(_M_IX86)
     void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
-    void *xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
+    void *xmm[ 20 ]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
     void *fiber_storage;
     void *dealloc_stack;
 #elif defined(__x86_64__) || defined(_M_X64)
 #ifdef _WIN32
     void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15, *rdi, *rsi;
-    void *xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
+    void *xmm[ 20 ]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
     void *fiber_storage;
     void *dealloc_stack;
 #else
@@ -411,28 +414,28 @@ struct routine_s
     void *eip, *esp, *ebp, *ebx, *esi, *edi;
 #elif defined(__ARM_EABI__)
 #ifndef __SOFTFP__
-    void *f[16];
+    void *f[ 16 ];
 #endif
-    void *d[4]; /* d8-d15 */
-    void *r[4]; /* r4-r11 */
+    void *d[ 4 ]; /* d8-d15 */
+    void *r[ 4 ]; /* r4-r11 */
     void *lr;
     void *sp;
 #elif defined(__aarch64__)
-    void *x[12]; /* x19-x30 */
+    void *x[ 12 ]; /* x19-x30 */
     void *sp;
     void *lr;
-    void *d[8]; /* d8-d15 */
+    void *d[ 8 ]; /* d8-d15 */
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-    uint64_t gprs[32];
+    uint64_t gprs[ 32 ];
     uint64_t lr;
     uint64_t ccr;
 
     /* FPRs */
-    uint64_t fprs[32];
+    uint64_t fprs[ 32 ];
 
 #ifdef __ALTIVEC__
     /* Altivec (VMX) */
-    uint64_t vmx[12 * 2];
+    uint64_t vmx[ 12 * 2 ];
     uint32_t vrsave;
 #endif
 #else
@@ -452,9 +455,9 @@ struct routine_s
     co_state status;
     co_callable_t func;
     defer_t defer;
-	char name[64];
-	char state[64];
-    char scrape[32];
+    char name[ 64 ];
+    char state[ 64 ];
+    char scrape[ CO_SCRAPE_SIZE ];
     /* unique coroutine id */
     int cid;
     size_t alarm_time;

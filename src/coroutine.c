@@ -121,7 +121,7 @@ uv_loop_t *co_loop() {
 }
 
 const char *co_itoa(int64_t number) {
-    snprintf(co_active()->scrape, 32, "%ld", number);
+    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
     return co_active()->scrape;
 }
 

@@ -27,6 +27,7 @@ CO_FORCE_INLINE channel_t *channel_buf(int elem_count) {
 }
 
 void channel_free(channel_t *c) {
+    c = map_remove(gc_channel_list(), c);
     if (c == NULL)
         return;
 

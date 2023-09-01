@@ -19,12 +19,15 @@ int fibonacci(channel_t *c, channel_t *quit) {
 
 void *func(void *args) {
     channel_t *c = ((channel_t **)args)[0];
-    channel_t *quit = ((channel_t **)args)[ 1 ];
+    channel_t *quit = ((channel_t **)args)[1];
 
     for (int i = 0; i < 10; i++) {
         printf("%d\n", co_recv(c).integer);
     }
     co_send(quit, 0);
+
+    channel_free(c);
+    channel_free(quit);
 
     return 0;
 }
