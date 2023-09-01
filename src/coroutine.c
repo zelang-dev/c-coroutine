@@ -121,7 +121,7 @@ uv_loop_t *co_loop() {
 }
 
 const char *co_itoa(int64_t number) {
-    snprintf(co_active()->scrape, 32, "%lld", number);
+    snprintf(co_active()->scrape, 32, "%ld", number);
     return co_active()->scrape;
 }
 
@@ -977,6 +977,7 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack) {
 
     t->all_coroutine_slot = n_all_coroutine;
     all_coroutine[ n_all_coroutine++ ] = t;
+    all_coroutine[ n_all_coroutine ] = NULL;
     coroutine_schedule(t);
 
     if (c->wait_active && c->wait_group != NULL) {
