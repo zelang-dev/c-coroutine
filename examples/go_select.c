@@ -26,8 +26,13 @@ void *func(void *args) {
     }
     co_send(quit, 0);
 
+    printf("\nChannel `quit` type is: %d, validity: %d\n", type_of(quit), is_valid(quit));
+
     channel_free(c);
     channel_free(quit);
+
+    printf("Channel `quit` freed, validity: %d\n", is_valid(quit));
+    printf("Channel `c` type is: %d accessed after freed!\n\n", type_of(c));
 
     return 0;
 }

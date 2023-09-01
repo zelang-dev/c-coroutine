@@ -1374,6 +1374,7 @@ void gc_coroutine(co_routine_t *co) {
 void gc_channel(channel_t *ch) {
     if (!channel_list) {
         channel_list = (map_t *)CO_CALLOC(1, sizeof(map_t));
+        channel_list->type = CO_MAP_STRUCT;
         channel_list->started = false;
         channel_list->dtor = CO_DEFER(channel_free);
         channel_list->dict = co_ht_channel_init();
@@ -1384,4 +1385,13 @@ void gc_channel(channel_t *ch) {
 
 map_t *gc_channel_list() {
     return channel_list;
+}
+
+bool is_valid(void_t self) {
+    int tester = ((var_t *)self)->type;
+    return (tester >= CO_DEF_ARR) && (tester <= CO_VALUE);
+}
+
+int type_of(void_t self) {
+    return ((var_t *)self)->type;
 }

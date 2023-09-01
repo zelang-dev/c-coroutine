@@ -7,6 +7,7 @@ channel_t *channel_create(int elem_size, int bufsize) {
     if (c == NULL || s == NULL)
         co_panic("channel_create failed");
 
+    c->type = CO_CHANNEL;
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;

@@ -298,6 +298,56 @@ extern "C"
 {
 #endif
 
+enum value_types
+{
+    CO_NULL = -1,
+    CO_INT,
+    CO_UINT,
+    CO_SLONG,
+    CO_ULONG,
+    CO_LLONG,
+    CO_MAXSIZE,
+    CO_FLOAT,
+    CO_DOUBLE,
+    CO_BOOL,
+    CO_SHORT,
+    CO_USHORT,
+    CO_CHAR,
+    CO_UCHAR,
+    CO_UCHAR_P,
+    CO_CHAR_P,
+    CO_STRING,
+    CO_ARRAY,
+    CO_HASH,
+    CO_OBJ,
+    CO_FUNC,
+    CO_DEF_ARR,
+    CO_DEF_FUNC,
+    CO_MAP_VALUE,
+    CO_MAP_STRUCT,
+    CO_MAP_ITER,
+    CO_MAP_ARR,
+    CO_ERR_PTR,
+    CO_ERR_CONTEXT,
+    CO_PROMISE,
+    CO_FUTURE,
+    CO_FUTURE_ARG,
+    CO_UV_ARG,
+    CO_SCHED,
+    CO_CHANNEL,
+    CO_STRUCT,
+    CO_VALUE
+};
+
+typedef void *void_t;
+typedef struct var_s {
+    enum value_types type;
+    void_t value;
+} var_t;
+
+C_API bool is_valid(void_t);
+C_API int type_of(void_t);
+
 typedef struct co_array_s
 {
     void *base;
@@ -306,12 +356,14 @@ typedef struct co_array_s
 
 typedef struct defer_s
 {
+    enum value_types type;
     co_array_t base;
 } defer_t;
 
 typedef void (*defer_func)(void *);
 typedef struct defer_func_s
 {
+    enum value_types type;
     defer_func func;
     void *data;
     void *check;
@@ -494,34 +546,10 @@ struct routine_s {
 /* scheduler queue struct */
 typedef struct co_scheduler_s
 {
+    enum value_types type;
     co_routine_t *head;
     co_routine_t *tail;
 } co_scheduler_t;
-
-enum value_types
-{
-    CO_NULL = -1,
-    CO_INT,
-    CO_UINT,
-    CO_SLONG,
-    CO_ULONG,
-    CO_LLONG,
-    CO_MAXSIZE,
-    CO_FLOAT,
-    CO_DOUBLE,
-    CO_BOOL,
-    CO_SHORT,
-    CO_USHORT,
-    CO_CHAR,
-    CO_UCHAR,
-    CO_UCHAR_P,
-    CO_CHAR_P,
-    CO_STRING,
-    CO_ARRAY,
-    CO_HASH,
-    CO_OBJ,
-    CO_FUNC
-};
 
 /* Generic simple union storage types. */
 typedef union
@@ -548,7 +576,7 @@ typedef union
 } value_t;
 
 /* Cast argument to union co_value_t storage type */
-#define co_args(x)		(co_value_t *)((x))
+#define co_args(x) (co_value_t *)((x))
 typedef struct co_value
 {
     value_t value;
@@ -557,6 +585,7 @@ typedef struct co_value
 
 typedef struct uv_args_s
 {
+    enum value_types type;
     /* allocated array of arguments */
     co_value_t *args;
     co_routine_t *context;
@@ -588,6 +617,7 @@ typedef struct msg_queue_s
 
 typedef struct channel_s
 {
+    enum value_types type;
     unsigned int bufsize;
     unsigned int elem_size;
     unsigned char *buf;
@@ -864,6 +894,7 @@ struct map_value_s {
 };
 
 struct array_item_s {
+    enum value_types type;
     map_value_t *value;
     array_item_t *prev;
     array_item_t *next;
@@ -875,6 +906,7 @@ typedef struct map_s map_t;
 typedef map_t slice_t;
 struct map_s
 {
+    enum value_types type;
     array_item_t *head;
     array_item_t *tail;
     co_ht_map_t *dict;
@@ -884,7 +916,6 @@ struct map_s
     int no_slices;
     slice_t **slice;
     enum map_data_type as;
-    enum value_types type;
     bool started;
     bool sliced;
 };
@@ -892,6 +923,7 @@ struct map_s
 typedef map_t array_t;
 struct map_iterator_s
 {
+    enum value_types type;
     map_t *array;
     array_item_t *item;
     bool forward;
@@ -1145,6 +1177,7 @@ enum
 /* stack of protected pointer */
 struct ex_ptr_s
 {
+    enum value_types type;
     ex_ptr_t *next;
     void (*func)(void *);
     void **ptr;
@@ -1153,6 +1186,7 @@ struct ex_ptr_s
 /* stack of exception */
 struct ex_context_s
 {
+    enum value_types type;
     /* The handler in the stack (which is a FILO container). */
     ex_context_t *next;
     ex_ptr_t *stack;
@@ -1194,6 +1228,7 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 
 typedef struct _promise
 {
+    enum value_types type;
     co_value_t *result;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
@@ -1203,6 +1238,7 @@ typedef struct _promise
 
 typedef struct _future
 {
+    enum value_types type;
     pthread_t thread;
     pthread_attr_t attr;
     void *(*func)(void *);
@@ -1212,6 +1248,7 @@ typedef struct _future
 
 typedef struct _future_arg
 {
+    enum value_types type;
     void *(*func)(void *);
     void *arg;
     promise *value;

@@ -124,6 +124,7 @@ map_t *map_new(map_value_dtor dtor) {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
     array->started = false;
     array->dtor = dtor;
+    array->type = CO_MAP_STRUCT;
     array->dict = co_ht_map_init();
     return array;
 }
@@ -132,6 +133,7 @@ map_t *map_long_init() {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
     array->started = false;
     array->dtor = NULL;
+    array->type = CO_MAP_STRUCT;
     array->dict = co_ht_map_long_init();
     return array;
 }
@@ -140,6 +142,7 @@ map_t *map_string_init() {
     map_t *array = (map_t *)CO_CALLOC(1, sizeof(map_t));
     array->started = false;
     array->dtor = NULL;
+    array->type = CO_MAP_STRUCT;
     array->dict = co_ht_map_string_init();
     return array;
 }
