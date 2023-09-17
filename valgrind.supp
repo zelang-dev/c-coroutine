@@ -1,0 +1,17 @@
+{
+   Instance not valid, reflection routine, after memory freed
+   Memcheck:Addr4
+   fun:is_instance
+}
+
+{
+   Not a valid type, reflection routine, after memory freed
+   Memcheck:Addr4
+   fun:type_of
+}
+
+{
+   Not a valid value type, reflection routine, after memory freed
+   Memcheck:Addr4
+   fun:is_value
+}

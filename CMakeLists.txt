@@ -25,6 +25,7 @@ file(GLOB lib_files
 add_definitions(-DCO_STACK_SIZE=10240)
 add_definitions(-DCO_MAIN_STACK=11264)
 add_definitions(-DCO_SCRAPE_SIZE=64)
+add_definitions(-DHASH_INIT_CAPACITY=512)
 add_library(coroutine STATIC ${lib_files})
 target_link_libraries(coroutine PUBLIC uv_a)
 
@@ -44,7 +45,7 @@ if(WIN32)
 endif()
 
 if(CO_BUILD_TESTS)
-    set(TARGET_LIST co_cpp_future_wait co_cpp_future test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group go_panic go_slice go_slice_ref go_array go_range)
+    set(TARGET_LIST co_cpp_future_wait co_cpp_future test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group go_panic go_slice go_slice_ref go_array go_range go_reflection test_reflect test_map)
     foreach (TARGET ${TARGET_LIST})
         add_executable(${TARGET} examples/${TARGET}.c)
         target_link_libraries(${TARGET} coroutine)

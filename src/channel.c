@@ -1,5 +1,7 @@
 #include "../include/coroutine.h"
 
+static thread_local int channel_id_generate = 0;
+
 channel_t *channel_create(int elem_size, int bufsize) {
     channel_t *c = CO_CALLOC(1, sizeof(channel_t) + bufsize * elem_size);
     co_value_t *s = CO_CALLOC(1, sizeof(co_value_t));
@@ -7,6 +9,7 @@ channel_t *channel_create(int elem_size, int bufsize) {
     if (c == NULL || s == NULL)
         co_panic("channel_create failed");
 
+    c->id = channel_id_generate++;
     c->type = CO_CHANNEL;
     c->elem_size = elem_size;
     c->bufsize = bufsize;
@@ -28,17 +31,21 @@ CO_FORCE_INLINE channel_t *channel_buf(int elem_count) {
 }
 
 void channel_free(channel_t *c) {
-    c = map_remove(gc_channel_list(), c);
     if (c == NULL)
         return;
 
-    if (c->name != NULL)
-        CO_FREE(c->name);
+    if (is_type(c, CO_CHANNEL)) {
+        int id = c->id;
+        if (c->name != NULL)
+            CO_FREE(c->name);
 
-    CO_FREE(c->tmp);
-    CO_FREE(c->a_recv.a);
-    CO_FREE(c->a_send.a);
-    CO_FREE(c);
+        CO_FREE(c->tmp);
+        CO_FREE(c->a_recv.a);
+        CO_FREE(c->a_send.a);
+        CO_FREE(c);
+
+       co_hash_remove(gc_channel_list(), co_itoa(id));
+    }
 }
 
 static void add_msg(msg_queue_t *a, channel_co_t *alt) {
@@ -126,7 +133,7 @@ static void channel_co_all_dequeue(channel_co_t *a) {
             channel_co_dequeue(&a[ i ]);
 }
 
-static void amove(void *dst, void *src, unsigned int n) {
+static void amove(void_t dst, void_t src, unsigned int n) {
     if (dst) {
         if (src == NULL)
             memset(dst, 0, n);
@@ -306,7 +313,7 @@ void channel_print(channel_t *c) {
     printf("--- end print channel ---\n");
 }
 
-static int _channel_op(channel_t *c, unsigned int op, void *p, unsigned int can_block) {
+static int _channel_op(channel_t *c, unsigned int op, void_t p, unsigned int can_block) {
     channel_co_t a[ 2 ];
 
     a[ 0 ].c = c;
@@ -318,7 +325,7 @@ static int _channel_op(channel_t *c, unsigned int op, void *p, unsigned int can_
     return 1;
 }
 
-int co_send(channel_t *c, void *v) {
+int co_send(channel_t *c, void_t v) {
     return _channel_op(c, CHANNEL_SEND, v, 1);
 }
 

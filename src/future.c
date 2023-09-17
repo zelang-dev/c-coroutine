@@ -13,7 +13,7 @@ static unsigned long thread_id(pthread_t thread) {
 #endif
 }
 
-future *future_create(co_callable_t start_routine) {
+future *future_create(callable_t start_routine) {
     future *f = CO_CALLOC(1, sizeof(future));
 
     pthread_attr_init(&f->attr);
@@ -27,26 +27,26 @@ future *future_create(co_callable_t start_routine) {
     return f;
 }
 
-void *future_func_wrapper(void *arg) {
+void_t future_func_wrapper(void_t arg) {
     future_arg *f = (future_arg *)arg;
     f->type = CO_FUTURE_ARG;
-    void *res = f->func(f->arg);
+    void_t res = f->func(f->arg);
     CO_FREE(f);
     pthread_exit(res);
     return res;
 }
 
-void *future_wrapper(void *arg) {
+void_t future_wrapper(void_t arg) {
     future_arg *f = (future_arg *)arg;
     f->type = CO_FUTURE_ARG;
-    void *res = f->func(f->arg);
+    void_t res = f->func(f->arg);
     promise_set(f->value, res);
     CO_FREE(f);
     pthread_exit(res);
     return res;
 }
 
-void async_start(future *f, promise *value, void *arg) {
+void async_start(future *f, promise *value, void_t arg) {
     future_arg *f_arg = CO_CALLOC(1, sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
@@ -55,7 +55,7 @@ void async_start(future *f, promise *value, void *arg) {
     CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
 }
 
-future *co_async(co_callable_t func, void *args) {
+future *co_async(callable_t func, void_t args) {
     future *f = future_create(func);
     promise *p = promise_create();
     f->value = p;
@@ -86,7 +86,7 @@ void co_async_wait(future *f) {
     }
 }
 
-void future_start(future *f, void *arg) {
+void future_start(future *f, void_t arg) {
     future_arg *f_arg = CO_CALLOC(1, sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
@@ -99,7 +99,7 @@ void future_stop(future *f) {
 }
 
 void future_close(future *f) {
-    void *status;
+    void_t status;
     int rc = pthread_join(f->thread, &status);
     pthread_attr_destroy(&f->attr);
     CO_FREE(f);
@@ -119,7 +119,7 @@ promise *promise_create() {
     return p;
 }
 
-void promise_set(promise *p, void *res) {
+void promise_set(promise *p, void_t res) {
     CO_INFO("promise id(%d) set LOCK in thread #%lx\n", p->id, co_async_self());
     pthread_mutex_lock(&p->mutex);
     p->result->value.object = res;

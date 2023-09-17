@@ -14,9 +14,6 @@ static void(fastcall *co_swap)(co_routine_t *, co_routine_t *) = 0;
 
 static thread_local uv_loop_t *co_main_loop_handle = NULL;
 
-static thread_local wait_group_t *coroutine_list = NULL;
-static thread_local map_t *channel_list = NULL;
-
 static int main_argc;
 static char **main_argv;
 
@@ -50,7 +47,7 @@ int coroutine_loop(int);
 void coroutine_interrupt(void);
 
 /* Create a new coroutine running func(arg) with stack size. */
-int coroutine_create(co_callable_t, void *, unsigned int);
+int coroutine_create(callable_t, void_t, unsigned int);
 
 /* Sets the current coroutine's name.*/
 void coroutine_name(char *, ...);
@@ -120,9 +117,65 @@ uv_loop_t *co_loop() {
     return uv_default_loop();
 }
 
-const char *co_itoa(int64_t number) {
+string_t co_itoa(int64_t number) {
     snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
     return co_active()->scrape;
+}
+
+void co_strcpy(char *dest, string_t src, size_t len) {
+#if defined(_WIN32) || defined(_WIN64)
+    strcpy_s(dest, len, src);
+#else
+    strcpy(dest, src);
+#endif
+}
+
+void println(int n_of_args, ...) {
+    va_list argp;
+    void_t list;
+    int type;
+
+    va_start(argp, n_of_args);
+    for (int i = 0; i < n_of_args; i++) {
+        list = va_arg(argp, void_t);
+        if (is_type(((map_t *)list), CO_MAP_STRUCT)) {
+            type = ((map_t *)list)->item_type;
+            foreach(item in list) {
+                if (type == CO_LLONG)
+                    printf("%lld ", has(item).long_long);
+                else if (type == CO_STRING)
+                    printf("%s ", has(item).str);
+                else if (type == CO_OBJ)
+                    printf("%p ", has(item).object);
+                else if (type == CO_BOOL)
+                    printf(has(item).boolean ? "true " : "false ");
+            }
+        } else if (is_reflection(list)) {
+            reflect_type_t *kind = (reflect_type_t *)list;
+            printf("[ %d, %s, %zu, %zu, %zu ]\n",
+                   reflect_type_enum(kind),
+                   reflect_type_of(kind),
+                   reflect_num_fields(kind),
+                   reflect_type_size(kind),
+                   reflect_packed_size(kind)
+            );
+            for (size_t i = 0; i < reflect_num_fields(kind); i++) {
+                printf("  -  %d, %s, %s, %zu, %zu, %d, %d\n",
+                       reflect_field_enum(kind, i),
+                       reflect_field_type(kind, i),
+                       reflect_field_name(kind, i),
+                       reflect_field_size(kind, i),
+                       reflect_field_offset(kind, i),
+                       reflect_field_is_signed(kind, i),
+                       reflect_field_array_size(kind, i)
+                );
+            }
+        } else {
+            printf("%s ", co_value(list).str);
+        }
+    }
+    va_end(argp);
+    puts("");
 }
 
 #ifdef CO_MPROTECT
@@ -153,7 +206,7 @@ static const unsigned char co_swap_function[ 4096 ] = {
 static void co_init(void) {
 #ifdef CO_MPROTECT
     DWORD old_privileges;
-    VirtualProtect((void *)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
+    VirtualProtect((void_t)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
 #endif
 }
 #else
@@ -167,12 +220,12 @@ static void co_init(void) {
     unsigned long addr = (unsigned long)co_swap_function;
     unsigned long base = addr - (addr % sysconf(_SC_PAGESIZE));
     unsigned long size = (addr - base) + sizeof co_swap_function;
-    mprotect((void *)base, size, PROT_READ | PROT_EXEC);
+    mprotect((void_t)base, size, PROT_READ | PROT_EXEC);
 #endif
 }
 #endif
 
-co_routine_t *co_derive(void *memory, size_t size) {
+co_routine_t *co_derive(void_t memory, size_t size) {
     co_routine_t *handle;
     if (!co_swap) {
         co_init();
@@ -261,7 +314,7 @@ static const unsigned char co_swap_function[ 4096 ] = {
 static void co_init(void) {
 #ifdef CO_MPROTECT
     DWORD old_privileges;
-    VirtualProtect((void *)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
+    VirtualProtect((void_t)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
 #endif
 }
 #else
@@ -295,11 +348,11 @@ static void co_init(void) {
     unsigned long long addr = (unsigned long long)co_swap_function;
     unsigned long long base = addr - (addr % sysconf(_SC_PAGESIZE));
     unsigned long long size = (addr - base) + sizeof co_swap_function;
-    mprotect((void *)base, size, PROT_READ | PROT_EXEC);
+    mprotect((void_t)base, size, PROT_READ | PROT_EXEC);
 #endif
 }
 #endif
-co_routine_t *co_derive(void *memory, size_t size) {
+co_routine_t *co_derive(void_t memory, size_t size) {
     co_routine_t *handle;
     if (!co_swap) {
         co_init();
@@ -345,11 +398,11 @@ static void co_init(void) {
     size_t addr = (size_t)co_swap_function;
     size_t base = addr - (addr % sysconf(_SC_PAGESIZE));
     size_t size = (addr - base) + sizeof co_swap_function;
-    mprotect((void *)base, size, PROT_READ | PROT_EXEC);
+    mprotect((void_t)base, size, PROT_READ | PROT_EXEC);
 #endif
 }
 
-co_routine_t *co_derive(void *memory, size_t size) {
+co_routine_t *co_derive(void_t memory, size_t size) {
     size_t *handle;
     co_routine_t *co;
     if (!co_swap) {
@@ -414,7 +467,7 @@ static const uint32_t co_swap_function[ 1024 ] = {
 static void co_init() {
 #ifdef CO_MPROTECT
     DWORD old_privileges;
-    VirtualProtect((void *)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
+    VirtualProtect((void_t)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
 #endif
 }
 #else
@@ -428,12 +481,12 @@ static void co_init(void) {
     size_t addr = (size_t)co_swap_function;
     size_t base = addr - (addr % sysconf(_SC_PAGESIZE));
     size_t size = (addr - base) + sizeof co_swap_function;
-    mprotect((void *)base, size, PROT_READ | PROT_EXEC);
+    mprotect((void_t)base, size, PROT_READ | PROT_EXEC);
 #endif
 }
 #endif
 
-co_routine_t *co_derive(void *memory, size_t size) {
+co_routine_t *co_derive(void_t memory, size_t size) {
     size_t *handle;
     co_routine_t *co;
     if (!co_swap) {
@@ -465,7 +518,7 @@ co_routine_t *co_derive(void *memory, size_t size) {
 }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
-#define ALIGN(p, x) ((void *)((uintptr_t)(p) & ~((x)-1)))
+#define ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
 
 #define MIN_STACK 0x10000lu
 #define MIN_STACK_FRAME 0x20lu
@@ -655,7 +708,7 @@ __asm__(
     ".cfi_endproc\n"
     ".size swap_context, .-swap_context\n");
 
-co_routine_t *co_derive(void *memory, size_t size) {
+co_routine_t *co_derive(void_t memory, size_t size) {
     uint8_t *sp;
     co_routine_t *context = (co_routine_t *)memory;
     if (!co_swap) {
@@ -757,7 +810,7 @@ int swapcontext(co_routine_t *oucp, const co_routine_t *ucp) {
 #endif
 
 #if defined(USE_OTHER)
-co_routine_t *co_derive(void *memory, size_t size) {
+co_routine_t *co_derive(void_t memory, size_t size) {
     if (!co_active_handle)
         co_active_handle = co_active_buffer;
 
@@ -782,7 +835,7 @@ co_routine_t *co_active(void) {
     return co_active_handle;
 }
 
-co_routine_t *co_create(size_t size, co_callable_t func, void *args) {
+co_routine_t *co_create(size_t size, callable_t func, void_t args) {
     if (size != 0) {
         /* Stack size should be at least `CO_STACK_SIZE`. */
         if (size < CO_STACK_SIZE) {
@@ -793,7 +846,7 @@ co_routine_t *co_create(size_t size, co_callable_t func, void *args) {
     }
 
     size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void *memory = CO_CALLOC(1, size + sizeof(channel_t) + sizeof(co_value_t));
+    void_t memory = CO_CALLOC(1, size + sizeof(channel_t) + sizeof(co_value_t));
     if (!memory)
         co_panic("calloc() failed");
 
@@ -877,7 +930,7 @@ void co_switch(co_routine_t *handle) {
 #endif
 }
 
-void *co_user_data(co_routine_t *co) {
+void_t co_user_data(co_routine_t *co) {
     return (co != NULL) ? co->user_data : NULL;
 }
 
@@ -893,11 +946,26 @@ co_routine_t *co_coroutine(void) {
     return co_running;
 }
 
-value_t co_value(void *data) {
+co_value_t *co_var(var_t *data) {
+    if (data)
+        return ((co_value_t *)data->value);
+
+    CO_LOG("attempt to get value on null");
+    return ((co_value_t *)0);
+}
+
+value_t co_value(void_t data) {
     if (data)
         return ((co_value_t *)data)->value;
 
     CO_LOG("attempt to get value on null");
+    return ((co_value_t *)0)->value;
+}
+
+value_t co_data(co_value_t *data) {
+    if (data)
+        return data->value;
+
     return ((co_value_t *)0)->value;
 }
 
@@ -960,7 +1028,7 @@ static void coroutine_remove(co_scheduler_t *l, co_routine_t *t) {
         l->tail = t->prev;
 }
 
-int coroutine_create(co_callable_t fn, void *arg, unsigned int stack) {
+int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     int id;
     co_routine_t *t;
     co_routine_t *c = co_active();
@@ -995,16 +1063,16 @@ int coroutine_create(co_callable_t fn, void *arg, unsigned int stack) {
     return id;
 }
 
-CO_FORCE_INLINE int co_go(co_callable_t fn, void *arg) {
+CO_FORCE_INLINE int co_go(callable_t fn, void_t arg) {
     return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
-CO_FORCE_INLINE void co_execute(co_call_t fn, void *arg) {
-    coroutine_create((co_callable_t)fn, arg, CO_STACK_SIZE);
+CO_FORCE_INLINE void co_execute(func_t fn, void_t arg) {
+    coroutine_create((callable_t)fn, arg, CO_STACK_SIZE);
     co_pause();
 }
 
-CO_FORCE_INLINE int co_uv(co_callable_t fn, void *arg) {
+CO_FORCE_INLINE int co_uv(callable_t fn, void_t arg) {
 
     co_routine_t *co = co_active();
     co->loop_active = true;
@@ -1027,7 +1095,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_pause();
         wgr = co_ht_result_init();
-        co_deferred(c, CO_DEFER(co_hash_free), wgr);
+        co_deferred(c, FUNC_VOID(co_hash_free), wgr);
         oa_pair *pair;
         while (wg->size != 0) {
             for (int i = 0; i < wg->capacity; i++) {
@@ -1067,7 +1135,7 @@ value_t co_group_get_result(wait_result_t *wgr, int cid) {
     return ((co_value_t *)co_hash_get(wgr, co_itoa(cid)))->value;
 }
 
-void co_result_set(co_routine_t *co, void *data) {
+void co_result_set(co_routine_t *co, void_t data) {
     co->results = data;
 }
 
@@ -1110,7 +1178,7 @@ CO_FORCE_INLINE void coroutine_interrupt(void) {
     coroutine_loop(UV_RUN_NOWAIT);
 }
 
-static void *coroutine_wait(void *v) {
+static void_t coroutine_wait(void_t v) {
     int ms;
     co_routine_t *t;
     size_t now;
@@ -1293,11 +1361,8 @@ static void coroutine_scheduler(void) {
                 CO_FREE(co_main_loop_handle);
             }
 #endif
-            if (channel_list)
-                map_free(channel_list);
-
-            if (coroutine_list)
-                co_hash_free(coroutine_list);
+            gc_channel_free();
+            gc_coroutine_free();
 
             if (n_all_coroutine) {
                 if (co_count)
@@ -1349,7 +1414,7 @@ static void coroutine_scheduler(void) {
     }
 }
 
-static void *coroutine_main(void *v) {
+static void_t coroutine_main(void_t v) {
     coroutine_name("co_main");
     exiting = co_main(main_argc, main_argv);
     return 0;
@@ -1363,35 +1428,4 @@ int main(int argc, char **argv) {
     coroutine_scheduler();
     fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
     return exiting;
-}
-
-void gc_coroutine(co_routine_t *co) {
-    if (!coroutine_list)
-        coroutine_list = co_ht_group_init();
-    co_hash_put(coroutine_list, co_itoa(co->cid), co);
-}
-
-void gc_channel(channel_t *ch) {
-    if (!channel_list) {
-        channel_list = (map_t *)CO_CALLOC(1, sizeof(map_t));
-        channel_list->type = CO_MAP_STRUCT;
-        channel_list->started = false;
-        channel_list->dtor = CO_DEFER(channel_free);
-        channel_list->dict = co_ht_channel_init();
-    }
-
-    map_push(channel_list, ch);
-}
-
-map_t *gc_channel_list() {
-    return channel_list;
-}
-
-bool is_valid(void_t self) {
-    int tester = ((var_t *)self)->type;
-    return (tester >= CO_DEF_ARR) && (tester <= CO_VALUE);
-}
-
-int type_of(void_t self) {
-    return ((var_t *)self)->type;
 }

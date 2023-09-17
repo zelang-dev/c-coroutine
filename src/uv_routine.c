@@ -1,9 +1,10 @@
 #include "../include/coroutine.h"
 
-static void *fs_init(void *);
+static void_t fs_init(void_t);
 
 static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->args = args;
+    uv_args->type = CO_UV_ARG;
     uv_args->fs_type = fs_type;
     uv_args->n_args = n_args;
     uv_args->is_path = is_path;
@@ -23,7 +24,7 @@ static void fs_cb(uv_fs_t *req) {
     if (result < 0) {
         fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
     } else {
-        void *fs_ptr = uv_fs_get_ptr(req);
+        void_t fs_ptr = uv_fs_get_ptr(req);
         uv_fs_type fs_type = uv_fs_get_type(req);
 
         switch (fs_type) {
@@ -78,7 +79,7 @@ static void fs_cb(uv_fs_t *req) {
     co_scheduler();
 }
 
-static void *fs_init(void *uv_args) {
+static void_t fs_init(void_t uv_args) {
     uv_fs_t *req = co_new_by(1, sizeof(uv_fs_t));
     uv_loop_t *loop = co_loop();
     uv_args_t *fs = (uv_args_t *)uv_args;
@@ -88,66 +89,66 @@ static void *fs_init(void *uv_args) {
     size_t length;
     int64_t offset;
     uv_buf_t *bufs;
-    const char *n_path;
+    string_t n_path;
     double atime, mtime;
     int flags, mode;
     int result = -4058;
 
-    co_defer(CO_DEFER(uv_fs_req_cleanup), req);
+    co_defer(FUNC_VOID(uv_fs_req_cleanup), req);
     if (fs->is_path) {
-        const char *path = args[ 0 ].value.char_ptr;
+        string_t path = var_char_ptr(args[0]);
         switch (fs->fs_type) {
             case UV_FS_OPEN:
-                flags = args[ 1 ].value.integer;
-                mode = args[ 2 ].value.integer;
+                flags = var_int(args[1]);
+                mode = var_int(args[2]);
                 result = uv_fs_open(loop, req, path, flags, mode, fs_cb);
                 break;
             case UV_FS_UNLINK:
                 result = uv_fs_unlink(loop, req, path, fs_cb);
                 break;
             case UV_FS_MKDIR:
-                mode = args[ 1 ].value.integer;
+                mode = var_int(args[1]);
                 result = uv_fs_mkdir(loop, req, path, mode, fs_cb);
                 break;
             case UV_FS_RENAME:
-                n_path = args[ 1 ].value.char_ptr;
+                n_path = var_char_ptr(args[1]);
                 result = uv_fs_rename(loop, req, path, n_path, fs_cb);
                 break;
             case UV_FS_CHMOD:
-                mode = args[ 1 ].value.integer;
+                mode = var_int(args[1]);
                 result = uv_fs_chmod(loop, req, path, mode, fs_cb);
                 break;
             case UV_FS_UTIME:
-                atime = args[ 1 ].value.precision;
-                mtime = args[ 2 ].value.precision;
+                atime = var_double(args[1]);
+                mtime = var_double(args[2]);
                 result = uv_fs_utime(loop, req, path, atime, mtime, fs_cb);
                 break;
             case UV_FS_CHOWN:
-                uid = args[ 1 ].value.uchar;
-                gid = args[ 2 ].value.uchar;
+                uid = var_unsigned_char(args[1]);
+                gid = var_unsigned_char(args[2]);
                 result = uv_fs_chown(loop, req, path, uid, gid, fs_cb);
                 break;
             case UV_FS_LINK:
-                n_path = args[ 1 ].value.char_ptr;
+                n_path = var_char_ptr(args[1]);
                 result = uv_fs_link(loop, req, path, n_path, fs_cb);
                 break;
             case UV_FS_SYMLINK:
-                n_path = args[ 1 ].value.char_ptr;
-                flags = args[ 2 ].value.integer;
+                n_path = var_char_ptr(args[1]);
+                flags = var_int(args[2]);
                 result = uv_fs_symlink(loop, req, path, n_path, flags, fs_cb);
                 break;
             case UV_FS_RMDIR:
                 result = uv_fs_rmdir(loop, req, path, fs_cb);
                 break;
             case UV_FS_FSTAT:
-                n_path = args[ 1 ].value.char_ptr;
+                n_path = var_char_ptr(args[1]);
                 result = uv_fs_lstat(loop, req, path, fs_cb);
                 break;
             case UV_FS_STAT:
                 result = uv_fs_stat(loop, req, path, fs_cb);
                 break;
             case UV_FS_SCANDIR:
-                flags = args[ 1 ].value.integer;
+                flags = var_int(args[1]);
                 result = uv_fs_scandir(loop, req, path, flags, fs_cb);
                 break;
             case UV_FS_READLINK:
@@ -160,15 +161,15 @@ static void *fs_init(void *uv_args) {
                 break;
         }
     } else {
-        uv_file fd = args[ 0 ].value.integer;
+        uv_file fd = var_int(args[0]);
         switch (fs->fs_type) {
             case UV_FS_FSTAT:
                 result = uv_fs_fstat(loop, req, fd, fs_cb);
                 break;
             case UV_FS_SENDFILE:
-                in_fd = args[ 1 ].value.integer;
-                offset = args[ 2 ].value.long_long;
-                length = args[ 3 ].value.max_size;
+                in_fd = var_int(args[1]);
+                offset = var_long_long(args[2]);
+                length = var_size_t(args[3]);
                 result = uv_fs_sendfile(loop, req, fd, in_fd, offset, length, fs_cb);
                 break;
             case UV_FS_CLOSE:
@@ -181,31 +182,31 @@ static void *fs_init(void *uv_args) {
                 result = uv_fs_fdatasync(loop, req, fd, fs_cb);
                 break;
             case UV_FS_FTRUNCATE:
-                offset = args[ 1 ].value.long_long;
+                offset = var_long_long(args[1]);
                 result = uv_fs_ftruncate(loop, req, fd, offset, fs_cb);
                 break;
             case UV_FS_FCHMOD:
-                mode = args[ 1 ].value.integer;
+                mode = var_int(args[1]);
                 result = uv_fs_fchmod(loop, req, fd, mode, fs_cb);
                 break;
             case UV_FS_FUTIME:
-                atime = args[ 1 ].value.precision;
-                mtime = args[ 2 ].value.precision;
+                atime = var_double(args[1]);
+                mtime = var_double(args[2]);
                 result = uv_fs_futime(loop, req, fd, atime, mtime, fs_cb);
                 break;
             case UV_FS_FCHOWN:
-                uid = args[ 1 ].value.uchar;
-                gid = args[ 2 ].value.uchar;
+                uid = var_unsigned_char(args[1]);
+                gid = var_unsigned_char(args[2]);
                 result = uv_fs_fchown(loop, req, fd, uid, gid, fs_cb);
                 break;
             case UV_FS_READ:
-                offset = args[ 1 ].value.long_long;
-                bufs = args[ 2 ].value.object;
+                offset = var_long_long(args[1]);
+                bufs = var_cast_ptr(uv_buf_t, args[2]);
                 result = uv_fs_read(loop, req, fd, bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_WRITE:
-                bufs = args[ 1 ].value.object;
-                offset = args[ 2 ].value.long_long;
+                bufs = var_cast_ptr(uv_buf_t, args[1]);
+                offset = var_long_long(args[2]);
                 result = uv_fs_write(loop, req, fd, bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_UNKNOWN:
@@ -222,20 +223,20 @@ static void *fs_init(void *uv_args) {
     }
 
     fs->context = co_active();
-    uv_req_set_data((uv_req_t *)req, (void *)fs);
+    uv_req_set_data((uv_req_t *)req, (void_t)fs);
     return 0;
 }
 
-uv_file co_fs_open(const char *path, int flags, int mode) {
+uv_file co_fs_open(string_t path, int flags, int mode) {
     co_value_t *args;
     uv_args_t *uv_args;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     args = (co_value_t *)co_new_by(3, sizeof(co_value_t));
 
-    args[ 0 ].value.char_ptr = (char *)path;
-    args[ 1 ].value.integer = flags;
-    args[ 2 ].value.integer = mode;
+    args[0].value.char_ptr = (string)path;
+    args[1].value.integer = flags;
+    args[2].value.integer = mode;
 
     return (uv_file)co_fs_init(uv_args, args, UV_FS_OPEN, 3, true).integer;
 }
@@ -247,7 +248,7 @@ uv_stat_t *co_fs_fstat(uv_file fd) {
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     args = (co_value_t *)co_new_by(1, sizeof(co_value_t));
 
-    args[ 0 ].value.integer = fd;
+    args[0].value.integer = fd;
     return (uv_stat_t *)co_fs_init(uv_args, args, UV_FS_FSTAT, 1, false).object;
 }
 
@@ -258,6 +259,6 @@ int co_fs_close(uv_file fd) {
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     args = (co_value_t *)co_new_by(1, sizeof(co_value_t));
 
-    args[ 0 ].value.integer = fd;
+    args[0].value.integer = fd;
     return co_fs_init(uv_args, args, UV_FS_CLOSE, 1, false).integer;
 }

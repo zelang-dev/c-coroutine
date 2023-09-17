@@ -22,7 +22,7 @@
 #endif
 
 #include "uv_routine.h"
-#include "reflect.h"
+#include "reflection.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/unistd.h"
@@ -35,7 +35,7 @@
 #include <time.h>
 
 /* invalid address indicator */
-#define CO_ERROR ((void *)-1)
+#define CO_ERROR ((void_t)-1)
 
 /* The `for_select` macro sets up a coroutine to wait on multiple channel
 operations. Must be closed out with `select_end`, and if no `select_case(channel)`, `select_case_if(channel)`, `select_break` provided, an infinite loop is created.
@@ -279,8 +279,8 @@ Must also closed out with `select_break()`. */
 #define UNLIKELY(x) LIKELY_IS((x), 0)
 #define INCREMENT 16
 
-/* Function casting for co_deferred, single argument. */
-#define CO_DEFER(fn)		((void (*)(void *))(fn))
+/* Function casting for single argument, no return. */
+#define FUNC_VOID(fn)		((void (*)(void_t))(fn))
 
 #if defined(_MSC_VER)
   #define section(name) __declspec(allocate("." #name))
@@ -293,15 +293,59 @@ Must also closed out with `select_break()`. */
 /* Number used only to assist checking for stack overflows. */
 #define CO_MAGIC_NUMBER 0x7E3CB1A9
 
+/**
+* Creates a reflection structure and reflection function as `reflect_get_*TYPE_NAME*()`.
+* Allows the inspect of data structures at runtime:
+* - field types
+* - field names
+* - size of array fields
+* - size of field
+*
+* `TYPE_NAME` - name of your structure
+* (`DATA_TYPE`, `C_TYPE`, `FIELD_NAME`[, `ARRAY_SIZE`]) - comma-separated list of fields in the structure
+*
+* - DATA_TYPE - type of field (INTEGER, STRING, ENUM, PTR, FLOAT, DOUBLE, or STRUCT)
+* - C_TYPE - type of the field (e.g. int, uint64, char, etc.)
+* - FIELD_NAME - name of the field
+* - ARRAY_SIZE - size of array, if a field is an array
+*/
+#define reflect_struct(TYPE_NAME, ...) RE_DEFINE_STRUCT(TYPE_NAME, (ENUM, value_types, type), __VA_ARGS__)
+
+/**
+* Creates a reflection function as `reflect_get_*TYPE_NAME*()`.
+*
+* Allows the inspect of data structures at runtime:
+* - field types
+* - field names
+* - size of array fields
+* - size of field
+*
+* `TYPE_NAME` - name of your structure
+* (`DATA_TYPE`, `C_TYPE`, `FIELD_NAME`[, `ARRAY_SIZE`]) - comma-separated list of fields in the structure
+*
+* - DATA_TYPE - type of field (INTEGER, STRING, ENUM, PTR, FLOAT, DOUBLE, or STRUCT)
+* - C_TYPE - type of the field (e.g. int, uint64, char, etc.)
+* - FIELD_NAME - name of the field
+* - ARRAY_SIZE - size of array, if a field is an array
+*/
+#define reflect_func(TYPE_NAME, ...) RE_DEFINE_METHOD(TYPE_NAME, (ENUM, value_types, type), __VA_ARGS__)
+
+/**
+* Creates a function proto as `extern reflect_type_t *reflect_get_*TYPE_NAME*(void);`
+*/
+#define reflect_proto(TYPE_NAME, ...) RE_DEFINE_PROTO(TYPE_NAME)
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-enum value_types
+typedef enum
 {
     CO_NULL = -1,
     CO_INT,
+    CO_ENUM,
+    CO_INTEGER,
     CO_UINT,
     CO_SLONG,
     CO_ULONG,
@@ -316,13 +360,19 @@ enum value_types
     CO_UCHAR,
     CO_UCHAR_P,
     CO_CHAR_P,
+    CO_CONST_CHAR,
     CO_STRING,
     CO_ARRAY,
     CO_HASH,
     CO_OBJ,
+    CO_PTR,
     CO_FUNC,
+    CO_NONE,
     CO_DEF_ARR,
     CO_DEF_FUNC,
+    CO_REFLECT_TYPE,
+    CO_REFLECT_INFO,
+    CO_REFLECT_VALUE,
     CO_MAP_VALUE,
     CO_MAP_STRUCT,
     CO_MAP_ITER,
@@ -336,37 +386,36 @@ enum value_types
     CO_SCHED,
     CO_CHANNEL,
     CO_STRUCT,
-    CO_VALUE
-};
+    CO_VALUE,
+    CO_NO_INSTANCE
+} value_types;
 
 typedef void *void_t;
-typedef struct var_s {
-    enum value_types type;
+typedef char *string;
+typedef const char *string_t;
+typedef struct {
+    value_types type;
     void_t value;
 } var_t;
 
-C_API bool is_valid(void_t);
-C_API int type_of(void_t);
-
-typedef struct co_array_s
-{
-    void *base;
+typedef void_t(*callable_t)(void_t);
+typedef void (*func_t)(void_t);
+typedef struct {
+    value_types type;
+    void_t base;
     size_t elements;
 } co_array_t;
 
-typedef struct defer_s
-{
-    enum value_types type;
+typedef struct {
+    value_types type;
     co_array_t base;
 } defer_t;
 
-typedef void (*defer_func)(void *);
-typedef struct defer_func_s
-{
-    enum value_types type;
-    defer_func func;
-    void *data;
-    void *check;
+typedef struct {
+    value_types type;
+    func_t func;
+    void_t data;
+    void_t check;
 } defer_func_t;
 
 /* Coroutine states. */
@@ -380,15 +429,15 @@ typedef enum co_state
     CO_EVENT /* The coroutine is in an Event Loop callback. */
 } co_state;
 
-typedef void (*co_call_t)(void *);
-typedef void *(*co_callable_t)(void *);
 typedef struct routine_s co_routine_t;
 typedef struct oa_hash_s co_hast_t;
 typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
 typedef co_hast_t wait_group_t;
 typedef co_hast_t wait_result_t;
-typedef co_hast_t co_ht_map_t;
+typedef co_hast_t ht_map_t;
+typedef co_hast_t gc_channel_t;
+typedef co_hast_t gc_coroutine_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
     #define USE_NATIVE 1
@@ -421,7 +470,7 @@ typedef co_hast_t co_ht_map_t;
         #endif
 
         typedef struct __stack {
-            void *ss_sp;
+            void_t ss_sp;
             size_t ss_size;
             int ss_flags;
         } stack_t;
@@ -449,34 +498,34 @@ typedef co_hast_t co_ht_map_t;
 /* Coroutine context structure. */
 struct routine_s {
 #if defined(_WIN32) && defined(_M_IX86)
-    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
-    void *xmm[ 20 ]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
-    void *fiber_storage;
-    void *dealloc_stack;
+    void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
+    void_t xmm[ 20 ]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
+    void_t fiber_storage;
+    void_t dealloc_stack;
 #elif defined(__x86_64__) || defined(_M_X64)
 #ifdef _WIN32
-    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15, *rdi, *rsi;
-    void *xmm[ 20 ]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
-    void *fiber_storage;
-    void *dealloc_stack;
+    void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15, *rdi, *rsi;
+    void_t xmm[ 20 ]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
+    void_t fiber_storage;
+    void_t dealloc_stack;
 #else
-    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
+    void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
 #endif
 #elif defined(__i386) || defined(__i386__)
-    void *eip, *esp, *ebp, *ebx, *esi, *edi;
+    void_t eip, *esp, *ebp, *ebx, *esi, *edi;
 #elif defined(__ARM_EABI__)
 #ifndef __SOFTFP__
-    void *f[ 16 ];
+    void_t f[ 16 ];
 #endif
-    void *d[ 4 ]; /* d8-d15 */
-    void *r[ 4 ]; /* r4-r11 */
-    void *lr;
-    void *sp;
+    void_t d[ 4 ]; /* d8-d15 */
+    void_t r[ 4 ]; /* r4-r11 */
+    void_t lr;
+    void_t sp;
 #elif defined(__aarch64__)
-    void *x[ 12 ]; /* x19-x30 */
-    void *sp;
-    void *lr;
-    void *d[ 8 ]; /* d8-d15 */
+    void_t x[ 12 ]; /* x19-x30 */
+    void_t sp;
+    void_t lr;
+    void_t d[ 8 ]; /* d8-d15 */
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
     uint64_t gprs[ 32 ];
     uint64_t lr;
@@ -498,14 +547,14 @@ struct routine_s {
     __sigset_t uc_sigmask;
 #endif
     /* Stack base address, can be used to scan memory in a garbage collector. */
-    void *stack_base;
+    void_t stack_base;
 #if defined(_WIN32) && (defined(_M_X64) || defined(_M_IX86))
-    void *stack_limit;
+    void_t stack_limit;
 #endif
     /* Coroutine stack size. */
     size_t stack_size;
     co_state status;
-    co_callable_t func;
+    callable_t func;
     defer_t defer;
     char name[ 64 ];
     char state[ 64 ];
@@ -527,14 +576,14 @@ struct routine_s {
     int all_coroutine_slot;
     co_routine_t *context;
     bool loop_active;
-    void *user_data;
+    void_t user_data;
 #if defined(CO_USE_VALGRIND)
     unsigned int vg_stack_id;
 #endif
-    void *args;
+    void_t args;
     /* Coroutine result of function return/exit. */
-    void *results;
-    void *volatile err;
+    void_t results;
+    void_t volatile err;
     const char *volatile panic;
     bool err_recovered;
     bool err_protected;
@@ -546,7 +595,7 @@ struct routine_s {
 /* scheduler queue struct */
 typedef struct co_scheduler_s
 {
-    enum value_types type;
+    value_types type;
     co_routine_t *head;
     co_routine_t *tail;
 } co_scheduler_t;
@@ -569,10 +618,10 @@ typedef union
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
-    const char str[512];
     char **array;
-    void *object;
-    co_callable_t func;
+    void_t object;
+    callable_t func;
+    const char str[512];
 } value_t;
 
 /* Cast argument to union co_value_t storage type */
@@ -580,12 +629,12 @@ typedef union
 typedef struct co_value
 {
     value_t value;
-    enum value_types type;
+    value_types type;
 } co_value_t;
 
 typedef struct uv_args_s
 {
-    enum value_types type;
+    value_types type;
     /* allocated array of arguments */
     co_value_t *args;
     co_routine_t *context;
@@ -617,12 +666,13 @@ typedef struct msg_queue_s
 
 typedef struct channel_s
 {
-    enum value_types type;
+    value_types type;
     unsigned int bufsize;
     unsigned int elem_size;
     unsigned char *buf;
     unsigned int nbuf;
     unsigned int off;
+    unsigned int id;
     co_value_t *tmp;
     msg_queue_t a_send;
     msg_queue_t a_recv;
@@ -642,7 +692,7 @@ enum
 struct channel_co_s
 {
     channel_t *c;
-    void *v;
+    void_t v;
     unsigned int op;
     co_routine_t *co;
     channel_co_t *x_msg;
@@ -654,10 +704,10 @@ uv_loop_t *co_loop(void);
 C_API co_routine_t *co_active(void);
 
 /* Initializes new coroutine, platform specific. */
-C_API co_routine_t *co_derive(void *, size_t);
+C_API co_routine_t *co_derive(void_t, size_t);
 
 /* Create new coroutine. */
-C_API co_routine_t *co_create(size_t, co_callable_t, void *);
+C_API co_routine_t *co_create(size_t, callable_t, void_t);
 
 /* Delete specified coroutine. */
 C_API void co_delete(co_routine_t *);
@@ -675,7 +725,12 @@ C_API co_routine_t *co_current(void);
 C_API co_routine_t *co_coroutine(void);
 
 /* Return the value in union storage type. */
-C_API value_t co_value(void *);
+C_API value_t co_value(void_t);
+
+C_API co_value_t *co_var(var_t *);
+
+/* Return the value in union storage type. */
+C_API value_t co_data(co_value_t *);
 
 /* Suspends the execution of current coroutine. */
 C_API void co_suspend(void);
@@ -691,36 +746,36 @@ C_API void co_resuming(co_routine_t *);
 C_API co_state co_status(co_routine_t *);
 
 /* Get coroutine user data. */
-C_API void *co_user_data(co_routine_t *);
+C_API void_t co_user_data(co_routine_t *);
 
 C_API void co_deferred_free(co_routine_t *);
 
 /* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
-C_API void co_defer(defer_func, void *);
-C_API void co_deferred(co_routine_t *, defer_func, void *);
+C_API void co_defer(func_t, void_t);
+C_API void co_deferred(co_routine_t *, func_t, void_t);
 C_API void co_deferred_run(co_routine_t *, size_t);
 C_API size_t co_deferred_count(const co_routine_t *);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
 you must call `co_recover` to retrieve error message and mark Error condition handled. */
-C_API void co_defer_recover(defer_func, void *);
-C_API const char *co_recover(void);
+C_API void co_defer_recover(func_t, void_t);
+C_API string_t co_recover(void);
 
 /* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
-C_API void *co_new_by(int, size_t);
-C_API void *co_calloc_full(co_routine_t *, int, size_t, defer_func);
+C_API void_t co_new_by(int, size_t);
+C_API void_t co_calloc_full(co_routine_t *, int, size_t, func_t);
 
 /* Call `CO_MALLOC` to allocate memory of given size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
-C_API void *co_new(size_t);
-C_API void *co_malloc(co_routine_t *, size_t);
-C_API void *co_malloc_full(co_routine_t *, size_t, defer_func);
-C_API char *co_strdup(const char *);
-C_API char *co_strndup(const char *, size_t);
-C_API char *co_sprintf(const char *, ...);
-C_API void *co_memdup(co_routine_t *, const void *, size_t);
+C_API void_t co_new(size_t);
+C_API void_t co_malloc(co_routine_t *, size_t);
+C_API void_t co_malloc_full(co_routine_t *, size_t, func_t);
+C_API char *co_strdup(string_t );
+C_API char *co_strndup(string_t , size_t);
+C_API char *co_sprintf(string_t , ...);
+C_API void_t co_memdup(co_routine_t *, const void *, size_t);
 
 C_API int co_array_init(co_array_t *);
 
@@ -732,21 +787,21 @@ similar to golang channels. */
 C_API channel_t *channel_buf(int);
 
 /* Send data to the channel. */
-C_API int co_send(channel_t *, void *);
+C_API int co_send(channel_t *, void_t);
 
 /* Receive data from the channel. */
 C_API value_t co_recv(channel_t *);
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
-C_API int co_go(co_callable_t, void *);
+C_API int co_go(callable_t, void_t);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
-C_API void co_execute(co_call_t, void *);
+C_API void co_execute(func_t, void_t);
 
 C_API uv_loop_t *co_loop(void);
 
-C_API int co_uv(co_callable_t, void *arg);
+C_API int co_uv(callable_t, void_t arg);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
@@ -779,34 +834,36 @@ C_API channel_t *channel_create(int, int);
 C_API void channel_free(channel_t *);
 
 #if defined(_WIN32) || defined(_WIN64)
-C_API int vasprintf(char **, const char *, va_list);
-C_API int asprintf(char **, const char *, ...);
+C_API int vasprintf(char **, string_t, va_list);
+C_API int asprintf(char **, string_t, ...);
 C_API int gettimeofday(struct timeval *, struct timezone *);
 #endif
 
-#define OA_HASH_LOAD_FACTOR (0.75)
-#define OA_HASH_GROWTH_FACTOR (1<<2)
-#define OA_HASH_INIT_CAPACITY (1<<4)
+#define HASH_LOAD_FACTOR (0.75)
+#define HASH_GROWTH_FACTOR (1<<2)
+#ifndef HASH_INIT_CAPACITY
+    #define HASH_INIT_CAPACITY (1<<9)
+#endif
 
 typedef struct oa_key_ops_s {
-    uint32_t (*hash)(const void *data, void *arg);
-    void* (*cp)(const void *data, void *arg);
-    void (*free)(void *data, void *arg);
-    bool (*eq)(const void *data1, const void *data2, void *arg);
-    void *arg;
+    uint32_t (*hash)(const void *data, void_t arg);
+    void* (*cp)(const void *data, void_t arg);
+    void (*free)(void_t data, void_t arg);
+    bool (*eq)(const void *data1, const void *data2, void_t arg);
+    void_t arg;
 } oa_key_ops;
 
 typedef struct oa_val_ops_s {
-    void* (*cp)(const void *data, void *arg);
-    void (*free)(void *data);
-    bool (*eq)(const void *data1, const void *data2, void *arg);
-    void *arg;
+    void* (*cp)(const void *data, void_t arg);
+    void (*free)(void_t data);
+    bool (*eq)(const void *data1, const void *data2, void_t arg);
+    void_t arg;
 } oa_val_ops;
 
 typedef struct oa_pair_s {
     uint32_t hash;
-    void *key;
-    void *value;
+    void_t key;
+    void_t value;
 } oa_pair;
 
 typedef struct oa_hash_s oa_hash;
@@ -820,10 +877,11 @@ struct oa_hash_s {
 };
 
 C_API void co_hash_free(co_hast_t *);
-C_API void *co_hash_put(co_hast_t *, const void *, const void *);
-C_API void *co_hash_replace(co_hast_t *, const void *, const void *);
-C_API void *co_hash_get(co_hast_t *, const void *);
+C_API void_t co_hash_put(co_hast_t *, const void *, const void *);
+C_API void_t co_hash_replace(co_hast_t *, const void *, const void *);
+C_API void_t co_hash_get(co_hast_t *, const void *);
 C_API void co_hash_delete(co_hast_t *, const void *);
+C_API void co_hash_remove(co_hast_t *, const void *);
 C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
 
 /* Creates a new wait group coroutine hash table. */
@@ -832,13 +890,13 @@ C_API wait_group_t *co_ht_group_init(void);
 /* Creates a new wait group results hash table. */
 C_API wait_result_t *co_ht_result_init(void);
 
-C_API co_ht_map_t *co_ht_channel_init(void);
+C_API gc_channel_t *co_ht_channel_init(void);
 
-C_API co_ht_map_t *co_ht_map_init(void);
+C_API ht_map_t *co_ht_map_init(void);
 
-C_API co_ht_map_t *co_ht_map_long_init(void);
+C_API ht_map_t *co_ht_map_long_init(void);
 
-C_API co_ht_map_t *co_ht_map_string_init(void);
+C_API ht_map_t *co_ht_map_string_init(void);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
@@ -854,11 +912,10 @@ C_API wait_result_t *co_wait(wait_group_t *);
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
 C_API value_t co_group_get_result(wait_result_t *, int);
 
-C_API void co_result_set(co_routine_t *, void *);
+C_API void co_result_set(co_routine_t *, void_t);
 
 typedef struct map_value_s map_value_t;
-typedef void (*func_t)(map_value_t *);
-typedef void (*map_value_dtor)(void *);
+typedef func_t map_value_dtor;
 typedef struct map_iterator_s map_iter_t;
 typedef struct array_item_s array_item_t;
 typedef union {
@@ -877,45 +934,46 @@ typedef union {
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
-    const char str[64];
     char **array;
-    void *object;
-    func_t func;
+    void_t object;
+    callable_t func;
+    const char str[64];
 } map_value;
 
-enum map_data_type {
+typedef enum {
     MAP_ARRAY = CO_ARRAY,
     MAP_HASH
-};
+} map_data_type;
 
 struct map_value_s {
     map_value value;
-    enum value_types type;
+    value_types type;
 };
 
 struct array_item_s {
-    enum value_types type;
+    value_types type;
     map_value_t *value;
     array_item_t *prev;
     array_item_t *next;
     int64_t indic;
-    const char *key;
+    string_t key;
 };
 
 typedef struct map_s map_t;
 typedef map_t slice_t;
 struct map_s
 {
-    enum value_types type;
+    value_types type;
     array_item_t *head;
     array_item_t *tail;
-    co_ht_map_t *dict;
+    ht_map_t *dict;
     map_value_dtor dtor;
     int64_t indices;
-    size_t length;
+    int64_t length;
     int no_slices;
     slice_t **slice;
-    enum map_data_type as;
+    value_types item_type;
+    map_data_type as;
     bool started;
     bool sliced;
 };
@@ -923,7 +981,7 @@ struct map_s
 typedef map_t array_t;
 struct map_iterator_s
 {
-    enum value_types type;
+    value_types type;
     map_t *array;
     array_item_t *item;
     bool forward;
@@ -937,29 +995,31 @@ C_API map_t *map_long(int, ...);
 C_API map_t *map_str(int, ...);
 C_API map_t *map_for(map_value_dtor dtor, char *desc, ...);
 C_API void map_free(map_t *);
-C_API int map_push(map_t *, void *);
+C_API int map_push(map_t *, void_t);
 C_API map_value_t *map_pop(map_t *);
-C_API void map_shift(map_t *, void *);
+C_API void map_shift(map_t *, void_t);
 C_API map_value_t *map_unshift(map_t *);
 C_API size_t map_count(map_t *);
-C_API void *map_remove(map_t *, void *);
-C_API void map_put(map_t *, const char *, void *);
-C_API map_value_t *map_get(map_t *, const char *);
+C_API void_t map_remove(map_t *, void_t);
+C_API void map_put(map_t *, string_t, void_t);
+C_API map_value_t *map_get(map_t *, string_t);
 C_API array_t *range(int start, int stop);
 C_API array_t *array(map_value_dtor, int n_args, ...);
 C_API array_t *array_long(int n_args, ...);
 C_API array_t *array_str(int n_args, ...);
-C_API void array_put_long(map_t *, const char *, int64_t value);
-C_API void array_put_str(map_t *, const char *, const char *);
+C_API void array_put_long(map_t *, string_t, int64_t value);
+C_API void array_put_str(map_t *, string_t, string_t);
 C_API slice_t *slice(array_t *, int64_t start, int64_t end);
-C_API const char *slice_find(map_t *array, int64_t index);
+C_API string_t slice_find(map_t *array, int64_t index);
 C_API map_iter_t *iter_new(map_t *, bool);
 C_API map_iter_t *iter_next(map_iter_t *);
-C_API map_value iter_value(map_iter_t *);
-C_API const char *iter_key(map_iter_t *);
+C_API map_value_t *iter_value(map_iter_t *);
+C_API string_t iter_key(map_iter_t *);
 C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);
-C_API void println(int n_of_maps, ...);
+C_API void println(int n_of_args, ...);
+
+C_API map_value_t *map_macro_type(void_t);
 
 #define $(list, index) map_get((list), slice_find((list), index))->value
 #define $$(list, index, value) map_put((list), slice_find((list), index), (value))
@@ -967,7 +1027,8 @@ C_API void println(int n_of_maps, ...);
 #define in ,
 #define array_free map_free
 #define kv(key, value) (key), (value)
-#define has(i) iter_value(i)
+#define has(i) map_macro_type((i))->value
+#define has_t(i) map_macro_type((i))
 #define indic(i) iter_key(i)
 #define foreach_xp(X, A) X A
 #define foreach_in(X, S) for(map_iter_t \
@@ -1001,7 +1062,70 @@ C_API void println(int n_of_maps, ...);
 #define c_unsigned_short(data) co_value((data)).u_short
 #define c_void_ptr(data) co_value((data)).object
 #define c_callable(data) co_value((data)).func
-#define c_cast_ptr(type, data) (type *)co_value((data)).object
+#define c_void_cast(type, data) (type *)co_value((data)).object
+
+#define c_integer(value) co_data((value)).integer
+#define c_signed_long(value) co_data((value)).s_long
+#define c_long_long(value) co_data((value)).long_long
+#define c_unsigned_integer(value) co_data((value)).u_int
+#define c_unsigned_long_int(value) co_data((value)).u_long
+#define c_unsigned_long_long(value) co_data((value)).max_size
+#define c_string(value) co_data((value)).str
+#define c_signed_chars(value) co_data((value)).schar
+#define c_const_chars(value) co_data((value)).char_ptr
+#define c_boolean(value) co_data((value)).boolean
+#define c_point(value) co_data((value)).point
+#define c_precision(value) co_data((value)).precision
+#define c_unsigned_chars(value) co_data((value)).uchar
+#define c_chars_array(value) co_data((value)).array
+#define c_unsigned_chars_ptr(value) co_data((value)).uchar_ptr
+#define c_signed_shorts(value) co_data((value)).s_short
+#define c_unsigned_shorts(value) co_data((value)).u_short
+#define c_object(value) co_data((value)).object
+#define c_func(value) co_data((value)).func
+#define c_object_cast(type, value) (type *)co_data((value)).object
+
+#define var_int(arg) (arg).value.integer
+#define var_long(arg) (arg).value.s_long
+#define var_long_long(arg) (arg).value.long_long
+#define var_unsigned_int(arg) (arg).value.u_int
+#define var_unsigned_long(arg) (arg).value.u_long
+#define var_size_t(arg) (arg).value.max_size
+#define var_const_char_512(arg) (arg).value.str
+#define var_char(arg) (arg).value.schar
+#define var_char_ptr(arg) (arg).value.char_ptr
+#define var_bool(arg) (arg).value.boolean
+#define var_float(arg) (arg).value.point
+#define var_double(arg) (arg).value.precision
+#define var_unsigned_char(arg) (arg).value.uchar
+#define var_char_array(arg) (arg).value.array
+#define var_unsigned_char_ptr(arg) (arg).value.uchar_ptr
+#define var_signed_short(arg) (arg).value.s_short
+#define var_unsigned_short(arg) (arg).value.u_short
+#define var_ptr(arg) (arg).value.object
+#define var_func(arg) (arg).value.func
+#define var_cast_ptr(type, arg) (type *)(arg).value.object
+
+#define has_int(arg) has_t((arg))->value.integer
+#define has_long(arg) has_t((arg))->value.s_long
+#define has_long_long(arg) has_t((arg))->value.long_long
+#define has_unsigned_int(arg) has_t((arg))->value.u_int
+#define has_unsigned_long(arg) has_t((arg))->value.u_long
+#define has_size_t(arg) has_t((arg))->value.max_size
+#define has_const_char_64(arg) has_t((arg))->value.str
+#define has_char(arg) has_t((arg))->value.schar
+#define has_char_ptr(arg) has_t((arg))->value.char_ptr
+#define has_bool(arg) has_t((arg))->value.boolean
+#define has_float(arg) has_t((arg))->value.point
+#define has_double(arg) has_t((arg))->value.precision
+#define has_unsigned_char(arg) has_t((arg))->value.uchar
+#define has_char_ptr_ptr(arg) has_t((arg))->value.array
+#define has_unsigned_char_ptr(arg) has_t((arg))->value.uchar_ptr
+#define has_signed_short(arg) has_t((arg))->value.s_short
+#define has_unsigned_short(arg) has_t((arg))->value.u_short
+#define has_ptr(arg) has_t((arg))->value.object
+#define has_func(arg) has_t((arg))->value.func
+#define has_cast_ptr(type, arg) (type *)has_t((arg))->value.object
 
 #define EX_CAT(a, b) a ## b
 
@@ -1012,8 +1136,8 @@ C_API void println(int n_of_maps, ...);
 #define EX_PNAME(p) EX_CAT(ex_protected_, p)
 
 #define EX_MAKE()                                              \
-    const char *const err = ((void)err, ex_err.ex);             \
-    const char *const err_file = ((void)err_file, ex_err.file); \
+    string_t const err = ((void)err, ex_err.ex);             \
+    string_t const err_file = ((void)err_file, ex_err.file); \
     const int err_line = ((void)err_line, ex_err.line)
 
 #ifdef sigsetjmp
@@ -1153,14 +1277,14 @@ throws an exception of given message. */
         ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message)); \
     } while (0)
 
-C_API void ex_throw(const char *, const char *, int, const char *, const char *);
+C_API void ex_throw(string_t, string_t, int, string_t, string_t);
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API void ex_init(void);
-C_API void (*ex_signal(int sig, const char *ex))(int);
-C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
+C_API void (*ex_signal(int sig, string_t ex))(int);
+C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t));
 #ifdef _WIN32
-C_API int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
+C_API int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
 C_API int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
 #endif
 
@@ -1177,16 +1301,16 @@ enum
 /* stack of protected pointer */
 struct ex_ptr_s
 {
-    enum value_types type;
+    value_types type;
     ex_ptr_t *next;
-    void (*func)(void *);
-    void **ptr;
+    func_t func;
+    void_t *ptr;
 };
 
 /* stack of exception */
 struct ex_context_s
 {
-    enum value_types type;
+    value_types type;
     /* The handler in the stack (which is a FILO container). */
     ex_context_t *next;
     ex_ptr_t *stack;
@@ -1228,7 +1352,7 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 
 typedef struct _promise
 {
-    enum value_types type;
+    value_types type;
     co_value_t *result;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
@@ -1238,37 +1362,37 @@ typedef struct _promise
 
 typedef struct _future
 {
-    enum value_types type;
+    value_types type;
     pthread_t thread;
     pthread_attr_t attr;
-    void *(*func)(void *);
+    callable_t func;
     int id;
     promise *value;
 } future;
 
 typedef struct _future_arg
 {
-    enum value_types type;
-    void *(*func)(void *);
-    void *arg;
+    value_types type;
+    callable_t func;
+    void_t arg;
     promise *value;
 } future_arg;
 
-C_API future *future_create(co_callable_t);
-C_API void future_start(future *, void *);
+C_API future *future_create(callable_t);
+C_API void future_start(future *, void_t);
 C_API void future_stop(future *);
 C_API void future_close(future *);
 
 C_API promise *promise_create();
 C_API value_t promise_get(promise *);
-C_API void promise_set(promise *, void *);
+C_API void promise_set(promise *, void_t);
 C_API bool promise_done(promise *);
 C_API void promise_close(promise *);
 
 /* Calls fn (with args as arguments) in separated thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed through
  the future object returned (by calling `co_async_get()`). */
-C_API future *co_async(co_callable_t, void *);
+C_API future *co_async(callable_t, void_t);
 
 /* Returns the value of a promise, a future thread's shared object, If not ready this
 function blocks the calling thread and waits until it is ready. */
@@ -1283,14 +1407,91 @@ C_API unsigned long co_async_self(void);
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
-C_API const char *co_itoa(int64_t number);
+C_API string_t co_itoa(int64_t number);
+C_API void co_strcpy(char *dest, string_t src, size_t len);
 
 C_API void gc_coroutine(co_routine_t *);
 C_API void gc_channel(channel_t *);
-C_API map_t *gc_channel_list(void);
+C_API gc_channel_t *gc_channel_list(void);
+C_API gc_coroutine_t *gc_coroutine_list(void);
+C_API void gc_coroutine_free(void);
+C_API void gc_channel_free(void);
 
-/* Write this function instead of main, this library provides its own main, the scheduler,
-which will call this function as an coroutine! */
+typedef struct reflect_value_s {
+    reflect_types type;
+    string_t value_type;
+    string_t name;
+    size_t size;
+    size_t offset;
+    bool is_signed;
+    int array_size;
+} reflect_value_t;
+
+typedef struct reflect_kind_s {
+    reflect_types type;
+    void_t instance;
+    string_t name;
+    size_t num_fields;
+    size_t size;
+    size_t packed_size;
+    reflect_value_t *fields;
+} reflect_kind_t;
+
+#define var(data) co_var((data))->value
+#define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)co_new_by(1, sizeof(var_t)); \
+    variable->type = enum_type; \
+    variable->value = (variable_type *)co_new_by(1, sizeof(variable_type) + sizeof(data)); \
+    memcpy(variable->value, &data, sizeof(data))
+
+#define as_char(variable, data) as_var(variable, char, data, CO_CHAR_P)
+#define as_string(variable, data) as_var(variable, char, data, CO_STRING)
+#define as_long(variable, data) as_var(variable, long, data, CO_LONG)
+#define as_int(variable, data) as_var(variable, int, data, CO_INTEGER)
+#define as_uchar(variable, data) as_var(variable, unsigned char, data, CO_UCHAR)
+
+#define as_reflect(variable, type, value) reflect_type_t *variable = reflect_get_##type(); \
+    variable->instance = value;
+
+#define as_var_ref(variable, type, data, enum_type) as_var(variable, type, data, enum_type); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_instance(variable, variable_type) variable_type *variable = (variable_type *)co_new_by(1, sizeof(variable_type)); \
+    variable->type = CO_STRUCT;
+
+#define as_instance_ref(variable, type) as_instance(variable, type); \
+    as_reflect(variable##_r, type, variable)
+
+C_API value_types type_of(void_t);
+C_API bool is_type(void_t, value_types);
+C_API bool is_instance_of(void_t, void_t);
+C_API bool is_value(void_t);
+C_API bool is_instance(void_t);
+C_API bool is_valid(void_t);
+C_API bool is_reflection(void_t self);
+
+C_API string_t reflect_kind(void_t);
+C_API void reflect_set_field(reflect_type_t *, int, void_t value);
+C_API void reflect_get_field(reflect_type_t *, int, void_t out);
+C_API void reflect_with(reflect_type_t *, void_t value);
+
+reflect_proto(var_t)
+reflect_proto(co_array_t)
+reflect_proto(defer_t)
+reflect_proto(defer_func_t)
+reflect_proto(promise)
+reflect_proto(future)
+reflect_proto(future_arg)
+reflect_proto(channel_t)
+reflect_proto(map_t)
+reflect_proto(map_iter_t)
+reflect_proto(array_item_t)
+reflect_proto(ex_ptr_t)
+reflect_proto(ex_context_t)
+reflect_proto(co_scheduler_t)
+reflect_proto(uv_args_t)
+
+/* Write this function instead of `main`, this library provides its own main, the scheduler,
+which call this function as an coroutine! */
 int co_main(int, char **);
 
 #ifdef __cplusplus

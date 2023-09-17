@@ -1,7 +1,40 @@
 #include "../include/coroutine.h"
 
-void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func) {
-    void *ptr = CO_MALLOC(size);
+static thread_local gc_channel_t *channel_list = NULL;
+static thread_local gc_coroutine_t *coroutine_list = NULL;
+
+void gc_coroutine(co_routine_t *co) {
+    if (!coroutine_list)
+        coroutine_list = (gc_coroutine_t *)co_ht_group_init();
+    co_hash_put(coroutine_list, co_itoa(co->cid), co);
+}
+
+void gc_channel(channel_t *ch) {
+    if (!channel_list)
+        channel_list = co_ht_channel_init();
+    co_hash_put(channel_list, co_itoa(ch->id), ch);
+}
+
+CO_FORCE_INLINE gc_channel_t *gc_channel_list() {
+    return channel_list;
+}
+
+CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
+    return coroutine_list;
+}
+
+void gc_channel_free() {
+    if (channel_list)
+        co_hash_free(channel_list);
+}
+
+void gc_coroutine_free() {
+    if (coroutine_list)
+        co_hash_free(coroutine_list);
+}
+
+void_t co_malloc_full(co_routine_t *coro, size_t size, func_t func) {
+    void_t ptr = CO_MALLOC(size);
 
     if (LIKELY(ptr)) {
         if (coro->err_allocated == NULL)
@@ -15,8 +48,8 @@ void *co_malloc_full(co_routine_t *coro, size_t size, defer_func func) {
     return ptr;
 }
 
-void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func) {
-    void *ptr = CO_CALLOC(count, size);
+void_t co_calloc_full(co_routine_t *coro, int count, size_t size, func_t func) {
+    void_t ptr = CO_CALLOC(count, size);
 
     if (LIKELY(ptr)) {
         if (coro->err_allocated == NULL)
@@ -30,19 +63,19 @@ void *co_calloc_full(co_routine_t *coro, int count, size_t size, defer_func func
     return ptr;
 }
 
-CO_FORCE_INLINE void *co_new_by(int count, size_t size) {
+CO_FORCE_INLINE void_t co_new_by(int count, size_t size) {
     return co_calloc_full(co_active(), count, size, CO_FREE);
 }
 
-CO_FORCE_INLINE void *co_new(size_t size) {
+CO_FORCE_INLINE void_t co_new(size_t size) {
     return co_malloc_full(co_active(), size, CO_FREE);
 }
 
-void *co_malloc(co_routine_t *coro, size_t size) {
+void_t co_malloc(co_routine_t *coro, size_t size) {
     return co_malloc_full(coro, size, CO_FREE);
 }
 
-char *co_strndup(const char *str, size_t max_len) {
+char *co_strndup(string_t str, size_t max_len) {
     const size_t len = strnlen(str, max_len) + 1;
     char *dup = co_memdup(co_active(), str, len);
 
@@ -52,12 +85,12 @@ char *co_strndup(const char *str, size_t max_len) {
     return dup;
 }
 
-char *co_strdup(const char *str) {
+CO_FORCE_INLINE char *co_strdup(string_t str) {
     return co_memdup(co_active(), str, strlen(str) + 1);
 }
 
 #if defined(_WIN32) || defined(_WIN64)
-int vasprintf(char **str_p, const char *fmt, va_list ap) {
+int vasprintf(char **str_p, string_t fmt, va_list ap) {
     va_list ap_copy;
     int formattedLength, actualLength;
     size_t requiredSize;
@@ -101,7 +134,7 @@ int vasprintf(char **str_p, const char *fmt, va_list ap) {
     return formattedLength;
 }
 
-int asprintf(char **str_p, const char *fmt, ...) {
+int asprintf(char **str_p, string_t fmt, ...) {
     int result;
 
     va_list ap;
@@ -113,7 +146,7 @@ int asprintf(char **str_p, const char *fmt, ...) {
 }
 #endif
 
-char *co_sprintf(const char *fmt, ...) {
+char *co_sprintf(string_t fmt, ...) {
     va_list values;
     int len;
     char *tmp_str;
@@ -129,8 +162,8 @@ char *co_sprintf(const char *fmt, ...) {
     return tmp_str;
 }
 
-void *co_memdup(co_routine_t *coro, const void *src, size_t len) {
-    void *ptr = co_malloc(coro, len);
+void_t co_memdup(co_routine_t *coro, const void *src, size_t len) {
+    void_t ptr = co_malloc(coro, len);
 
     return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;
 }

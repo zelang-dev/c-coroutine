@@ -40,7 +40,7 @@ static inline bool umull_overflow(size_t a, size_t b, size_t *out) {
 #define umull_overflow __builtin_mul_overflow
 #endif
 
-void *realloc_array(void *optr, size_t nmemb, size_t size) {
+void_t realloc_array(void_t optr, size_t nmemb, size_t size) {
     size_t total_size;
     if (UNLIKELY(umull_overflow(nmemb, size, &total_size))) {
         errno = ENOMEM;
@@ -63,9 +63,9 @@ static inline bool add_overflow(size_t a, size_t b, size_t *out) {
 #define add_overflow __builtin_add_overflow
 #endif
 
-void *co_array_append(co_array_t *a, size_t element_size) {
+void_t co_array_append(co_array_t *a, size_t element_size) {
     if (!(a->elements % INCREMENT)) {
-        void *new_base;
+        void_t new_base;
         size_t new_cap;
 
         if (UNLIKELY(add_overflow(a->elements, INCREMENT, &new_cap))) {
@@ -88,7 +88,7 @@ void co_array_sort(co_array_t *a, size_t element_size, int (*cmp)(const void *a,
         qsort(a->base, a->elements - 1, element_size, cmp);
 }
 
-static void co_array_free(void *data) {
+static void co_array_free(void_t data) {
     co_array_t *array = data;
 
     co_array_reset(array);
@@ -187,7 +187,7 @@ void co_deferred_free(co_routine_t *coro) {
     co_deferred_array_reset(&coro->defer);
 }
 
-static void co_deferred_any(co_routine_t *coro, defer_func func, void *data, void *check) {
+static void co_deferred_any(co_routine_t *coro, func_t func, void_t data, void_t check) {
     defer_func_t *defer;
 
     CO_ASSERT(func);
@@ -202,20 +202,20 @@ static void co_deferred_any(co_routine_t *coro, defer_func func, void *data, voi
     }
 }
 
-CO_FORCE_INLINE void co_defer(defer_func func, void *data) {
+CO_FORCE_INLINE void co_defer(func_t func, void_t data) {
     co_deferred(co_active(), func, data);
 }
 
-CO_FORCE_INLINE void co_defer_recover(defer_func func, void *data) {
-    co_deferred_any(co_active(), func, data, (void *)"err");
+CO_FORCE_INLINE void co_defer_recover(func_t func, void_t data) {
+    co_deferred_any(co_active(), func, data, (void_t)"err");
 }
 
-const char *co_recover() {
+string_t co_recover() {
     co_routine_t *co = co_active();
     co->err_recovered = true;
     return (co->panic != NULL) ? co->panic : co->err;
 }
 
-void co_deferred(co_routine_t *coro, defer_func func, void *data) {
+void co_deferred(co_routine_t *coro, func_t func, void_t data) {
     co_deferred_any(coro, func, data, NULL);
 }

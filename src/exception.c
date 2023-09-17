@@ -84,7 +84,7 @@ thread_local ex_context_t *ex_context = 0;
 thread_local char ex_message[ 256 ] = { 0 };
 static volatile sig_atomic_t got_signal = false;
 
-static void ex_print(ex_context_t *exception, const char *message) {
+static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
     fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
             (exception->co->panic != NULL) ? exception->co->panic : exception->ex, exception->function);
@@ -102,10 +102,11 @@ static void ex_print(ex_context_t *exception, const char *message) {
     (void)fflush(stderr);
 }
 
-ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
+ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t)) {
     if (!ex_context)
         ex_init();
 
+    const_ptr->type = CO_ERR_PTR;
     const_ptr->next = ex_context->stack;
     const_ptr->func = func;
     const_ptr->ptr = ptr;
@@ -134,6 +135,7 @@ static void unwind_stack(ex_context_t *ctx) {
 
 void ex_init(void) {
     ex_context = &ex_context_buffer;
+    ex_context->type = CO_ERR_CONTEXT;
 }
 
 int ex_uncaught_exception(void) {
@@ -154,7 +156,7 @@ void ex_terminate(void) {
     }
 }
 
-void ex_throw(const char *exception, const char *file, int line, const char *function, const char *message) {
+void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message) {
     ex_context_t *ctx = ex_context;
 
     if (!ctx) {
@@ -168,7 +170,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ctx->function = function;
 
     ctx->co = co_active();
-    ctx->co->err = (void *)ctx->ex;
+    ctx->co->err = (void_t)ctx->ex;
     ctx->co->panic = message;
     if (ctx->unstack)
         ex_terminate();
@@ -190,7 +192,7 @@ enum {
 };
 
 static struct {
-    const char *ex;
+    string_t ex;
     int sig;
 #ifdef _WIN32
     DWORD seh;
@@ -198,8 +200,8 @@ static struct {
 } ex_sig[ max_ex_sig ];
 
 #ifdef _WIN32
-int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
-    const char *ex = 0;
+int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
+    string_t ex = 0;
     int i;
 
     for (i = 0; i < max_ex_sig; i++) {
@@ -217,7 +219,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
         ctx = ex_context;
     }
 
-    const char *ex = 0;
+    string_t ex = 0;
     int i;
 
     if (code == EXCEPTION_PANIC) {
@@ -234,7 +236,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
             ctx->function = NULL;
 
             ctx->co = co_active();
-            ctx->co->err = (void *)ctx->ex;
+            ctx->co->err = (void_t)ctx->ex;
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }
@@ -242,7 +244,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-void ex_signal_seh(DWORD sig, const char *ex) {
+void ex_signal_seh(DWORD sig, string_t ex) {
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
@@ -273,7 +275,7 @@ void ex_handler(int sig) {
     sigfillset(&sa.sa_mask);
     void (*old)(int) = sigaction(sig, &sa, NULL);
 #endif
-    const char *ex = 0;
+    string_t ex = 0;
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
@@ -292,7 +294,7 @@ void ex_handler(int sig) {
     ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
-void (*ex_signal(int sig, const char *ex))(int) {
+void (*ex_signal(int sig, string_t ex))(int) {
     void (*old)(int);
     int i;
 

@@ -31,13 +31,13 @@ Two videos covering things to keep in mind about concurrency, [Building Scalable
 
 ```c
 /* Write this function instead of main, this library provides its own main, the scheduler,
-which will call this function as an coroutine! */
+which call this function as an coroutine! */
 int co_main(int, char **);
 
 /* Calls fn (with args as arguments) in separated thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed through
  the future object returned (by calling `co_async_get()`). */
-C_API future *co_async(co_callable_t, void *);
+C_API future *co_async(callable_t, void_t);
 
 /* Returns the value of a promise, a future thread's shared object, If not ready this
 function blocks the calling thread and waits until it is ready. */
@@ -72,7 +72,7 @@ similar to golang channels. */
 C_API channel_t *channel_buf(int);
 
 /* Send data to the channel. */
-C_API int co_send(channel_t *, void *);
+C_API int co_send(channel_t *, void_t);
 
 /* Receive data from the channel. */
 C_API value_t *co_recv(channel_t *);
@@ -85,7 +85,7 @@ This behaves same as GoLang `select {}` statement.
 */
 for_select {
     select_case(channel) {
-        co_send(channel, void *data);
+        co_send(channel, void_t data);
         // Or
         value_t *r = co_recv(channel);
     // Or
@@ -101,10 +101,10 @@ for_select {
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
-C_API int co_go(co_callable_t, void *);
+C_API int co_go(callable_t, void_t);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
-C_API void co_execute(co_call_t, void *);
+C_API void co_execute(co_call_t, void_t);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
@@ -112,15 +112,15 @@ C_API unsigned int co_sleep(unsigned int ms);
 
 /* Call `CO_MALLOC` to allocate memory of given size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
-C_API void *co_new(size_t);
+C_API void_t co_new(size_t);
 
 /* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
-C_API void *co_new_by(int count, size_t size);
+C_API void_t co_new_by(int count, size_t size);
 
 /* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
-C_API void co_defer(defer_func, void *);
+C_API void co_defer(func_t, void_t);
 
 /* An macro that stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */
@@ -128,7 +128,7 @@ co_panic(message);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
 you must call `co_recover` to retrieve error message and mark Error condition handled. */
-C_API void co_defer_recover(recover_func, void *);
+C_API void co_defer_recover(recover_func, void_t);
 
 /* Generic simple union storage types. */
 typedef union
@@ -148,20 +148,20 @@ typedef union
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
-    const char str[512];
     char **array;
-    void *object;
-    co_callable_t func;
+    void_t object;
+    callable_t func;
+    const char str[512];
 } value_t;
 
 typedef struct co_value
 {
     value_t value;
-    enum value_types type;
+    value_types type;
 } co_value_t;
 
 /* Return an value in union type storage. */
-C_API value_t co_value(void *);
+C_API value_t co_value(void_t);
 ```
 
 The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/symplely/c-coroutine/blob/main/include/coroutine.h) for additional.
@@ -208,7 +208,7 @@ func greetings(name string) {
 <pre><code>
 # include "../include/coroutine.h"
 
-void *greetings(void *arg)
+void_t greetings(void_t arg)
 {
     const char *name = c_const_char(arg);
     for (int i = 0; i < 3; i++)
@@ -336,7 +336,7 @@ func sendData(ch chan string) {
 <pre><code>
 #include "../include/coroutine.h"
 
-void *sendData(void *arg) {
+void_t sendData(void_t arg) {
     channel_t *ch = (channel_t *)arg;
 
     // data sent to the channel
@@ -444,7 +444,7 @@ int fibonacci(channel_t *c, channel_t *quit) {
     } select_end;
 }
 
-void *func(void *args) {
+void_t func(void_t args) {
     channel_t *c = ((channel_t **)args)[0];
     channel_t *quit = ((channel_t **)args)[1];
 
@@ -647,13 +647,13 @@ int mul(int x, int y) {
     return x * y;
 }
 
-void func(void *arg) {
+void func(void_t arg) {
     const char *err = co_recover();
     if (NULL != err)
         printf("panic occurred: %s\n", err);
 }
 
-void divByZero(void *arg) {
+void divByZero(void_t arg) {
     co_defer_recover(func, arg);
     printf("%d", div_err(1, 0));
 }
@@ -735,7 +735,7 @@ func main() {
 <pre><code>
 #include "../include/coroutine.h"
 
-void *worker(void *arg) {
+void_t worker(void_t arg) {
     // int id = c_int(arg);
     int id = co_id();
     printf("Worker %d starting\n", id);
@@ -743,9 +743,9 @@ void *worker(void *arg) {
     co_sleep(1000);
     printf("Worker %d done\n", id);
     if (id == 4)
-        return (void *)32;
+        return (void_t)32;
     else if (id == 3)
-        return (void *)"hello world\0";
+        return (void_t)"hello world\0";
 
     return 0;
 }
@@ -885,11 +885,11 @@ int main ()
 #include "../include/coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
-void *is_prime(void *arg) {
+void_t is_prime(void_t arg) {
     int x = c_int(arg);
     for (int i = 2; i < x; ++i)
-        if (x % i == 0) return (void *)false;
-    return (void *)true;
+        if (x % i == 0) return (void_t)false;
+    return (void_t)true;
 }
 
 int co_main(int argc, char **argv) {
