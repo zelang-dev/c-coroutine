@@ -118,7 +118,11 @@ uv_loop_t *co_loop() {
 }
 
 string_t co_itoa(int64_t number) {
+#ifdef _WIN32
+    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
+#else
     snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
+#endif
     return co_active()->scrape;
 }
 
@@ -159,7 +163,7 @@ void println(int n_of_args, ...) {
                    reflect_type_size(kind),
                    reflect_packed_size(kind)
             );
-            for (size_t i = 0; i < reflect_num_fields(kind); i++) {
+            for (int i = 0; i < reflect_num_fields(kind); i++) {
                 printf("  -  %d, %s, %s, %zu, %zu, %d, %d\n",
                        reflect_field_enum(kind, i),
                        reflect_field_type(kind, i),
