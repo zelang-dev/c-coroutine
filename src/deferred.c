@@ -83,7 +83,7 @@ void_t co_array_append(co_array_t *a, size_t element_size) {
     return ((unsigned char *)a->base) + a->elements++ * element_size;
 }
 
-void co_array_sort(co_array_t *a, size_t element_size, int (*cmp)(const void *a, const void *b)) {
+void co_array_sort(co_array_t *a, size_t element_size, int (*cmp)(const_t a, const_t b)) {
     if (LIKELY(a->elements))
         qsort(a->base, a->elements - 1, element_size, cmp);
 }
@@ -105,7 +105,7 @@ co_array_t *co_array_new(co_routine_t *coro) {
     return array;
 }
 
-static CO_FORCE_INLINE void co_deferred_array_sort(defer_t *array, int (*cmp)(const void *a, const void *b)) {
+static CO_FORCE_INLINE void co_deferred_array_sort(defer_t *array, int (*cmp)(const_t a, const_t b)) {
     co_array_sort((co_array_t *)array, sizeof(defer_func_t), cmp);
 }
 

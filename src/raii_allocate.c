@@ -162,7 +162,7 @@ char *co_sprintf(string_t fmt, ...) {
     return tmp_str;
 }
 
-void_t co_memdup(co_routine_t *coro, const void *src, size_t len) {
+void_t co_memdup(co_routine_t *coro, const_t src, size_t len) {
     void_t ptr = co_malloc(coro, len);
 
     return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;

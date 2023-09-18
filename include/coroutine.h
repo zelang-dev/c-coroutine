@@ -391,6 +391,7 @@ typedef enum
 } value_types;
 
 typedef void *void_t;
+typedef const void *const_t;
 typedef char *string;
 typedef const char *string_t;
 typedef struct {
@@ -775,7 +776,7 @@ C_API void_t co_malloc_full(co_routine_t *, size_t, func_t);
 C_API char *co_strdup(string_t );
 C_API char *co_strndup(string_t , size_t);
 C_API char *co_sprintf(string_t , ...);
-C_API void_t co_memdup(co_routine_t *, const void *, size_t);
+C_API void_t co_memdup(co_routine_t *, const_t , size_t);
 
 C_API int co_array_init(co_array_t *);
 
@@ -846,17 +847,17 @@ C_API int gettimeofday(struct timeval *, struct timezone *);
 #endif
 
 typedef struct oa_key_ops_s {
-    uint32_t (*hash)(const void *data, void_t arg);
-    void* (*cp)(const void *data, void_t arg);
+    uint32_t (*hash)(const_t data, void_t arg);
+    void* (*cp)(const_t data, void_t arg);
     void (*free)(void_t data, void_t arg);
-    bool (*eq)(const void *data1, const void *data2, void_t arg);
+    bool (*eq)(const_t data1, const_t data2, void_t arg);
     void_t arg;
 } oa_key_ops;
 
 typedef struct oa_val_ops_s {
-    void* (*cp)(const void *data, void_t arg);
+    void* (*cp)(const_t data, void_t arg);
     void (*free)(void_t data);
-    bool (*eq)(const void *data1, const void *data2, void_t arg);
+    bool (*eq)(const_t data1, const_t data2, void_t arg);
     void_t arg;
 } oa_val_ops;
 
@@ -877,12 +878,12 @@ struct oa_hash_s {
 };
 
 C_API void co_hash_free(co_hast_t *);
-C_API void_t co_hash_put(co_hast_t *, const void *, const void *);
-C_API void_t co_hash_replace(co_hast_t *, const void *, const void *);
-C_API void_t co_hash_get(co_hast_t *, const void *);
-C_API void co_hash_delete(co_hast_t *, const void *);
-C_API void co_hash_remove(co_hast_t *, const void *);
-C_API void co_hash_print(co_hast_t *, void (*print_key)(const void *k), void (*print_val)(const void *v));
+C_API void_t co_hash_put(co_hast_t *, const_t, const_t);
+C_API void_t co_hash_replace(co_hast_t *, const_t, const_t);
+C_API void_t co_hash_get(co_hast_t *, const_t);
+C_API void co_hash_delete(co_hast_t *, const_t);
+C_API void co_hash_remove(co_hast_t *, const_t);
+C_API void co_hash_print(co_hast_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
 /* Creates a new wait group coroutine hash table. */
 C_API wait_group_t *co_ht_group_init(void);
