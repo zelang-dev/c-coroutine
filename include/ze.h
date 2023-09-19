@@ -3,15 +3,40 @@
 
 #include "../include/coroutine.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define var(data) co_var((data))->value
+#define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)co_new_by(1, sizeof(var_t)); \
+    variable->type = enum_type; \
+    variable->value = (variable_type *)co_new_by(1, sizeof(variable_type) + sizeof(data)); \
+    memcpy(variable->value, &data, sizeof(data))
+
+#define as_char(variable, data) as_var(variable, char, data, CO_CHAR_P)
+#define as_string(variable, data) as_var(variable, char, data, CO_STRING)
+#define as_long(variable, data) as_var(variable, long, data, CO_LONG)
+#define as_int(variable, data) as_var(variable, int, data, CO_INTEGER)
+#define as_uchar(variable, data) as_var(variable, unsigned char, data, CO_UCHAR)
+
+#define as_reflect(variable, type, value) reflect_type_t *variable = reflect_get_##type(); \
+    variable->instance = value;
+
+#define as_var_ref(variable, type, data, enum_type) as_var(variable, type, data, enum_type); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_instance(variable, variable_type) variable_type *variable = (variable_type *)co_new_by(1, sizeof(variable_type)); \
+    variable->type = CO_STRUCT;
+
+#define as_instance_ref(variable, type) as_instance(variable, type); \
+    as_reflect(variable##_r, type, variable)
 
 #define $(list, index) map_get((list), slice_find((list), index))->value
 #define $$(list, index, value) map_put((list), slice_find((list), index), (value))
 
+#define pop(list) map_pop((list))
+#define push(list, value) map_push((list), (value))
+
+#define unshift(list) map_unshift((list))
+#define shift(list, value) map_shift((list), (value))
+
 #define in ,
-#define array_free map_free
 #define kv(key, value) (key), (value)
 #define has(i) map_macro_type((i))->value
 #define has_t(i) map_macro_type((i))
@@ -113,9 +138,62 @@ extern "C" {
 #define has_func(arg) has_t((arg))->value.func
 #define has_cast_ptr(type, arg) (type *)has_t((arg))->value.object
 
+#define match(variable_type) switch (type_of(variable_type))
+#define and(ENUM) case ENUM:
+#define or(ENUM) break; case ENUM:
+#define otherwise break; default:
+
+/* The `for_select` macro sets up a coroutine to wait on multiple channel
+operations. Must be closed out with `select_end`, and if no `select_case(channel)`, `select_case_if(channel)`, `select_break` provided, an infinite loop is created.
+
+This behaves same as GoLang `select {}` statement. */
+#define for_select       \
+  bool ___##__FUNCTION__; \
+  while (true)            \
+  {                       \
+      ___##__FUNCTION__ = false; \
+    if (true)
+
+#define select_end              \
+  if (___##__FUNCTION__ == false) \
+      coroutine_yield();          \
+  }
+
+#define select_case(ch)                                 \
+  if ((ch)->select_ready && ___##__FUNCTION__ == false) \
+  {                                                     \
+      (ch)->select_ready = false; if (true)
+
+#define select_break      \
+  ___##__FUNCTION__ = true; \
+  }
+
+#define select_case_if(ch) \
+  select_break else select_case(ch)
+
+/* The `select_default` is run if no other case is ready.
+Must also closed out with `select_break()`. */
+#define select_default()    \
+  select_break if (___##__FUNCTION__ == false) {
+
+#define await(func, arg) co_execute(FUNC_VOID(func), arg)
+#define defer(func, arg) co_defer(FUNC_VOID(func), arg)
+#define launch(func, arg) co_go(func, arg)
+#define sleep_for(ms) co_sleep(ms)
+
+#define thread(func, arg) co_async(func, arg)
+#define thread_await(futures) co_async_wait(futures)
+#define thread_get(futures) co_async_get(futures)
+
+#define message() channel()
+#define message_buf(s) channel_buf(s)
+#define send_msg(c, i) co_send(c, i)
+#define recv_msg(c) co_recv(c)
+
 /* An macro that stops the ordinary flow of control and begins panicking,
-throws an exception of given message. */
-#define error(message) co_panic(message)
+throws an exception of given message `issue`. */
+#define error(issue) co_panic(issue)
+
 /**
 * Creates a reflection structure and reflection function as `reflect_get_*TYPE_NAME*()`.
 * Allows the inspect of data structures at runtime:
@@ -157,6 +235,26 @@ throws an exception of given message. */
 * Creates a reflection function proto as `extern reflect_type_t *reflect_get_*TYPE_NAME*(void);`
 */
 #define ze_proto(TYPE_NAME) RE_DEFINE_PROTO(TYPE_NAME)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+ze_proto(var_t);
+ze_proto(co_array_t);
+ze_proto(defer_t);
+ze_proto(defer_func_t);
+ze_proto(promise);
+ze_proto(future);
+ze_proto(future_arg);
+ze_proto(channel_t);
+ze_proto(map_t);
+ze_proto(map_iter_t);
+ze_proto(array_item_t);
+ze_proto(ex_ptr_t);
+ze_proto(ex_context_t);
+ze_proto(co_scheduler_t);
+ze_proto(uv_args_t);
 
 #ifdef __cplusplus
 }

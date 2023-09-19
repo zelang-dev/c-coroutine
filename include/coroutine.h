@@ -70,6 +70,11 @@ Must also closed out with `select_break()`. */
 #define select_default()                         \
   select_break if (___##__FUNCTION__ == false) {
 
+#define match(variable_type) switch (type_of(variable_type))
+#define and(ENUM) case ENUM:
+#define or(ENUM) break; case ENUM:
+#define otherwise break; default:
+
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
     #define S_IRUSR S_IREAD  /* read, user */
@@ -1019,6 +1024,7 @@ C_API string_t iter_key(map_iter_t *);
 C_API map_iter_t *iter_remove(map_iter_t *);
 C_API void iter_free(map_iter_t *);
 C_API void println(int n_of_args, ...);
+C_API void delete(void_t ptr);
 
 C_API map_value_t *map_macro_type(void_t);
 

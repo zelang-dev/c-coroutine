@@ -6,10 +6,10 @@ int co_main(int argc, char **argv) {
 
     printf("%s %s\n", $(list, 0).str, $(list, 1).str);
     println(1, list);
-    array_free(list);
+    delete(list);
 
     list = array_long(6, 2, 3, 5, 7, 11, 13);
-    co_defer(array_free, list);
+    co_defer(delete, list);
 
     println(1, list);
 

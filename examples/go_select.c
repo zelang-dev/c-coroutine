@@ -28,8 +28,8 @@ void *func(void *args) {
 
     printf("\nChannel `quit` type is: %d, validity: %d\n", type_of(quit), is_instance(quit));
 
-    channel_free(c);
-    channel_free(quit);
+    delete(c);
+    delete(quit);
 
     printf("Channel `quit` freed, validity: %d\n", is_instance(quit));
     printf("Channel `c` type is: %d accessed after freed!\n\n", type_of(c));

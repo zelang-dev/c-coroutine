@@ -134,6 +134,17 @@ void co_strcpy(char *dest, string_t src, size_t len) {
 #endif
 }
 
+void delete(void_t ptr) {
+    match(ptr) {
+        and (CO_MAP_STRUCT)
+            map_free(ptr);
+        or (CO_CHANNEL)
+            channel_free(ptr);
+        otherwise
+            CO_FREE(ptr);
+    }
+}
+
 void println(int n_of_args, ...) {
     va_list argp;
     void_t list;
@@ -146,7 +157,11 @@ void println(int n_of_args, ...) {
             type = ((map_t *)list)->item_type;
             foreach(item in list) {
                 if (type == CO_LLONG)
+#ifdef _WIN32
+                    printf("%ld ", (long)has(item).long_long);
+#else
                     printf("%lld ", has(item).long_long);
+#endif
                 else if (type == CO_STRING)
                     printf("%s ", has(item).str);
                 else if (type == CO_OBJ)
