@@ -195,6 +195,32 @@ Must also closed out with `select_break()`. */
 throws an exception of given message `issue`. */
 #define error(issue) co_panic(issue)
 
+#define as_array(variable, dtor, n_of_items, ...) array_t *variable = array(dtor, n_of_items, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_range(variable, start, stop) array_t *variable = range(start, stop); \
+    defer(map_free, variable)
+
+#define as_array_long(variable, n_of_items, ...) array_t *variable = array_long(n_of_items, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_array_string(variable, n_of_items, ...) array_t *variable = array_str(n_of_items, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_slice(variable, list, start, end) slice_t *variable = slice(list, start, end);
+
+#define as_map_for(variable, dtor, desc, ...) map_t *variable = map_for(dtor, desc, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_map(variable, dtor, n_of_pairs, ...) map_t *variable = map(dtor, n_of_pairs, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_map_long(variable, n_of_pairs, ...) map_t *variable = map_long(n_of_pairs, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_map_string(variable, n_of_pairs, ...) map_t *variable = map_str(n_of_pairs, __VA_ARGS__); \
+    defer(map_free, variable)
+
 /**
 * Creates a reflection structure and reflection function as `reflect_get_*TYPE_NAME*()`.
 * Allows the inspect of data structures at runtime:

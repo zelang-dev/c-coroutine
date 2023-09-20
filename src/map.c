@@ -292,20 +292,22 @@ void map_free(map_t *array) {
     if (!array)
         return;
 
-    while (array->head) {
-        if (array->dtor)
-            array->dtor(array->head->value);
+    if (is_type(array, CO_MAP_STRUCT)) {
+        while (array->head) {
+            if (array->dtor)
+                array->dtor(array->head->value);
 
-        next = array->head->next;
-        CO_FREE(array->head);
-        array->head = next;
+            next = array->head->next;
+            CO_FREE(array->head);
+            array->head = next;
+        }
+
+        co_hash_free(array->dict);
+        if (array->slice != NULL)
+            slice_free(array);
+
+        CO_FREE(array);
     }
-
-    co_hash_free(array->dict);
-    if (array->slice != NULL)
-        slice_free(array);
-
-    CO_FREE(array);
 }
 
 int map_push(map_t *array, void_t value) {
@@ -455,7 +457,7 @@ void_t map_del(map_t *array, string_t key) {
     if (!array)
         return NULL;
 
-    return map_remove(array->dict, co_hash_get(array->dict, key));
+    return map_remove(array, co_hash_get(array->dict, key));
 }
 
 map_value_t *map_get(map_t *array, string_t key) {

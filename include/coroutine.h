@@ -638,6 +638,16 @@ typedef struct co_value
     value_types type;
 } co_value_t;
 
+typedef enum {
+    ZE_OK = CO_NONE,
+    ZE_ERR = CO_NULL,
+} result_type;
+
+typedef struct {
+    result_type type;
+    value_t *value;
+} result_t;
+
 typedef struct uv_args_s
 {
     value_types type;
@@ -1133,6 +1143,34 @@ C_API map_value_t *map_macro_type(void_t);
 #define has_ptr(arg) has_t((arg))->value.object
 #define has_func(arg) has_t((arg))->value.func
 #define has_cast_ptr(type, arg) (type *)has_t((arg))->value.object
+
+#define defer(func, arg) co_defer(FUNC_VOID(func), arg)
+
+#define as_array(variable, dtor, n_of_items, ...) array_t *variable = array(dtor, n_of_items, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_range(variable, start, stop) array_t *variable = range(start, stop); \
+    defer(map_free, variable)
+
+#define as_array_long(variable, n_of_items, ...) array_t *variable = array_long(n_of_items, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_array_string(variable, n_of_items, ...) array_t *variable = array_str(n_of_items, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_slice(variable, list, start, end) slice_t *variable = slice(list, start, end);
+
+#define as_map_for(variable, dtor, desc, ...) map_t *variable = map_for(dtor, desc, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_map(variable, dtor, n_of_pairs, ...) map_t *variable = map(dtor, n_of_pairs, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_map_long(variable, n_of_pairs, ...) map_t *variable = map_long(n_of_pairs, __VA_ARGS__); \
+    defer(map_free, variable)
+
+#define as_map_string(variable, n_of_pairs, ...) map_t *variable = map_str(n_of_pairs, __VA_ARGS__); \
+    defer(map_free, variable)
 
 #define EX_CAT(a, b) a ## b
 
