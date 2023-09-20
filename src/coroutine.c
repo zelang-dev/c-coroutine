@@ -141,7 +141,10 @@ void delete(void_t ptr) {
         or (CO_CHANNEL)
             channel_free(ptr);
         otherwise
-            CO_FREE(ptr);
+            if (is_valid(ptr))
+                CO_FREE(ptr);
+            else
+                CO_LOG("Pointer not freed, possible double free attempt!");
     }
 }
 

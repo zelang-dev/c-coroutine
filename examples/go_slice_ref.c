@@ -3,7 +3,7 @@
 
 int co_main(int argc, char **argv) {
     array_t *names = array_str(4, "John", "Paul", "George", "Ringo");
-    co_defer(array_free, names);
+    co_defer(delete, names);
 
     println(1, names);
 

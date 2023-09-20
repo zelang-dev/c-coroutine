@@ -29,6 +29,7 @@
 
 #define $(list, index) map_get((list), slice_find((list), index))->value
 #define $$(list, index, value) map_put((list), slice_find((list), index), (value))
+#define $$$(list, index) map_del((list), slice_find((list), index))
 
 #define pop(list) map_pop((list))
 #define push(list, value) map_push((list), (value))

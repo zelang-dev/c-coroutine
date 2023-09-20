@@ -1009,6 +1009,7 @@ C_API size_t map_count(map_t *);
 C_API void_t map_remove(map_t *, void_t);
 C_API void map_put(map_t *, string_t, void_t);
 C_API map_value_t *map_get(map_t *, string_t);
+C_API void_t map_del(map_t *, string_t);
 C_API array_t *range(int start, int stop);
 C_API array_t *array(map_value_dtor, int n_args, ...);
 C_API array_t *array_long(int n_args, ...);
@@ -1032,7 +1033,6 @@ C_API map_value_t *map_macro_type(void_t);
 #define $$(list, index, value) map_put((list), slice_find((list), index), (value))
 
 #define in ,
-#define array_free map_free
 #define kv(key, value) (key), (value)
 #define has(i) map_macro_type((i))->value
 #define has_t(i) map_macro_type((i))

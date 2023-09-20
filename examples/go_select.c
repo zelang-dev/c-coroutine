@@ -33,6 +33,7 @@ void *func(void *args) {
 
     printf("Channel `quit` freed, validity: %d\n", is_instance(quit));
     printf("Channel `c` type is: %d accessed after freed!\n\n", type_of(c));
+    delete(quit);
 
     return 0;
 }

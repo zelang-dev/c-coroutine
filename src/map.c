@@ -451,6 +451,13 @@ void_t map_remove(map_t *array, void_t value) {
     return NULL;
 }
 
+void_t map_del(map_t *array, string_t key) {
+    if (!array)
+        return NULL;
+
+    return map_remove(array->dict, co_hash_get(array->dict, key));
+}
+
 map_value_t *map_get(map_t *array, string_t key) {
     return (map_value_t *)co_hash_get(array->dict, key);
 }
