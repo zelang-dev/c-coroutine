@@ -387,10 +387,11 @@ typedef enum
     CO_PROMISE,
     CO_FUTURE,
     CO_FUTURE_ARG,
-    CO_UV_ARG,
+    CO_EVENT_ARG,
     CO_SCHED,
     CO_CHANNEL,
     CO_STRUCT,
+    CO_UNION,
     CO_VALUE,
     CO_NO_INSTANCE
 } value_types;
@@ -817,7 +818,9 @@ C_API void co_execute(func_t, void_t);
 
 C_API uv_loop_t *co_loop(void);
 
-C_API int co_uv(callable_t, void_t arg);
+C_API value_t co_event(callable_t, void_t arg);
+
+C_API value_t co_await(callable_t fn, void_t arg);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
@@ -1534,6 +1537,7 @@ reflect_proto(ex_ptr_t)
 reflect_proto(ex_context_t)
 reflect_proto(co_scheduler_t)
 reflect_proto(uv_args_t)
+reflect_proto(result_t)
 
 /* Write this function instead of `main`, this library provides its own main, the scheduler,
 which call this function as an coroutine! */

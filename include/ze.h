@@ -3,6 +3,9 @@
 
 #include "../include/coroutine.h"
 
+#define nullptr NULL
+#define nil nullptr
+
 #define var(data) co_var((data))->value
 #define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)co_new_by(1, sizeof(var_t)); \
     variable->type = enum_type; \
@@ -177,13 +180,19 @@ Must also closed out with `select_break()`. */
 #define select_default()    \
   select_break if (___##__FUNCTION__ == false) {
 
-#define await(func, arg) co_execute(FUNC_VOID(func), arg)
+#define await(func, arg) co_await(func, arg)
 #define defer(func, arg) co_defer(FUNC_VOID(func), arg)
+#define execute(func, arg) co_execute(FUNC_VOID(func), arg)
 #define launch(func, arg) co_go(func, arg)
+
 #define sleep_for(ms) co_sleep(ms)
 
+#define wait_group(wg) wait_group_t *wg = co_wait_group()
+#define wait_for(wg, wait_result)  wait_result_t *wait_result = co_wait(wg)
+#define get_result_for(wait_result, coroutine_id) co_group_get_result(wait_result, coroutine_id)
+
 #define thread(func, arg) co_async(func, arg)
-#define thread_await(futures) co_async_wait(futures)
+#define thread_until(futures) co_async_wait(futures)
 #define thread_get(futures) co_async_get(futures)
 
 #define message() channel()
@@ -282,6 +291,7 @@ ze_proto(ex_ptr_t);
 ze_proto(ex_context_t);
 ze_proto(co_scheduler_t);
 ze_proto(uv_args_t);
+ze_proto(result_t);
 
 #ifdef __cplusplus
 }

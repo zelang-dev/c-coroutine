@@ -4,15 +4,12 @@ static void_t fs_init(void_t);
 
 static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->args = args;
-    uv_args->type = CO_UV_ARG;
+    uv_args->type = CO_EVENT_ARG;
     uv_args->fs_type = fs_type;
     uv_args->n_args = n_args;
     uv_args->is_path = is_path;
 
-    wait_group_t *wg = co_wait_group();
-    int cid = co_uv(fs_init, uv_args);
-    wait_result_t *wgr = co_wait(wg);
-    return co_group_get_result(wgr, cid);
+    return co_event(fs_init, uv_args);
 }
 
 static void fs_cb(uv_fs_t *req) {

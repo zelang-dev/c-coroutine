@@ -57,7 +57,7 @@ TODO:
     RE_PROMISE,
     RE_FUTURE,
     RE_FUTURE_ARG,
-    RE_UV_ARG,
+    RE_EVENT_ARG,
     RE_SCHED,
     RE_CHANNEL,
     RE_VALUE,
@@ -77,10 +77,12 @@ string_t reflect_kind(void_t value) {
     switch (res) {
         case RE_STRUCT:
             return "struct";
+        case RE_UNION:
+            return "union";
         case RE_CONST_CHAR:
             return "const char *";
         case RE_STRING:
-        //    return "string";
+            // return "string";
         case RE_CHAR_P:
             return "char *";
         case RE_UCHAR_P:
@@ -277,3 +279,32 @@ reflect_func(ex_context_t,
              (INTEGER, int volatile, state),
              (INTEGER, int, unstack)
 )
+
+reflect_type_t *reflect_get_result_t() {
+    static reflect_field_t fields_info[+1 + 1] = {
+    {
+        RE_ENUM,
+        "result_type",
+        "type",
+        sizeof(result_type),
+        ((size_t) & (((result_t *)0)->type)),
+        (result_type)-1 < (result_type)1, -1},
+    {
+        RE_UNION,
+        "value_t *",
+        "value",
+         sizeof(value_t *),
+        ((size_t) & (((result_t *)0)->value)), 0, -1},
+    };
+
+    static reflect_type_t type_info = {
+        RE_STRUCT,
+        ((void *)0),
+        "result_t", +1 + 1,
+        sizeof(result_t),
+        +sizeof(result_type) + sizeof(value_t *),
+        fields_info
+    };
+
+    return &type_info;
+}

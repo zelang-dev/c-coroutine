@@ -65,10 +65,11 @@ typedef enum {
     RE_PROMISE,
     RE_FUTURE,
     RE_FUTURE_ARG,
-    RE_UV_ARG,
+    RE_EVENT_ARG,
     RE_SCHED,
     RE_CHANNEL,
     RE_STRUCT,
+    RE_UNION,
     RE_VALUE,
     RE_NO_INSTANCE
 } reflect_types;
@@ -216,6 +217,7 @@ typedef struct reflect_type_s {
 #define RE_IS_SIGNED_PTR(C_TYPE) 0
 #define RE_IS_SIGNED_OBJ(C_TYPE) 0
 #define RE_IS_SIGNED_STRUCT(C_TYPE) 0
+#define RE_IS_SIGNED_UNION(C_TYPE)0
 #define RE_IS_SIGNED_CHAR_P(C_TYPE) RE_IS_TYPE_SIGNED_(C_TYPE)
 #define RE_IS_SIGNED_UCHAR_P(C_TYPE) RE_IS_TYPE_SIGNED_(C_TYPE)
 #define RE_IS_SIGNED_BOOL(C_TYPE) RE_IS_TYPE_SIGNED_(C_TYPE)

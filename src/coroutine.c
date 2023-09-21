@@ -1094,11 +1094,19 @@ CO_FORCE_INLINE void co_execute(func_t fn, void_t arg) {
     co_pause();
 }
 
-CO_FORCE_INLINE int co_uv(callable_t fn, void_t arg) {
+value_t co_await(callable_t fn, void_t arg) {
+
+    wait_group_t *wg = co_wait_group();
+    int cid = co_go(fn, arg);
+    wait_result_t *wgr = co_wait(wg);
+    return co_group_get_result(wgr, cid);
+}
+
+value_t co_event(callable_t fn, void_t arg) {
 
     co_routine_t *co = co_active();
     co->loop_active = true;
-    return coroutine_create(fn, arg, CO_STACK_SIZE);
+    return co_await(fn, arg);
 }
 
 wait_group_t *co_wait_group(void) {
