@@ -409,6 +409,12 @@ typedef void_t(*callable_t)(void_t);
 typedef void (*func_t)(void_t);
 typedef struct {
     value_types type;
+    void_t value;
+    func_t dtor;
+} object_t;
+
+typedef struct {
+    value_types type;
     void_t base;
     size_t elements;
 } co_array_t;
@@ -1538,6 +1544,7 @@ reflect_proto(ex_context_t)
 reflect_proto(co_scheduler_t)
 reflect_proto(uv_args_t)
 reflect_proto(result_t)
+reflect_proto(object_t)
 
 /* Write this function instead of `main`, this library provides its own main, the scheduler,
 which call this function as an coroutine! */

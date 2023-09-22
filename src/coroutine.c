@@ -140,11 +140,14 @@ void delete(void_t ptr) {
             map_free(ptr);
         or (CO_CHANNEL)
             channel_free(ptr);
-        otherwise
+        or (CO_OBJ)
+            ((object_t *)ptr)->dtor(ptr);
+        otherwise {
             if (is_valid(ptr))
                 CO_FREE(ptr);
             else
                 CO_LOG("Pointer not freed, possible double free attempt!");
+        }
     }
 }
 

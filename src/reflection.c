@@ -105,6 +105,7 @@ string_t reflect_kind(void_t value) {
         case RE_DOUBLE:
             return "double";
         case RE_OBJ:
+            return "* object(struct)";
         case RE_PTR:
             return "* ptr";
         case RE_FUNC:
@@ -279,7 +280,10 @@ reflect_func(ex_context_t,
              (INTEGER, int volatile, state),
              (INTEGER, int, unstack)
 )
-
+reflect_func(object_t,
+             (PTR, void_t, value),
+             (FUNC, func_t, dtor)
+)
 reflect_type_t *reflect_get_result_t() {
     static reflect_field_t fields_info[+1 + 1] = {
     {
