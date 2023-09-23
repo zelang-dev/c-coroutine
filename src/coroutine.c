@@ -219,7 +219,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
         }
         c->wait_active = false;
         c->wait_group = NULL;
-        co_count_down();
+        --coroutine_count;
     }
 
     co_hash_free(wg);

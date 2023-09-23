@@ -10,7 +10,7 @@ reflect_struct(details,
                (STRING, string, fname),
                (STRING, string, lname),
                (INTEGER, int, age),
-               (FLOAT, float, balance)
+               (DOUBLE, double, balance)
 )
 
 typedef string myType;
@@ -39,8 +39,8 @@ void showDetails(reflect_type_t *i, void_t j) {
                 printf("%d.Type: %s || Value: %d\n",
                    (index + 1), reflect_field_type(i, index), c_int(value));
             else if (index == 4)
-                printf("%d.Type: %s || Value: %f\n",
-                   (index + 1), reflect_field_type(i, index), c_float(value));
+                printf("%d.Type: %s || Value: %.3f\n",
+                   (index + 1), reflect_field_type(i, index), c_double(value));
             else
                 printf("%d.Type: %s || Value: %s\n",
                    (index + 1), reflect_field_type(i, index), c_char_ptr(value));

@@ -30,7 +30,7 @@ thread_local int exiting = 0;
 thread_local int n_co_switched;
 
 /* track the number of coroutines used */
-thread_local int co_count;
+thread_local int coroutine_count;
 
 /* record which coroutine is executing for scheduler */
 thread_local co_routine_t *co_running;
@@ -903,7 +903,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
 
     t = co_create(stack, fn, arg);
     t->cid = ++co_id_generate;
-    co_count++;
+    coroutine_count++;
     id = t->cid;
     if (n_all_coroutine % 64 == 0) {
         all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[ 0 ]));
@@ -962,10 +962,6 @@ CO_FORCE_INLINE void coroutine_interrupt(void) {
     coroutine_loop(UV_RUN_NOWAIT);
 }
 
-CO_FORCE_INLINE void co_count_down(void) {
-    --co_count;
-}
-
 static void_t coroutine_wait(void_t v) {
     int ms;
     co_routine_t *t;
@@ -996,7 +992,7 @@ static void_t coroutine_wait(void_t v) {
         while ((t = sleeping.head) && now >= t->alarm_time) {
             coroutine_remove(&sleeping, t);
             if (!t->system && --sleeping_counted == 0)
-                co_count--;
+                coroutine_count--;
 
             coroutine_schedule(t);
         }
@@ -1038,7 +1034,7 @@ unsigned int co_sleep(unsigned int ms) {
         sleeping.tail = t;
 
     if (!t->system && sleeping_counted++ == 0)
-        co_count++;
+        coroutine_count++;
 
     co_switch(co_current());
 
@@ -1094,7 +1090,7 @@ char *coroutine_get_name() {
 void coroutine_system(void) {
     if (!co_running->system) {
         co_running->system = 1;
-        --co_count;
+        --coroutine_count;
     }
 }
 
@@ -1133,7 +1129,7 @@ static void coroutine_scheduler(void) {
     co_routine_t *t;
 
     for (;;) {
-        if (co_count == 0 || !coroutine_active()) {
+        if (coroutine_count == 0 || !coroutine_active()) {
 #ifdef UV_H
             if (co_main_loop_handle != NULL) {
                 uv_loop_close(co_main_loop_handle);
@@ -1144,10 +1140,10 @@ static void coroutine_scheduler(void) {
             gc_coroutine_free();
 
             if (n_all_coroutine) {
-                if (co_count)
+                if (coroutine_count)
                     n_all_coroutine--;
 
-                for (int i = 0; i < (n_all_coroutine + (co_count != 0)); i++) {
+                for (int i = 0; i < (n_all_coroutine + (coroutine_count != 0)); i++) {
                     t = all_coroutine[ n_all_coroutine - i ];
                     if (t)
                         CO_FREE(t);
@@ -1155,8 +1151,8 @@ static void coroutine_scheduler(void) {
             }
 
             CO_FREE(all_coroutine);
-            if (co_count > 0) {
-                fprintf(stderr, "No runnable coroutines! %d stalled\n", co_count);
+            if (coroutine_count > 0) {
+                fprintf(stderr, "No runnable coroutines! %d stalled\n", coroutine_count);
                 exit(1);
             } else {
                 CO_LOG("Coroutine scheduler exited");
@@ -1180,7 +1176,7 @@ static void coroutine_scheduler(void) {
         co_running = NULL;
         if (t->halt || t->exiting) {
             if (!t->system)
-                --co_count;
+                --coroutine_count;
             i = t->all_coroutine_slot;
             all_coroutine[ i ] = all_coroutine[ --n_all_coroutine ];
             all_coroutine[ i ]->all_coroutine_slot = i;

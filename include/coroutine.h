@@ -1171,6 +1171,7 @@ struct ex_context_s
 
 C_API thread_local ex_context_t *ex_context;
 C_API thread_local char ex_message[256];
+C_API thread_local int coroutine_count;
 
 typedef struct _promise
 {
@@ -1228,7 +1229,6 @@ C_API unsigned long co_async_self(void);
 
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
-C_API void co_count_down(void);
 
 C_API string_t co_itoa(int64_t number);
 C_API void co_strcpy(char *dest, string_t src, size_t len);
