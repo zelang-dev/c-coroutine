@@ -46,6 +46,12 @@ int n_all_coroutine;
 int coroutine_loop(int);
 void coroutine_interrupt(void);
 
+/* Initializes new coroutine, platform specific. */
+co_routine_t *co_derive(void_t, size_t);
+
+/* Create new coroutine. */
+co_routine_t *co_create(size_t, callable_t, void_t);
+
 /* Create a new coroutine running func(arg) with stack size. */
 int coroutine_create(callable_t, void_t, unsigned int);
 
@@ -81,9 +87,7 @@ static void co_awaitable() {
             co_result_set(co, co->func(co->args));
             co_deferred_free(co);
         }
-    }
-    catch_any
-    {
+    } catch_any {
         co_deferred_free(co);
         if (!co->err_recovered)
             rethrow();
@@ -92,8 +96,7 @@ static void co_awaitable() {
             co->status = CO_EVENT;
         else
             co->status = CO_NORMAL;
-    }
-    end_try;
+    } end_try;
 }
 
 static void co_func() {

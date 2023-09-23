@@ -3,6 +3,19 @@
 
 #include "../include/coroutine.h"
 
+#define try ex_try
+#define catch_any ex_catch_any
+#define catch(e) ex_catch(e)
+#define end_try ex_end_try
+#define finally ex_finally
+
+/* An macro that stops the ordinary flow of control and begins panicking,
+throws an exception of given message `issue`. */
+#define error(issue) co_panic(issue)
+
+/* invalid address indicator */
+#define ZE_ERROR ((void_t)-1)
+
 #define nullptr NULL
 #define nil nullptr
 
@@ -77,7 +90,7 @@
 #define c_unsigned_short(data) co_value((data)).u_short
 #define c_void_ptr(data) co_value((data)).object
 #define c_callable(data) co_value((data)).func
-#define c_void_cast(type, data) (type *)co_value((data)).object
+#define c_cast(type, data) (type *)co_value((data)).object
 
 #define c_integer(value) co_data((value)).integer
 #define c_signed_long(value) co_data((value)).s_long
@@ -98,7 +111,7 @@
 #define c_unsigned_shorts(value) co_data((value)).u_short
 #define c_object(value) co_data((value)).object
 #define c_func(value) co_data((value)).func
-#define c_object_cast(type, value) (type *)co_data((value)).object
+#define c_cast_ptr(type, value) (type *)co_data((value)).object
 
 #define var_int(arg) (arg).value.integer
 #define var_long(arg) (arg).value.s_long
@@ -119,7 +132,7 @@
 #define var_unsigned_short(arg) (arg).value.u_short
 #define var_ptr(arg) (arg).value.object
 #define var_func(arg) (arg).value.func
-#define var_cast_ptr(type, arg) (type *)(arg).value.object
+#define var_cast(type, arg) (type *)(arg).value.object
 
 #define has_int(arg) has_t((arg))->value.integer
 #define has_long(arg) has_t((arg))->value.s_long
@@ -199,10 +212,6 @@ Must also closed out with `select_break()`. */
 #define message_buf(s) channel_buf(s)
 #define send_msg(c, i) co_send(c, i)
 #define recv_msg(c) co_recv(c)
-
-/* An macro that stops the ordinary flow of control and begins panicking,
-throws an exception of given message `issue`. */
-#define error(issue) co_panic(issue)
 
 #define as_array(variable, dtor, n_of_items, ...) array_t *variable = array(dtor, n_of_items, __VA_ARGS__); \
     defer(map_free, variable)
@@ -292,6 +301,7 @@ ze_proto(ex_context_t);
 ze_proto(co_scheduler_t);
 ze_proto(uv_args_t);
 ze_proto(result_t);
+ze_proto(object_t);
 
 #ifdef __cplusplus
 }

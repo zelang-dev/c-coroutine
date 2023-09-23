@@ -643,12 +643,6 @@ uv_loop_t *co_loop(void);
 /* Return handle to current coroutine. */
 C_API co_routine_t *co_active(void);
 
-/* Initializes new coroutine, platform specific. */
-C_API co_routine_t *co_derive(void_t, size_t);
-
-/* Create new coroutine. */
-C_API co_routine_t *co_create(size_t, callable_t, void_t);
-
 /* Delete specified coroutine. */
 C_API void co_delete(co_routine_t *);
 
@@ -995,7 +989,7 @@ C_API map_value_t *map_macro_type(void_t);
     ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, NULL)
 
 #ifdef _WIN32
-#define try                                   \
+#define ex_try                                   \
     {                                         \
         /* local context */                   \
         ex_context_t ex_err;                  \
@@ -1015,7 +1009,7 @@ C_API map_value_t *map_macro_type(void_t);
         {                                     \
             {
 
-#define catch_any                    \
+#define ex_catch_any                    \
     }                                \
     }                                \
     }                                \
@@ -1026,7 +1020,7 @@ C_API map_value_t *map_macro_type(void_t);
             EX_MAKE();               \
             ex_err.state = ex_catch_st;
 
-#define end_try                            \
+#define ex_end_try                            \
     }                                      \
     }                                      \
     if (ex_context == &ex_err)             \
@@ -1038,7 +1032,7 @@ C_API map_value_t *map_macro_type(void_t);
     }
 
 #else
-#define try                               \
+#define ex_try                               \
     {                                         \
         /* local context */                   \
         ex_context_t ex_err;                  \
@@ -1056,7 +1050,7 @@ C_API map_value_t *map_macro_type(void_t);
         {                                     \
             {
 
-#define catch_any                    \
+#define ex_catch_any                    \
     }                                \
     }                                \
     if (ex_err.state == ex_throw_st) \
@@ -1065,7 +1059,7 @@ C_API map_value_t *map_macro_type(void_t);
             EX_MAKE();               \
             ex_err.state = ex_catch_st;
 
-#define end_try                            \
+#define ex_end_try                            \
     }                                      \
     }                                      \
     if (ex_context == &ex_err)             \
@@ -1076,7 +1070,7 @@ C_API map_value_t *map_macro_type(void_t);
     }
 #endif
 
-#define finally                          \
+#define ex_finally                          \
     }                                    \
     }                                    \
     {                                    \
@@ -1085,7 +1079,7 @@ C_API map_value_t *map_macro_type(void_t);
             /* global context updated */ \
             ex_context = ex_err.next;
 
-#define catch(E)                        \
+#define ex_catch(E)                        \
     }                                   \
     }                                   \
     if (ex_err.state == ex_throw_st)    \
@@ -1178,16 +1172,6 @@ struct ex_context_s
 C_API thread_local ex_context_t *ex_context;
 C_API thread_local char ex_message[256];
 
-/* Protects dynamically allocated memory against exceptions.
-If the object pointed by `ptr` changes before `unprotected()`,
-the new object will be automatically protected.
-
-If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
-#define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_protect_ptr(&EX_PNAME(ptr), &ptr, func)
-
-/* Remove memory pointer protection, does not free the memory. */
-#define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
-
 typedef struct _promise
 {
     value_types type;
@@ -1278,6 +1262,22 @@ typedef struct reflect_kind_s {
 
 #ifndef ZE_LANG_H_
 #define ZE_LANG_H_
+
+#define try ex_try
+#define catch_any ex_catch_any
+#define catch(e) ex_catch(e)
+#define end_try ex_end_try
+#define finally ex_finally
+
+/* Protects dynamically allocated memory against exceptions.
+If the object pointed by `ptr` changes before `unprotected()`,
+the new object will be automatically protected.
+
+If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
+#define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_protect_ptr(&EX_PNAME(ptr), &ptr, func)
+
+/* Remove memory pointer protection, does not free the memory. */
+#define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
 
 /* invalid address indicator */
 #define CO_ERROR ((void_t)-1)
