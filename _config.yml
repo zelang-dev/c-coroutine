@@ -1,5 +1,8 @@
 plugins:
   - jekyll-relative-links
+  - jemoji
+  - jekyll-avatar
+  - jekyll-mentions
 relative_links:
   enabled: true
   collections: true
@@ -10,5 +13,31 @@ include:
   - ISSUE_TEMPLATE.md
   - PULL_REQUEST_TEMPLATE.md
 
-theme: jekyll-theme-hacker
+remote_theme:   sighingnow/jekyll-gitbook
 show_downloads: [true]
+syntax_highlighter_style: colorful
+toc:
+    enabled: true
+    h_min: 1
+    h_max: 3
+
+exclude:
+  - Makefile
+  - CMakeLists.txt
+  - CNAME
+  - LICENSE
+  - update.sh
+  - Gemfile
+  - Gemfile.lock
+  - requirements.txt
+  - build
+  - src
+  - libuv
+  - coroutine-built
+  - pthreads4w
+  - .github
+  - valgrind.supp
+  - package.json
+  - package-lock.json
+  - webpack.config.js
+  - jekyll-rtd-theme.gemspec
