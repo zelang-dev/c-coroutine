@@ -13,7 +13,7 @@ include:
   - examples
   - PULL_REQUEST_TEMPLATE.md
 
-remote_theme: luxedo/jekyll-theme-potato-hacker
+theme: jekyll-theme-hacker
 show_downloads: [true]
 toc:
   enabled: true
