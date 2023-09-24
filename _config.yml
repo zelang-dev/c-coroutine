@@ -8,13 +8,14 @@ relative_links:
   collections: true
 include:
   - index.md
-  - README.md
+  - home.md
   - LICENSE.md
   - ISSUE_TEMPLATE.md
   - PULL_REQUEST_TEMPLATE.md
+  - examples
 
 remote_theme: rundocs/jekyll-rtd-theme
-show_downloads: [true]
+theme: null
 syntax_highlighter_style: colorful
 toc:
     enabled: true
@@ -22,6 +23,7 @@ toc:
     h_max: 3
 
 exclude:
+  - README.md
   - Makefile
   - CMakeLists.txt
   - CNAME
