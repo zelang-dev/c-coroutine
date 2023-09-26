@@ -58,26 +58,6 @@ void println(int n_of_args, ...) {
                 else if (type == CO_BOOL)
                     printf(has(item).boolean ? "true " : "false ");
             }
-        } else if (is_reflection(list)) {
-            reflect_type_t *kind = (reflect_type_t *)list;
-            printf("[ %d, %s, %zu, %zu, %zu ]\n",
-                   reflect_type_enum(kind),
-                   reflect_type_of(kind),
-                   reflect_num_fields(kind),
-                   reflect_type_size(kind),
-                   reflect_packed_size(kind)
-            );
-            for (int i = 0; i < reflect_num_fields(kind); i++) {
-                printf("  -  %d, %s, %s, %zu, %zu, %d, %d\n",
-                       reflect_field_enum(kind, i),
-                       reflect_field_type(kind, i),
-                       reflect_field_name(kind, i),
-                       reflect_field_size(kind, i),
-                       reflect_field_offset(kind, i),
-                       reflect_field_is_signed(kind, i),
-                       reflect_field_array_size(kind, i)
-                );
-            }
         } else {
             printf("%s ", co_value(list).str);
         }
@@ -258,4 +238,28 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 
 unsigned int co_id() {
     return co_active()->cid;
+}
+
+CO_FORCE_INLINE value_types type_of(void_t self) {
+    return ((var_t *)self)->type;
+}
+
+CO_FORCE_INLINE bool is_type(void_t self, value_types check) {
+    return type_of(self) == check;
+}
+
+CO_FORCE_INLINE bool is_instance_of(void_t self, void_t check) {
+    return type_of(self) == type_of(check);
+}
+
+CO_FORCE_INLINE bool is_value(void_t self) {
+    return (type_of(self) > CO_NULL) && (type_of(self) < CO_NONE);
+}
+
+CO_FORCE_INLINE bool is_instance(void_t self) {
+    return (type_of(self) > CO_NONE) && (type_of(self) < CO_NO_INSTANCE);
+}
+
+CO_FORCE_INLINE bool is_valid(void_t self) {
+    return is_value(self) || is_instance(self);
 }

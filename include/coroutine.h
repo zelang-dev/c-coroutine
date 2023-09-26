@@ -22,7 +22,6 @@
 #endif
 
 #include "uv_routine.h"
-#include "reflection.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/unistd.h"
@@ -1240,29 +1239,6 @@ C_API gc_coroutine_t *gc_coroutine_list(void);
 C_API void gc_coroutine_free(void);
 C_API void gc_channel_free(void);
 
-typedef struct reflect_value_s {
-    reflect_types type;
-    string_t value_type;
-    string_t name;
-    size_t size;
-    size_t offset;
-    bool is_signed;
-    int array_size;
-} reflect_value_t;
-
-typedef struct reflect_kind_s {
-    reflect_types type;
-    void_t instance;
-    string_t name;
-    size_t num_fields;
-    size_t size;
-    size_t packed_size;
-    reflect_value_t *fields;
-} reflect_kind_t;
-
-#ifndef ZE_LANG_H_
-#define ZE_LANG_H_
-
 #define try ex_try
 #define catch_any ex_catch_any
 #define catch(e) ex_catch(e)
@@ -1320,48 +1296,6 @@ Must also closed out with `select_break()`. */
 #define or(ENUM) break; case ENUM:
 #define otherwise break; default:
 
-/**
-* Creates a reflection structure and reflection function as `reflect_get_*TYPE_NAME*()`.
-* Allows the inspect of data structures at runtime:
-* - field types
-* - field names
-* - size of array fields
-* - size of field
-*
-* `TYPE_NAME` - name of your structure
-* (`DATA_TYPE`, `C_TYPE`, `FIELD_NAME`[, `ARRAY_SIZE`]) - comma-separated list of fields in the structure
-*
-* - DATA_TYPE - type of field (INTEGER, STRING, ENUM, PTR, FLOAT, DOUBLE, or STRUCT)
-* - C_TYPE - type of the field (e.g. int, uint64, char, etc.)
-* - FIELD_NAME - name of the field
-* - ARRAY_SIZE - size of array, if a field is an array
-*/
-#define reflect_struct(TYPE_NAME, ...) RE_DEFINE_STRUCT(TYPE_NAME, (ENUM, value_types, type), __VA_ARGS__)
-
-/**
-* Creates a reflection function as `reflect_get_*TYPE_NAME*()`.
-*
-* Allows the inspect of data structures at runtime:
-* - field types
-* - field names
-* - size of array fields
-* - size of field
-*
-* `TYPE_NAME` - name of your structure
-* (`DATA_TYPE`, `C_TYPE`, `FIELD_NAME`[, `ARRAY_SIZE`]) - comma-separated list of fields in the structure
-*
-* - DATA_TYPE - type of field (INTEGER, STRING, ENUM, PTR, FLOAT, DOUBLE, or STRUCT)
-* - C_TYPE - type of the field (e.g. int, uint64, char, etc.)
-* - FIELD_NAME - name of the field
-* - ARRAY_SIZE - size of array, if a field is an array
-*/
-#define reflect_func(TYPE_NAME, ...) RE_DEFINE_METHOD(TYPE_NAME, (ENUM, value_types, type), __VA_ARGS__)
-
-/**
-* Creates a function proto as `extern reflect_type_t *reflect_get_*TYPE_NAME*(void);`
-*/
-#define reflect_proto(TYPE_NAME, ...) RE_DEFINE_PROTO(TYPE_NAME)
-
 #define $(list, index) map_get((list), slice_find((list), index))->value
 #define $$(list, index, value) map_put((list), slice_find((list), index), (value))
 
@@ -1402,7 +1336,7 @@ Must also closed out with `select_break()`. */
 #define c_unsigned_short(data) co_value((data)).u_short
 #define c_void_ptr(data) co_value((data)).object
 #define c_callable(data) co_value((data)).func
-#define c_void_cast(type, data) (type *)co_value((data)).object
+#define c_cast(type, data) (type *)co_value((data)).object
 
 #define c_integer(value) co_data((value)).integer
 #define c_signed_long(value) co_data((value)).s_long
@@ -1423,7 +1357,7 @@ Must also closed out with `select_break()`. */
 #define c_unsigned_shorts(value) co_data((value)).u_short
 #define c_object(value) co_data((value)).object
 #define c_func(value) co_data((value)).func
-#define c_object_cast(type, value) (type *)co_data((value)).object
+#define c_cast_of(type, value) (type *)co_data((value)).object
 
 #define var_int(arg) (arg).value.integer
 #define var_long(arg) (arg).value.s_long
@@ -1444,7 +1378,7 @@ Must also closed out with `select_break()`. */
 #define var_unsigned_short(arg) (arg).value.u_short
 #define var_ptr(arg) (arg).value.object
 #define var_func(arg) (arg).value.func
-#define var_cast_ptr(type, arg) (type *)(arg).value.object
+#define var_cast(type, arg) (type *)(arg).value.object
 
 #define has_int(arg) has_t((arg))->value.integer
 #define has_long(arg) has_t((arg))->value.s_long
@@ -1465,7 +1399,7 @@ Must also closed out with `select_break()`. */
 #define has_unsigned_short(arg) has_t((arg))->value.u_short
 #define has_ptr(arg) has_t((arg))->value.object
 #define has_func(arg) has_t((arg))->value.func
-#define has_cast_ptr(type, arg) (type *)has_t((arg))->value.object
+#define has_cast(type, arg) (type *)has_t((arg))->value.object
 
 #define defer(func, arg) co_defer(FUNC_VOID(func), arg)
 
@@ -1507,19 +1441,8 @@ Must also closed out with `select_break()`. */
 #define as_int(variable, data) as_var(variable, int, data, CO_INTEGER)
 #define as_uchar(variable, data) as_var(variable, unsigned char, data, CO_UCHAR)
 
-#define as_reflect(variable, type, value) reflect_type_t *variable = reflect_get_##type(); \
-    variable->instance = value;
-
-#define as_var_ref(variable, type, data, enum_type) as_var(variable, type, data, enum_type); \
-    as_reflect(variable##_r, var_t, variable)
-
 #define as_instance(variable, variable_type) variable_type *variable = (variable_type *)co_new_by(1, sizeof(variable_type)); \
     variable->type = CO_STRUCT;
-
-#define as_instance_ref(variable, type) as_instance(variable, type); \
-    as_reflect(variable##_r, type, variable)
-
-#endif /* ZE_LANG_H_ */
 
 C_API value_types type_of(void_t);
 C_API bool is_type(void_t, value_types);
@@ -1527,30 +1450,6 @@ C_API bool is_instance_of(void_t, void_t);
 C_API bool is_value(void_t);
 C_API bool is_instance(void_t);
 C_API bool is_valid(void_t);
-C_API bool is_reflection(void_t self);
-
-C_API string_t reflect_kind(void_t);
-C_API void reflect_set_field(reflect_type_t *, int, void_t value);
-C_API void reflect_get_field(reflect_type_t *, int, void_t out);
-C_API void reflect_with(reflect_type_t *, void_t value);
-
-reflect_proto(var_t)
-reflect_proto(co_array_t)
-reflect_proto(defer_t)
-reflect_proto(defer_func_t)
-reflect_proto(promise)
-reflect_proto(future)
-reflect_proto(future_arg)
-reflect_proto(channel_t)
-reflect_proto(map_t)
-reflect_proto(map_iter_t)
-reflect_proto(array_item_t)
-reflect_proto(ex_ptr_t)
-reflect_proto(ex_context_t)
-reflect_proto(co_scheduler_t)
-reflect_proto(uv_args_t)
-reflect_proto(result_t)
-reflect_proto(object_t)
 
 /* Write this function instead of `main`, this library provides its own main, the scheduler,
 which call this function as an coroutine! */

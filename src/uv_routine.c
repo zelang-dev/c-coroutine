@@ -198,11 +198,11 @@ static void_t fs_init(void_t uv_args) {
                 break;
             case UV_FS_READ:
                 offset = var_long_long(args[1]);
-                bufs = var_cast_ptr(uv_buf_t, args[2]);
+                bufs = var_cast(uv_buf_t, args[2]);
                 result = uv_fs_read(loop, req, fd, bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_WRITE:
-                bufs = var_cast_ptr(uv_buf_t, args[1]);
+                bufs = var_cast(uv_buf_t, args[1]);
                 offset = var_long_long(args[2]);
                 result = uv_fs_write(loop, req, fd, bufs, 1, offset, fs_cb);
                 break;
