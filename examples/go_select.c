@@ -18,8 +18,10 @@ int fibonacci(channel_t *c, channel_t *quit) {
 }
 
 void *func(void *args) {
-    channel_t *c = ((channel_t **)args)[0];
-    channel_t *quit = ((channel_t **)args)[1];
+    args_get(c, args, 0, channel_t);
+    args_get(quit, args, 1, channel_t);
+
+    defer(delete, c);
 
     for (int i = 0; i < 10; i++) {
         printf("%d\n", co_recv(c).integer);
@@ -39,12 +41,10 @@ void *func(void *args) {
 }
 
 int co_main(int argc, char **argv) {
-    channel_t *args[2];
-    channel_t *c = channel();
-    channel_t *quit = channel();
+    args_by(args, 2, channel_t);
+    args_set(args, 0, channel());
+    args_set(args, 1, channel());
 
-    args[0] = c;
-    args[1] = quit;
     co_go(func, args);
-    return fibonacci(c, quit);
+    return fibonacci(args[0], args[1]);
 }

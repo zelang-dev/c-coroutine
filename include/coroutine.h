@@ -552,8 +552,6 @@ typedef union
     const char str[512];
 } value_t;
 
-/* Cast argument to union co_value_t storage type */
-#define co_args(x) (co_value_t *)((x))
 typedef struct co_value
 {
     value_t value;
@@ -842,7 +840,6 @@ C_API value_t co_group_get_result(wait_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void_t);
 
-C_API void println(int n_of_args, ...);
 C_API void delete(void_t ptr);
 
 #define EX_CAT(a, b) a ## b
@@ -1247,6 +1244,13 @@ Must also closed out with `select_break()`. */
 #define var_cast(type, arg) (type *)(arg).value.object
 
 #define defer(func, arg) co_defer(FUNC_VOID(func), arg)
+
+/* Cast argument to generic union co_value_t storage type */
+#define args_cast(x) (co_value_t *)((x))
+
+#define args_by(variable, number_of, variable_type) variable_type *variable[number_of]
+#define args_set(variable, index, value) variable[index] = value
+#define args_get(variable, func_args, index, variable_type) variable_type *variable = ((variable_type **)func_args)[index]
 
 #define var(data) co_var((data))->value
 #define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)co_new_by(1, sizeof(var_t)); \
