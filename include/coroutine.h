@@ -358,14 +358,14 @@ typedef enum co_state
     CO_EVENT /* The coroutine is in an Event Loop callback. */
 } co_state;
 
-typedef struct routine_s co_routine_t;
-typedef struct oa_hash_s co_hast_t;
+typedef struct routine_s routine_t;
+typedef struct oa_hash_s hash_t;
 typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
-typedef co_hast_t wait_group_t;
-typedef co_hast_t wait_result_t;
-typedef co_hast_t gc_channel_t;
-typedef co_hast_t gc_coroutine_t;
+typedef hash_t wait_group_t;
+typedef hash_t wait_result_t;
+typedef hash_t gc_channel_t;
+typedef hash_t gc_coroutine_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
     #define USE_NATIVE 1
@@ -417,7 +417,7 @@ typedef co_hast_t gc_coroutine_t;
         C_API int getcontext(ucontext_t *ucp);
         C_API int setcontext(const ucontext_t *ucp);
         C_API int makecontext(ucontext_t *, void (*)(), int, ...);
-        C_API int swapcontext(co_routine_t *, const co_routine_t *);
+        C_API int swapcontext(routine_t *, const routine_t *);
     #else
         #include <ucontext.h>
     #endif
@@ -490,8 +490,8 @@ struct routine_s {
     /* unique coroutine id */
     int cid;
     size_t alarm_time;
-    co_routine_t *next;
-    co_routine_t *prev;
+    routine_t *next;
+    routine_t *prev;
     bool channeled;
     bool ready;
     bool system;
@@ -500,9 +500,9 @@ struct routine_s {
     bool synced;
     bool wait_active;
     int wait_counter;
-    co_hast_t *wait_group;
+    hash_t *wait_group;
     int all_coroutine_slot;
-    co_routine_t *context;
+    routine_t *context;
     bool loop_active;
     void_t user_data;
 #if defined(CO_USE_VALGRIND)
@@ -524,8 +524,8 @@ struct routine_s {
 typedef struct co_scheduler_s
 {
     value_types type;
-    co_routine_t *head;
-    co_routine_t *tail;
+    routine_t *head;
+    routine_t *tail;
 } co_scheduler_t;
 
 /* Generic simple union storage types. */
@@ -552,11 +552,11 @@ typedef union
     const char str[512];
 } value_t;
 
-typedef struct co_value
+typedef struct values_s
 {
     value_t value;
     value_types type;
-} co_value_t;
+} values_t;
 
 typedef enum {
     ZE_OK = CO_NONE,
@@ -572,8 +572,8 @@ typedef struct uv_args_s
 {
     value_types type;
     /* allocated array of arguments */
-    co_value_t *args;
-    co_routine_t *context;
+    values_t *args;
+    routine_t *context;
 
     bool is_path;
     uv_fs_type fs_type;
@@ -609,7 +609,7 @@ typedef struct channel_s
     unsigned int nbuf;
     unsigned int off;
     unsigned int id;
-    co_value_t *tmp;
+    values_t *tmp;
     msg_queue_t a_send;
     msg_queue_t a_recv;
     char *name;
@@ -630,37 +630,37 @@ struct channel_co_s
     channel_t *c;
     void_t v;
     unsigned int op;
-    co_routine_t *co;
+    routine_t *co;
     channel_co_t *x_msg;
 };
 
 uv_loop_t *co_loop(void);
 
 /* Return handle to current coroutine. */
-C_API co_routine_t *co_active(void);
+C_API routine_t *co_active(void);
 
 /* Delete specified coroutine. */
-C_API void co_delete(co_routine_t *);
+C_API void co_delete(routine_t *);
 
 /* Switch to specified coroutine. */
-C_API void co_switch(co_routine_t *);
+C_API void co_switch(routine_t *);
 
 /* Check for coroutine completetion and return. */
-C_API bool co_terminated(co_routine_t *);
+C_API bool co_terminated(routine_t *);
 
 /* Return handle to previous coroutine. */
-C_API co_routine_t *co_current(void);
+C_API routine_t *co_current(void);
 
 /* Return coroutine executing for scheduler */
-C_API co_routine_t *co_coroutine(void);
+C_API routine_t *co_coroutine(void);
 
 /* Return the value in union storage type. */
 C_API value_t co_value(void_t);
 
-C_API co_value_t *co_var(var_t *);
+C_API values_t *co_var(var_t *);
 
 /* Return the value in union storage type. */
-C_API value_t co_data(co_value_t *);
+C_API value_t co_data(values_t *);
 
 /* Suspends the execution of current coroutine. */
 C_API void co_suspend(void);
@@ -668,24 +668,24 @@ C_API void co_suspend(void);
 C_API void co_scheduler(void);
 
 /* Yield to specified coroutine, passing data. */
-C_API void co_yielding(co_routine_t *);
+C_API void co_yielding(routine_t *);
 
-C_API void co_resuming(co_routine_t *);
+C_API void co_resuming(routine_t *);
 
 /* Returns the status of the coroutine. */
-C_API co_state co_status(co_routine_t *);
+C_API co_state co_status(routine_t *);
 
 /* Get coroutine user data. */
-C_API void_t co_user_data(co_routine_t *);
+C_API void_t co_user_data(routine_t *);
 
-C_API void co_deferred_free(co_routine_t *);
+C_API void co_deferred_free(routine_t *);
 
 /* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
 C_API void co_defer(func_t, void_t);
-C_API void co_deferred(co_routine_t *, func_t, void_t);
-C_API void co_deferred_run(co_routine_t *, size_t);
-C_API size_t co_deferred_count(const co_routine_t *);
+C_API void co_deferred(routine_t *, func_t, void_t);
+C_API void co_deferred_run(routine_t *, size_t);
+C_API size_t co_deferred_count(const routine_t *);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
 you must call `co_recover` to retrieve error message and mark Error condition handled. */
@@ -695,17 +695,17 @@ C_API string_t co_recover(void);
 /* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
 C_API void_t co_new_by(int, size_t);
-C_API void_t co_calloc_full(co_routine_t *, int, size_t, func_t);
+C_API void_t co_calloc_full(routine_t *, int, size_t, func_t);
 
 /* Call `CO_MALLOC` to allocate memory of given size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */
 C_API void_t co_new(size_t);
-C_API void_t co_malloc(co_routine_t *, size_t);
-C_API void_t co_malloc_full(co_routine_t *, size_t, func_t);
+C_API void_t co_malloc(routine_t *, size_t);
+C_API void_t co_malloc_full(routine_t *, size_t, func_t);
 C_API char *co_strdup(string_t );
 C_API char *co_strndup(string_t , size_t);
 C_API char *co_sprintf(string_t , ...);
-C_API void_t co_memdup(co_routine_t *, const_t , size_t);
+C_API void_t co_memdup(routine_t *, const_t , size_t);
 
 C_API int co_array_init(co_array_t *);
 
@@ -757,7 +757,7 @@ C_API char *coroutine_get_name(void);
 exit the entire program using the given exit status. */
 C_API void coroutine_exit(int);
 
-C_API void coroutine_schedule(co_routine_t *);
+C_API void coroutine_schedule(routine_t *);
 C_API bool coroutine_active(void);
 C_API void coroutine_info(void);
 
@@ -808,13 +808,13 @@ struct oa_hash_s {
     oa_val_ops val_ops;
 };
 
-C_API void co_hash_free(co_hast_t *);
-C_API void_t co_hash_put(co_hast_t *, const_t, const_t);
-C_API void_t co_hash_replace(co_hast_t *, const_t, const_t);
-C_API void_t co_hash_get(co_hast_t *, const_t);
-C_API void co_hash_delete(co_hast_t *, const_t);
-C_API void co_hash_remove(co_hast_t *, const_t);
-C_API void co_hash_print(co_hast_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
+C_API void co_hash_free(hash_t *);
+C_API void_t co_hash_put(hash_t *, const_t, const_t);
+C_API void_t co_hash_replace(hash_t *, const_t, const_t);
+C_API void_t co_hash_get(hash_t *, const_t);
+C_API void co_hash_delete(hash_t *, const_t);
+C_API void co_hash_remove(hash_t *, const_t);
+C_API void co_hash_print(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
 /* Creates a new wait group coroutine hash table. */
 C_API wait_group_t *co_ht_group_init(void);
@@ -838,7 +838,7 @@ C_API wait_result_t *co_wait(wait_group_t *);
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
 C_API value_t co_group_get_result(wait_result_t *, int);
 
-C_API void co_result_set(co_routine_t *, void_t);
+C_API void co_result_set(routine_t *, void_t);
 
 C_API void delete(void_t ptr);
 
@@ -1029,7 +1029,7 @@ struct ex_context_s
     /* The handler in the stack (which is a FILO container). */
     ex_context_t *next;
     ex_ptr_t *stack;
-    co_routine_t *co;
+    routine_t *co;
 
     /** The function from which the exception was thrown */
     const char *volatile function;
@@ -1059,7 +1059,7 @@ C_API thread_local int coroutine_count;
 typedef struct _promise
 {
     value_types type;
-    co_value_t *result;
+    values_t *result;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     bool done;
@@ -1116,7 +1116,7 @@ C_API void co_stack_check(int);
 C_API string_t co_itoa(int64_t number);
 C_API void co_strcpy(char *dest, string_t src, size_t len);
 
-C_API void gc_coroutine(co_routine_t *);
+C_API void gc_coroutine(routine_t *);
 C_API void gc_channel(channel_t *);
 C_API gc_channel_t *gc_channel_list(void);
 C_API gc_coroutine_t *gc_coroutine_list(void);
@@ -1245,8 +1245,8 @@ Must also closed out with `select_break()`. */
 
 #define defer(func, arg) co_defer(FUNC_VOID(func), arg)
 
-/* Cast argument to generic union co_value_t storage type */
-#define args_cast(x) (co_value_t *)((x))
+/* Cast argument to generic union values_t storage type */
+#define args_cast(x) (values_t *)((x))
 
 #define args_by(variable, number_of, variable_type) variable_type *variable[number_of]
 #define args_set(variable, index, value) variable[index] = value

@@ -95,7 +95,7 @@ static void co_array_free(void_t data) {
     CO_FREE(array);
 }
 
-co_array_t *co_array_new(co_routine_t *coro) {
+co_array_t *co_array_new(routine_t *coro) {
     co_array_t *array;
 
     array = co_malloc_full(coro, sizeof(*array), co_array_free);
@@ -109,7 +109,7 @@ static CO_FORCE_INLINE void co_deferred_array_sort(defer_t *array, int (*cmp)(co
     co_array_sort((co_array_t *)array, sizeof(defer_func_t), cmp);
 }
 
-static CO_FORCE_INLINE defer_t *co_deferred_array_new(co_routine_t *coro) {
+static CO_FORCE_INLINE defer_t *co_deferred_array_new(routine_t *coro) {
     return (defer_t *)co_array_new(coro);
 }
 
@@ -140,7 +140,7 @@ static CO_FORCE_INLINE size_t co_deferred_array_len(const defer_t *array) {
     return array->base.elements;
 }
 
-void co_deferred_run(co_routine_t *coro, size_t generation) {
+void co_deferred_run(routine_t *coro, size_t generation) {
     co_array_t *array = (co_array_t *)&coro->defer;
     defer_func_t *defers = array->base;
     size_t i;
@@ -175,19 +175,19 @@ void co_deferred_run(co_routine_t *coro, size_t generation) {
     }
 }
 
-size_t co_deferred_count(const co_routine_t *coro) {
+size_t co_deferred_count(const routine_t *coro) {
     const co_array_t *array = (co_array_t *)&coro->defer;
 
     return array->elements;
 }
 
-void co_deferred_free(co_routine_t *coro) {
+void co_deferred_free(routine_t *coro) {
     CO_ASSERT(coro);
     co_deferred_run(coro, 0);
     co_deferred_array_reset(&coro->defer);
 }
 
-static void co_deferred_any(co_routine_t *coro, func_t func, void_t data, void_t check) {
+static void co_deferred_any(routine_t *coro, func_t func, void_t data, void_t check) {
     defer_func_t *defer;
 
     CO_ASSERT(func);
@@ -211,11 +211,11 @@ CO_FORCE_INLINE void co_defer_recover(func_t func, void_t data) {
 }
 
 string_t co_recover() {
-    co_routine_t *co = co_active();
+    routine_t *co = co_active();
     co->err_recovered = true;
     return (co->panic != NULL) ? co->panic : co->err;
 }
 
-void co_deferred(co_routine_t *coro, func_t func, void_t data) {
+void co_deferred(routine_t *coro, func_t func, void_t data) {
     co_deferred_any(coro, func, data, NULL);
 }

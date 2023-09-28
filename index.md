@@ -154,11 +154,11 @@ typedef union
     const char str[512];
 } value_t;
 
-typedef struct co_value
+typedef struct values_s
 {
     value_t value;
     value_types type;
-} co_value_t;
+} values_t;
 
 /* Return an value in union type storage. */
 C_API value_t co_value(void_t);
@@ -166,7 +166,7 @@ C_API value_t co_value(void_t);
 
 The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/symplely/c-coroutine/blob/main/include/coroutine.h) for additional.
 
-> Note: None of the functions above require passing/handling the underlying `co_routine_t` object/structure.
+> Note: None of the functions above require passing/handling the underlying `routine_t` object/structure.
 
 ## Usage
 

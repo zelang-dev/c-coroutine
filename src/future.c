@@ -107,7 +107,7 @@ void future_close(future *f) {
 
 promise *promise_create() {
     promise *p = CO_CALLOC(1, sizeof(promise));
-    p->result = CO_CALLOC(1, sizeof(co_value_t));
+    p->result = CO_CALLOC(1, sizeof(values_t));
     pthread_mutex_init(&p->mutex, NULL);
     pthread_cond_init(&p->cond, NULL);
     srand((unsigned int)time(NULL));

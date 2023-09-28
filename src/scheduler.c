@@ -2,15 +2,15 @@
 
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
-static thread_local co_routine_t co_active_buffer[4];
+static thread_local routine_t co_active_buffer[4];
 /* Variable holding the current running coroutine per thread. */
-static thread_local co_routine_t *co_active_handle = NULL;
+static thread_local routine_t *co_active_handle = NULL;
 /* Variable holding the main target that gets called once an coroutine
 function fully completes and return. */
-static thread_local co_routine_t *co_main_handle = NULL;
+static thread_local routine_t *co_main_handle = NULL;
 /* Variable holding the previous running coroutine per thread. */
-static thread_local co_routine_t *co_current_handle = NULL;
-static void(fastcall *co_swap)(co_routine_t *, co_routine_t *) = 0;
+static thread_local routine_t *co_current_handle = NULL;
+static void(fastcall *co_swap)(routine_t *, routine_t *) = 0;
 
 static thread_local uv_loop_t *co_main_loop_handle = NULL;
 
@@ -33,13 +33,13 @@ thread_local int n_co_switched;
 thread_local int coroutine_count;
 
 /* record which coroutine is executing for scheduler */
-thread_local co_routine_t *co_running;
+thread_local routine_t *co_running;
 
 /* coroutines's FIFO scheduler queue */
 thread_local co_scheduler_t co_run_queue;
 
 /* scheduler tracking for all coroutines */
-co_routine_t **all_coroutine;
+routine_t **all_coroutine;
 
 int n_all_coroutine;
 
@@ -47,10 +47,10 @@ int coroutine_loop(int);
 void coroutine_interrupt(void);
 
 /* Initializes new coroutine, platform specific. */
-co_routine_t *co_derive(void_t, size_t);
+routine_t *co_derive(void_t, size_t);
 
 /* Create new coroutine. */
-co_routine_t *co_create(size_t, callable_t, void_t);
+routine_t *co_create(size_t, callable_t, void_t);
 
 /* Create a new coroutine running func(arg) with stack size. */
 int coroutine_create(callable_t, void_t, unsigned int);
@@ -68,7 +68,7 @@ void coroutine_state(char *, ...);
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
 
-/* called only if co_routine_t func returns */
+/* called only if routine_t func returns */
 static void co_done() {
     if (!co_active()->loop_active) {
         co_active()->halt = true;
@@ -79,7 +79,7 @@ static void co_done() {
 }
 
 static void co_awaitable() {
-    co_routine_t *co = co_active();
+    routine_t *co = co_active();
     try {
         if (co->loop_active) {
             co->func(co->args);
@@ -167,14 +167,14 @@ static void co_init(void) {
 }
 #endif
 
-co_routine_t *co_derive(void_t memory, size_t size) {
-    co_routine_t *handle;
+routine_t *co_derive(void_t memory, size_t size) {
+    routine_t *handle;
     if (!co_swap) {
         co_init();
-        co_swap = (void(fastcall *)(co_routine_t *, co_routine_t *))co_swap_function;
+        co_swap = (void(fastcall *)(routine_t *, routine_t *))co_swap_function;
     }
 
-    if ((handle = (co_routine_t *)memory)) {
+    if ((handle = (routine_t *)memory)) {
         unsigned long stack_top = (unsigned long)handle + size;
         stack_top -= 32;
         stack_top &= ~((unsigned long)15);
@@ -184,7 +184,7 @@ co_routine_t *co_derive(void_t memory, size_t size) {
         *(long *)handle = (long)p;     /* stack pointer */
 
 #ifdef CO_USE_VALGRIND
-        size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
+        size_t stack_addr = _co_align_forward((size_t)handle + sizeof(routine_t), 16);
         handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
@@ -294,14 +294,14 @@ static void co_init(void) {
 #endif
 }
 #endif
-co_routine_t *co_derive(void_t memory, size_t size) {
-    co_routine_t *handle;
+routine_t *co_derive(void_t memory, size_t size) {
+    routine_t *handle;
     if (!co_swap) {
         co_init();
-        co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
+        co_swap = (void (*)(routine_t *, routine_t *))co_swap_function;
     }
 
-    if ((handle = (co_routine_t *)memory)) {
+    if ((handle = (routine_t *)memory)) {
         size_t stack_top = (size_t)handle + size;
         stack_top -= 32;
         stack_top &= ~((size_t)15);
@@ -315,7 +315,7 @@ co_routine_t *co_derive(void_t memory, size_t size) {
 #endif
 
 #ifdef CO_USE_VALGRIND
-        size_t stack_addr = _co_align_forward((size_t)handle + sizeof(co_routine_t), 16);
+        size_t stack_addr = _co_align_forward((size_t)handle + sizeof(routine_t), 16);
         handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
@@ -344,12 +344,12 @@ static void co_init(void) {
 #endif
 }
 
-co_routine_t *co_derive(void_t memory, size_t size) {
+routine_t *co_derive(void_t memory, size_t size) {
     size_t *handle;
-    co_routine_t *co;
+    routine_t *co;
     if (!co_swap) {
         co_init();
-        co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
+        co_swap = (void (*)(routine_t *, routine_t *))co_swap_function;
     }
 
     if ((handle = (size_t *)memory)) {
@@ -359,9 +359,9 @@ co_routine_t *co_derive(void_t memory, size_t size) {
         handle[ 8 ] = (size_t)p;
         handle[ 9 ] = (size_t)co_func;
 
-        co = (co_routine_t *)handle;
+        co = (routine_t *)handle;
 #ifdef CO_USE_VALGRIND
-        size_t stack_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
+        size_t stack_addr = _co_align_forward((size_t)co + sizeof(routine_t), 16);
         co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
@@ -428,12 +428,12 @@ static void co_init(void) {
 }
 #endif
 
-co_routine_t *co_derive(void_t memory, size_t size) {
+routine_t *co_derive(void_t memory, size_t size) {
     size_t *handle;
-    co_routine_t *co;
+    routine_t *co;
     if (!co_swap) {
         co_init();
-        co_swap = (void (*)(co_routine_t *, co_routine_t *))co_swap_function;
+        co_swap = (void (*)(routine_t *, routine_t *))co_swap_function;
     }
 
     if ((handle = (size_t *)memory)) {
@@ -449,9 +449,9 @@ co_routine_t *co_derive(void_t memory, size_t size) {
         handle[ 23 ] = (size_t)handle;        /* stack limit */
 #endif
 
-        co = (co_routine_t *)handle;
+        co = (routine_t *)handle;
 #ifdef CO_USE_VALGRIND
-        size_t stack_addr = _co_align_forward((size_t)co + sizeof(co_routine_t), 16);
+        size_t stack_addr = _co_align_forward((size_t)co + sizeof(routine_t), 16);
         co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     }
@@ -466,7 +466,7 @@ co_routine_t *co_derive(void_t memory, size_t size) {
 #define MIN_STACK_FRAME 0x20lu
 #define STACK_ALIGN 0x10lu
 
-void swap_context(co_routine_t *read, co_routine_t *write);
+void swap_context(routine_t *read, routine_t *write);
 __asm__(
     ".text\n"
     ".align 4\n"
@@ -650,11 +650,11 @@ __asm__(
     ".cfi_endproc\n"
     ".size swap_context, .-swap_context\n");
 
-co_routine_t *co_derive(void_t memory, size_t size) {
+routine_t *co_derive(void_t memory, size_t size) {
     uint8_t *sp;
-    co_routine_t *context = (co_routine_t *)memory;
+    routine_t *context = (routine_t *)memory;
     if (!co_swap) {
-        co_swap = (void (*)(co_routine_t *, co_routine_t *))swap_context;
+        co_swap = (void (*)(routine_t *, routine_t *))swap_context;
     }
 
     /* save current context into new context to initialize it */
@@ -677,7 +677,7 @@ co_routine_t *co_derive(void_t memory, size_t size) {
     context->lr = (uint64_t)co_func;
 
 #ifdef CO_USE_VALGRIND
-    size_t stack_addr = _co_align_forward((size_t)context + sizeof(co_routine_t), 16);
+    size_t stack_addr = _co_align_forward((size_t)context + sizeof(routine_t), 16);
     context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
     return context;
@@ -735,7 +735,7 @@ int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...) {
     return 0;
 }
 
-int swapcontext(co_routine_t *oucp, const co_routine_t *ucp) {
+int swapcontext(routine_t *oucp, const routine_t *ucp) {
     int ret;
 
     if ((oucp == NULL) || (ucp == NULL)) {
@@ -752,13 +752,13 @@ int swapcontext(co_routine_t *oucp, const co_routine_t *ucp) {
 #endif
 
 #if defined(USE_OTHER)
-co_routine_t *co_derive(void_t memory, size_t size) {
+routine_t *co_derive(void_t memory, size_t size) {
     if (!co_active_handle)
         co_active_handle = co_active_buffer;
 
     ucontext_t *thread = (ucontext_t *)memory;
-    memory = (unsigned char *)memory + sizeof(co_routine_t);
-    size -= sizeof(co_routine_t);
+    memory = (unsigned char *)memory + sizeof(routine_t);
+    size -= sizeof(routine_t);
     if ((!getcontext(thread) && !(thread->uc_stack.ss_sp = 0)) && (thread->uc_stack.ss_sp = memory)) {
         thread->uc_link = (ucontext_t *)co_active_handle;
         thread->uc_stack.ss_size = size;
@@ -767,21 +767,21 @@ co_routine_t *co_derive(void_t memory, size_t size) {
         co_panic("getcontext failed!");
     }
 
-    return (co_routine_t *)thread;
+    return (routine_t *)thread;
 }
 #endif
 
-co_routine_t *co_active(void) {
+routine_t *co_active(void) {
     if (!co_active_handle)
         co_active_handle = co_active_buffer;
     return co_active_handle;
 }
 
-co_routine_t *co_current(void) {
+routine_t *co_current(void) {
     return co_current_handle;
 }
 
-co_routine_t *co_coroutine(void) {
+routine_t *co_coroutine(void) {
     return co_running;
 }
 
@@ -790,7 +790,7 @@ CO_FORCE_INLINE void co_scheduler() {
 }
 
 void co_stack_check(int n) {
-    co_routine_t *t;
+    routine_t *t;
 
     t = co_running;
     if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER) {
@@ -799,7 +799,7 @@ void co_stack_check(int n) {
     }
 }
 
-co_routine_t *co_create(size_t size, callable_t func, void_t args) {
+routine_t *co_create(size_t size, callable_t func, void_t args) {
     if (size != 0) {
         /* Stack size should be at least `CO_STACK_SIZE`. */
         if (size < CO_STACK_SIZE) {
@@ -809,12 +809,12 @@ co_routine_t *co_create(size_t size, callable_t func, void_t args) {
         size = CO_STACK_SIZE;
     }
 
-    size = _co_align_forward(size + sizeof(co_routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void_t memory = CO_CALLOC(1, size + sizeof(channel_t) + sizeof(co_value_t));
+    size = _co_align_forward(size + sizeof(routine_t), 16); /* Stack size should be aligned to 16 bytes. */
+    void_t memory = CO_CALLOC(1, size + sizeof(channel_t) + sizeof(values_t));
     if (!memory)
         co_panic("calloc() failed");
 
-    co_routine_t *co = co_derive(memory, size);
+    routine_t *co = co_derive(memory, size);
     if (!co_current_handle)
         co_current_handle = co_active();
 
@@ -832,12 +832,12 @@ co_routine_t *co_create(size_t size, callable_t func, void_t args) {
 
     if (UNLIKELY(co_deferred_array_init(&co->defer) < 0)) {
         CO_FREE(co);
-        return (co_routine_t *)-1;
+        return (routine_t *)-1;
     }
 
     co->func = func;
     co->status = CO_SUSPENDED;
-    co->stack_size = size + sizeof(channel_t) + sizeof(co_value_t);
+    co->stack_size = size + sizeof(channel_t) + sizeof(values_t);
     co->channeled = false;
     co->halt = false;
     co->synced = false;
@@ -852,11 +852,11 @@ co_routine_t *co_create(size_t size, callable_t func, void_t args) {
     return co;
 }
 
-void co_switch(co_routine_t *handle) {
+void co_switch(routine_t *handle) {
 #if defined(_M_X64) || defined(_M_IX86)
-    register co_routine_t *co_previous_handle = co_active_handle;
+    register routine_t *co_previous_handle = co_active_handle;
 #else
-    co_routine_t *co_previous_handle = co_active_handle;
+    routine_t *co_previous_handle = co_active_handle;
 #endif
     co_active_handle = handle;
     co_active_handle->status = CO_RUNNING;
@@ -870,7 +870,7 @@ void co_switch(co_routine_t *handle) {
 }
 
 /* Add coroutine to scheduler queue, appending. */
-static void coroutine_add(co_scheduler_t *l, co_routine_t *t) {
+static void coroutine_add(co_scheduler_t *l, routine_t *t) {
     if (l->tail) {
         l->tail->next = t;
         t->prev = l->tail;
@@ -884,7 +884,7 @@ static void coroutine_add(co_scheduler_t *l, co_routine_t *t) {
 }
 
 /* Remove coroutine from scheduler queue. */
-static void coroutine_remove(co_scheduler_t *l, co_routine_t *t) {
+static void coroutine_remove(co_scheduler_t *l, routine_t *t) {
     if (t->prev)
         t->prev->next = t->next;
     else
@@ -898,8 +898,8 @@ static void coroutine_remove(co_scheduler_t *l, co_routine_t *t) {
 
 int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     int id;
-    co_routine_t *t;
-    co_routine_t *c = co_active();
+    routine_t *t;
+    routine_t *c = co_active();
 
     t = co_create(stack, fn, arg);
     t->cid = ++co_id_generate;
@@ -964,7 +964,7 @@ CO_FORCE_INLINE void coroutine_interrupt(void) {
 
 static void_t coroutine_wait(void_t v) {
     int ms;
-    co_routine_t *t;
+    routine_t *t;
     size_t now;
 
     coroutine_system();
@@ -1001,7 +1001,7 @@ static void_t coroutine_wait(void_t v) {
 
 unsigned int co_sleep(unsigned int ms) {
     size_t when, now;
-    co_routine_t *t;
+    routine_t *t;
 
     if (!started_wait) {
         started_wait = 1;
@@ -1041,7 +1041,7 @@ unsigned int co_sleep(unsigned int ms) {
     return (unsigned int)(nsec() - now) / 1000000;
 }
 
-void coroutine_schedule(co_routine_t *t) {
+void coroutine_schedule(routine_t *t) {
     t->ready = 1;
     coroutine_add(&co_run_queue, t);
 }
@@ -1061,7 +1061,7 @@ bool coroutine_active() {
 
 void coroutine_state(char *fmt, ...) {
     va_list args;
-    co_routine_t *t;
+    routine_t *t;
 
     t = co_running;
     va_start(args, fmt);
@@ -1075,7 +1075,7 @@ char *coroutine_get_state() {
 
 void coroutine_name(char *fmt, ...) {
     va_list args;
-    co_routine_t *t;
+    routine_t *t;
 
     t = co_running;
     va_start(args, fmt);
@@ -1103,7 +1103,7 @@ void coroutine_exit(int val) {
 
 void coroutine_info() {
     int i;
-    co_routine_t *t;
+    routine_t *t;
     char *extra;
 
     fprintf(stderr, "coroutine list:\n");
@@ -1126,7 +1126,7 @@ void coroutine_info() {
 static void coroutine_scheduler(void) {
     int i;
     bool is_loop_close;
-    co_routine_t *t;
+    routine_t *t;
 
     for (;;) {
         if (coroutine_count == 0 || !coroutine_active()) {

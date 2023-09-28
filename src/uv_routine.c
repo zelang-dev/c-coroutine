@@ -2,7 +2,7 @@
 
 static void_t fs_init(void_t);
 
-static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
+static value_t co_fs_init(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->args = args;
     uv_args->type = CO_EVENT_ARG;
     uv_args->fs_type = fs_type;
@@ -15,7 +15,7 @@ static value_t co_fs_init(uv_args_t *uv_args, co_value_t *args, uv_fs_type fs_ty
 static void fs_cb(uv_fs_t *req) {
     ssize_t result = uv_fs_get_result(req);
     uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
-    co_routine_t *co = uv_args->context;
+    routine_t *co = uv_args->context;
     bool override = false;
 
     if (result < 0) {
@@ -70,7 +70,7 @@ static void fs_cb(uv_fs_t *req) {
 
     co->halt = true;
     if (!override)
-        co_result_set(co, (co_value_t *)uv_fs_get_result(req));
+        co_result_set(co, (values_t *)uv_fs_get_result(req));
 
     co_resuming(co->context);
     co_scheduler();
@@ -80,7 +80,7 @@ static void_t fs_init(void_t uv_args) {
     uv_fs_t *req = co_new_by(1, sizeof(uv_fs_t));
     uv_loop_t *loop = co_loop();
     uv_args_t *fs = (uv_args_t *)uv_args;
-    co_value_t *args = fs->args;
+    values_t *args = fs->args;
     uv_uid_t uid, gid;
     uv_file in_fd;
     size_t length;
@@ -225,11 +225,11 @@ static void_t fs_init(void_t uv_args) {
 }
 
 uv_file co_fs_open(string_t path, int flags, int mode) {
-    co_value_t *args;
+    values_t *args;
     uv_args_t *uv_args;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (co_value_t *)co_new_by(3, sizeof(co_value_t));
+    args = (values_t *)co_new_by(3, sizeof(values_t));
 
     args[0].value.char_ptr = (string)path;
     args[1].value.integer = flags;
@@ -239,22 +239,22 @@ uv_file co_fs_open(string_t path, int flags, int mode) {
 }
 
 uv_stat_t *co_fs_fstat(uv_file fd) {
-    co_value_t *args;
+    values_t *args;
     uv_args_t *uv_args;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (co_value_t *)co_new_by(1, sizeof(co_value_t));
+    args = (values_t *)co_new_by(1, sizeof(values_t));
 
     args[0].value.integer = fd;
     return (uv_stat_t *)co_fs_init(uv_args, args, UV_FS_FSTAT, 1, false).object;
 }
 
 int co_fs_close(uv_file fd) {
-    co_value_t *args;
+    values_t *args;
     uv_args_t *uv_args;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (co_value_t *)co_new_by(1, sizeof(co_value_t));
+    args = (values_t *)co_new_by(1, sizeof(values_t));
 
     args[0].value.integer = fd;
     return co_fs_init(uv_args, args, UV_FS_CLOSE, 1, false).integer;

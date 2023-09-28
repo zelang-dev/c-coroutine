@@ -32,7 +32,7 @@ void delete(void_t ptr) {
     }
 }
 
-void co_delete(co_routine_t *handle) {
+void co_delete(routine_t *handle) {
     if (!handle) {
         CO_LOG("attempt to delete an invalid coroutine");
     } else if (!(handle->status == CO_NORMAL || handle->status == CO_DEAD || handle->status == CO_EVENT_DEAD) && !handle->exiting) {
@@ -57,52 +57,52 @@ void co_delete(co_routine_t *handle) {
     }
 }
 
-void_t co_user_data(co_routine_t *co) {
+void_t co_user_data(routine_t *co) {
     return (co != NULL) ? co->user_data : NULL;
 }
 
-co_state co_status(co_routine_t *co) {
+co_state co_status(routine_t *co) {
     return (co != NULL) ? co->status : CO_DEAD;
 }
 
-co_value_t *co_var(var_t *data) {
+values_t *co_var(var_t *data) {
     if (data)
-        return ((co_value_t *)data->value);
+        return ((values_t *)data->value);
 
     CO_LOG("attempt to get value on null");
-    return ((co_value_t *)0);
+    return ((values_t *)0);
 }
 
 value_t co_value(void_t data) {
     if (data)
-        return ((co_value_t *)data)->value;
+        return ((values_t *)data)->value;
 
     CO_LOG("attempt to get value on null");
-    return ((co_value_t *)0)->value;
+    return ((values_t *)0)->value;
 }
 
-value_t co_data(co_value_t *data) {
+value_t co_data(values_t *data) {
     if (data)
         return data->value;
 
-    return ((co_value_t *)0)->value;
+    return ((values_t *)0)->value;
 }
 
 CO_FORCE_INLINE void co_suspend() {
     co_yielding(co_current());
 }
 
-void co_yielding(co_routine_t *handle) {
+void co_yielding(routine_t *handle) {
     co_stack_check(0);
     co_switch(handle);
 }
 
-CO_FORCE_INLINE void co_resuming(co_routine_t *handle) {
+CO_FORCE_INLINE void co_resuming(routine_t *handle) {
     if (!co_terminated(handle))
         co_switch(handle);
 }
 
-CO_FORCE_INLINE bool co_terminated(co_routine_t *co) {
+CO_FORCE_INLINE bool co_terminated(routine_t *co) {
     return co->halt;
 }
 
@@ -115,13 +115,13 @@ value_t co_await(callable_t fn, void_t arg) {
 
 value_t co_event(callable_t fn, void_t arg) {
 
-    co_routine_t *co = co_active();
+    routine_t *co = co_active();
     co->loop_active = true;
     return co_await(fn, arg);
 }
 
 wait_group_t *co_wait_group(void) {
-    co_routine_t *c = co_active();
+    routine_t *c = co_active();
     wait_group_t *wg = co_ht_group_init();
     c->wait_active = true;
     c->wait_group = wg;
@@ -130,9 +130,9 @@ wait_group_t *co_wait_group(void) {
 }
 
 wait_result_t *co_wait(wait_group_t *wg) {
-    co_routine_t *c = co_active();
+    routine_t *c = co_active();
     wait_result_t *wgr = NULL;
-    co_routine_t *co;
+    routine_t *co;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_pause();
         wgr = co_ht_result_init();
@@ -143,7 +143,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
                 pair = wg->buckets[i];
                 if (NULL != pair) {
                     if (pair->value != NULL) {
-                        co = (co_routine_t *)pair->value;
+                        co = (routine_t *)pair->value;
                         if (!co_terminated(co)) {
                             if (!co->loop_active && co->status == CO_NORMAL)
                                 coroutine_schedule(co);
@@ -173,10 +173,10 @@ wait_result_t *co_wait(wait_group_t *wg) {
 }
 
 value_t co_group_get_result(wait_result_t *wgr, int cid) {
-    return ((co_value_t *)co_hash_get(wgr, co_itoa(cid)))->value;
+    return ((values_t *)co_hash_get(wgr, co_itoa(cid)))->value;
 }
 
-void co_result_set(co_routine_t *co, void_t data) {
+void co_result_set(routine_t *co, void_t data) {
     co->results = data;
 }
 

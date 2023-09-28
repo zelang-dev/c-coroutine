@@ -377,7 +377,7 @@ uint32_t oa_string_hash(const_t data, void_t arg) {
 void_t oa_string_cp(const_t data, void_t arg) {
     string_t input = (string_t)data;
     size_t input_length = strlen(input) + 1;
-    char *result = CO_CALLOC(1, sizeof(*result) * input_length + sizeof(co_value_t) + 1);
+    char *result = CO_CALLOC(1, sizeof(*result) * input_length + sizeof(values_t) + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
@@ -390,7 +390,7 @@ bool oa_coroutine_eq(const_t data1, const_t data2, void_t arg) {
 }
 
 void_t oa_coroutine_cp(const_t data, void_t arg) {
-    return (co_routine_t *)data;
+    return (routine_t *)data;
 }
 
 void_t oa_channel_cp(const_t data, void_t arg) {
@@ -398,7 +398,7 @@ void_t oa_channel_cp(const_t data, void_t arg) {
 }
 
 void_t oa_value_cp(const_t data, void_t arg) {
-    co_value_t *result = CO_CALLOC(1, sizeof(data) + sizeof(co_value_t) + 1);
+    values_t *result = CO_CALLOC(1, sizeof(data) + sizeof(values_t) + 1);
     if (NULL == result)
         co_panic("calloc() failed");
 
@@ -436,30 +436,30 @@ CO_FORCE_INLINE gc_channel_t *co_ht_channel_init() {
     return (gc_channel_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE void co_hash_free(co_hast_t *htable) {
+CO_FORCE_INLINE void co_hash_free(hash_t *htable) {
     oa_hash_free(htable);
 }
 
-CO_FORCE_INLINE void_t co_hash_put(co_hast_t *htable, const_t key, const_t value) {
+CO_FORCE_INLINE void_t co_hash_put(hash_t *htable, const_t key, const_t value) {
     return oa_hash_put(htable, key, value);
 }
 
-CO_FORCE_INLINE void_t co_hash_replace(co_hast_t *htable, const_t key, const_t value) {
+CO_FORCE_INLINE void_t co_hash_replace(hash_t *htable, const_t key, const_t value) {
     return oa_hash_replace(htable, key, value);
 }
 
-CO_FORCE_INLINE void_t co_hash_get(co_hast_t *htable, const_t key) {
+CO_FORCE_INLINE void_t co_hash_get(hash_t *htable, const_t key) {
     return oa_hash_get(htable, key);
 }
 
-CO_FORCE_INLINE void co_hash_delete(co_hast_t *htable, const_t key) {
+CO_FORCE_INLINE void co_hash_delete(hash_t *htable, const_t key) {
     oa_hash_delete(htable, key);
 }
 
-CO_FORCE_INLINE void co_hash_remove(co_hast_t *htable, const_t key) {
+CO_FORCE_INLINE void co_hash_remove(hash_t *htable, const_t key) {
     oa_hash_remove(htable, key);
 }
 
-CO_FORCE_INLINE void co_hash_print(co_hast_t *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
+CO_FORCE_INLINE void co_hash_print(hash_t *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
     oa_hash_print(htable, print_key, print_val);
 }

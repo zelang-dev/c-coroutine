@@ -3,7 +3,7 @@
 static thread_local gc_channel_t *channel_list = NULL;
 static thread_local gc_coroutine_t *coroutine_list = NULL;
 
-void gc_coroutine(co_routine_t *co) {
+void gc_coroutine(routine_t *co) {
     if (!coroutine_list)
         coroutine_list = (gc_coroutine_t *)co_ht_group_init();
     co_hash_put(coroutine_list, co_itoa(co->cid), co);
@@ -33,7 +33,7 @@ void gc_coroutine_free() {
         co_hash_free(coroutine_list);
 }
 
-void_t co_malloc_full(co_routine_t *coro, size_t size, func_t func) {
+void_t co_malloc_full(routine_t *coro, size_t size, func_t func) {
     void_t ptr = CO_MALLOC(size);
 
     if (LIKELY(ptr)) {
@@ -48,7 +48,7 @@ void_t co_malloc_full(co_routine_t *coro, size_t size, func_t func) {
     return ptr;
 }
 
-void_t co_calloc_full(co_routine_t *coro, int count, size_t size, func_t func) {
+void_t co_calloc_full(routine_t *coro, int count, size_t size, func_t func) {
     void_t ptr = CO_CALLOC(count, size);
 
     if (LIKELY(ptr)) {
@@ -71,7 +71,7 @@ CO_FORCE_INLINE void_t co_new(size_t size) {
     return co_malloc_full(co_active(), size, CO_FREE);
 }
 
-void_t co_malloc(co_routine_t *coro, size_t size) {
+void_t co_malloc(routine_t *coro, size_t size) {
     return co_malloc_full(coro, size, CO_FREE);
 }
 
@@ -162,7 +162,7 @@ char *co_sprintf(string_t fmt, ...) {
     return tmp_str;
 }
 
-void_t co_memdup(co_routine_t *coro, const_t src, size_t len) {
+void_t co_memdup(routine_t *coro, const_t src, size_t len) {
     void_t ptr = co_malloc(coro, len);
 
     return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;

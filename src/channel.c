@@ -4,7 +4,7 @@ static thread_local int channel_id_generate = 0;
 
 channel_t *channel_create(int elem_size, int bufsize) {
     channel_t *c = CO_CALLOC(1, sizeof(channel_t) + bufsize * elem_size);
-    co_value_t *s = CO_CALLOC(1, sizeof(co_value_t));
+    values_t *s = CO_CALLOC(1, sizeof(values_t));
 
     if (c == NULL || s == NULL)
         co_panic("channel_create failed");
@@ -23,11 +23,11 @@ channel_t *channel_create(int elem_size, int bufsize) {
 }
 
 CO_FORCE_INLINE channel_t *channel() {
-    return channel_create(sizeof(co_value_t), 0);
+    return channel_create(sizeof(values_t), 0);
 }
 
 CO_FORCE_INLINE channel_t *channel_buf(int elem_count) {
-    return channel_create(sizeof(co_value_t), elem_count);
+    return channel_create(sizeof(values_t), elem_count);
 }
 
 void channel_free(channel_t *c) {
@@ -218,7 +218,7 @@ static void channel_co_exec(channel_co_t *a) {
 static int channel_proc(channel_co_t *a) {
     int i, j, n_can, n, can_block;
     channel_t *c;
-    co_routine_t *t;
+    routine_t *t;
 
     co_stack_check(512);
     for (i = 0; a[ i ].op != CHANNEL_END && a[ i ].op != CHANNEL_BLK; i++);
