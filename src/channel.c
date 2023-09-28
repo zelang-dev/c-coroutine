@@ -44,7 +44,7 @@ void channel_free(channel_t *c) {
         CO_FREE(c->a_send.a);
         CO_FREE(c);
 
-       co_hash_remove(gc_channel_list(), co_itoa(id));
+       hash_remove(gc_channel_list(), co_itoa(id));
     }
 }
 

@@ -808,21 +808,21 @@ struct oa_hash_s {
     oa_val_ops val_ops;
 };
 
-C_API void co_hash_free(hash_t *);
-C_API void_t co_hash_put(hash_t *, const_t, const_t);
-C_API void_t co_hash_replace(hash_t *, const_t, const_t);
-C_API void_t co_hash_get(hash_t *, const_t);
-C_API void co_hash_delete(hash_t *, const_t);
-C_API void co_hash_remove(hash_t *, const_t);
-C_API void co_hash_print(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
+C_API void hash_free(hash_t *);
+C_API void_t hash_put(hash_t *, const_t, const_t);
+C_API void_t hash_replace(hash_t *, const_t, const_t);
+C_API void_t hash_get(hash_t *, const_t);
+C_API void hash_delete(hash_t *, const_t);
+C_API void hash_remove(hash_t *, const_t);
+C_API void hash_print(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
 /* Creates a new wait group coroutine hash table. */
-C_API wait_group_t *co_ht_group_init(void);
+C_API wait_group_t *ht_group_init(void);
 
 /* Creates a new wait group results hash table. */
-C_API wait_result_t *co_ht_result_init(void);
+C_API wait_result_t *ht_result_init(void);
 
-C_API gc_channel_t *co_ht_channel_init(void);
+C_API gc_channel_t *ht_channel_init(void);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 

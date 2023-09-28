@@ -918,7 +918,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
 
     if (c->wait_active && c->wait_group != NULL) {
         t->synced = true;
-        co_hash_put(c->wait_group, co_itoa(id), t);
+        hash_put(c->wait_group, co_itoa(id), t);
         c->wait_counter++;
     }
 

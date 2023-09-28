@@ -122,7 +122,7 @@ value_t co_event(callable_t fn, void_t arg) {
 
 wait_group_t *co_wait_group(void) {
     routine_t *c = co_active();
-    wait_group_t *wg = co_ht_group_init();
+    wait_group_t *wg = ht_group_init();
     c->wait_active = true;
     c->wait_group = wg;
 
@@ -135,8 +135,8 @@ wait_result_t *co_wait(wait_group_t *wg) {
     routine_t *co;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_pause();
-        wgr = co_ht_result_init();
-        co_deferred(c, FUNC_VOID(co_hash_free), wgr);
+        wgr = ht_result_init();
+        co_deferred(c, FUNC_VOID(hash_free), wgr);
         oa_pair *pair;
         while (wg->size != 0) {
             for (int i = 0; i < wg->capacity; i++) {
@@ -151,12 +151,12 @@ wait_result_t *co_wait(wait_group_t *wg) {
                             coroutine_yield();
                         } else {
                             if (co->results != NULL)
-                                co_hash_put(wgr, co_itoa(co->cid), &co->results);
+                                hash_put(wgr, co_itoa(co->cid), &co->results);
 
                             if (co->loop_active)
                                 co_deferred_free(co);
 
-                            co_hash_delete(wg, pair->key);
+                            hash_delete(wg, pair->key);
                             --c->wait_counter;
                         }
                     }
@@ -168,12 +168,12 @@ wait_result_t *co_wait(wait_group_t *wg) {
         --coroutine_count;
     }
 
-    co_hash_free(wg);
+    hash_free(wg);
     return wgr;
 }
 
 value_t co_group_get_result(wait_result_t *wgr, int cid) {
-    return ((values_t *)co_hash_get(wgr, co_itoa(cid)))->value;
+    return ((values_t *)hash_get(wgr, co_itoa(cid)))->value;
 }
 
 void co_result_set(routine_t *co, void_t data) {

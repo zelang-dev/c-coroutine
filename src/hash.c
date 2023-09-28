@@ -424,42 +424,42 @@ oa_val_ops oa_val_ops_string = { oa_string_cp, CO_FREE, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
 oa_val_ops oa_val_ops_channel = {oa_channel_cp, FUNC_VOID(channel_free), oa_value_eq, NULL};
 
-CO_FORCE_INLINE wait_group_t *co_ht_group_init() {
+CO_FORCE_INLINE wait_group_t *ht_group_init() {
     return (wait_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE wait_result_t *co_ht_result_init() {
+CO_FORCE_INLINE wait_result_t *ht_result_init() {
     return (wait_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE gc_channel_t *co_ht_channel_init() {
+CO_FORCE_INLINE gc_channel_t *ht_channel_init() {
     return (gc_channel_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE void co_hash_free(hash_t *htable) {
+CO_FORCE_INLINE void hash_free(hash_t *htable) {
     oa_hash_free(htable);
 }
 
-CO_FORCE_INLINE void_t co_hash_put(hash_t *htable, const_t key, const_t value) {
+CO_FORCE_INLINE void_t hash_put(hash_t *htable, const_t key, const_t value) {
     return oa_hash_put(htable, key, value);
 }
 
-CO_FORCE_INLINE void_t co_hash_replace(hash_t *htable, const_t key, const_t value) {
+CO_FORCE_INLINE void_t hash_replace(hash_t *htable, const_t key, const_t value) {
     return oa_hash_replace(htable, key, value);
 }
 
-CO_FORCE_INLINE void_t co_hash_get(hash_t *htable, const_t key) {
+CO_FORCE_INLINE void_t hash_get(hash_t *htable, const_t key) {
     return oa_hash_get(htable, key);
 }
 
-CO_FORCE_INLINE void co_hash_delete(hash_t *htable, const_t key) {
+CO_FORCE_INLINE void hash_delete(hash_t *htable, const_t key) {
     oa_hash_delete(htable, key);
 }
 
-CO_FORCE_INLINE void co_hash_remove(hash_t *htable, const_t key) {
+CO_FORCE_INLINE void hash_remove(hash_t *htable, const_t key) {
     oa_hash_remove(htable, key);
 }
 
-CO_FORCE_INLINE void co_hash_print(hash_t *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
+CO_FORCE_INLINE void hash_print(hash_t *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
     oa_hash_print(htable, print_key, print_val);
 }

@@ -5,14 +5,14 @@ static thread_local gc_coroutine_t *coroutine_list = NULL;
 
 void gc_coroutine(routine_t *co) {
     if (!coroutine_list)
-        coroutine_list = (gc_coroutine_t *)co_ht_group_init();
-    co_hash_put(coroutine_list, co_itoa(co->cid), co);
+        coroutine_list = (gc_coroutine_t *)ht_group_init();
+    hash_put(coroutine_list, co_itoa(co->cid), co);
 }
 
 void gc_channel(channel_t *ch) {
     if (!channel_list)
-        channel_list = co_ht_channel_init();
-    co_hash_put(channel_list, co_itoa(ch->id), ch);
+        channel_list = ht_channel_init();
+    hash_put(channel_list, co_itoa(ch->id), ch);
 }
 
 CO_FORCE_INLINE gc_channel_t *gc_channel_list() {
@@ -25,12 +25,12 @@ CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
 
 void gc_channel_free() {
     if (channel_list)
-        co_hash_free(channel_list);
+        hash_free(channel_list);
 }
 
 void gc_coroutine_free() {
     if (coroutine_list)
-        co_hash_free(coroutine_list);
+        hash_free(coroutine_list);
 }
 
 void_t co_malloc_full(routine_t *coro, size_t size, func_t func) {
