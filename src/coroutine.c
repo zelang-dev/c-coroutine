@@ -19,8 +19,6 @@ void co_strcpy(char *dest, string_t src, size_t len) {
 
 void delete(void_t ptr) {
     match(ptr) {
-        and (CO_MAP_STRUCT)
-            map_free(ptr);
         or (CO_CHANNEL)
             channel_free(ptr);
         or (CO_OBJ)
@@ -32,38 +30,6 @@ void delete(void_t ptr) {
                 CO_LOG("Pointer not freed, possible double free attempt!");
         }
     }
-}
-
-void println(int n_of_args, ...) {
-    va_list argp;
-    void_t list;
-    int type;
-
-    va_start(argp, n_of_args);
-    for (int i = 0; i < n_of_args; i++) {
-        list = va_arg(argp, void_t);
-        if (is_type(((map_t *)list), CO_MAP_STRUCT)) {
-            type = ((map_t *)list)->item_type;
-            foreach(item in list) {
-                if (type == CO_LLONG)
-#ifdef _WIN32
-                    printf("%ld ", (long)has(item).long_long);
-#else
-                    printf("%lld ", has(item).long_long);
-#endif
-                else if (type == CO_STRING)
-                    printf("%s ", has(item).str);
-                else if (type == CO_OBJ)
-                    printf("%p ", has(item).object);
-                else if (type == CO_BOOL)
-                    printf(has(item).boolean ? "true " : "false ");
-            }
-        } else {
-            printf("%s ", co_value(list).str);
-        }
-    }
-    va_end(argp);
-    puts("");
 }
 
 void co_delete(co_routine_t *handle) {

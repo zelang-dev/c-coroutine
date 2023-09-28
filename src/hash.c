@@ -418,32 +418,10 @@ void oa_string_print(const_t data) {
     printf("%s", (string_t)data);
 }
 
-void oa_map_free(void_t data) {}
-
-void_t oa_map_cp(const_t data, void_t arg) {
-    map_value_t *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t) + 1);
-    if (NULL == result)
-        co_panic("calloc() failed");
-
-    memcpy(result, data, sizeof(data));
-    return result;
-}
-
-void_t oa_map_cp_long(const_t data, void_t arg) {
-    int64_t *result = CO_CALLOC(1, sizeof(data) + sizeof(map_value_t));
-    if (NULL == result)
-        co_panic("calloc() failed");
-
-    memcpy(result, data, sizeof(data));
-    return result;
-}
-
 oa_key_ops oa_key_ops_string = { oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_struct = { oa_coroutine_cp, FUNC_VOID(co_delete), oa_value_eq, NULL };
 oa_val_ops oa_val_ops_string = { oa_string_cp, CO_FREE, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
-oa_val_ops oa_val_ops_map_long = { oa_map_cp_long, CO_FREE, oa_value_eq, NULL };
-oa_val_ops oa_val_ops_map = {oa_map_cp, CO_FREE, oa_value_eq, NULL};
 oa_val_ops oa_val_ops_channel = {oa_channel_cp, FUNC_VOID(channel_free), oa_value_eq, NULL};
 
 CO_FORCE_INLINE wait_group_t *co_ht_group_init() {
@@ -456,18 +434,6 @@ CO_FORCE_INLINE wait_result_t *co_ht_result_init() {
 
 CO_FORCE_INLINE gc_channel_t *co_ht_channel_init() {
     return (gc_channel_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
-}
-
-CO_FORCE_INLINE ht_map_t *co_ht_map_init() {
-    return (ht_map_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_map, oa_hash_lp_idx);
-}
-
-CO_FORCE_INLINE ht_map_t *co_ht_map_long_init() {
-    return (ht_map_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_map_long, oa_hash_lp_idx);
-}
-
-CO_FORCE_INLINE ht_map_t *co_ht_map_string_init() {
-    return (ht_map_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx);
 }
 
 CO_FORCE_INLINE void co_hash_free(co_hast_t *htable) {

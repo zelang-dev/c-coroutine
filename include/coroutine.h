@@ -364,7 +364,6 @@ typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
 typedef co_hast_t wait_group_t;
 typedef co_hast_t wait_result_t;
-typedef co_hast_t ht_map_t;
 typedef co_hast_t gc_channel_t;
 typedef co_hast_t gc_coroutine_t;
 
@@ -827,12 +826,6 @@ C_API wait_result_t *co_ht_result_init(void);
 
 C_API gc_channel_t *co_ht_channel_init(void);
 
-C_API ht_map_t *co_ht_map_init(void);
-
-C_API ht_map_t *co_ht_map_long_init(void);
-
-C_API ht_map_t *co_ht_map_string_init(void);
-
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
@@ -849,114 +842,8 @@ C_API value_t co_group_get_result(wait_result_t *, int);
 
 C_API void co_result_set(co_routine_t *, void_t);
 
-typedef struct map_value_s map_value_t;
-typedef func_t map_value_dtor;
-typedef struct map_iterator_s map_iter_t;
-typedef struct array_item_s array_item_t;
-typedef union {
-    int integer;
-    unsigned int u_int;
-    signed long s_long;
-    unsigned long u_long;
-    long long long_long;
-    size_t max_size;
-    float point;
-    double precision;
-    bool boolean;
-    signed short s_short;
-    unsigned short u_short;
-    signed char schar;
-    unsigned char uchar;
-    unsigned char *uchar_ptr;
-    char *char_ptr;
-    char **array;
-    void_t object;
-    callable_t func;
-    const char str[64];
-} map_value;
-
-typedef enum {
-    MAP_ARRAY = CO_ARRAY,
-    MAP_HASH
-} map_data_type;
-
-struct map_value_s {
-    map_value value;
-    value_types type;
-};
-
-struct array_item_s {
-    value_types type;
-    map_value_t *value;
-    array_item_t *prev;
-    array_item_t *next;
-    int64_t indic;
-    string_t key;
-};
-
-typedef struct map_s map_t;
-typedef map_t slice_t;
-struct map_s
-{
-    value_types type;
-    array_item_t *head;
-    array_item_t *tail;
-    ht_map_t *dict;
-    map_value_dtor dtor;
-    int64_t indices;
-    int64_t length;
-    int no_slices;
-    slice_t **slice;
-    value_types item_type;
-    map_data_type as;
-    bool started;
-    bool sliced;
-};
-
-typedef map_t array_t;
-struct map_iterator_s
-{
-    value_types type;
-    map_t *array;
-    array_item_t *item;
-    bool forward;
-};
-
-C_API map_t *map_new(map_value_dtor);
-C_API map_t *map_long_init(void);
-C_API map_t *map_string_init(void);
-C_API map_t *map(map_value_dtor, int, ...);
-C_API map_t *map_long(int, ...);
-C_API map_t *map_str(int, ...);
-C_API map_t *map_for(map_value_dtor dtor, char *desc, ...);
-C_API void map_free(map_t *);
-C_API int map_push(map_t *, void_t);
-C_API map_value_t *map_pop(map_t *);
-C_API void map_shift(map_t *, void_t);
-C_API map_value_t *map_unshift(map_t *);
-C_API size_t map_count(map_t *);
-C_API void_t map_remove(map_t *, void_t);
-C_API void map_put(map_t *, string_t, void_t);
-C_API map_value_t *map_get(map_t *, string_t);
-C_API void_t map_del(map_t *, string_t);
-C_API array_t *range(int start, int stop);
-C_API array_t *array(map_value_dtor, int n_args, ...);
-C_API array_t *array_long(int n_args, ...);
-C_API array_t *array_str(int n_args, ...);
-C_API void array_put_long(map_t *, string_t, int64_t value);
-C_API void array_put_str(map_t *, string_t, string_t);
-C_API slice_t *slice(array_t *, int64_t start, int64_t end);
-C_API string_t slice_find(map_t *array, int64_t index);
-C_API map_iter_t *iter_new(map_t *, bool);
-C_API map_iter_t *iter_next(map_iter_t *);
-C_API map_value_t *iter_value(map_iter_t *);
-C_API string_t iter_key(map_iter_t *);
-C_API map_iter_t *iter_remove(map_iter_t *);
-C_API void iter_free(map_iter_t *);
 C_API void println(int n_of_args, ...);
 C_API void delete(void_t ptr);
-
-C_API map_value_t *map_macro_type(void_t);
 
 #define EX_CAT(a, b) a ## b
 
@@ -1296,27 +1183,6 @@ Must also closed out with `select_break()`. */
 #define or(ENUM) break; case ENUM:
 #define otherwise break; default:
 
-#define $(list, index) map_get((list), slice_find((list), index))->value
-#define $$(list, index, value) map_put((list), slice_find((list), index), (value))
-
-#define in ,
-#define kv(key, value) (key), (value)
-#define has(i) map_macro_type((i))->value
-#define has_t(i) map_macro_type((i))
-#define indic(i) iter_key(i)
-#define foreach_xp(X, A) X A
-#define foreach_in(X, S) for(map_iter_t \
-  *(X) = iter_new((map_t *)(S), true); \
-  X != NULL; \
-  X = iter_next(X))
-#define reverse_in(X, S) for(map_iter_t \
-  *(X) = iter_new((map_t *)(S), false); \
-  X != NULL; \
-  X = iter_next(X))
-#define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
-#define reverse(...) foreach_xp(reverse_in, (__VA_ARGS__))
-#define ranging(...) foreach(__VA_ARGS__)
-
 #define c_int(data) co_value((data)).integer
 #define c_long(data) co_value((data)).s_long
 #define c_int64(data) co_value((data)).long_long
@@ -1380,54 +1246,7 @@ Must also closed out with `select_break()`. */
 #define var_func(arg) (arg).value.func
 #define var_cast(type, arg) (type *)(arg).value.object
 
-#define has_int(arg) has_t((arg))->value.integer
-#define has_long(arg) has_t((arg))->value.s_long
-#define has_long_long(arg) has_t((arg))->value.long_long
-#define has_unsigned_int(arg) has_t((arg))->value.u_int
-#define has_unsigned_long(arg) has_t((arg))->value.u_long
-#define has_size_t(arg) has_t((arg))->value.max_size
-#define has_const_char_64(arg) has_t((arg))->value.str
-#define has_char(arg) has_t((arg))->value.schar
-#define has_char_ptr(arg) has_t((arg))->value.char_ptr
-#define has_bool(arg) has_t((arg))->value.boolean
-#define has_float(arg) has_t((arg))->value.point
-#define has_double(arg) has_t((arg))->value.precision
-#define has_unsigned_char(arg) has_t((arg))->value.uchar
-#define has_char_ptr_ptr(arg) has_t((arg))->value.array
-#define has_unsigned_char_ptr(arg) has_t((arg))->value.uchar_ptr
-#define has_signed_short(arg) has_t((arg))->value.s_short
-#define has_unsigned_short(arg) has_t((arg))->value.u_short
-#define has_ptr(arg) has_t((arg))->value.object
-#define has_func(arg) has_t((arg))->value.func
-#define has_cast(type, arg) (type *)has_t((arg))->value.object
-
 #define defer(func, arg) co_defer(FUNC_VOID(func), arg)
-
-#define as_array(variable, dtor, n_of_items, ...) array_t *variable = array(dtor, n_of_items, __VA_ARGS__); \
-    defer(map_free, variable)
-
-#define as_range(variable, start, stop) array_t *variable = range(start, stop); \
-    defer(map_free, variable)
-
-#define as_array_long(variable, n_of_items, ...) array_t *variable = array_long(n_of_items, __VA_ARGS__); \
-    defer(map_free, variable)
-
-#define as_array_string(variable, n_of_items, ...) array_t *variable = array_str(n_of_items, __VA_ARGS__); \
-    defer(map_free, variable)
-
-#define as_slice(variable, list, start, end) slice_t *variable = slice(list, start, end);
-
-#define as_map_for(variable, dtor, desc, ...) map_t *variable = map_for(dtor, desc, __VA_ARGS__); \
-    defer(map_free, variable)
-
-#define as_map(variable, dtor, n_of_pairs, ...) map_t *variable = map(dtor, n_of_pairs, __VA_ARGS__); \
-    defer(map_free, variable)
-
-#define as_map_long(variable, n_of_pairs, ...) map_t *variable = map_long(n_of_pairs, __VA_ARGS__); \
-    defer(map_free, variable)
-
-#define as_map_string(variable, n_of_pairs, ...) map_t *variable = map_str(n_of_pairs, __VA_ARGS__); \
-    defer(map_free, variable)
 
 #define var(data) co_var((data))->value
 #define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)co_new_by(1, sizeof(var_t)); \
