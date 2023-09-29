@@ -50,7 +50,9 @@ static void fs_cb(uv_fs_t *req) {
                 break;
             case UV_FS_FSTAT:
                 override = true;
-                co_result_set(co, uv_fs_get_statbuf(req));
+                values_t *stat = co_new_by(1, sizeof(req->statbuf));
+                memcpy(stat, &req->statbuf, sizeof(req->statbuf));
+                co_result_set(co, stat);
                 break;
             case UV_FS_READLINK:
                 break;
@@ -137,7 +139,7 @@ static void_t fs_init(void_t uv_args) {
             case UV_FS_RMDIR:
                 result = uv_fs_rmdir(loop, req, path, fs_cb);
                 break;
-            case UV_FS_FSTAT:
+            case UV_FS_LSTAT:
                 n_path = var_char_ptr(args[1]);
                 result = uv_fs_lstat(loop, req, path, fs_cb);
                 break;
@@ -247,6 +249,17 @@ uv_stat_t *co_fs_fstat(uv_file fd) {
 
     args[0].value.integer = fd;
     return (uv_stat_t *)co_fs_init(uv_args, args, UV_FS_FSTAT, 1, false).object;
+}
+
+string co_fs_read(uv_file fd, int64_t offset) {
+    values_t *args;
+    uv_args_t *uv_args;
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    args = (values_t *)co_new_by(1, sizeof(values_t));
+
+    args[0].value.integer = fd;
+    args[1].value.long_long = offset;
+    return co_fs_init(uv_args, args, UV_FS_READ, 2, false).char_ptr;
 }
 
 int co_fs_close(uv_file fd) {

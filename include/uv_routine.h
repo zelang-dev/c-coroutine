@@ -42,10 +42,9 @@ typedef union
 } uv_routine_cb;
 
 C_API uv_file co_fs_open(const char *, int, int);
-
-C_API uv_stat_t *co_fs_fstat(uv_file);
-
 C_API int co_fs_close(uv_file);
+C_API uv_stat_t *co_fs_fstat(uv_file);
+C_API char *co_fs_read(uv_file, int64_t);
 
 C_API int co_close(uv_handle_t *);
 
@@ -70,10 +69,6 @@ C_API void co_timer_start(uv_timer_t *timer, uv_timer_cb callback, uint64_t time
 
 /** @return int */
 C_API void co_fs_unlink(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb callback);
-
-
-/** @return int */
-C_API void co_fs_read(uv_loop_t *, uv_fs_t *, uv_file file, uv_buf_t, int, int64_t offset, uv_fs_cb cb);
 
 /** @return int */
 C_API void co_fs_write(uv_loop_t *, uv_fs_t *, uv_file file, uv_buf_t, int, int64_t offset, uv_fs_cb cb);
