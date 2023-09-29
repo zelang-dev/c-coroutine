@@ -52,6 +52,9 @@ void co_delete(routine_t *handle) {
             if (handle->err_allocated != NULL)
                 CO_FREE(handle->err_allocated);
 
+            if (handle->results != NULL)
+                CO_FREE(handle->results);
+
             CO_FREE(handle);
         }
     }
@@ -150,8 +153,11 @@ wait_result_t *co_wait(wait_group_t *wg) {
 
                             coroutine_yield();
                         } else {
-                            if (co->results != NULL)
-                                hash_put(wgr, co_itoa(co->cid), &co->results);
+                            if (co->results != NULL) {
+                                hash_put(wgr, co_itoa(co->cid), co->results);
+                                CO_FREE(co->results);
+                                co->results = NULL;
+                            }
 
                             if (co->loop_active)
                                 co_deferred_free(co);
@@ -177,7 +183,11 @@ value_t co_group_get_result(wait_result_t *wgr, int cid) {
 }
 
 void co_result_set(routine_t *co, void_t data) {
-    co->results = data;
+    if (co->results != NULL)
+        CO_FREE(co->results);
+
+    co->results = CO_CALLOC(1, sizeof(values_t) + sizeof(data));
+    memcpy(co->results, &data, sizeof(data));
 }
 
 #if defined(_WIN32) || defined(_WIN64)

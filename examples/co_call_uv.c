@@ -8,5 +8,7 @@ int co_main(int argc, char *argv[]) {
     printf("\nFile closed, status: %d\n", status);
     fd = co_fs_open(__FILE__, O_RDONLY, 0);
     printf("\nFile opened, fd: %d\n", fd);
+    status = co_fs_close(fd);
+    printf("\nFile really closed, status: %d\n", status);
     return 0;
 }
