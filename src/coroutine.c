@@ -187,7 +187,7 @@ void co_result_set(routine_t *co, void_t data) {
         if (&co->results != NULL)
             CO_FREE(co->results);
 
-        co->results = CO_CALLOC(1, sizeof(values_t) + sizeof(data));
+        co->results = try_calloc(1, sizeof(values_t) + sizeof(data));
         memcpy(co->results, &data, sizeof(data));
     }
 }

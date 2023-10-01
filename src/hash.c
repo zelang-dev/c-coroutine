@@ -66,9 +66,7 @@ oa_hash *oa_hash_new(
     oa_key_ops key_ops,
     oa_val_ops val_ops,
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx)) {
-    oa_hash *htable = CO_CALLOC(1, sizeof(*htable));
-    if (NULL == htable)
-        co_panic("calloc() failed");
+    oa_hash *htable = try_calloc(1, sizeof(*htable));
 
     htable->size = 0;
     htable->capacity = HASH_INIT_CAPACITY;
@@ -76,9 +74,7 @@ oa_hash *oa_hash_new(
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
 
-    htable->buckets = CO_CALLOC(1, sizeof(*(htable->buckets)) * htable->capacity);
-    if (NULL == htable->buckets)
-        co_panic("calloc() failed");
+    htable->buckets = try_calloc(1, sizeof(*(htable->buckets)) * htable->capacity);
 
     for (int i = 0; i < htable->capacity; i++) {
         htable->buckets[ i ] = NULL;
@@ -128,10 +124,7 @@ inline static void oa_hash_grow(oa_hash *htable) {
 
     htable->capacity = (uint32_t)new_capacity_64;
     htable->size = 0;
-    htable->buckets = CO_CALLOC(1, htable->capacity * sizeof(*(htable->buckets)));
-
-    if (NULL == htable->buckets)
-        co_panic("calloc() failed");
+    htable->buckets = try_calloc(1, htable->capacity * sizeof(*(htable->buckets)));
 
     for (int i = 0; i < htable->capacity; i++) {
         htable->buckets[ i ] = NULL;
@@ -330,9 +323,7 @@ static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, con
 }
 
 oa_pair *oa_pair_new(uint32_t hash, const_t key, const_t value) {
-    oa_pair *p = CO_CALLOC(1, sizeof(*p) + sizeof(key) + sizeof(value) + 2);
-    if (NULL == p)
-        co_panic("calloc() failed");
+    oa_pair *p = try_calloc(1, sizeof(*p) + sizeof(key) + sizeof(value) + 2);
 
     p->hash = hash;
     p->value = (void_t)value;
@@ -377,9 +368,7 @@ uint32_t oa_string_hash(const_t data, void_t arg) {
 void_t oa_string_cp(const_t data, void_t arg) {
     string_t input = (string_t)data;
     size_t input_length = strlen(input) + 1;
-    char *result = CO_CALLOC(1, sizeof(*result) * input_length + sizeof(values_t) + 1);
-    if (NULL == result)
-        co_panic("calloc() failed");
+    char *result = try_calloc(1, sizeof(*result) * input_length + sizeof(values_t) + 1);
 
     co_strcpy(result, input, input_length);
     return result;
@@ -398,9 +387,7 @@ void_t oa_channel_cp(const_t data, void_t arg) {
 }
 
 void_t oa_value_cp(const_t data, void_t arg) {
-    values_t *result = CO_CALLOC(1, sizeof(data) + sizeof(values_t) + 1);
-    if (NULL == result)
-        co_panic("calloc() failed");
+    values_t *result = try_calloc(1, sizeof(data) + sizeof(values_t) + 1);
 
     memcpy(result, data, sizeof(data));
     return result;

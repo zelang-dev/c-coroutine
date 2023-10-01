@@ -2,7 +2,7 @@
 
 static void_t fs_init(void_t);
 
-static value_t co_fs_init(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
+static value_t fs_start(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->args = args;
     uv_args->type = CO_EVENT_ARG;
     uv_args->fs_type = fs_type;
@@ -202,9 +202,7 @@ static void_t fs_init(void_t uv_args) {
                 result = uv_fs_read(loop, req, fd, &fs->bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_WRITE:
-                fs->buffer = var_char_ptr(args[1]);
-                fs->bufs = uv_buf_init(fs->buffer, sizeof(fs->buffer));
-                offset = var_long_long(args[2]);
+                offset = var_long_long(args[1]);
                 result = uv_fs_write(loop, req, fd, &fs->bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_UNKNOWN:
@@ -225,7 +223,7 @@ static void_t fs_init(void_t uv_args) {
     return 0;
 }
 
-uv_file co_fs_open(string_t path, int flags, int mode) {
+uv_file fs_open(string_t path, int flags, int mode) {
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -236,10 +234,10 @@ uv_file co_fs_open(string_t path, int flags, int mode) {
     args[1].value.integer = flags;
     args[2].value.integer = mode;
 
-    return (uv_file)co_fs_init(uv_args, args, UV_FS_OPEN, 3, true).integer;
+    return (uv_file)fs_start(uv_args, args, UV_FS_OPEN, 3, true).integer;
 }
 
-uv_stat_t *co_fs_fstat(uv_file fd) {
+uv_stat_t *fs_fstat(uv_file fd) {
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -247,11 +245,11 @@ uv_stat_t *co_fs_fstat(uv_file fd) {
     args = (values_t *)co_new_by(1, sizeof(values_t));
     args[0].value.integer = fd;
 
-    return (uv_stat_t *)co_fs_init(uv_args, args, UV_FS_FSTAT, 1, false).object;
+    return (uv_stat_t *)fs_start(uv_args, args, UV_FS_FSTAT, 1, false).object;
 }
 
-string co_fs_read(uv_file fd, int64_t offset) {
-    uv_stat_t *stat = co_fs_fstat(fd);
+string fs_read(uv_file fd, int64_t offset) {
+    uv_stat_t *stat = fs_fstat(fd);
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -263,10 +261,27 @@ string co_fs_read(uv_file fd, int64_t offset) {
     args[0].value.integer = fd;
     args[1].value.u_int = offset;
 
-    return co_fs_init(uv_args, args, UV_FS_READ, 2, false).char_ptr;
+    return fs_start(uv_args, args, UV_FS_READ, 2, false).char_ptr;
 }
 
-int co_fs_close(uv_file fd) {
+int fs_write(uv_file fd, string_t text, int64_t offset) {
+    size_t size = sizeof(text) + 1;
+    values_t *args = NULL;
+    uv_args_t *uv_args = NULL;
+
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    uv_args->buffer = co_new_by(1, size);
+    memcpy(uv_args->buffer, text, size);
+    uv_args->bufs = uv_buf_init(uv_args->buffer, size);
+
+    args = (values_t *)co_new_by(2, sizeof(values_t));
+    args[0].value.integer = fd;
+    args[1].value.u_int = offset;
+
+    return fs_start(uv_args, args, UV_FS_WRITE, 2, false).integer;
+}
+
+int fs_close(uv_file fd) {
     values_t *args;
     uv_args_t *uv_args;
 
@@ -274,5 +289,5 @@ int co_fs_close(uv_file fd) {
     args = (values_t *)co_new_by(1, sizeof(values_t));
 
     args[0].value.integer = fd;
-    return co_fs_init(uv_args, args, UV_FS_CLOSE, 1, false).integer;
+    return fs_start(uv_args, args, UV_FS_CLOSE, 1, false).integer;
 }

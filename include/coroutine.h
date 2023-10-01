@@ -1277,6 +1277,9 @@ C_API bool is_value(void_t);
 C_API bool is_instance(void_t);
 C_API bool is_valid(void_t);
 
+C_API void_t try_calloc(int, size_t);
+C_API void_t try_malloc(size_t);
+
 /* Write this function instead of `main`, this library provides its own main, the scheduler,
 which call this function as an coroutine! */
 int co_main(int, char **);

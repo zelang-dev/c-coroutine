@@ -810,10 +810,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     }
 
     size = _co_align_forward(size + sizeof(routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void_t memory = CO_CALLOC(1, size + sizeof(channel_t) + sizeof(values_t));
-    if (!memory)
-        co_panic("calloc() failed");
-
+    void_t memory = try_calloc(1, size + sizeof(channel_t) + sizeof(values_t));
     routine_t *co = co_derive(memory, size);
     if (!co_current_handle)
         co_current_handle = co_active();
@@ -823,7 +820,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
 
 #ifdef UV_H
     if (!co_main_loop_handle) {
-        co_main_loop_handle = CO_CALLOC(1, sizeof(uv_loop_t));
+        co_main_loop_handle = try_calloc(1, sizeof(uv_loop_t));
         int r = uv_loop_init(co_main_loop_handle);
         if (r)
             fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);

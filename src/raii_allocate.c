@@ -33,32 +33,44 @@ void gc_coroutine_free() {
         hash_free(coroutine_list);
 }
 
-void_t co_malloc_full(routine_t *coro, size_t size, func_t func) {
+void_t try_calloc(int count, size_t size) {
+    void_t ptr = CO_CALLOC(count, size);
+    if (ptr == NULL)
+        co_panic("Memory allocation failed!");
+
+    return ptr;
+}
+
+void_t try_malloc(size_t size) {
     void_t ptr = CO_MALLOC(size);
+    if (ptr == NULL)
+        co_panic("Memory allocation failed!");
 
-    if (LIKELY(ptr)) {
-        if (coro->err_allocated == NULL)
-            coro->err_allocated = CO_MALLOC(sizeof(ex_ptr_t));
+    return ptr;
+}
 
-        ex_protect_ptr(coro->err_allocated, ptr, func);
-        coro->err_protected = true;
-        co_deferred(coro, func, ptr);
-    }
+void_t co_malloc_full(routine_t *coro, size_t size, func_t func) {
+    void_t ptr = try_malloc(size);
+
+    if (coro->err_allocated == NULL)
+        coro->err_allocated = try_malloc(sizeof(ex_ptr_t));
+
+    ex_protect_ptr(coro->err_allocated, ptr, func);
+    coro->err_protected = true;
+    co_deferred(coro, func, ptr);
 
     return ptr;
 }
 
 void_t co_calloc_full(routine_t *coro, int count, size_t size, func_t func) {
-    void_t ptr = CO_CALLOC(count, size);
+    void_t ptr = try_calloc(count, size);
 
-    if (LIKELY(ptr)) {
-        if (coro->err_allocated == NULL)
-            coro->err_allocated = CO_CALLOC(1, sizeof(ex_ptr_t));
+    if (coro->err_allocated == NULL)
+        coro->err_allocated = try_calloc(1, sizeof(ex_ptr_t));
 
-        ex_protect_ptr(coro->err_allocated, ptr, func);
-        coro->err_protected = true;
-        co_deferred(coro, func, ptr);
-    }
+    ex_protect_ptr(coro->err_allocated, ptr, func);
+    coro->err_protected = true;
+    co_deferred(coro, func, ptr);
 
     return ptr;
 }

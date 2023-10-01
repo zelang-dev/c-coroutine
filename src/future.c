@@ -14,7 +14,7 @@ static unsigned long thread_id(pthread_t thread) {
 }
 
 future *future_create(callable_t start_routine) {
-    future *f = CO_CALLOC(1, sizeof(future));
+    future *f = try_calloc(1, sizeof(future));
 
     pthread_attr_init(&f->attr);
     pthread_attr_setdetachstate(&f->attr, PTHREAD_CREATE_JOINABLE);
@@ -47,7 +47,7 @@ void_t future_wrapper(void_t arg) {
 }
 
 void async_start(future *f, promise *value, void_t arg) {
-    future_arg *f_arg = CO_CALLOC(1, sizeof(future_arg));
+    future_arg *f_arg = try_calloc(1, sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
     f_arg->value = value;
@@ -87,7 +87,7 @@ void co_async_wait(future *f) {
 }
 
 void future_start(future *f, void_t arg) {
-    future_arg *f_arg = CO_CALLOC(1, sizeof(future_arg));
+    future_arg *f_arg = try_calloc(1, sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
     int r = pthread_create(&f->thread, &f->attr, future_func_wrapper, f_arg);
@@ -106,8 +106,8 @@ void future_close(future *f) {
 }
 
 promise *promise_create() {
-    promise *p = CO_CALLOC(1, sizeof(promise));
-    p->result = CO_CALLOC(1, sizeof(values_t));
+    promise *p = try_calloc(1, sizeof(promise));
+    p->result = try_calloc(1, sizeof(values_t));
     pthread_mutex_init(&p->mutex, NULL);
     pthread_cond_init(&p->cond, NULL);
     srand((unsigned int)time(NULL));
