@@ -41,11 +41,12 @@ typedef union
     uv_random_cb randoms;
 } uv_routine_cb;
 
-C_API uv_file fs_open(const char *, int, int);
-C_API int fs_close(uv_file);
-C_API uv_stat_t *fs_fstat(uv_file);
-C_API char *fs_read(uv_file, int64_t);
-C_API int fs_write(uv_file, const char *, int64_t);
+C_API uv_file fs_open(const char *path, int flags, int mode);
+C_API int fs_close(uv_file fd);
+C_API uv_stat_t *fs_fstat(uv_file fd);
+C_API char *fs_read(uv_file fd, int64_t offset);
+C_API int fs_write(uv_file fd, const char *text, int64_t offset);
+C_API int fs_unlink(string_t path);
 
 C_API int co_close(uv_handle_t *);
 
@@ -66,10 +67,6 @@ C_API void co_poll_start(uv_poll_t *, int events, uv_poll_cb callback);
 
 /** @return int */
 C_API void co_timer_start(uv_timer_t *timer, uv_timer_cb callback, uint64_t timeout, uint64_t repeat);
-
-
-/** @return int */
-C_API void fs_unlink(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb callback);
 
 /** @return int */
 C_API void fs_copyfile(uv_loop_t *, uv_fs_t *, const char path, const char new_path, int flags, uv_fs_cb cb);

@@ -237,6 +237,17 @@ uv_file fs_open(string_t path, int flags, int mode) {
     return (uv_file)fs_start(uv_args, args, UV_FS_OPEN, 3, true).integer;
 }
 
+int fs_unlink(string_t path) {
+    values_t *args = NULL;
+    uv_args_t *uv_args = NULL;
+
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    args = (values_t *)co_new_by(1, sizeof(values_t));
+    args[0].value.char_ptr = (string)path;
+
+    return (uv_file)fs_start(uv_args, args, UV_FS_UNLINK, 1, true).integer;
+}
+
 uv_stat_t *fs_fstat(uv_file fd) {
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
