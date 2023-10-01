@@ -574,6 +574,9 @@ typedef struct uv_args_s
     /* allocated array of arguments */
     values_t *args;
     routine_t *context;
+    string buffer;
+    uv_buf_t bufs;
+    uv_stat_t stat[1];
 
     bool is_path;
     uv_fs_type fs_type;

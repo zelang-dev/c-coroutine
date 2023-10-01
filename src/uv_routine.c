@@ -14,8 +14,8 @@ static value_t co_fs_init(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type
 
 static void fs_cb(uv_fs_t *req) {
     ssize_t result = uv_fs_get_result(req);
-    uv_args_t *uv_args = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
-    routine_t *co = uv_args->context;
+    uv_args_t *fs = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
+    routine_t *co = fs->context;
     bool override = false;
 
     if (result < 0) {
@@ -47,16 +47,16 @@ static void fs_cb(uv_fs_t *req) {
                 break;
             case UV_FS_LSTAT:
             case UV_FS_STAT:
-                break;
             case UV_FS_FSTAT:
                 override = true;
-                values_t *stat = co_new_by(1, sizeof(req->statbuf));
-                memcpy(stat, &req->statbuf, sizeof(req->statbuf));
-                co_result_set(co, stat);
+                memcpy(fs->stat, &req->statbuf, sizeof(fs->stat));
+                co_result_set(co, fs->stat);
                 break;
             case UV_FS_READLINK:
                 break;
             case UV_FS_READ:
+                override = true;
+                co_result_set(co, fs->buffer);
                 break;
             case UV_FS_SENDFILE:
                 break;
@@ -87,7 +87,6 @@ static void_t fs_init(void_t uv_args) {
     uv_file in_fd;
     size_t length;
     int64_t offset;
-    uv_buf_t *bufs;
     string_t n_path;
     double atime, mtime;
     int flags, mode;
@@ -200,13 +199,13 @@ static void_t fs_init(void_t uv_args) {
                 break;
             case UV_FS_READ:
                 offset = var_long_long(args[1]);
-                bufs = var_cast(uv_buf_t, args[2]);
-                result = uv_fs_read(loop, req, fd, bufs, 1, offset, fs_cb);
+                result = uv_fs_read(loop, req, fd, &fs->bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_WRITE:
-                bufs = var_cast(uv_buf_t, args[1]);
+                fs->buffer = var_char_ptr(args[1]);
+                fs->bufs = uv_buf_init(fs->buffer, sizeof(fs->buffer));
                 offset = var_long_long(args[2]);
-                result = uv_fs_write(loop, req, fd, bufs, 1, offset, fs_cb);
+                result = uv_fs_write(loop, req, fd, &fs->bufs, 1, offset, fs_cb);
                 break;
             case UV_FS_UNKNOWN:
             case UV_FS_CUSTOM:
@@ -227,8 +226,8 @@ static void_t fs_init(void_t uv_args) {
 }
 
 uv_file co_fs_open(string_t path, int flags, int mode) {
-    values_t *args;
-    uv_args_t *uv_args;
+    values_t *args = NULL;
+    uv_args_t *uv_args = NULL;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     args = (values_t *)co_new_by(3, sizeof(values_t));
@@ -241,24 +240,29 @@ uv_file co_fs_open(string_t path, int flags, int mode) {
 }
 
 uv_stat_t *co_fs_fstat(uv_file fd) {
-    values_t *args;
-    uv_args_t *uv_args;
+    values_t *args = NULL;
+    uv_args_t *uv_args = NULL;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     args = (values_t *)co_new_by(1, sizeof(values_t));
-
     args[0].value.integer = fd;
+
     return (uv_stat_t *)co_fs_init(uv_args, args, UV_FS_FSTAT, 1, false).object;
 }
 
 string co_fs_read(uv_file fd, int64_t offset) {
-    values_t *args;
-    uv_args_t *uv_args;
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(1, sizeof(values_t));
+    uv_stat_t *stat = co_fs_fstat(fd);
+    values_t *args = NULL;
+    uv_args_t *uv_args = NULL;
 
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    uv_args->buffer = co_new_by(1, stat->st_size);
+    uv_args->bufs = uv_buf_init(uv_args->buffer, stat->st_size);
+
+    args = (values_t *)co_new_by(2, sizeof(values_t));
     args[0].value.integer = fd;
-    args[1].value.long_long = offset;
+    args[1].value.u_int = offset;
+
     return co_fs_init(uv_args, args, UV_FS_READ, 2, false).char_ptr;
 }
 

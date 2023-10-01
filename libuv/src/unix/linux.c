@@ -986,7 +986,7 @@ int uv__iou_fs_statx(uv_loop_t* loop,
   struct uv__statx* statxbuf;
   struct uv__iou* iou;
 
-  statxbuf = uv__malloc(sizeof(*statxbuf));
+  statxbuf = uv__calloc(1, sizeof(*statxbuf));
   if (statxbuf == NULL)
     return 0;
 

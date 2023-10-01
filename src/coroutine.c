@@ -52,7 +52,7 @@ void co_delete(routine_t *handle) {
             if (handle->err_allocated != NULL)
                 CO_FREE(handle->err_allocated);
 
-            if (handle->results != NULL)
+            if (&handle->results != NULL)
                 CO_FREE(handle->results);
 
             CO_FREE(handle);
@@ -183,11 +183,13 @@ value_t co_group_get_result(wait_result_t *wgr, int cid) {
 }
 
 void co_result_set(routine_t *co, void_t data) {
-    if (co->results != NULL)
-        CO_FREE(co->results);
+    if (&data != NULL) {
+        if (&co->results != NULL)
+            CO_FREE(co->results);
 
-    co->results = CO_CALLOC(1, sizeof(values_t) + sizeof(data));
-    memcpy(co->results, &data, sizeof(data));
+        co->results = CO_CALLOC(1, sizeof(values_t) + sizeof(data));
+        memcpy(co->results, &data, sizeof(data));
+    }
 }
 
 #if defined(_WIN32) || defined(_WIN64)
