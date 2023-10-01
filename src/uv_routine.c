@@ -259,6 +259,17 @@ uv_stat_t *fs_fstat(uv_file fd) {
     return (uv_stat_t *)fs_start(uv_args, args, UV_FS_FSTAT, 1, false).object;
 }
 
+int fs_fsync(uv_file fd) {
+    values_t *args = NULL;
+    uv_args_t *uv_args = NULL;
+
+    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    args = (values_t *)co_new_by(1, sizeof(values_t));
+    args[0].value.integer = fd;
+
+    return fs_start(uv_args, args, UV_FS_FSYNC, 1, false).integer;
+}
+
 string fs_read(uv_file fd, int64_t offset) {
     uv_stat_t *stat = fs_fstat(fd);
     values_t *args = NULL;

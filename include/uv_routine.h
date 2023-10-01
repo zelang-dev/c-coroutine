@@ -46,7 +46,11 @@ C_API int fs_close(uv_file fd);
 C_API uv_stat_t *fs_fstat(uv_file fd);
 C_API char *fs_read(uv_file fd, int64_t offset);
 C_API int fs_write(uv_file fd, const char *text, int64_t offset);
-C_API int fs_unlink(string_t path);
+C_API int fs_unlink(const char *path);
+C_API int fs_fsync(uv_file file);
+C_API int fs_fdatasync(uv_file file);
+C_API int fs_ftruncate(uv_file file, int64_t offset);
+C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length);
 
 C_API int co_close(uv_handle_t *);
 
@@ -100,18 +104,6 @@ C_API void fs_stat(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb cb);
 
 /** @return int */
 C_API void fs_rename(uv_loop_t *, uv_fs_t *, const char path, const char new_path, uv_fs_cb cb);
-
-/** @return int */
-C_API void fs_fsync(uv_loop_t *, uv_fs_t *, uv_file file, uv_fs_cb cb);
-
-/** @return int */
-C_API void fs_fdatasync(uv_loop_t *, uv_fs_t *, uv_file file, uv_fs_cb cb);
-
-/** @return int */
-C_API void fs_ftruncate(uv_loop_t *, uv_fs_t *, uv_file file, int64_t offset, uv_fs_cb cb);
-
-/** @return int */
-C_API void fs_sendfile(uv_loop_t *, uv_fs_t *, uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length, uv_fs_cb cb);
 
 /** @return int */
 C_API void fs_access(uv_loop_t *, uv_fs_t *, const char path, int mode, uv_fs_cb cb);
