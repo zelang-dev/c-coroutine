@@ -51,6 +51,9 @@ C_API int fs_fsync(uv_file file);
 C_API int fs_fdatasync(uv_file file);
 C_API int fs_ftruncate(uv_file file, int64_t offset);
 C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length);
+C_API int fs_fchmod(uv_file file, int mode);
+C_API int fs_fchown(uv_file file, uv_uid_t uid, uv_gid_t gid);
+C_API int fs_futime(uv_file file, double atime, double mtime);
 
 C_API int co_close(uv_handle_t *);
 
@@ -71,6 +74,8 @@ C_API void co_poll_start(uv_poll_t *, int events, uv_poll_cb callback);
 
 /** @return int */
 C_API void co_timer_start(uv_timer_t *timer, uv_timer_cb callback, uint64_t timeout, uint64_t repeat);
+
+
 
 /** @return int */
 C_API void fs_copyfile(uv_loop_t *, uv_fs_t *, const char path, const char new_path, int flags, uv_fs_cb cb);
@@ -115,9 +120,6 @@ C_API void fs_chmod(uv_loop_t *, uv_fs_t *, const char path, int mode, uv_fs_cb 
 C_API void fs_utime(uv_loop_t *, uv_fs_t *, const char path, double atime, double mtime, uv_fs_cb cb);
 
 /** @return int */
-C_API void fs_futime(uv_loop_t *, uv_fs_t *, uv_file file, double atime, double mtime, uv_fs_cb cb);
-
-/** @return int */
 C_API void fs_lutime(uv_loop_t *, uv_fs_t *, const char path, double atime, double mtime, uv_fs_cb cb);
 
 /** @return int */
@@ -136,13 +138,7 @@ C_API void fs_readlink(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb cb);
 C_API void fs_realpath(uv_loop_t *, uv_fs_t *, const char path, uv_fs_cb cb);
 
 /** @return int */
-C_API void fs_fchmod(uv_loop_t *, uv_fs_t *, uv_file file, int mode, uv_fs_cb cb);
-
-/** @return int */
 C_API void fs_chown(uv_loop_t *, uv_fs_t *, const char path, uv_uid_t uid, uv_gid_t gid, uv_fs_cb cb);
-
-/** @return int */
-C_API void fs_fchown(uv_loop_t *, uv_fs_t *, uv_file file, uv_uid_t uid, uv_gid_t gid, uv_fs_cb cb);
 
 /** @return int */
 C_API void fs_lchown(uv_loop_t *, uv_fs_t *, const char path, uv_uid_t uid, uv_gid_t gid, uv_fs_cb cb);
