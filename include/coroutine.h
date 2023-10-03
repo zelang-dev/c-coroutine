@@ -577,8 +577,10 @@ typedef struct uv_args_s
     string buffer;
     uv_buf_t bufs;
     uv_stat_t stat[1];
+    uv_statfs_t statfs[1];
 
     bool is_path;
+    bool is_request;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
