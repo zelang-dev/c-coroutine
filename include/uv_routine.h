@@ -46,6 +46,8 @@ typedef union
     uv_signal_cb signal;
 } uv_routine_cb;
 
+C_API void coro_uv_close(uv_handle_t *);
+
 C_API char *fs_readfile(const char *path);
 C_API uv_file fs_open(const char *path, int flags, int mode);
 C_API int fs_close(uv_file fd);
@@ -88,13 +90,22 @@ C_API uv_statfs_t *fs_statfs(const char *path);
 C_API void fs_poll_start(const char *path, int interval);
 C_API void fs_event_start(const char *path, int flags);
 
-C_API void coro_close(uv_handle_t *);
-C_API char *coro_read(uv_stream_t *);
-C_API int coro_write(uv_stream_t *, const char *text);
+C_API char *stream_read(uv_stream_t *);
+C_API int stream_write(uv_stream_t *, const char *text);
 
-C_API int coro_write2(uv_stream_t *, const char *text, uv_stream_t *send_handle);
+C_API int stream_write2(uv_stream_t *, const char *text, uv_stream_t *send_handle);
 
-C_API void coro_shutdown(uv_shutdown_t *, uv_stream_t *, uv_shutdown_cb cb);
+C_API void stream_shutdown(uv_shutdown_t *, uv_stream_t *, uv_shutdown_cb cb);
+
+C_API void stream_listen(uv_stream_t *stream, int backlog, uv_connection_cb cb);
+
+C_API uv_tty_t *tty_create(uv_file fd);
+
+C_API uv_pipe_t *pipe_create(bool is_ipc);
+C_API void pipe_connect(uv_pipe_t *, const char *name);
+
+C_API uv_tcp_t *tcp_create(void);
+C_API void tcp_connect(uv_tcp_t *handle, const struct sockaddr *addr);
 
 C_API void coro_async_init(uv_loop_t *, uv_async_t *async, uv_async_cb callback);
 
@@ -113,9 +124,6 @@ C_API void coro_signal_start_oneshot(uv_signal_t *, uv_signal_cb signal_cb, int 
 /** @return int */
 C_API void coro_spawn(uv_loop_t *, uv_process_t *, uv_process_options_t *options);
 
-/** @return void */
-C_API void coro_pipe_connect(uv_connect_t *, uv_pipe_t *, const char *name, uv_connect_cb cb);
-
 /** @return int */
 C_API void coro_queue_work(uv_loop_t *, uv_work_t *, uv_work_cb work_cb, uv_after_work_cb after_work_cb);
 
@@ -127,15 +135,6 @@ C_API void coro_check_start(uv_check_t *check, uv_check_cb callback);
 
 /** @return int */
 C_API void coro_idle_start(uv_idle_t *idle, uv_idle_cb callback);
-
-/** @return int */
-C_API void coro_listen(uv_stream_t *stream, int backlog, uv_connection_cb cb);
-
-/** @return int */
-C_API void coro_tcp_connect(uv_connect_t *req,
-                          uv_tcp_t *handle,
-                          const struct sockaddr *addr,
-                          uv_connect_cb cb);
 
 /** @return int */
 C_API void coro_getaddrinfo(uv_loop_t *loop,

@@ -3,6 +3,14 @@
 static void_t fs_init(void_t);
 static void_t uv_init(void_t);
 
+static void _close_cb(uv_handle_t *handle) {
+    CO_FREE(handle);
+}
+
+static void uv_close_free(void_t handle) {
+    uv_close((uv_handle_t *)handle, _close_cb);
+}
+
 static value_t fs_start(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->args = args;
     uv_args->type = CO_EVENT_ARG;
@@ -45,7 +53,7 @@ static void write_cb(uv_write_t *req, int status) {
     }
 
     co->halt = true;
-    co_result_set(co, &status);
+    co_result_set(co, (status < 0 ? &status : 0));
     co_resuming(co->context);
     co_scheduler();
 }
@@ -68,7 +76,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
         else
             fprintf(stderr, "Error: %s\n", uv_strerror(nread));
 
-        co_result_set(co, &nread);
+        co_result_set(co, (nread == UV_EOF ? 0 : &nread));
         uv_read_stop(stream);
     } else {
         co_result_set(co, (nread > 0 ? buf->base : NULL));
@@ -292,7 +300,6 @@ static void_t fs_init(void_t uv_args) {
 }
 
 static void_t uv_init(void_t uv_args) {
-    uv_loop_t *loop = co_loop();
     uv_args_t *uv = (uv_args_t *)uv_args;
     values_t *args = uv->args;
     int result = -4083;
@@ -415,7 +422,7 @@ string fs_read(uv_file fd, int64_t offset) {
     uv_args_t *uv_args = NULL;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    uv_args->buffer = co_new_by(1, stat->st_size);
+    uv_args->buffer = co_new_by(1, stat->st_size + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, stat->st_size);
 
     args = (values_t *)co_new_by(2, sizeof(values_t));
@@ -461,8 +468,8 @@ string fs_readfile(string_t path) {
     return file;
 }
 
-int coro_write(uv_stream_t *handle, const char *text) {
-    size_t size = sizeof(text) + 1;
+int stream_write(uv_stream_t *handle, string_t text) {
+    size_t size = strlen(text) + 1;
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -477,7 +484,7 @@ int coro_write(uv_stream_t *handle, const char *text) {
     return uv_start(uv_args, args, UV_WRITE, 1, true).integer;
 }
 
-string coro_read(uv_stream_t *handle) {
+string stream_read(uv_stream_t *handle) {
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -488,7 +495,7 @@ string coro_read(uv_stream_t *handle) {
     return uv_start(uv_args, args, UV_STREAM, 1, false).char_ptr;
 }
 
-void coro_close(uv_handle_t *handle) {
+void coro_uv_close(uv_handle_t *handle) {
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -497,4 +504,34 @@ void coro_close(uv_handle_t *handle) {
     args[0].value.object = handle;
 
     uv_start(uv_args, args, UV_HANDLE, 1, false);
+}
+
+uv_pipe_t *pipe_create(bool is_ipc) {
+    uv_pipe_t *pipe = (uv_pipe_t *)co_calloc_full(co_active(), 1, sizeof(uv_pipe_t), uv_close_free);
+    int r = uv_pipe_init(co_loop(), pipe, (int)is_ipc);
+    if (r) {
+        co_panic(uv_strerror(r));
+    }
+
+    return pipe;
+}
+
+uv_tcp_t *tcp_create(void) {
+    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(co_active(), 1, sizeof(uv_tcp_t), uv_close_free);
+    int r = uv_tcp_init(co_loop(), tcp);
+    if (r) {
+        co_panic(uv_strerror(r));
+    }
+
+    return tcp;
+}
+
+uv_tty_t *tty_create(uv_file fd) {
+    uv_tty_t *tty = (uv_tty_t *)co_calloc_full(co_active(), 1, sizeof(uv_tty_t), uv_close_free);
+    int r = uv_tty_init(co_loop(), tty, fd, 0);
+    if (r) {
+        co_panic(uv_strerror(r));
+    }
+
+    return tty;
 }

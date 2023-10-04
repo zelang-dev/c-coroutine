@@ -45,7 +45,7 @@ if(WIN32)
 endif()
 
 if(CO_BUILD_TESTS)
-    set(TARGET_LIST co_cpp_future_wait co_cpp_future test_delay chan_3 primes co_call_uv go_channel go_sleep go_select go_wait_group go_panic go_readfile)
+    set(TARGET_LIST co_cpp_future_wait co_cpp_future test_delay chan_3 primes co_uv_fs co_uv_stream go_channel go_sleep go_select go_wait_group go_panic go_readfile)
     foreach (TARGET ${TARGET_LIST})
         add_executable(${TARGET} examples/${TARGET}.c)
         target_link_libraries(${TARGET} coroutine)
