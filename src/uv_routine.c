@@ -70,18 +70,19 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data((uv_handle_t *)stream);
     routine_t *co = uv->context;
 
+    co->halt = true;
     if (nread < 0) {
-        if (nread == UV_EOF)
-            co->halt = true;
-        else
+        if (nread != UV_EOF)
             fprintf(stderr, "Error: %s\n", uv_strerror(nread));
 
         co_result_set(co, (nread == UV_EOF ? 0 : &nread));
-        uv_read_stop(stream);
+    } else if (nread == UV_EAGAIN) {
+        co_result_set(co, (void *)UV_EAGAIN);
     } else {
         co_result_set(co, (nread > 0 ? buf->base : NULL));
     }
 
+    uv_read_stop(stream);
     co_resuming(co->context);
     co_scheduler();
 }

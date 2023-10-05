@@ -8,8 +8,7 @@
 #define C_API extern
 #endif
 
-#define STR_LEN(str) (str), (sizeof(str) - 1)
-#define UV_BUF_STATIC(lit) uv_buf_init((char *)STR_LEN(lit))
+#define stream(handle) ((uv_stream_t *)handle)
 
 #ifdef __cplusplus
 extern "C"

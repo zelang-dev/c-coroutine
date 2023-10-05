@@ -26,9 +26,21 @@
     #include "compat/pthread.h"
     #include "compat/unistd.h"
     #include <excpt.h>
+    /* O.S. physical ~input/output~ console `DEVICE`. */
+    #define SYS_CONSOLE "\\\\?\\CON"
+    /* O.S. physical ~null~ `DEVICE`. */
+    #define SYS_NULL "\\\\?\\NUL"
+    /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
+    #define SYS_PIPE "\\\\.\\pipe\\"
 #else
     #include <pthread.h>
     #include <unistd.h>
+    /* O.S. physical ~input/output~ console `DEVICE`. */
+    #define SYS_CONSOLE "/dev/tty"
+    /* O.S. physical ~null~ `DEVICE`. */
+    #define SYS_NULL "/dev/null"
+    /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
+    #define SYS_PIPE "./"
 #endif
 
 #include <time.h>
@@ -244,6 +256,7 @@
 
 /* Function casting for single argument, no return. */
 #define FUNC_VOID(fn)		((void (*)(void_t))(fn))
+#define UNUSED(x) ((void)(x))
 
 #if defined(_MSC_VER)
   #define section(name) __declspec(allocate("." #name))
