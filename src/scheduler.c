@@ -31,6 +31,7 @@ thread_local int n_co_switched;
 
 /* track the number of coroutines used */
 thread_local int coroutine_count;
+thread_local bool scheduler_info_log = true;
 
 /* record which coroutine is executing for scheduler */
 thread_local routine_t *co_running;
@@ -840,7 +841,9 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->synced = false;
     co->wait_active = false;
     co->wait_group = NULL;
+    co->event_group = NULL;
     co->loop_active = false;
+    co->event_active = false;
     co->args = args;
     co->results = NULL;
     co->magic_number = CO_MAGIC_NUMBER;
@@ -913,7 +916,12 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     all_coroutine[ n_all_coroutine ] = NULL;
     coroutine_schedule(t);
 
-    if (c->wait_active && c->wait_group != NULL) {
+    if (c->event_active & c->event_group != NULL) {
+        t->event_active = true;
+        t->synced = true;
+        hash_put(c->event_group, co_itoa(id), t);
+        c->event_active = false;
+    } else if (c->wait_active && c->wait_group != NULL) {
         t->synced = true;
         hash_put(c->wait_group, co_itoa(id), t);
         c->wait_counter++;
@@ -1117,9 +1125,38 @@ void coroutine_info() {
     }
 }
 
-/*
- * startup
- */
+void coroutine_update(routine_t *t) {
+    int i = t->all_coroutine_slot;
+    all_coroutine[i] = all_coroutine[--n_all_coroutine];
+    all_coroutine[i]->all_coroutine_slot = i;
+}
+
+void coroutine_cleanup() {
+    routine_t *t;
+    gc_channel_free();
+    gc_coroutine_free();
+
+    if (n_all_coroutine) {
+        if (coroutine_count)
+            n_all_coroutine--;
+
+        for (int i = 0; i < (n_all_coroutine + (coroutine_count != 0)); i++) {
+            t = all_coroutine[n_all_coroutine - i];
+            if (t) {
+                CO_FREE(t);
+            }
+        }
+    }
+
+    CO_FREE(all_coroutine);
+#ifdef UV_H
+    if (co_main_loop_handle != NULL) {
+        uv_loop_close(co_main_loop_handle);
+        CO_FREE(co_main_loop_handle);
+    }
+#endif
+}
+
 static void coroutine_scheduler(void) {
     int i;
     bool is_loop_close;
@@ -1127,27 +1164,7 @@ static void coroutine_scheduler(void) {
 
     for (;;) {
         if (coroutine_count == 0 || !coroutine_active()) {
-#ifdef UV_H
-            if (co_main_loop_handle != NULL) {
-                uv_loop_close(co_main_loop_handle);
-                CO_FREE(co_main_loop_handle);
-            }
-#endif
-            gc_channel_free();
-            gc_coroutine_free();
-
-            if (n_all_coroutine) {
-                if (coroutine_count)
-                    n_all_coroutine--;
-
-                for (int i = 0; i < (n_all_coroutine + (coroutine_count != 0)); i++) {
-                    t = all_coroutine[ n_all_coroutine - i ];
-                    if (t)
-                        CO_FREE(t);
-                }
-            }
-
-            CO_FREE(all_coroutine);
+            coroutine_cleanup();
             if (coroutine_count > 0) {
                 fprintf(stderr, "No runnable coroutines! %d stalled\n", coroutine_count);
                 exit(1);
@@ -1162,21 +1179,22 @@ static void coroutine_scheduler(void) {
         t->ready = 0;
         co_running = t;
         n_co_switched++;
-        CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d\n", co_async_self(), t->cid,
+        if (scheduler_info_log)
+            CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d\n", co_async_self(), t->cid,
                 ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"),
                 t->status);
         coroutine_interrupt();
         is_loop_close = (t->status > CO_EVENT || t->status < 0);
         if (!is_loop_close && !t->halt)
             co_switch(t);
-        CO_LOG("Back at coroutine scheduling");
+        if (scheduler_info_log)
+            CO_LOG("Back at coroutine scheduling");
         co_running = NULL;
         if (t->halt || t->exiting) {
             if (!t->system)
                 --coroutine_count;
-            i = t->all_coroutine_slot;
-            all_coroutine[ i ] = all_coroutine[ --n_all_coroutine ];
-            all_coroutine[ i ]->all_coroutine_slot = i;
+
+            coroutine_update(t);
             if (!t->synced && !t->channeled) {
                 co_delete(t);
             } else if (t->channeled) {

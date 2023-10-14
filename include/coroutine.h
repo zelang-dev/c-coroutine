@@ -254,6 +254,14 @@
 #define UNLIKELY(x) LIKELY_IS((x), 0)
 #define INCREMENT 16
 
+#ifndef MAX
+# define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MIN
+# define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
 /* Function casting for single argument, no return. */
 #define FUNC_VOID(fn)		((void (*)(void_t))(fn))
 #define UNUSED(x) ((void)(x))
@@ -276,7 +284,7 @@ extern "C"
 
 typedef enum
 {
-    CO_NULL = -1,
+    CO_NULL,
     CO_INT,
     CO_ENUM,
     CO_INTEGER,
@@ -304,6 +312,8 @@ typedef enum
     CO_NONE,
     CO_DEF_ARR,
     CO_DEF_FUNC,
+    CO_ROUTINE,
+    CO_OA_HASH,
     CO_REFLECT_TYPE,
     CO_REFLECT_INFO,
     CO_REFLECT_VALUE,
@@ -375,6 +385,7 @@ typedef struct routine_s routine_t;
 typedef struct oa_hash_s hash_t;
 typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
+typedef hash_t ht_string_t;
 typedef hash_t wait_group_t;
 typedef hash_t wait_result_t;
 typedef hash_t gc_channel_t;
@@ -514,9 +525,11 @@ struct routine_s {
     bool wait_active;
     int wait_counter;
     hash_t *wait_group;
+    hash_t *event_group;
     int all_coroutine_slot;
     routine_t *context;
     bool loop_active;
+    bool event_active;
     void_t user_data;
 #if defined(CO_USE_VALGRIND)
     unsigned int vg_stack_id;
@@ -601,6 +614,7 @@ typedef struct uv_args_s
     uv_tty_mode_t tty_mode;
     uv_stdio_flags stdio_flag;
     uv_errno_t errno_code;
+    int bind_type;
 
     /* total number of args in set */
     size_t n_args;
@@ -721,9 +735,12 @@ C_API void_t co_new(size_t);
 C_API void_t co_malloc(routine_t *, size_t);
 C_API void_t co_malloc_full(routine_t *, size_t, func_t);
 C_API char *co_strdup(string_t );
-C_API char *co_strndup(string_t , size_t);
-C_API char *co_sprintf(string_t , ...);
-C_API void_t co_memdup(routine_t *, const_t , size_t);
+C_API char *co_strndup(string_t, size_t);
+C_API char *co_string(string_t str, size_t length);
+C_API char *co_sprintf(string_t, ...);
+C_API void_t co_memdup(routine_t *, const_t, size_t);
+C_API string *co_str_split(string_t s, string_t delim, int *count);
+C_API string co_concat_by(int num_args, ...);
 
 C_API int co_array_init(co_array_t *);
 
@@ -753,6 +770,8 @@ C_API value_t co_event(callable_t, void_t arg);
 
 C_API value_t co_await(callable_t fn, void_t arg);
 
+C_API void co_handler(func_t fn, void_t handle, func_t dtor);
+
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
 C_API unsigned int co_sleep(unsigned int ms);
@@ -774,6 +793,8 @@ C_API char *coroutine_get_name(void);
 /* Exit the current coroutine. If this is the last non-system coroutine,
 exit the entire program using the given exit status. */
 C_API void coroutine_exit(int);
+C_API void coroutine_cleanup(void);
+C_API void coroutine_update(routine_t *);
 
 C_API void coroutine_schedule(routine_t *);
 C_API bool coroutine_active(void);
@@ -818,6 +839,7 @@ typedef struct oa_pair_s {
 
 typedef struct oa_hash_s oa_hash;
 struct oa_hash_s {
+    value_types type;
     int capacity;
     size_t size;
     oa_pair **buckets;
@@ -832,15 +854,17 @@ C_API void_t hash_replace(hash_t *, const_t, const_t);
 C_API void_t hash_get(hash_t *, const_t);
 C_API void hash_delete(hash_t *, const_t);
 C_API void hash_remove(hash_t *, const_t);
-C_API void hash_print(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
+C_API void hash_print(hash_t *);
+C_API void hash_print_custom(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
 /* Creates a new wait group coroutine hash table. */
 C_API wait_group_t *ht_group_init(void);
-
 /* Creates a new wait group results hash table. */
 C_API wait_result_t *ht_result_init(void);
 
 C_API gc_channel_t *ht_channel_init(void);
+
+C_API ht_string_t *ht_string_init(void);
 
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group, same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
@@ -1073,6 +1097,8 @@ struct ex_context_s
 C_API thread_local ex_context_t *ex_context;
 C_API thread_local char ex_message[256];
 C_API thread_local int coroutine_count;
+C_API thread_local bool scheduler_info_log;
+C_API thread_local uv_args_t *uv_server_args;
 
 typedef struct _promise
 {
@@ -1132,6 +1158,7 @@ C_API unsigned long co_async_self(void);
 C_API void co_stack_check(int);
 
 C_API string_t co_itoa(int64_t number);
+C_API int co_strpos(string_t text, string pattern);
 C_API void co_strcpy(char *dest, string_t src, size_t len);
 
 C_API void gc_coroutine(routine_t *);

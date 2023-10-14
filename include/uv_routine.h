@@ -1,6 +1,7 @@
 #ifndef UV_ROUTINE_H
 #define UV_ROUTINE_H
 
+#include <ctype.h>
 #include "uv.h"
 
 /* Public API qualifier. */
@@ -91,14 +92,18 @@ C_API void fs_event_start(const char *path, int flags);
 
 C_API char *stream_read(uv_stream_t *);
 C_API int stream_write(uv_stream_t *, const char *text);
+C_API uv_stream_t *stream_connect(uv_handle_type scheme, const char *address, int port);
+C_API uv_stream_t *stream_listen(uv_stream_t *, int backlog);
+C_API uv_stream_t *stream_bind(uv_handle_type scheme, const char *address, int port_flag);
+C_API void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client);
 
 C_API int stream_write2(uv_stream_t *, const char *text, uv_stream_t *send_handle);
 
 C_API void stream_shutdown(uv_shutdown_t *, uv_stream_t *, uv_shutdown_cb cb);
 
-C_API void stream_listen(uv_stream_t *stream, int backlog, uv_connection_cb cb);
-
 C_API uv_tty_t *tty_create(uv_file fd);
+
+C_API uv_udp_t *udp_create(void);
 
 C_API uv_pipe_t *pipe_create(bool is_ipc);
 C_API void pipe_connect(uv_pipe_t *, const char *name);
@@ -166,6 +171,99 @@ C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 
 /** @return int */
 C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
+
+typedef struct parse_s {
+    char *scheme;
+    char *user;
+    char *pass;
+    char *host;
+    unsigned short port;
+    char *path;
+    char *query;
+    char *fragment;
+} url_parse_t;
+
+typedef enum {
+    URL_SCHEME,
+    URL_HOST,
+    URL_PORT,
+    URL_USER,
+    URL_PASS,
+    URL_PATH,
+    URL_QUERY,
+    URL_FRAGMENT,
+} url_key;
+
+typedef enum {
+    /* Request Methods */
+    HTTP_DELETE,
+    HTTP_GET,
+    HTTP_HEAD,
+    HTTP_POST,
+    HTTP_PUT,
+    /* pathological */
+    HTTP_CONNECT,
+    HTTP_OPTIONS,
+    HTTP_TRACE,
+    /* webdav */
+    HTTP_COPY,
+    HTTP_LOCK,
+    HTTP_MKCOL,
+    HTTP_MOVE,
+    HTTP_PROPFIND,
+    HTTP_PROPPATCH,
+    HTTP_SEARCH,
+    HTTP_UNLOCK,
+    /* subversion */
+    HTTP_REPORT,
+    HTTP_MKACTIVITY,
+    HTTP_CHECKOUT,
+    HTTP_MERGE,
+    /* upnp */
+    HTTP_MSEARCH,
+    HTTP_NOTIFY,
+    HTTP_SUBSCRIBE,
+    HTTP_UNSUBSCRIBE,
+    /* RFC-5789 */
+    HTTP_PATCH,
+    HTTP_PURGE
+} http_method;
+
+typedef enum {
+    HTTP_REQUEST,
+    HTTP_RESPONSE,
+    HTTP_BOTH
+} http_parser_type;
+
+typedef enum {
+    F_CHUNKED = 1 << 0,
+    F_CONNECTION_KEEP_ALIVE = 1 << 1,
+    F_CONNECTION_CLOSE = 1 << 2,
+    F_TRAILING = 1 << 3,
+    F_UPGRADE = 1 << 4,
+    F_SKIP_BODY = 1 << 5
+} http_flags;
+
+/*
+Parse a URL and return its components, return `NULL` for malformed URLs.
+
+Modifed C code from PHP userland function
+see https://php.net/manual/en/function.parse-url.php
+*/
+C_API url_parse_t *parse_url(char const *str);
+C_API url_parse_t *url_parse_ex(char const *str, size_t length);
+C_API url_parse_t *url_parse_ex2(char const *str, size_t length, bool *has_port);
+C_API char *url_decode(char *str, size_t len);
+C_API char *url_encode(char const *s, size_t len);
+
+/*
+Returns valid HTTP status codes reasons.
+
+Verified 2020-05-22
+
+see https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+*/
+C_API const char *url_status_str(uint16_t const status);
 
 #ifdef __cplusplus
 }

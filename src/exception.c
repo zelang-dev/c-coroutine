@@ -83,6 +83,7 @@ static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = 0;
 thread_local char ex_message[ 256 ] = { 0 };
 static volatile sig_atomic_t got_signal = false;
+static volatile sig_atomic_t got_uncaught_exception = false;
 
 static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
@@ -116,6 +117,7 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t)) {
 
 static void unwind_stack(ex_context_t *ctx) {
     ex_ptr_t *p = ctx->stack;
+    void_t temp = NULL;
 
     ctx->unstack = 1;
 
@@ -123,8 +125,16 @@ static void unwind_stack(ex_context_t *ctx) {
         co_deferred_free(ctx->co);
     } else {
         while (p) {
-            if (*p->ptr)
+            if (*p->ptr) {
+                if (temp == *p->ptr) {
+                    got_uncaught_exception = true;
+                    break;
+                }
+
                 p->func(*p->ptr);
+                temp = *p->ptr;
+            }
+
             p = p->next;
         }
     }
@@ -147,13 +157,13 @@ int ex_uncaught_exception(void) {
 
 void ex_terminate(void) {
     fflush(stdout);
-    if (ex_uncaught_exception()) {
+    if (ex_uncaught_exception() || got_uncaught_exception)
         ex_print(ex_context, "Coroutine-system, exception during stack unwinding leading to an undefined behavior");
-        abort();
-    } else {
+    else
         ex_print(ex_context, "Coroutine-system, exiting with uncaught exception");
-        exit(EXIT_FAILURE);
-    }
+
+    coroutine_cleanup();
+    exit(EXIT_FAILURE);
 }
 
 void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message) {

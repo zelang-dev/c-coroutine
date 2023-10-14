@@ -39,9 +39,11 @@ void channel_free(channel_t *c) {
         CO_FREE(c->tmp);
         CO_FREE(c->a_recv.a);
         CO_FREE(c->a_send.a);
+        memset(c, 0, sizeof(value_types));
         CO_FREE(c);
 
-       hash_remove(gc_channel_list(), co_itoa(id));
+        if (gc_channel_list()->size > 0)
+            hash_remove(gc_channel_list(), co_itoa(id));
     }
 }
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_SOURCE_DIR}/pthreads4w/cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_SOURCE_DIR}/deps/pthreads4w/cmake")
 
 include (CheckIncludeFile)
 include (CheckFunctionExists)
@@ -133,7 +133,7 @@ endif()
 
 
 # Update filename with proper version info
-configure_file(${CMAKE_SOURCE_DIR}/pthreads4w/cmake/version.rc.in ${CMAKE_BINARY_DIR}/version.rc @ONLY)
+configure_file(${CMAKE_SOURCE_DIR}/deps/pthreads4w/cmake/version.rc.in ${CMAKE_BINARY_DIR}/version.rc @ONLY)
 
 #################################
 # Libraries                     #
