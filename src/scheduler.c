@@ -916,7 +916,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     all_coroutine[ n_all_coroutine ] = NULL;
     coroutine_schedule(t);
 
-    if (c->event_active & c->event_group != NULL) {
+    if (c->event_active && c->event_group != NULL) {
         t->event_active = true;
         t->synced = true;
         hash_put(c->event_group, co_itoa(id), t);

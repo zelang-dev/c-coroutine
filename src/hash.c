@@ -104,6 +104,7 @@ void oa_hash_free(oa_hash *htable) {
         if (htable->buckets)
             CO_FREE(htable->buckets);
 
+        memset(htable, 0, sizeof(value_types));
         CO_FREE(htable);
     }
 }
