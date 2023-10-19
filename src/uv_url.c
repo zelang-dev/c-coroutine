@@ -1,5 +1,23 @@
 #include "../include/coroutine.h"
 
+uv_handle_type scheme_type(string scheme) {
+    if (strcmp(scheme, "http") == 0
+        || strcmp(scheme, "tcp") == 0
+        || strcmp(scheme, "https") == 0
+        || strcmp(scheme, "tls") == 0
+        || strcmp(scheme, "ftp") == 0
+        || strcmp(scheme, "ftps") == 0
+        || strcmp(scheme, "ssl") == 0) {
+        return UV_TCP;
+    } else if (strcmp(scheme, "file") == 0 || strcmp(scheme, "unix") == 0) {
+        return UV_NAMED_PIPE;
+    } else if (strcmp(scheme, "udp") == 0) {
+        return UV_UDP;
+    } else {
+        return UV_UNKNOWN_HANDLE;
+    }
+}
+
 static int htoi(char *s) {
     int value;
     int c;
@@ -355,7 +373,10 @@ url_parse_t *url_parse_ex(char const *str, size_t length) {
 }
 
 url_parse_t *parse_url(char const *str) {
-    return url_parse_ex(str, strlen(str));
+    url_parse_t *url = url_parse_ex(str, strlen(str));
+    url->url_type = scheme_type(url->scheme);
+
+    return url;
 }
 
 string url_encode(char const *s, size_t len) {

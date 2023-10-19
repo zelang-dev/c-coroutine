@@ -47,6 +47,7 @@ typedef union
 } uv_routine_cb;
 
 C_API void coro_uv_close(uv_handle_t *);
+C_API void uv_close_free(void *handle);
 
 C_API char *fs_readfile(const char *path);
 C_API uv_file fs_open(const char *path, int flags, int mode);
@@ -92,9 +93,11 @@ C_API void fs_event_start(const char *path, int flags);
 
 C_API char *stream_read(uv_stream_t *);
 C_API int stream_write(uv_stream_t *, const char *text);
-C_API uv_stream_t *stream_connect(uv_handle_type scheme, const char *address, int port);
+C_API uv_stream_t *stream_connect(const char *address);
+C_API uv_stream_t *stream_connect_ex(uv_handle_type scheme, const char *address, int port);
 C_API uv_stream_t *stream_listen(uv_stream_t *, int backlog);
-C_API uv_stream_t *stream_bind(uv_handle_type scheme, const char *address, int port_flag);
+C_API uv_stream_t *stream_bind(const char *address, int flags);
+C_API uv_stream_t *stream_bind_ex(uv_handle_type scheme, const char *address, int port, int flags);
 C_API void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client);
 
 C_API int stream_write2(uv_stream_t *, const char *text, uv_stream_t *send_handle);
@@ -173,6 +176,7 @@ C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
 
 typedef struct parse_s {
+    uv_handle_type url_type;
     char *scheme;
     char *user;
     char *pass;
@@ -193,6 +197,77 @@ typedef enum {
     URL_QUERY,
     URL_FRAGMENT,
 } url_key;
+
+typedef enum {
+    // Informational 1xx
+    STATUS_CONTINUE = 100,
+    STATUS_SWITCHING_PROTOCOLS = 101,
+    STATUS_PROCESSING = 102,
+    STATUS_EARLY_HINTS = 103,
+    // Successful 2xx
+    STATUS_OK = 200,
+    STATUS_CREATED = 201,
+    STATUS_ACCEPTED = 202,
+    STATUS_NON_AUTHORITATIVE_INFORMATION = 203,
+    STATUS_NO_CONTENT = 204,
+    STATUS_RESET_CONTENT = 205,
+    STATUS_PARTIAL_CONTENT = 206,
+    STATUS_MULTI_STATUS = 207,
+    STATUS_ALREADY_REPORTED = 208,
+    STATUS_IM_USED = 226,
+    // Redirection 3xx
+    STATUS_MULTIPLE_CHOICES = 300,
+    STATUS_MOVED_PERMANENTLY = 301,
+    STATUS_FOUND = 302,
+    STATUS_SEE_OTHER = 303,
+    STATUS_NOT_MODIFIED = 304,
+    STATUS_USE_PROXY = 305,
+    STATUS_RESERVED = 306,
+    STATUS_TEMPORARY_REDIRECT = 307,
+    STATUS_PERMANENT_REDIRECT = 308,
+    // Client Errors 4xx
+    STATUS_BAD_REQUEST = 400,
+    STATUS_UNAUTHORIZED = 401,
+    STATUS_PAYMENT_REQUIRED = 402,
+    STATUS_FORBIDDEN = 403,
+    STATUS_NOT_FOUND = 404,
+    STATUS_METHOD_NOT_ALLOWED = 405,
+    STATUS_NOT_ACCEPTABLE = 406,
+    STATUS_PROXY_AUTHENTICATION_REQUIRED = 407,
+    STATUS_REQUEST_TIMEOUT = 408,
+    STATUS_CONFLICT = 409,
+    STATUS_GONE = 410,
+    STATUS_LENGTH_REQUIRED = 411,
+    STATUS_PRECONDITION_FAILED = 412,
+    STATUS_PAYLOAD_TOO_LARGE = 413,
+    STATUS_URI_TOO_LONG = 414,
+    STATUS_UNSUPPORTED_MEDIA_TYPE = 415,
+    STATUS_RANGE_NOT_SATISFIABLE = 416,
+    STATUS_EXPECTATION_FAILED = 417,
+    STATUS_IM_A_TEAPOT = 418,
+    STATUS_MISDIRECTED_REQUEST = 421,
+    STATUS_UNPROCESSABLE_ENTITY = 422,
+    STATUS_LOCKED = 423,
+    STATUS_FAILED_DEPENDENCY = 424,
+    STATUS_TOO_EARLY = 425,
+    STATUS_UPGRADE_REQUIRED = 426,
+    STATUS_PRECONDITION_REQUIRED = 428,
+    STATUS_TOO_MANY_REQUESTS = 429,
+    STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431,
+    STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 451,
+    // Server Errors 5xx
+    STATUS_INTERNAL_SERVER_ERROR = 500,
+    STATUS_NOT_IMPLEMENTED = 501,
+    STATUS_BAD_GATEWAY = 502,
+    STATUS_SERVICE_UNAVAILABLE = 503,
+    STATUS_GATEWAY_TIMEOUT = 504,
+    STATUS_VERSION_NOT_SUPPORTED = 505,
+    STATUS_VARIANT_ALSO_NEGOTIATES = 506,
+    STATUS_INSUFFICIENT_STORAGE = 507,
+    STATUS_LOOP_DETECTED = 508,
+    STATUS_NOT_EXTENDED = 510,
+    STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511
+} http_status;
 
 typedef enum {
     /* Request Methods */
@@ -243,6 +318,51 @@ typedef enum {
     F_UPGRADE = 1 << 4,
     F_SKIP_BODY = 1 << 5
 } http_flags;
+
+typedef struct {
+    http_parser_type action;
+
+    /* The current response status */
+    http_status status;
+
+    /* The current response body */
+    char *body;
+
+    /* The unchanged data from server */
+    char *raw;
+
+    /* The current headers */
+    char **headers;
+
+    /* The protocol */
+    char *protocol;
+
+    /* The protocol version */
+    float version;
+
+    /* The requested status code */
+    http_status code;
+
+    /* The requested status message */
+    char *message;
+
+    /* The requested method */
+    char *method;
+
+    /* The requested path */
+    char *path;
+
+    /* The requested uri */
+    char *uri;
+
+    /* The request params */
+    char **parameters;
+
+    char *hostname;
+
+    /* Response headers to send */
+    char **header;
+} http_parse_t;
 
 /*
 Parse a URL and return its components, return `NULL` for malformed URLs.

@@ -94,7 +94,8 @@ static void co_array_free(void_t data) {
 
     co_array_reset(array);
     memset(array, 0, sizeof(array));
-    CO_FREE(array);
+    //  CO_FREE(array);
+    data = NULL;
 }
 
 co_array_t *co_array_new(routine_t *coro) {
@@ -120,6 +121,10 @@ static CO_FORCE_INLINE defer_func_t *co_deferred_array_append(defer_t *array) {
 
 static CO_FORCE_INLINE int co_deferred_array_reset(defer_t *array) {
     return co_array_reset((co_array_t *)array);
+}
+
+static CO_FORCE_INLINE void co_deferred_array_free(defer_t *array) {
+    co_array_free((co_array_t *)array);
 }
 
 static CO_FORCE_INLINE co_array_t *co_deferred_array_get_array(defer_t *array) {
@@ -189,7 +194,10 @@ void co_deferred_free(routine_t *coro) {
 
     if (is_type(&coro->defer, CO_DEF_ARR)) {
         co_deferred_run(coro, 0);
-        co_deferred_array_reset(&coro->defer);
+        if (coro->loop_erred)
+            co_deferred_array_free(&coro->defer);
+        else
+            co_deferred_array_reset(&coro->defer);
     }
 }
 

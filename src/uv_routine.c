@@ -5,6 +5,14 @@ static void_t uv_init(void_t);
 
 thread_local uv_args_t *uv_server_args = NULL;
 
+void_t uv_error_post(routine_t *co, int r) {
+    co->loop_erred = true;
+    co->loop_code = r;
+    co->status = CO_ERRED;
+    fprintf(stderr, "failed: %s\n", uv_strerror(r));
+    return NULL;
+}
+
 static void _close_cb(uv_handle_t *handle) {
     if (UV_UNKNOWN_HANDLE == ((uv_handle_t *)handle)->type)
         return;
@@ -13,7 +21,7 @@ static void _close_cb(uv_handle_t *handle) {
     CO_FREE(handle);
 }
 
-static void uv_close_free(void_t handle) {
+void uv_close_free(void_t handle) {
     if (!uv_is_closing((uv_handle_t *)handle))
         uv_close((uv_handle_t *)handle, _close_cb);
 }
@@ -47,42 +55,34 @@ static void close_cb(uv_handle_t *handle) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    co_result_set(co, NULL);
     co_resuming(co->context);
     co_scheduler();
-}
-
-static void_t error_result(uv_args_t *uv, int error) {
-    routine_t *co = uv->context;
-
-    fprintf(stderr, "failed: %s\n", uv_strerror(error));
-    co->halt = true;
-    co_result_set(co, NULL);
-    co_resuming(co->context);
-
-    return CO_ERROR;
 }
 
 static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
-    CO_FREE(uv);
-    co->halt = true;
-    scheduler_info_log = false;
-    co_result_set(co, NULL);
     if (co_recover() != NULL) {
-        if (uv_loop_alive(co_loop())) {
+        if (uv_loop_alive(co_loop()) && uv_server_args) {
+            co->halt = true;
+            co->loop_erred = true;
+            co->status = CO_ERRED;
+            scheduler_info_log = false;
+            uv_server_args = NULL;
             if (co->context->wait_group)
                 hash_free(co->context->wait_group);
 
             if (co->context->event_group)
                 hash_free(co->context->event_group);
 
-            uv_walk(co_loop(), (uv_walk_cb)uv_close_free, NULL);
-            uv_run(co_loop(), UV_RUN_ONCE);
 
-            uv_stop(co_loop());
-            uv_run(co_loop(), UV_RUN_DEFAULT);
+            if (uv_loop_alive(co_loop())) {
+                uv_walk(co_loop(), (uv_walk_cb)uv_close_free, NULL);
+                uv_run(co_loop(), UV_RUN_DEFAULT);
+
+                uv_stop(co_loop());
+                uv_run(co_loop(), UV_RUN_DEFAULT);
+            }
         }
     }
 }
@@ -385,7 +385,7 @@ static void_t fs_init(void_t uv_args) {
     }
 
     if (result) {
-        return error_result(fs, result);
+        return uv_error_post(co_active(), result);
     }
 
     fs->context = co_active();
@@ -414,6 +414,7 @@ static void_t uv_init(void_t uv_args) {
                     case UV_NAMED_PIPE:
                         uv->handle_type = UV_NAMED_PIPE;
                         uv_pipe_connect((uv_connect_t *)req, (uv_pipe_t *)stream, var_const_char_512(args[3]), connect_cb);
+                        result = 0;
                         break;
                     default:
                         uv->handle_type = UV_TCP;
@@ -472,10 +473,11 @@ static void_t uv_init(void_t uv_args) {
                         uv_ip4_name((const struct sockaddr_in *)&name, (char *)ip, sizeof ip);
                     }
 
-                    if (uv_server_args == NULL)
+                    if (uv_server_args == NULL) {
                         uv_server_args = uv;
+                    }
 
-                    CO_INFO("Listening to %s for connections.\n", ip);
+                    CO_INFO("Listening to %s:%d for connections.\n", ip, var_int(args[4]));
                     scheduler_info_log = false;
                 }
                 break;
@@ -502,7 +504,9 @@ static void_t uv_init(void_t uv_args) {
     }
 
     if (result) {
-        return error_result(uv, result);
+        uv->context->context->loop_code = result;
+        uv_error_post(uv->context, result);
+        co_resuming(uv->context->context);
     }
 
     return 0;
@@ -601,10 +605,14 @@ int fs_close(uv_file fd) {
 
 string fs_readfile(string_t path) {
     uv_file fd = fs_open(path, O_RDONLY, 0);
-    string file = fs_read(fd, 0);
-    fs_close(fd);
+    if (fd) {
+        string file = fs_read(fd, 0);
+        fs_close(fd);
 
-    return file;
+        return file;
+    }
+
+    return (string)0;
 }
 
 void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
@@ -612,6 +620,9 @@ void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
 }
 
 int stream_write(uv_stream_t *handle, string_t text) {
+    if (handle == NULL)
+        return -1;
+
     size_t size = strlen(text) + 1;
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
@@ -628,6 +639,9 @@ int stream_write(uv_stream_t *handle, string_t text) {
 }
 
 string stream_read(uv_stream_t *handle) {
+    if (handle == NULL)
+        return NULL;
+
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -638,26 +652,35 @@ string stream_read(uv_stream_t *handle) {
     return uv_start(uv_args, args, UV_STREAM, 1, false).char_ptr;
 }
 
-uv_stream_t *stream_connect(uv_handle_type scheme, string_t address, int port) {
+uv_stream_t *stream_connect(string_t address) {
+    if (address == NULL)
+        return NULL;
+
+    url_parse_t *url = parse_url(address);
+    if (url == NULL)
+        return NULL;
+
+    return stream_connect_ex(url->url_type, (string_t)url->host, url->port);
+}
+
+uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port) {
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
-    void_t addr = NULL;
+    void_t addr_set = NULL;
     void_t handle = NULL;
     int r = 0;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(4, sizeof(values_t));
     if (co_strpos(address, ":") >= 0) {
-        addr = co_new_by(1, sizeof(struct sockaddr_in6));
-        r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)addr);
+        r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
+        addr_set = uv_args->in6;
     } else if (co_strpos(address, ".") >= 0) {
-        addr = co_new_by(1, sizeof(struct sockaddr_in));
-        r = uv_ip4_addr(address, port, (struct sockaddr_in *)addr);
+        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in);
+        addr_set = uv_args->in;
     }
 
     if (!r) {
-        fprintf(stderr, "failed: %s\n", uv_strerror(r));
-        return CO_ERROR;
+        return uv_error_post(co_active(), r);
     }
 
     switch (scheme) {
@@ -666,10 +689,9 @@ uv_stream_t *stream_connect(uv_handle_type scheme, string_t address, int port) {
             break;
         case UV_UDP:
             handle = udp_create();
-            r = uv_udp_connect(handle, (const struct sockaddr *)addr);
-            if (!r) {
-                fprintf(stderr, "failed: %s\n", uv_strerror(r));
-                return CO_ERROR;
+            r = uv_udp_connect(handle, (const struct sockaddr *)addr_set);
+            if (r) {
+                return uv_error_post(co_active(), r);
             }
             return stream(handle);
         default:
@@ -677,8 +699,9 @@ uv_stream_t *stream_connect(uv_handle_type scheme, string_t address, int port) {
             break;
     }
 
+    args = (values_t *)co_new_by(4, sizeof(values_t));
     args[0].value.object = handle;
-    args[1].value.object = addr;
+    args[1].value.object = addr_set;
     args[2].value.integer = scheme;
     args[3].value.char_ptr = (string)address;
 
@@ -686,28 +709,45 @@ uv_stream_t *stream_connect(uv_handle_type scheme, string_t address, int port) {
 }
 
 uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
+    if (stream == NULL)
+        return NULL;
+
     uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data((uv_handle_t *)stream);
     values_t *args = uv_args->args;
 
     args[0].value.object = stream;
     args[1].value.integer = backlog;
 
-    return (uv_stream_t *)uv_start(uv_args, args, UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP, 4, false).object;
+    value_t handle = uv_start(uv_args, args, UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP, 5, false);
+    if (handle.object == NULL)
+        return NULL;
+
+    return (uv_stream_t *)handle.object;
 }
 
-uv_stream_t *stream_bind(uv_handle_type scheme, string_t address, int port_flag) {
-    void_t addr, handle;
+uv_stream_t *stream_bind(string_t address, int flags) {
+    if (address == NULL)
+        return NULL;
+
+    url_parse_t *url = parse_url(address);
+    if (url == NULL)
+        return NULL;
+
+    return stream_bind_ex(url->url_type, (string_t)url->host, url->port, flags);
+}
+
+uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, int flags) {
+    void_t addr_set, handle;
     int r = 0;
 
-    uv_args_t *uv_args = (uv_args_t *)CO_CALLOC(1, sizeof(uv_args_t));
+    uv_args_t *uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     co_defer_recover(error_catch, uv_args);
-
     if (co_strpos(address, ":") >= 0) {
-        addr = co_new_by(1, sizeof(struct sockaddr_in6));
-        r = uv_ip6_addr(address, port_flag, (struct sockaddr_in6 *)addr);
+        r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
+        addr_set = uv_args->in6;
     } else if (co_strpos(address, ".") >= 0) {
-        addr = co_new_by(1, sizeof(struct sockaddr_in));
-        r = uv_ip4_addr(address, port_flag, (struct sockaddr_in *)addr);
+        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in);
+        addr_set = uv_args->in;
     }
 
     if (!r) {
@@ -718,24 +758,25 @@ uv_stream_t *stream_bind(uv_handle_type scheme, string_t address, int port_flag)
                 break;
             case UV_UDP:
                 handle = udp_create();
-                r = uv_udp_bind(handle, (const struct sockaddr *)addr, port_flag);
+                r = uv_udp_bind(handle, (const struct sockaddr *)addr_set, flags);
                 break;
             default:
                 handle = tcp_create();
-                r = uv_tcp_bind(handle, (const struct sockaddr *)addr, port_flag);
+                r = uv_tcp_bind(handle, (const struct sockaddr *)addr_set, flags);
                 break;
         }
     }
 
     if (r) {
-        co_panic(uv_strerror(r));
+        return uv_error_post(co_active(), r);
     }
 
-    values_t *args = (values_t *)co_new_by(4, sizeof(values_t));
+    values_t *args = (values_t *)co_new_by(5, sizeof(values_t));
 
     args[0].value.object = handle;
-    args[2].value.object = addr;
+    args[2].value.object = addr_set;
     args[3].value.char_ptr = (string)address;
+    args[4].value.integer = port;
 
     uv_args->bind_type = scheme;
     uv_args->args = args;
@@ -745,6 +786,9 @@ uv_stream_t *stream_bind(uv_handle_type scheme, string_t address, int port_flag)
 }
 
 void coro_uv_close(uv_handle_t *handle) {
+    if (handle == NULL)
+        return;
+
     values_t *args = NULL;
     uv_args_t *uv_args = NULL;
 
@@ -759,7 +803,7 @@ uv_udp_t *udp_create() {
     uv_udp_t *udp = (uv_udp_t *)co_calloc_full(co_active(), 1, sizeof(uv_udp_t), uv_close_free);
     int r = uv_udp_init(co_loop(), udp);
     if (r) {
-        co_panic(uv_strerror(r));
+        return uv_error_post(co_active(), r);
     }
 
     return udp;
@@ -769,7 +813,7 @@ uv_pipe_t *pipe_create(bool is_ipc) {
     uv_pipe_t *pipe = (uv_pipe_t *)co_calloc_full(co_active(), 1, sizeof(uv_pipe_t), uv_close_free);
     int r = uv_pipe_init(co_loop(), pipe, (int)is_ipc);
     if (r) {
-        co_panic(uv_strerror(r));
+        return uv_error_post(co_active(), r);
     }
 
     return pipe;
@@ -779,7 +823,7 @@ uv_tcp_t *tcp_create() {
     uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(co_active(), 1, sizeof(uv_tcp_t), uv_close_free);
     int r = uv_tcp_init(co_loop(), tcp);
     if (r) {
-        co_panic(uv_strerror(r));
+        return uv_error_post(co_active(), r);
     }
 
     return tcp;
@@ -789,7 +833,7 @@ uv_tty_t *tty_create(uv_file fd) {
     uv_tty_t *tty = (uv_tty_t *)co_calloc_full(co_active(), 1, sizeof(uv_tty_t), uv_close_free);
     int r = uv_tty_init(co_loop(), tty, fd, 0);
     if (r) {
-        co_panic(uv_strerror(r));
+        return uv_error_post(co_active(), r);
     }
 
     return tty;

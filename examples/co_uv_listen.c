@@ -19,10 +19,13 @@ void handleClient(uv_stream_t *socket) {
 }
 
 int co_main(int argc, char *argv[]) {
-    uv_stream_t *socket = stream_bind(UV_TCP, "127.0.0.1", 9010);
+    uv_stream_t *socket = stream_bind("http://127.0.0.1:9010", 0);
 
     while (true) {
         uv_stream_t *connectedSocket = stream_listen(socket, 1024);
+        if (connectedSocket == NULL)
+            printf("Invalid handle, got error code: %d\n", co_err_code());
+
         break;
         stream_handler(handleClient, connectedSocket);
     }

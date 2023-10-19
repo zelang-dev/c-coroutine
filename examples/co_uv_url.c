@@ -3,6 +3,7 @@
 int co_main(int argc, char *argv[]) {
     url_parse_t *url = parse_url("http://secret:hideout@zelang.dev:80/this/is/a/very/deep/directory/structure/and/file.html?lots=1&of=2&parameters=3&too=4&here=5#some_page_ref123");
 
+    printf("[url_type] => %d\n", url->url_type);
     printf("[scheme] => %s\n", url->scheme);
     printf("[host] => %s\n", url->host);
     printf("[user] => %s\n", url->user);

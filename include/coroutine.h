@@ -378,7 +378,8 @@ typedef enum co_state
     CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
     CO_RUNNING,  /* The coroutine is active and running. */
     CO_SUSPENDED, /* The coroutine is suspended (in a startup, or it has not started running yet). */
-    CO_EVENT /* The coroutine is in an Event Loop callback. */
+    CO_EVENT, /* The coroutine is in an Event Loop callback. */
+    CO_ERRED, /* The coroutine has erred. */
 } co_state;
 
 typedef struct routine_s routine_t;
@@ -530,6 +531,8 @@ struct routine_s {
     routine_t *context;
     bool loop_active;
     bool event_active;
+    bool loop_erred;
+    signed int loop_code;
     void_t user_data;
 #if defined(CO_USE_VALGRIND)
     unsigned int vg_stack_id;
@@ -604,6 +607,9 @@ typedef struct uv_args_s
     uv_buf_t bufs;
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
+
+    struct sockaddr_in6 in6[1];
+    struct sockaddr_in in[1];
 
     bool is_path;
     bool is_request;
@@ -778,6 +784,7 @@ C_API unsigned int co_sleep(unsigned int ms);
 
 /* Return the unique id for the current coroutine. */
 C_API unsigned int co_id(void);
+C_API signed int co_err_code(void);
 
 /* Pause and reschedule current coroutine. */
 C_API void co_pause(void);
@@ -1318,6 +1325,8 @@ C_API bool is_instance_of(void_t, void_t);
 C_API bool is_value(void_t);
 C_API bool is_instance(void_t);
 C_API bool is_valid(void_t);
+
+C_API bool is_status_invalid(routine_t *);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);
