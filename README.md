@@ -6,7 +6,7 @@
 
 This library was initially a rework/refactor and merge of [libco](https://github.com/higan-emu/libco) with [minicoro](https://github.com/edubart/minicoro). These two differ among many [coru](https://github.com/geky/coru), [libdill](https://github.com/sustrik/libdill), [libmill](https://github.com/sustrik/libmill), [libwire](https://github.com/baruch/libwire), [libcoro](https://github.com/semistrict/libcoro), [libcsp](https://github.com/shiyanhui/libcsp), [dyco-coroutine](https://github.com/piaodazhu/dyco-coroutine), in that Windows is supported, and not using **ucontext**. That was until I came across [libtask](https://swtch.com/libtask), where the design is the underpinning of GoLang, and made it Windows compatible in an fork [symplely/libtask](https://github.com/symplely/libtask). **Libtask** has it's channel design origins from [Richard Beton's libcsp](https://libcsp.sourceforge.net/)
 
-_This library is currently being build as fully `C` representation of GoLang `Go` **routine**. **PR** are welcome._
+_This library is currently represent a fully `C` implementation of GoLang `Go` **routine**._
 
 To be clear, this is a programming paradigm on structuring your code. Which can be implemented in whatever language of choice. So this is also the `C` representation of my purely PHP [coroutine](https://symplely.github.io/coroutine/) library by way of `yield`. The same way **Python** usage evolved, see [A Journey to Python Async](https://dev.to/uponthesky/python-a-journey-to-python-async-1-intro-4mgj).
 
@@ -26,6 +26,59 @@ Two videos covering things to keep in mind about concurrency, [Building Scalable
 * [License](#license)
 
 ## Introduction
+
+### What's the issue with no standard coroutine implementation in **C**, where that other languages seem to solve, or the ones still trying to solve?
+   1. Probably the main answer is **C's** manual memory/resource management requirement,
+the source of memory leaks, many bugs, just about everything.
+   2. The other, the self impose adherence to idioms.
+
+Whereas, a few languages derive there origins by using **C** as the development staring point.
+
+***The solution is quite amazing. Use what's already have been assembled, or to be assembled differently.***
+
+There is another benefic of using coroutines besides concurrency, async abilities, better ululation of resources.
+- The **Go** language has `defer` keyword, the given callback is used for general resource cleanup,
+memory management by garbage collection.
+- The **Zig** language has the `defer` keyword also, but used for semi-automatic memory management,
+memory cleanup attached to callback function, no garbage collection.
+- The **Rust** language has a complicated borrow checker system, memory owned/scope to caller, no garbage collection.
+
+This library take these concepts and attach them to memory allocation routines, where the created/running, or switched to coroutine is the owner.
+All internal functions that needs memory allocation is using these routines.
+  - `co_new(size)` shortcut to `co_malloc_full(coroutine, size, callback);`
+    calls macro CO_MALLOC for allocation, and CO_FREE as the callback.
+  - `co_new_by(count, size)` shortcut to `co_calloc_full(coroutine, count, size, callback);`
+    calls macro CO_CALLOC for allocation, and CO_FREE as the callback.
+  - `co_defer(callback, *ptr)` will execute **queued** up callbacks when a coroutine exits/finish, LIFO.
+> The macros can be set to use anything beside the default _malloc/calloc/realloc/free_.
+
+There will be at least one coroutine always present, the initial, required `co_main()`.
+When a coroutine finish execution either by returning or exceptions, memory is released/freed.
+
+The other problem with **C** is the low level usage view. I initially started out with the concept of creating ***Yet Another Programming language***.
+But after discovering [Cello High Level C](https://libcello.org/), and the general issues and need to still integrate with exiting C libraries.
+This repo is now staging area the missing **C** runtime, [ZeLang](https://docs.zelang.dev). The documentation **WIP**.
+
+This **page**, `coroutine.h` and _examples folder_ files is the only current docs, but basic usage should be apparent.
+The _coroutine execution_ part here is _completed_, but how it operates/behaves with other system resources is what still being developed and tested.
+
+There are five simple ways to create coroutines:
+1. `co_go(callable, *args);` schedules and returns **int** _coroutine id_, needed by other internal functions,
+    this is a shortcut to `coroutine_create(callable, *args, CO_STACK_SIZE)`.
+2. `co_await(callable, *args);` returns your _value_ inside a generic union **value_t** type, after coroutine fully completes.
+    - This is a combine shortcut to four functions:
+    1. `co_wait_group();` returns **hash-table** storing _coroutine-id's_ of any future created,
+    2. `co_go(callable, *args);` calls, will end with a call to,
+    3. `co_wait(hash-table);` will suspend current coroutine, process coroutines until all are completed,
+        returns **hash-table** of results for,
+    4. `co_group_get_result(hash-table, coroutine-id);` returns your _value_ inside a generic union **value_t** type.
+3. `co_execute(function, *args)` creates coroutine and immediately execute, does not return any value.
+4. `co_event(callable, *args)` same as `co_await()` but for **libuv** or any event driven like library.
+5. `co_handler(function, *handle, destructor)` initial setup for coroutine background handling of **http** _request/response_,
+    the _destructor_ function is passed to `co_defer()`
+> The coroutine stack size is set by defining `CO_STACK_SIZE` and `CO_MAIN_STACK` for `co_main()`,
+
+> The default for `CO_STACK_SIZE` is _10kb_, and `CO_MAIN_STACK` is _11kb_ in `cmake` build script, but `coroutine.h` has _64kb_ for `CO_MAIN_STACK`.
 
 ## Synopsis
 
@@ -676,6 +729,26 @@ int co_main(int argc, char **argv)
 ### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
 
 ## Installation
+
+The build system uses **cmake**, that produces _single_ **static** library stored under `coroutine-built`, and the complete `include` folder is needed.
+
+**Linux**
+
+```shell
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON/OFF # use to build files examples folder
+cmake --build .
+```
+
+**Windows**
+
+```shell
+mkdir build
+cd build
+cmake .. -D BUILD_TESTING=ON/OFF # use to build files examples folder
+cmake --build . --config Debug/Release
+```
 
 ## Contributing
 
