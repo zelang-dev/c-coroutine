@@ -747,6 +747,7 @@ C_API char *co_sprintf(string_t, ...);
 C_API void_t co_memdup(routine_t *, const_t, size_t);
 C_API string *co_str_split(string_t s, string_t delim, int *count);
 C_API string co_concat_by(int num_args, ...);
+C_API string co_str_concat(string_t header, string_t *words, size_t num_words);
 
 C_API int co_array_init(co_array_t *);
 
