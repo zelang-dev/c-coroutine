@@ -169,8 +169,8 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     co_deferred(c, FUNC_VOID(hash_free), eg);
     co_deferred(c, dtor, handle);
 
-    char event[64] = "co_handler #";
-    vsnprintf(c->name, sizeof c->name, strcat(event, key), NULL);
+    // char event[64] = "co_handler #";
+    // vsnprintf(c->name, sizeof c->name, strcat(event, key), NULL);
 }
 
 wait_group_t *co_wait_group(void) {

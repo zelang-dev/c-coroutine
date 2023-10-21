@@ -26,7 +26,6 @@ int co_main(int argc, char *argv[]) {
         if (connectedSocket == NULL)
             printf("Invalid handle, got error code: %d\n", co_err_code());
 
-        break;
         stream_handler(handleClient, connectedSocket);
     }
 
