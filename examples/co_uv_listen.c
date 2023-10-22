@@ -3,7 +3,7 @@
 void handleClient(uv_stream_t *socket) {
     string data = stream_read(socket);
 
-    printf("Received following request: %s\n\n", data);
+    printf("Coroutine named: %s, received following request: %s\n\n", coroutine_get_name(), data);
 
     if (strcmp(data, "exit") == 0) {
         // exit command will cause this script to quit out

@@ -99,6 +99,8 @@ static void co_awaitable() {
             co->loop_active = false;
         } else if (co->loop_active) {
             co->status = CO_EVENT;
+        } else if (co->event_active) {
+            co->synced = false;
         } else {
             co->status = CO_NORMAL;
         }
