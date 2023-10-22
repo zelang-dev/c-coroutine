@@ -69,9 +69,9 @@
     #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
     #define CO_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
 #else
-    #define CO_LOG(s)
-    #define CO_INFO(s, ...)
-    #define CO_HERE()
+    #define CO_LOG(s) UNUSED(s)
+    #define CO_INFO(s, ...)  UNUSED(s)
+    #define CO_HERE()  UNUSED(0)
 #endif
 
 /* Stack size when creating a coroutine. */

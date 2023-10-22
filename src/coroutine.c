@@ -86,7 +86,7 @@ void co_delete(routine_t *co) {
             if (co->err_allocated)
                 CO_FREE(co->err_allocated);
 
-            if (co->results)
+            if (co->results && !co->event_active)
                 CO_FREE(co->results);
 
             CO_FREE(co);
@@ -173,7 +173,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     co_deferred(c, dtor, handle);
     int r = snprintf(c->name, sizeof(c->name), "handler #%s", key);
     if (r < 0)
-        co_panic("Invalid handler");
+        CO_LOG("Invalid handler");
 
     co->event_group = NULL;
     hash_remove(eg, key);
@@ -212,12 +212,18 @@ wait_result_t *co_wait(wait_group_t *wg) {
                         } else {
                             if (co->results != NULL && !co->loop_erred) {
                                 hash_put(wgr, co_itoa(co->cid), co->results);
-                                CO_FREE(co->results);
+                                if(!co->event_active)
+                                    CO_FREE(co->results);
+
                                 co->results = NULL;
                             }
 
                             if (co->loop_erred) {
                                 //return NULL;
+                                //hash_remove(wg, pair->key);
+                                //--c->wait_counter;
+                                //break;
+                                //continue;
                                 hash_free(wg);
                                 return wgr;
                             }
@@ -250,11 +256,15 @@ value_t co_group_get_result(wait_result_t *wgr, int cid) {
 
 void co_result_set(routine_t *co, void_t data) {
     if (data && data != CO_ERROR) {
-        if (co->results != NULL)
+        if (co->results != NULL && !co->event_active)
             CO_FREE(co->results);
 
-        co->results = try_calloc(1, sizeof(values_t) + sizeof(data));
-        memcpy(co->results, &data, sizeof(data));
+        if (co->event_active) {
+            co->results = data;
+        } else {
+            co->results = try_calloc(1, sizeof(values_t) + sizeof(data));
+            memcpy(co->results, &data, sizeof(data));
+        }
     }
 }
 

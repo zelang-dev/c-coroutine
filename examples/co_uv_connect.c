@@ -27,9 +27,10 @@ int co_main(int argc, char *argv[]) {
         host_part = url->host;
 
     if (argc >= 1) {
-        headers = co_concat_by(3, "GET ", (command == NULL ? "/" : command), " HTTP/1.1\r\n");
-        headers = co_concat_by(7,
-                               headers,
+        headers = co_concat_by(9,
+                               "GET ",
+                               (command == NULL ? "/" : command),
+                               " HTTP/1.1\r\n",
                                "Host: ",
                                host_part,
                                "\r\n",

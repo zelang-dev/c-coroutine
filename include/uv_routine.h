@@ -46,6 +46,9 @@ typedef union
     uv_signal_cb signal;
 } uv_routine_cb;
 
+typedef struct sockaddr_in sock_in_t;
+typedef struct sockaddr_in6 sock_in6_t;
+
 C_API void coro_uv_close(uv_handle_t *);
 C_API void uv_close_free(void *handle);
 
