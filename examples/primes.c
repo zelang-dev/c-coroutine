@@ -13,7 +13,7 @@ void *prime_co(void *arg) {
     if (p > goal)
         return 0;
     if (!quiet) {
-        printf("%s ", coroutine_get_name());
+        printf("%s ", co_get_name());
         printf("%d\n", p);
     }
     nc = channel_buf(buffer);

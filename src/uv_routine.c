@@ -170,8 +170,6 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
             fprintf(stderr, "Error: %s\n", uv_strerror(nread));
 
         co_result_set(co, (nread == UV_EOF ? 0 : &nread));
-    } else if (nread == UV_EAGAIN) {
-        co_result_set(co, (void *)UV_EAGAIN);
     } else {
         co_result_set(co, (nread > 0 ? buf->base : NULL));
     }
@@ -675,8 +673,8 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
         addr_set = uv_args->in6;
     } else if (co_strpos(address, ".") >= 0) {
-        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in);
-        addr_set = uv_args->in;
+        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in4);
+        addr_set = uv_args->in4;
     }
 
     if (!r) {
@@ -746,8 +744,8 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
         addr_set = uv_args->in6;
     } else if (co_strpos(address, ".") >= 0) {
-        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in);
-        addr_set = uv_args->in;
+        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in4);
+        addr_set = uv_args->in4;
     }
 
     if (!r) {

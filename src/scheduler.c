@@ -1083,9 +1083,6 @@ void coroutine_state(char *fmt, ...) {
     va_end(args);
 }
 
-char *coroutine_get_state() {
-    return co_running->state;
-}
 
 void coroutine_name(char *fmt, ...) {
     va_list args;
@@ -1097,8 +1094,8 @@ void coroutine_name(char *fmt, ...) {
     va_end(args);
 }
 
-char *coroutine_get_name() {
-    return co_running->name;
+char *coroutine_get_state() {
+    return co_active()->state;
 }
 
 void coroutine_system(void) {

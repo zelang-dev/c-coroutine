@@ -171,7 +171,10 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     routine_t *c = (routine_t *)hash_get(eg, key);
 
     co_deferred(c, dtor, handle);
-    snprintf(c->name, sizeof(c->name), "handler #%s", key);
+    int r = snprintf(c->name, sizeof(c->name), "handler #%s", key);
+    if (r < 0)
+        co_panic("Invalid handler");
+
     co->event_group = NULL;
     hash_remove(eg, key);
     hash_free(eg);
@@ -282,6 +285,10 @@ unsigned int co_id() {
 }
 signed int co_err_code() {
     return co_active()->loop_code;
+}
+
+char *co_get_name() {
+    return co_active()->name;
 }
 
 CO_FORCE_INLINE value_types type_of(void_t self) {

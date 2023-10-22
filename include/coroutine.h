@@ -609,7 +609,7 @@ typedef struct uv_args_s
     uv_statfs_t statfs[1];
 
     struct sockaddr_in6 in6[1];
-    struct sockaddr_in in[1];
+    struct sockaddr_in in4[1];
 
     bool is_path;
     bool is_request;
@@ -796,7 +796,7 @@ the number of other tasks that ran while the current task was waiting. */
 C_API int coroutine_yield(void);
 
 /* Returns the current coroutine's name. */
-C_API char *coroutine_get_name(void);
+C_API char *co_get_name(void);
 
 /* Exit the current coroutine. If this is the last non-system coroutine,
 exit the entire program using the given exit status. */

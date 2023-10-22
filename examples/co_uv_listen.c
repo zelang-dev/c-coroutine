@@ -3,7 +3,7 @@
 void handleClient(uv_stream_t *socket) {
     string data = stream_read(socket);
 
-    printf("Coroutine named: %s, received following request: %s\n\n", coroutine_get_name(), data);
+    printf("Coroutine named: %s, received following request: %s\n\n", co_get_name(), data);
 
     if (strcmp(data, "exit") == 0) {
         // exit command will cause this script to quit out
@@ -23,8 +23,10 @@ int co_main(int argc, char *argv[]) {
 
     while (true) {
         uv_stream_t *connectedSocket = stream_listen(socket, 1024);
-        if (connectedSocket == NULL)
+        if (connectedSocket == NULL) {
             printf("Invalid handle, got error code: %d\n", co_err_code());
+            break;
+        }
 
         stream_handler(handleClient, connectedSocket);
     }
