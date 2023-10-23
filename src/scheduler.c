@@ -1208,9 +1208,6 @@ static void coroutine_scheduler(void) {
                 if (uv_server_args) {
                     if (t->context->wait_group)
                         hash_free(t->context->wait_group);
-
-                    if (t->context->event_group)
-                        hash_free(t->context->event_group);
                 }
 
                 if (uv_loop_alive(co_loop())) {

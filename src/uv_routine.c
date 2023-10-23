@@ -14,7 +14,7 @@ void_t uv_error_post(routine_t *co, int r) {
 }
 
 static void _close_cb(uv_handle_t *handle) {
-    if (UV_UNKNOWN_HANDLE == ((uv_handle_t *)handle)->type)
+    if (UV_UNKNOWN_HANDLE == handle->type)
         return;
 
     memset(handle, 0, sizeof(uv_handle_t));
@@ -22,8 +22,14 @@ static void _close_cb(uv_handle_t *handle) {
 }
 
 void uv_close_free(void_t handle) {
-    if (!uv_is_closing((uv_handle_t *)handle))
-        uv_close((uv_handle_t *)handle, _close_cb);
+    uv_handle_t *h = (uv_handle_t *)handle;
+    /* for "^ctrl-c" bug fix point in co_uv_listen: *** deps/libuv/src/unix/core.c:221: uv_close: Assertion `0' failed.
+    if (UV_UNKNOWN_HANDLE == h->type) {
+        return;
+    } */
+
+    if (!uv_is_closing(h))
+        uv_close(h, _close_cb);
 }
 
 static value_t fs_start(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
@@ -71,10 +77,6 @@ static void error_catch(void_t uv) {
             uv_server_args = NULL;
             if (co->context->wait_group)
                 hash_free(co->context->wait_group);
-
-            if (co->context->event_group)
-                hash_free(co->context->event_group);
-
 
             if (uv_loop_alive(co_loop())) {
                 uv_walk(co_loop(), (uv_walk_cb)uv_close_free, NULL);
