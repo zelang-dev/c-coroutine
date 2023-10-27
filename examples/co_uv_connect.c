@@ -8,7 +8,7 @@ int co_main(int argc, char *argv[]) {
     struct hostent *host;
 
     if (argc >= 1) {
-        if (strcmp(argv[1], "--host") == 0 && co_strpos(argv[2], ".") >= 0) {
+        if (strcmp(argv[1], "--host") == 0 && is_str_in(argv[2], ".")) {
             memcpy(hostname, argv[2], len);
             command = argc >= 3 ? argv[3] : NULL;
         } else {
@@ -20,7 +20,7 @@ int co_main(int argc, char *argv[]) {
         command = "hi";
     }
 
-    url_parse_t *url = parse_url((co_strpos(hostname, "://") < 0)
+    url_t *url = parse_url(!is_str_in(hostname, "://")
                                  ? (string_t)co_concat_by(2, "tcp://", hostname)
                                  : hostname);
     if (url->host)
@@ -48,7 +48,7 @@ int co_main(int argc, char *argv[]) {
     return 0;
 
     // Connect to Server
-    uv_stream_t *socket = stream_connect_ex(url->url_type, url->host, (url->port == 0 ? 5000 : url->port));
+    uv_stream_t *socket = stream_connect_ex(url->uv_type, url->host, (url->port == 0 ? 5000 : url->port));
 
     // Send a command
     stream_write(socket, http);

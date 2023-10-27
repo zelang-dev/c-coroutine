@@ -1,50 +1,5 @@
 #include "../include/coroutine.h"
 
-string_t co_itoa(int64_t number) {
-#ifdef _WIN32
-    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
-#else
-    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
-#endif
-    return co_active()->scrape;
-}
-
-int co_strpos(string_t text, string pattern) {
-    int c, d, e, text_length, pattern_length, position = -1;
-
-    text_length = strlen(text);
-    pattern_length = strlen(pattern);
-
-    if (pattern_length > text_length) {
-        return -1;
-    }
-
-    for (c = 0; c <= text_length - pattern_length; c++) {
-        position = e = c;
-        for (d = 0; d < pattern_length; d++) {
-            if (pattern[d] == text[e]) {
-                e++;
-            } else {
-                break;
-            }
-        }
-
-        if (d == pattern_length) {
-            return position;
-        }
-    }
-
-    return -1;
-}
-
-void co_strcpy(char *dest, string_t src, size_t len) {
-#if defined(_WIN32) || defined(_WIN64)
-    strcpy_s(dest, len, src);
-#else
-    strcpy(dest, src);
-#endif
-}
-
 void delete(void_t ptr) {
     match(ptr) {
         and (CO_CHANNEL)
@@ -97,11 +52,11 @@ void co_delete(routine_t *co) {
 }
 
 void_t co_user_data(routine_t *co) {
-    return (co != NULL) ? co->user_data : NULL;
+    return !is_empty(co) ? co->user_data : NULL;
 }
 
 co_state co_status(routine_t *co) {
-    return (co != NULL) ? co->status : CO_DEAD;
+    return !is_empty(co) ? co->status : CO_DEAD;
 }
 
 values_t *co_var(var_t *data) {
@@ -149,7 +104,7 @@ value_t co_await(callable_t fn, void_t arg) {
     wait_group_t *wg = co_wait_group();
     int cid = co_go(fn, arg);
     wait_result_t *wgr = co_wait(wg);
-   // if (wgr == NULL)
+    // if (is_empty(wgr))
    //     return;
 
     return co_group_get_result(wgr, cid);
@@ -204,7 +159,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
             for (int i = 0; i < wg->capacity; i++) {
                 pair = wg->buckets[i];
                 if (NULL != pair) {
-                    if (pair->value != NULL) {
+                    if (!is_empty(pair->value)) {
                         co = (routine_t *)pair->value;
                         if (!co_terminated(co)) {
                             if (!co->loop_active && co->status == CO_NORMAL)
@@ -212,7 +167,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
 
                             coroutine_yield();
                         } else {
-                            if (co->results != NULL && !co->loop_erred) {
+                            if (!is_empty(co->results) && !co->loop_erred) {
                                 hash_put(wgr, co_itoa(co->cid), co->results);
                                 if(!co->event_active)
                                     CO_FREE(co->results);
@@ -250,7 +205,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
 }
 
 value_t co_group_get_result(wait_result_t *wgr, int cid) {
-  //  if (wgr == NULL)
+    //  if (is_empty(wgr))
    //     return;
 
     return ((values_t *)hash_get(wgr, co_itoa(cid)))->value;
@@ -258,7 +213,7 @@ value_t co_group_get_result(wait_result_t *wgr, int cid) {
 
 void co_result_set(routine_t *co, void_t data) {
     if (data && data != CO_ERROR) {
-        if (co->results != NULL && !co->event_active)
+        if (!is_empty(co->results) && !co->event_active)
             CO_FREE(co->results);
 
         if (co->event_active) {
@@ -290,11 +245,20 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
     tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
     return 0;
 }
+
+struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
+    int r = gmtime_s(buf, timer);
+    if (r)
+        return NULL;
+
+    return buf;
+}
 #endif
 
 unsigned int co_id() {
     return co_active()->cid;
 }
+
 signed int co_err_code() {
     return co_active()->loop_code;
 }
@@ -326,6 +290,19 @@ CO_FORCE_INLINE bool is_instance(void_t self) {
 CO_FORCE_INLINE bool is_valid(void_t self) {
     return is_value(self) || is_instance(self);
 }
+
 CO_FORCE_INLINE bool is_status_invalid(routine_t *task) {
     return (task->status > CO_EVENT || task->status < 0);
+}
+
+CO_FORCE_INLINE bool is_null(size_t self) {
+    return self == 0;
+}
+
+CO_FORCE_INLINE bool is_empty(void_t self) {
+    return self == NULL;
+}
+
+CO_FORCE_INLINE bool is_str_in(string_t text, string pattern) {
+    return co_strpos(text, pattern) >= 0;
 }

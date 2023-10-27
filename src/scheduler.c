@@ -122,7 +122,7 @@ static CO_FORCE_INLINE int co_deferred_array_init(defer_t *array) {
 }
 
 uv_loop_t *co_loop() {
-    if (co_main_loop_handle != NULL)
+    if (!is_empty(co_main_loop_handle))
         return co_main_loop_handle;
 
     return uv_default_loop();
@@ -746,7 +746,7 @@ int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...) {
 int swapcontext(routine_t *oucp, const routine_t *ucp) {
     int ret;
 
-    if ((oucp == NULL) || (ucp == NULL)) {
+    if (is_empty(oucp) || is_empty(ucp)) {
         /*errno = EINVAL;*/
         return -1;
     }
@@ -916,7 +916,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     id = t->cid;
     if (n_all_coroutine % 64 == 0) {
         all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[ 0 ]));
-        if (all_coroutine == NULL)
+        if (is_empty(all_coroutine))
             co_panic("realloc() failed");
     }
 
@@ -925,12 +925,12 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     all_coroutine[ n_all_coroutine ] = NULL;
     coroutine_schedule(t);
 
-    if (c->event_active && c->event_group != NULL) {
+    if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
         t->synced = true;
         hash_put(c->event_group, co_itoa(id), t);
         c->event_active = false;
-    } else if (c->wait_active && c->wait_group != NULL) {
+    } else if (c->wait_active && !is_empty(c->wait_group)) {
         t->synced = true;
         hash_put(c->wait_group, co_itoa(id), t);
         c->wait_counter++;
@@ -1024,7 +1024,7 @@ unsigned int co_sleep(unsigned int ms) {
 
     now = nsec();
     when = now + (size_t)ms * 1000000;
-    for (t = sleeping.head; t != NULL && t->alarm_time < when; t = t->next)
+    for (t = sleeping.head; !is_empty(t) && t->alarm_time < when; t = t->next)
         ;
 
     if (t) {
@@ -1070,7 +1070,7 @@ int coroutine_yield() {
 }
 
 bool coroutine_active() {
-    return co_run_queue.head != NULL;
+    return !is_empty(co_run_queue.head);
 }
 
 void coroutine_state(char *fmt, ...) {
@@ -1156,7 +1156,7 @@ void coroutine_cleanup() {
 
     CO_FREE(all_coroutine);
 #ifdef UV_H
-    if (co_main_loop_handle != NULL) {
+    if (!is_empty(co_main_loop_handle)) {
         uv_loop_close(co_main_loop_handle);
         CO_FREE(co_main_loop_handle);
     }
@@ -1185,7 +1185,7 @@ static void coroutine_scheduler(void) {
         n_co_switched++;
         if (scheduler_info_log)
             CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d\n", co_async_self(), t->cid,
-                ((t->name != NULL && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status);
+                    ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status);
 
         coroutine_interrupt();
         if (!is_status_invalid(t) && !t->halt)

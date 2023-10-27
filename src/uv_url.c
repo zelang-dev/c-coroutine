@@ -18,7 +18,7 @@ uv_handle_type scheme_type(string scheme) {
     }
 }
 
-static int htoi(char *s) {
+static int htoi(string s) {
     int value;
     int c;
 
@@ -83,20 +83,7 @@ static const unsigned char tolower_map[256] = {
 0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
 };
 
-static string_t method_strings[] = {
-"DELETE", "GET", "HEAD", "POST", "PUT", "CONNECT", "OPTIONS", "TRACE", "COPY", "LOCK", "MKCOL", "MOVE", "PROPFIND", "PROPPATCH", "SEARCH", "UNLOCK", "REPORT", "MKACTIVITY", "CHECKOUT", "MERGE", "M-SEARCH", "NOTIFY", "SUBSCRIBE", "UNSUBSCRIBE", "PATCH", "PURGE"
-};
-
 #define tolower_ascii(c) (tolower_map[(unsigned char)(c)])
-
-#define PROXY_CONNECTION "proxy-connection"
-#define CONNECTION "connection"
-#define CONTENT_LENGTH "content-length"
-#define TRANSFER_ENCODING "transfer-encoding"
-#define UPGRADE "upgrade"
-#define CHUNKED "chunked"
-#define KEEP_ALIVE "keep-alive"
-#define CLOSE "close"
 
 int binary_strcasecmp(string_t s1, size_t len1, string_t s2, size_t len2)
 {
@@ -133,7 +120,7 @@ static string_t binary_strcspn(string_t s, string_t e, string_t chars) {
     return e;
 }
 
-char *replace_ctrl_ex(char *str, size_t len) {
+string replace_ctrl_ex(string str, size_t len) {
     unsigned char *s = (unsigned char *)str;
     unsigned char *e = (unsigned char *)str + len;
 
@@ -152,9 +139,9 @@ char *replace_ctrl_ex(char *str, size_t len) {
     return (str);
 }
 
-url_parse_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
+url_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
     char port_buf[6];
-    url_parse_t *ret = co_new_by(1, sizeof(url_parse_t));
+    url_t *ret = co_new_by(1, sizeof(url_t));
     char const *s, *e, *p, *pp, *ue;
 
     *has_port = 0;
@@ -242,7 +229,7 @@ url_parse_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
 
         if (pp - p > 0 && pp - p < 6 && (pp == ue || *pp == '/')) {
             long port;
-            char *end;
+            string end;
             memcpy(port_buf, p, (pp - p));
             port_buf[pp - p] = '\0';
             port = strtol(port_buf, &end, 10);
@@ -305,7 +292,7 @@ parse_host:
                 return NULL;
             } else if (e - p > 0) {
                 long port;
-                char *end;
+                string end;
                 memcpy(port_buf, p, (e - p));
                 port_buf[e - p] = '\0';
                 port = strtol(port_buf, &end, 10);
@@ -367,14 +354,15 @@ just_path:
     return ret;
 }
 
-url_parse_t *url_parse_ex(char const *str, size_t length) {
+url_t *url_parse_ex(char const *str, size_t length) {
     bool has_port;
     return url_parse_ex2(str, length, &has_port);
 }
 
-url_parse_t *parse_url(char const *str) {
-    url_parse_t *url = url_parse_ex(str, strlen(str));
-    url->url_type = scheme_type(url->scheme);
+url_t *parse_url(char const *str) {
+    url_t *url = url_parse_ex(str, strlen(str));
+    if (!is_empty(url))
+        url->uv_type = scheme_type(url->scheme);
 
     return url;
 }
@@ -417,9 +405,9 @@ string url_encode(char const *s, size_t len) {
     return ret;
 }
 
-string url_decode(char *str, size_t len) {
-    char *dest = str;
-    char *data = str;
+string url_decode(string str, size_t len) {
+    string dest = str;
+    string data = str;
 
     while (len--) {
         if (*data == '+') {
@@ -437,84 +425,4 @@ string url_decode(char *str, size_t len) {
     }
     *dest = '\0';
     return dest;
-}
-
-string_t url_status_str(uint16_t const status) {
-    switch (status) {
-        // Informational 1xx
-        case 100: return "Continue";
-        case 101: return "Switching Protocols";
-        case 102: return "Processing"; // RFC 2518, obsoleted by RFC 4918
-        case 103: return "Early Hints";
-
-        // Success 2xx
-        case 200: return "OK";
-        case 201: return "Created";
-        case 202: return "Accepted";
-        case 203: return "Non-Authoritative Information";
-        case 204: return "No Content";
-        case 205: return "Reset Content";
-        case 206: return "Partial Content";
-        case 207: return "Multi-Status"; // RFC 4918
-        case 208: return "Already Reported";
-        case 226: return "IM Used";
-
-        // Redirection 3xx
-        case 300: return "Multiple Choices";
-        case 301: return "Moved Permanently";
-        case 302: return "Moved Temporarily";
-        case 303: return "See Other";
-        case 304: return "Not Modified";
-        case 305: return "Use Proxy";
-        case 306: return "Reserved";
-        case 307: return "Temporary Redirect";
-        case 308: return "Permanent Redirect";
-
-        // Client Error 4xx
-        case 400: return "Bad Request";
-        case 401: return "Unauthorized";
-        case 402: return "Payment Required";
-        case 403: return "Forbidden";
-        case 404: return "Not Found";
-        case 405: return "Method Not Allowed";
-        case 406: return "Not Acceptable";
-        case 407: return "Proxy Authentication Required";
-        case 408: return "Request Time-out";
-        case 409: return "Conflict";
-        case 410: return "Gone";
-        case 411: return "Length Required";
-        case 412: return "Precondition Failed";
-        case 413: return "Request Entity Too Large";
-        case 414: return "Request-URI Too Large";
-        case 415: return "Unsupported Media Type";
-        case 416: return "Requested Range Not Satisfiable";
-        case 417: return "Expectation Failed";
-        case 418: return "I'm a teapot";               // RFC 2324
-        case 422: return "Unprocessable Entity";       // RFC 4918
-        case 423: return "Locked";                     // RFC 4918
-        case 424: return "Failed Dependency";          // RFC 4918
-        case 425: return "Unordered Collection";       // RFC 4918
-        case 426: return "Upgrade Required";           // RFC 2817
-        case 428: return "Precondition Required";      // RFC 6585
-        case 429: return "Too Many Requests";          // RFC 6585
-        case 431: return "Request Header Fields Too Large";// RFC 6585
-        case 444: return "Connection Closed Without Response";
-        case 451: return "Unavailable For Legal Reasons";
-        case 499: return "Client Closed Request";
-
-        // Server Error 5xx
-        case 500: return "Internal Server Error";
-        case 501: return "Not Implemented";
-        case 502: return "Bad Gateway";
-        case 503: return "Service Unavailable";
-        case 504: return "Gateway Time-out";
-        case 505: return "HTTP Version Not Supported";
-        case 506: return "Variant Also Negotiates";    // RFC 2295
-        case 507: return "Insufficient Storage";       // RFC 4918
-        case 509: return "Bandwidth Limit Exceeded";
-        case 510: return "Not Extended";               // RFC 2774
-        case 511: return "Network Authentication Required"; // RFC 6585
-        case 599: return "Network Connect Timeout Error";
-        default: return NULL;
-    }
 }

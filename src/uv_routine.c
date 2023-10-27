@@ -68,7 +68,7 @@ static void close_cb(uv_handle_t *handle) {
 static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
-    if (co_recover() != NULL) {
+    if (!is_empty((void_t)co_recover())) {
         if (uv_loop_alive(co_loop()) && uv_server_args) {
             co->halt = true;
             co->loop_erred = true;
@@ -131,9 +131,10 @@ static void connection_cb(uv_stream_t *server, int status) {
 
     if (r) {
         fprintf(stderr, "Error: %s\n", uv_strerror(r));
-        if (handle != NULL)
+        if (!is_empty(handle))
             CO_FREE(handle);
 
+        co->loop_code = r;
         co_result_set(co, &r);
     }
 
@@ -467,13 +468,13 @@ static void_t uv_init(void_t uv_args) {
                             break;
                     }
 
-                    if (co_strpos(var_char_ptr(args[3]), ":") >= 0) {
+                    if (is_str_in(var_char_ptr(args[3]), ":")) {
                         uv_ip6_name((const struct sockaddr_in6 *)&name, (char *)ip, sizeof ip);
-                    } else if (co_strpos(var_char_ptr(args[3]), ".") >= 0) {
+                    } else if (is_str_in(var_char_ptr(args[3]), ".")) {
                         uv_ip4_name((const struct sockaddr_in *)&name, (char *)ip, sizeof ip);
                     }
 
-                    if (uv_server_args == NULL) {
+                    if (is_empty(uv_server_args)) {
                         uv_server_args = uv;
                     }
 
@@ -620,7 +621,7 @@ void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
 }
 
 int stream_write(uv_stream_t *handle, string_t text) {
-    if (handle == NULL)
+    if (is_empty(handle))
         return -1;
 
     size_t size = strlen(text) + 1;
@@ -639,7 +640,7 @@ int stream_write(uv_stream_t *handle, string_t text) {
 }
 
 string stream_read(uv_stream_t *handle) {
-    if (handle == NULL)
+    if (is_empty(handle))
         return NULL;
 
     values_t *args = NULL;
@@ -653,14 +654,14 @@ string stream_read(uv_stream_t *handle) {
 }
 
 uv_stream_t *stream_connect(string_t address) {
-    if (address == NULL)
+    if (is_empty((void_t)address))
         return NULL;
 
-    url_parse_t *url = parse_url(address);
-    if (url == NULL)
+    url_t *url = parse_url(address);
+    if (is_empty(url))
         return NULL;
 
-    return stream_connect_ex(url->url_type, (string_t)url->host, url->port);
+    return stream_connect_ex(url->uv_type, (string_t)url->host, url->port);
 }
 
 uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port) {
@@ -671,10 +672,10 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     int r = 0;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    if (co_strpos(address, ":") >= 0) {
+    if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
         addr_set = uv_args->in6;
-    } else if (co_strpos(address, ".") >= 0) {
+    } else if (is_str_in(address, ".")) {
         r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in4);
         addr_set = uv_args->in4;
     }
@@ -709,7 +710,7 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
 }
 
 uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
-    if (stream == NULL)
+    if (is_empty(stream))
         return NULL;
 
     uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data((uv_handle_t *)stream);
@@ -719,21 +720,21 @@ uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
     args[1].value.integer = backlog;
 
     value_t handle = uv_start(uv_args, args, UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP, 5, false);
-    if (handle.object == NULL)
+    if (is_empty(handle.object))
         return NULL;
 
     return (uv_stream_t *)handle.object;
 }
 
 uv_stream_t *stream_bind(string_t address, int flags) {
-    if (address == NULL)
+    if (is_empty((void_t)address))
         return NULL;
 
-    url_parse_t *url = parse_url(address);
-    if (url == NULL)
+    url_t *url = parse_url(address);
+    if (is_empty(url))
         return NULL;
 
-    return stream_bind_ex(url->url_type, (string_t)url->host, url->port, flags);
+    return stream_bind_ex(url->uv_type, (string_t)url->host, url->port, flags);
 }
 
 uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, int flags) {
@@ -742,10 +743,10 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
 
     uv_args_t *uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     co_defer_recover(error_catch, uv_args);
-    if (co_strpos(address, ":") >= 0) {
+    if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
         addr_set = uv_args->in6;
-    } else if (co_strpos(address, ".") >= 0) {
+    } else if (is_str_in(address, ".")) {
         r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->in4);
         addr_set = uv_args->in4;
     }
@@ -786,7 +787,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
 }
 
 void coro_uv_close(uv_handle_t *handle) {
-    if (handle == NULL)
+    if (is_empty(handle))
         return;
 
     values_t *args = NULL;

@@ -151,23 +151,23 @@ void co_deferred_run(routine_t *coro, size_t generation) {
     defer_func_t *defers = array->base;
     size_t i;
 
-    coro->err_recovered = coro->err == NULL;
+    coro->err_recovered = is_empty(coro->err);
 
     for (i = array->elements; i != generation; i--) {
         defer_func_t *defer = &defers[ i - 1 ];
 
-        if (coro->err != NULL && defer->check != NULL)
+        if (!is_empty(coro->err) && !is_empty(defer->check))
             coro->err_recovered = false;
 
         defer->func(defer->data);
         defer->data = NULL;
     }
 
-    if (coro->err_protected && coro->err_allocated != NULL && coro->err != NULL) {
+    if (coro->err_protected && !is_empty(coro->err_allocated) && !is_empty(coro->err)) {
         if (!ex_context)
             ex_init();
 
-        if (*coro->err_allocated->ptr != NULL) {
+        if (!is_empty(*coro->err_allocated->ptr)) {
             coro->err_allocated->func(*coro->err_allocated->ptr);
             *coro->err_allocated->ptr = NULL;
         }
@@ -177,7 +177,7 @@ void co_deferred_run(routine_t *coro, size_t generation) {
     }
 
     array->elements = generation;
-    if (coro->err_allocated != NULL){
+    if (!is_empty(coro->err_allocated)) {
         CO_FREE(coro->err_allocated);
         coro->err_allocated = NULL;
     }
@@ -227,7 +227,7 @@ CO_FORCE_INLINE void co_defer_recover(func_t func, void_t data) {
 string_t co_recover() {
     routine_t *co = co_active();
     co->err_recovered = true;
-    return (co->panic != NULL) ? co->panic : co->err;
+    return !is_empty((void_t)co->panic) ? co->panic : co->err;
 }
 
 void co_deferred(routine_t *coro, func_t func, void_t data) {

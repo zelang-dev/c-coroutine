@@ -740,14 +740,19 @@ will auto free `LIFO` on function exit/return, do not free! */
 C_API void_t co_new(size_t);
 C_API void_t co_malloc(routine_t *, size_t);
 C_API void_t co_malloc_full(routine_t *, size_t, func_t);
-C_API char *co_strdup(string_t );
+C_API void_t co_memdup(routine_t *, const_t, size_t);
+
+C_API char *co_strdup(string_t);
 C_API char *co_strndup(string_t, size_t);
 C_API char *co_string(string_t str, size_t length);
 C_API char *co_sprintf(string_t, ...);
-C_API void_t co_memdup(routine_t *, const_t, size_t);
 C_API string *co_str_split(string_t s, string_t delim, int *count);
 C_API string co_concat_by(int num_args, ...);
 C_API string co_str_concat(string_t header, string_t *words, size_t num_words);
+C_API ht_string_t *co_parse_str(char *lines, char *sep);
+C_API string str_toupper(string s, size_t len);
+C_API string str_tolower(string s, size_t len);
+C_API string word_toupper(string str, char sep);
 
 C_API int co_array_init(co_array_t *);
 
@@ -816,6 +821,7 @@ C_API void channel_free(channel_t *);
 C_API int vasprintf(char **, string_t, va_list);
 C_API int asprintf(char **, string_t, ...);
 C_API int gettimeofday(struct timeval *, struct timezone *);
+C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);
 #endif
 
 #define HASH_LOAD_FACTOR (0.75)
@@ -824,6 +830,7 @@ C_API int gettimeofday(struct timeval *, struct timezone *);
     #define HASH_INIT_CAPACITY (1<<9)
 #endif
 
+typedef void_t(*hash_iter_func)(void_t instance, string_t key, const_t value);
 typedef struct oa_key_ops_s {
     uint32_t (*hash)(const_t data, void_t arg);
     void* (*cp)(const_t data, void_t arg);
@@ -860,6 +867,9 @@ C_API void hash_free(hash_t *);
 C_API void_t hash_put(hash_t *, const_t, const_t);
 C_API void_t hash_replace(hash_t *, const_t, const_t);
 C_API void_t hash_get(hash_t *, const_t);
+C_API bool hash_has(hash_t *, const_t);
+C_API size_t hash_count(hash_t *);
+C_API void_t hash_iter(hash_t *, void_t, hash_iter_func);
 C_API void hash_delete(hash_t *, const_t);
 C_API void hash_remove(hash_t *, const_t);
 C_API void hash_print(hash_t *);
@@ -1328,6 +1338,9 @@ C_API bool is_instance(void_t);
 C_API bool is_valid(void_t);
 
 C_API bool is_status_invalid(routine_t *);
+C_API bool is_null(size_t);
+C_API bool is_empty(void_t);
+C_API bool is_str_in(string_t text, string pattern);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);

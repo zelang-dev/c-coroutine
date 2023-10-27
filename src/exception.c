@@ -88,11 +88,11 @@ static volatile sig_atomic_t got_uncaught_exception = false;
 static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
     fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
-            (exception->co->panic != NULL) ? exception->co->panic : exception->ex, exception->function);
+            !is_empty(exception->co->panic) ? exception->co->panic : exception->ex, exception->function);
 #else
-    fprintf(stderr, "\n%s: %s\n", message, (exception->co->panic != NULL) ? exception->co->panic : exception->ex);
-    if (exception->file != NULL) {
-        if (exception->function != NULL) {
+    fprintf(stderr, "\n%s: %s\n", message, !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex);
+    if (!is_empty((void_t)exception->file)) {
+        if (!is_empty((void_t)exception->function)) {
             fprintf(stderr, "    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
         } else {
             fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
@@ -191,7 +191,7 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
         ex_terminate();
 
 #ifdef _WIN32
-    if (message != NULL)
+    if (!is_empty(message))
         RaiseException(EXCEPTION_PANIC, 0, 0, 0);
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);

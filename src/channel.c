@@ -28,12 +28,12 @@ CO_FORCE_INLINE channel_t *channel_buf(int elem_count) {
 }
 
 void channel_free(channel_t *c) {
-    if (c == NULL)
+    if (is_empty(c))
         return;
 
     if (is_type(c, CO_CHANNEL)) {
         int id = c->id;
-        if (c->name != NULL)
+        if (!is_empty(c->name))
             CO_FREE(c->name);
 
         CO_FREE(c->tmp);
@@ -111,7 +111,7 @@ static void channel_co_dequeue(channel_co_t *a) {
     msg_queue_t *ar;
 
     ar = channel_msg(a->c, a->op);
-    if (ar == NULL) {
+    if (is_empty(ar)) {
         snprintf(ex_message, 256, "bad use of channel_co_dequeue op=%d\n", a->op);
         co_panic(ex_message);
     }
@@ -134,7 +134,7 @@ static void channel_co_all_dequeue(channel_co_t *a) {
 
 static void amove(void_t dst, void_t src, unsigned int n) {
     if (dst) {
-        if (src == NULL)
+        if (is_empty(src))
             memset(dst, 0, n);
         else
             memmove(dst, src, n);
@@ -157,17 +157,17 @@ static void channel_co_copy(channel_co_t *s, channel_co_t *r) {
     /*
      * Work out who is sender and who is receiver
      */
-    if (s == NULL && r == NULL)
+    if (is_empty(s) && is_empty(r))
         return;
-    CO_ASSERT(s != NULL);
+    CO_ASSERT(!is_empty(s));
     c = s->c;
     if (s->op == CHANNEL_RECV) {
         t = s;
         s = r;
         r = t;
     }
-    CO_ASSERT(s == NULL || s->op == CHANNEL_SEND);
-    CO_ASSERT(r == NULL || r->op == CHANNEL_RECV);
+    CO_ASSERT(is_empty(s) || s->op == CHANNEL_SEND);
+    CO_ASSERT(is_empty(r) || r->op == CHANNEL_RECV);
 
     /*
      * channel_t is empty (or unbuffered) - copy directly.

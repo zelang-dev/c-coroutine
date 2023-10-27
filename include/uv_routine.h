@@ -178,8 +178,8 @@ C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 /** @return int */
 C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
 
-typedef struct parse_s {
-    uv_handle_type url_type;
+typedef struct url_s {
+    uv_handle_type uv_type;
     char *scheme;
     char *user;
     char *pass;
@@ -188,7 +188,7 @@ typedef struct parse_s {
     char *path;
     char *query;
     char *fragment;
-} url_parse_t;
+} url_t;
 
 typedef enum {
     URL_SCHEME,
@@ -322,7 +322,7 @@ typedef enum {
     F_SKIP_BODY = 1 << 5
 } http_flags;
 
-typedef struct {
+typedef struct http_s {
     http_parser_type action;
 
     /* The current response status */
@@ -335,7 +335,7 @@ typedef struct {
     char *raw;
 
     /* The current headers */
-    char **headers;
+    void *headers;
 
     /* The protocol */
     char *protocol;
@@ -359,13 +359,13 @@ typedef struct {
     char *uri;
 
     /* The request params */
-    char **parameters;
+    void *parameters;
 
     char *hostname;
 
     /* Response headers to send */
-    char **header;
-} http_parse_t;
+    void *header;
+} http_t;
 
 /*
 Parse a URL and return its components, return `NULL` for malformed URLs.
@@ -373,9 +373,9 @@ Parse a URL and return its components, return `NULL` for malformed URLs.
 Modifed C code from PHP userland function
 see https://php.net/manual/en/function.parse-url.php
 */
-C_API url_parse_t *parse_url(char const *str);
-C_API url_parse_t *url_parse_ex(char const *str, size_t length);
-C_API url_parse_t *url_parse_ex2(char const *str, size_t length, bool *has_port);
+C_API url_t *parse_url(char const *str);
+C_API url_t *url_parse_ex(char const *str, size_t length);
+C_API url_t *url_parse_ex2(char const *str, size_t length, bool *has_port);
 C_API char *url_decode(char *str, size_t len);
 C_API char *url_encode(char const *s, size_t len);
 
@@ -386,7 +386,83 @@ Verified 2020-05-22
 
 see https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 */
-C_API const char *url_status_str(uint16_t const status);
+C_API const char *http_status_str(uint16_t const status);
+
+/* Return date string in standard format for http headers */
+C_API char *http_std_date(time_t t);
+
+/* Parse/prepare server headers, and store. */
+C_API void parse(http_t *this, char *headers);
+
+/**
+ * Returns `http_t` instance, for simple generic handling/constructing **http** request/response
+ * messages, following the https://tools.ietf.org/html/rfc2616.html specs.
+ *
+ * - For use with `http_response()` and `http_request()`.
+ *
+ * - `action` either HTTP_RESPONSE or HTTP_REQUEST
+ * - `hostname` for `Host:` header request, this will be ignored on `path/url` setting
+ * - `protocol` version for `HTTP/` header
+ */
+C_API http_t *http_for(http_parser_type action, char *hostname, float protocol);
+
+/**
+ * Construct a new response string.
+ *
+ * - `body` defaults to `Not Found`, if `status` empty
+ * - `status` defaults to `404`, if `body` empty, otherwise `200`
+ * - `type`
+ * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
+ */
+C_API char *http_response(http_t *this, char *body, int status, char *type, char *extras);
+
+/**
+ * Construct a new request string.
+ *
+ * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
+ */
+C_API char *http_request(http_t *this, char *method, char *path, char *type, char *body_data, char *extras);
+
+/**
+ * Return a request header `content`.
+ *
+ * - `defaults` value to return if not found
+ */
+C_API char *get_header(http_t *this, char *key, char *defaults);
+
+/**
+ * Return a request header content `variable` value.
+ *
+ * - `key` header to check for
+ * - `var` variable to find
+ * - `defaults` value to return if not found
+ */
+C_API char *get_variable(http_t *this, char *key, char *var, char *defaults);
+
+/**
+ * Return a request parameter `value`.
+ *
+ * - `defaults` value to return if not found
+ */
+C_API char *get_parameter(http_t *this, char *key, char *defaults);
+
+/**
+ * Add or overwrite an response header parameter.
+ */
+C_API void put_header(http_t *this, char *key, char *value);
+
+C_API bool has_header(http_t *this, char *key);
+C_API bool has_variable(http_t *this, char *key, char *var);
+C_API bool has_flag(http_t *this, char *key, char *flag);
+C_API bool has_parameter(http_t *this, char *key);
+
+#ifndef URL_AGENT
+#define URL_AGENT "uv_client"
+#endif
+
+#ifndef URL_SERVER
+#define URL_SERVER "uv_server"
+#endif
 
 #ifdef __cplusplus
 }
