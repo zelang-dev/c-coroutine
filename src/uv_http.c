@@ -64,7 +64,7 @@ string_t http_status_str(uint16_t const status) {
         case 102: return "Processing"; // RFC 2518, obsoleted by RFC 4918
         case 103: return "Early Hints";
 
-        // Success 2xx
+            // Success 2xx
         case 200: return "OK";
         case 201: return "Created";
         case 202: return "Accepted";
@@ -76,7 +76,7 @@ string_t http_status_str(uint16_t const status) {
         case 208: return "Already Reported";
         case 226: return "IM Used";
 
-        // Redirection 3xx
+            // Redirection 3xx
         case 300: return "Multiple Choices";
         case 301: return "Moved Permanently";
         case 302: return "Moved Temporarily";
@@ -87,7 +87,7 @@ string_t http_status_str(uint16_t const status) {
         case 307: return "Temporary Redirect";
         case 308: return "Permanent Redirect";
 
-        // Client Error 4xx
+            // Client Error 4xx
         case 400: return "Bad Request";
         case 401: return "Unauthorized";
         case 402: return "Payment Required";
@@ -119,7 +119,7 @@ string_t http_status_str(uint16_t const status) {
         case 451: return "Unavailable For Legal Reasons";
         case 499: return "Client Closed Request";
 
-        // Server Error 5xx
+            // Server Error 5xx
         case 500: return "Internal Server Error";
         case 501: return "Not Implemented";
         case 502: return "Bad Gateway";
@@ -168,7 +168,7 @@ void parse(http_t *this, string headers) {
             } else if (is_str_in(line, "HTTP/") && this->action == HTTP_RESPONSE) {
                 params = co_str_split(line, " ", NULL);
                 this->protocol = params[0];
-                this->code = atoi(params[1]) ;
+                this->code = atoi(params[1]);
                 this->message = params[2];
             }
 
@@ -200,6 +200,7 @@ http_t *http_for(http_parser_type action, string hostname, float protocol) {
     this->header = NULL;
     this->path = NULL;
     this->method = NULL;
+    this->cookies= NULL;
     this->code = 200;
     this->message = NULL;
     this->action = action;
@@ -231,7 +232,7 @@ string http_response(http_t *this, string body, int status, string type, string 
 
     // set initial headers
     put_header(this, "Date", http_std_date(0));
-    put_header(this, "Content-Type", co_concat_by(2, (is_empty(type) ? "text/html" : type) ," ; charset=utf-8"));
+    put_header(this, "Content-Type", co_concat_by(2, (is_empty(type) ? "text/html" : type), "; charset=utf-8"));
     put_header(this, "Content-Length", (string)co_itoa(strlen(this->body)));
     put_header(this, "Server", URL_SERVER);
 
@@ -240,7 +241,7 @@ string http_response(http_t *this, string body, int status, string type, string 
         string *token = co_str_split(extras, ";", &i);
         for (int x = 0; x < i; x++) {
             string *parts = co_str_split(token[x], ":", NULL);
-                put_header(this, parts[0], parts[1]);
+            put_header(this, parts[0], parts[1]);
         }
     }
 
@@ -256,7 +257,7 @@ string http_response(http_t *this, string body, int status, string type, string 
                          " ",
                          http_status_str(this->status),
                          CRLF
-                         );
+    );
 
     // add the headers
     lines = hash_iter(this->header, lines, concat_headers);
@@ -324,10 +325,10 @@ string get_variable(http_t *this, string key, string var, string defaults) {
         int count = 1;
         string line = get_header(this, key, defaults);
         string *sections = (is_str_in(line, "; ")) ? co_str_split(line, "; ", &count) : (string *)line;
-        for(int x = 0; x < count; x++) {
+        for (int x = 0; x < count; x++) {
             string parts = sections[x];
             string *variable = co_str_split(parts, "=", NULL);
-            if (strcmp(variable[0], var) == 0){
+            if (strcmp(variable[0], var) == 0) {
                 return !is_empty(variable[1]) ? variable[1] : defaults;
             }
         }

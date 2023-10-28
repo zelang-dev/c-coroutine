@@ -322,11 +322,28 @@ typedef enum {
     F_SKIP_BODY = 1 << 5
 } http_flags;
 
+typedef struct cookie_s {
+    char *domain;
+    char *lifetime;
+    int expiry;
+    bool httpOnly;
+    int maxAge;
+    char *name;
+    char *path;
+    bool secure;
+    char *value;
+    bool strict;
+    char *sameSite;
+} cookie_t;
+
 typedef struct http_s {
     http_parser_type action;
 
     /* The current response status */
     http_status status;
+
+    /* The cookie headers */
+    cookie_t *cookies;
 
     /* The current response body */
     char *body;
@@ -336,6 +353,7 @@ typedef struct http_s {
 
     /* The current headers */
     void *headers;
+
 
     /* The protocol */
     char *protocol;
