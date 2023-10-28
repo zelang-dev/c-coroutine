@@ -222,7 +222,7 @@ string http_response(http_t *this, string body, int status, string type, string 
     this->body = is_empty(body)
         ? co_concat_by(7,
                        "<h1>",
-                       URL_SERVER,
+                       HTTP_SERVER,
                        ": ",
                        status,
                        " - ",
@@ -234,7 +234,7 @@ string http_response(http_t *this, string body, int status, string type, string 
     put_header(this, "Date", http_std_date(0));
     put_header(this, "Content-Type", co_concat_by(2, (is_empty(type) ? "text/html" : type), "; charset=utf-8"));
     put_header(this, "Content-Length", (string)co_itoa(strlen(this->body)));
-    put_header(this, "Server", URL_SERVER);
+    put_header(this, "Server", HTTP_SERVER);
 
     if (!is_empty(extras)) {
         int i = 0;
@@ -303,7 +303,7 @@ string http_request(http_t *this, string method, string path, string type, strin
         }
     }
 
-    headers = co_concat_by(4, headers, "User-Agent: ", URL_AGENT, CRLF);
+    headers = co_concat_by(4, headers, "User-Agent: ", HTTP_AGENT, CRLF);
     headers = co_concat_by(4, headers, "Connection: close", CRLF, CRLF);
 
     if (!is_empty(body_data))
@@ -328,7 +328,7 @@ string get_variable(http_t *this, string key, string var, string defaults) {
         for (int x = 0; x < count; x++) {
             string parts = sections[x];
             string *variable = co_str_split(parts, "=", NULL);
-            if (strcmp(variable[0], var) == 0) {
+            if (is_str_eq(variable[0], var)) {
                 return !is_empty(variable[1]) ? variable[1] : defaults;
             }
         }

@@ -1,17 +1,17 @@
 #include "../include/coroutine.h"
 
 uv_handle_type scheme_type(string scheme) {
-    if (strcmp(scheme, "http") == 0
-        || strcmp(scheme, "tcp") == 0
-        || strcmp(scheme, "https") == 0
-        || strcmp(scheme, "tls") == 0
-        || strcmp(scheme, "ftp") == 0
-        || strcmp(scheme, "ftps") == 0
-        || strcmp(scheme, "ssl") == 0) {
+    if (is_str_eq(scheme, "http")
+        || is_str_eq(scheme, "tcp")
+        || is_str_eq(scheme, "https")
+        || is_str_eq(scheme, "tls")
+        || is_str_eq(scheme, "ftp")
+        || is_str_eq(scheme, "ftps")
+        || is_str_eq(scheme, "ssl")) {
         return UV_TCP;
-    } else if (strcmp(scheme, "file") == 0 || strcmp(scheme, "unix") == 0) {
+    } else if (is_str_eq(scheme, "file") || is_str_eq(scheme, "unix")) {
         return UV_NAMED_PIPE;
-    } else if (strcmp(scheme, "udp") == 0) {
+    } else if (is_str_eq(scheme, "udp")) {
         return UV_UDP;
     } else {
         return UV_UNKNOWN_HANDLE;

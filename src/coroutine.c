@@ -306,3 +306,7 @@ CO_FORCE_INLINE bool is_empty(void_t self) {
 CO_FORCE_INLINE bool is_str_in(string_t text, string pattern) {
     return co_strpos(text, pattern) >= 0;
 }
+
+CO_FORCE_INLINE bool is_str_eq(string_t str, string_t str2) {
+    return strcmp(str, str2) == 0;
+}

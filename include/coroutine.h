@@ -1341,6 +1341,7 @@ C_API bool is_status_invalid(routine_t *);
 C_API bool is_null(size_t);
 C_API bool is_empty(void_t);
 C_API bool is_str_in(string_t text, string pattern);
+C_API bool is_str_eq(string_t str, string_t str2);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);

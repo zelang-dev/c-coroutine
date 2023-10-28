@@ -410,7 +410,7 @@ C_API const char *http_status_str(uint16_t const status);
 C_API char *http_std_date(time_t t);
 
 /* Parse/prepare server headers, and store. */
-C_API void parse(http_t *this, char *headers);
+C_API void parse(http_t *, char *headers);
 
 /**
  * Returns `http_t` instance, for simple generic handling/constructing **http** request/response
@@ -419,7 +419,7 @@ C_API void parse(http_t *this, char *headers);
  * - For use with `http_response()` and `http_request()`.
  *
  * - `action` either HTTP_RESPONSE or HTTP_REQUEST
- * - `hostname` for `Host:` header request, this will be ignored on `path/url` setting
+ * - `hostname` for `Host:` header request,  will be ignored on `path/url` setting
  * - `protocol` version for `HTTP/` header
  */
 C_API http_t *http_for(http_parser_type action, char *hostname, float protocol);
@@ -432,21 +432,21 @@ C_API http_t *http_for(http_parser_type action, char *hostname, float protocol);
  * - `type`
  * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
  */
-C_API char *http_response(http_t *this, char *body, int status, char *type, char *extras);
+C_API char *http_response(http_t *, char *body, int status, char *type, char *extras);
 
 /**
  * Construct a new request string.
  *
  * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
  */
-C_API char *http_request(http_t *this, char *method, char *path, char *type, char *body_data, char *extras);
+C_API char *http_request(http_t *, char *method, char *path, char *type, char *body_data, char *extras);
 
 /**
  * Return a request header `content`.
  *
  * - `defaults` value to return if not found
  */
-C_API char *get_header(http_t *this, char *key, char *defaults);
+C_API char *get_header(http_t *, char *key, char *defaults);
 
 /**
  * Return a request header content `variable` value.
@@ -455,31 +455,31 @@ C_API char *get_header(http_t *this, char *key, char *defaults);
  * - `var` variable to find
  * - `defaults` value to return if not found
  */
-C_API char *get_variable(http_t *this, char *key, char *var, char *defaults);
+C_API char *get_variable(http_t *, char *key, char *var, char *defaults);
 
 /**
  * Return a request parameter `value`.
  *
  * - `defaults` value to return if not found
  */
-C_API char *get_parameter(http_t *this, char *key, char *defaults);
+C_API char *get_parameter(http_t *, char *key, char *defaults);
 
 /**
  * Add or overwrite an response header parameter.
  */
-C_API void put_header(http_t *this, char *key, char *value);
+C_API void put_header(http_t *, char *key, char *value);
 
-C_API bool has_header(http_t *this, char *key);
-C_API bool has_variable(http_t *this, char *key, char *var);
-C_API bool has_flag(http_t *this, char *key, char *flag);
-C_API bool has_parameter(http_t *this, char *key);
+C_API bool has_header(http_t *, char *key);
+C_API bool has_variable(http_t *, char *key, char *var);
+C_API bool has_flag(http_t *, char *key, char *flag);
+C_API bool has_parameter(http_t *, char *key);
 
-#ifndef URL_AGENT
-#define URL_AGENT "uv_client"
+#ifndef HTTP_AGENT
+#define HTTP_AGENT "uv_client"
 #endif
 
-#ifndef URL_SERVER
-#define URL_SERVER "uv_server"
+#ifndef HTTP_SERVER
+#define HTTP_SERVER "uv_server"
 #endif
 
 #ifdef __cplusplus
