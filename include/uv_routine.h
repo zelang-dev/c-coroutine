@@ -178,6 +178,8 @@ C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 /** @return int */
 C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
 
+#define CRLF "\r\n"
+
 typedef struct url_s {
     uv_handle_type uv_type;
     char *scheme;
@@ -428,18 +430,24 @@ C_API http_t *http_for(http_parser_type action, char *hostname, float protocol);
  * Construct a new response string.
  *
  * - `body` defaults to `Not Found`, if `status` empty
- * - `status` defaults to `404`, if `body` empty, otherwise `200`
+ * - `status` defaults to `STATUS_NO_FOUND`, if `body` empty, otherwise `STATUS_OK`
  * - `type`
  * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
  */
-C_API char *http_response(http_t *, char *body, int status, char *type, char *extras);
+C_API char *http_response(http_t *, char *body, http_status status, char *type, char *extras);
 
 /**
  * Construct a new request string.
  *
  * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
  */
-C_API char *http_request(http_t *, char *method, char *path, char *type, char *body_data, char *extras);
+C_API char *http_request(http_t *,
+                         http_method method,
+                         char *path,
+                         char *type,
+                         char *connection,
+                         char *body_data,
+                         char *extras);
 
 /**
  * Return a request header `content`.
@@ -467,7 +475,7 @@ C_API char *get_parameter(http_t *, char *key, char *defaults);
 /**
  * Add or overwrite an response header parameter.
  */
-C_API void put_header(http_t *, char *key, char *value);
+C_API void put_header(http_t *, char *key, char *value, bool force_cap);
 
 C_API bool has_header(http_t *, char *key);
 C_API bool has_variable(http_t *, char *key, char *var);
