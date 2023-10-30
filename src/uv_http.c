@@ -135,7 +135,7 @@ string_t http_status_str(uint16_t const status) {
     }
 }
 
-void parse(http_t *this, string headers) {
+void parse_http(http_t *this, string headers) {
     int count = 0;
     this->raw = headers;
 

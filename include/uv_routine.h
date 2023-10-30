@@ -412,7 +412,7 @@ C_API const char *http_status_str(uint16_t const status);
 C_API char *http_std_date(time_t t);
 
 /* Parse/prepare server headers, and store. */
-C_API void parse(http_t *, char *headers);
+C_API void parse_http(http_t *, char *headers);
 
 /**
  * Returns `http_t` instance, for simple generic handling/constructing **http** request/response
