@@ -37,7 +37,7 @@ int co_strpos(string_t text, string pattern) {
     return -1;
 }
 
-void co_strcpy(char *dest, string_t src, size_t len) {
+void co_strcpy(string dest, string_t src, size_t len) {
 #if defined(_WIN32) || defined(_WIN64)
     strcpy_s(dest, len, src);
 #else
@@ -217,7 +217,8 @@ ht_string_t *co_parse_str(string lines, string sep) {
     string *token = co_str_split(lines, sep, &i);
     for (int x = 0; x < i; x++) {
         string *parts = co_str_split(token[x], "=", NULL);
-        hash_put(this, parts[0], parts[1]);
+        if (!is_empty(parts))
+            hash_put(this, trim(parts[0]), trim(parts[1]));
     }
 
     return this;
@@ -272,4 +273,20 @@ string word_toupper(string str, char sep) {
     }
 
     return str;
+}
+
+string ltrim(string s) {
+    while (isspace(*s)) s++;
+    return s;
+}
+
+string rtrim(string s) {
+    string back = s + strlen(s);
+    while (isspace(*--back));
+    *(back + 1) = '\0';
+    return s;
+}
+
+string trim(string s) {
+    return rtrim(ltrim(s));
 }

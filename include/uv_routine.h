@@ -451,26 +451,21 @@ C_API char *http_request(http_t *,
 
 /**
  * Return a request header `content`.
- *
- * - `defaults` value to return if not found
  */
-C_API char *get_header(http_t *, char *key, char *defaults);
+C_API char *get_header(http_t *, char *key);
 
 /**
  * Return a request header content `variable` value.
  *
  * - `key` header to check for
  * - `var` variable to find
- * - `defaults` value to return if not found
  */
-C_API char *get_variable(http_t *, char *key, char *var, char *defaults);
+C_API char *get_variable(http_t *, char *key, char *var);
 
 /**
  * Return a request parameter `value`.
- *
- * - `defaults` value to return if not found
  */
-C_API char *get_parameter(http_t *, char *key, char *defaults);
+C_API char *get_parameter(http_t *, char *key);
 
 /**
  * Add or overwrite an response header parameter.

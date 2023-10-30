@@ -10,41 +10,36 @@ int co_main(int argc, char *argv[]) {
                                   "Connection: close", CRLF, CRLF);
 
     if (is_str_eq(request, http_request(parser, HTTP_GET, "http://url.com/index.html", NULL, NULL, NULL, "x-powered-by=ZeLang;")))
-        printf("\nThey match!\n\n%s\n The uri is: %s\n", request, parser->uri);
+        printf("\nThey match!\n\n%sThe uri is: %s\n", request, parser->uri);
 
     char raw[] = "POST /path?free=one&open=two HTTP/1.1\n\
-User-Agent: PHP-SOAP/BeSimpleSoapClient\n\
-Host: url.com:80\n\
-Accept: */*\n\
-Accept-Encoding: deflate, gzip\n\
-Content-Type:text/xml; charset=utf-8\n\
-Content-Length: 1108\n\
-Expect: 100-continue\n\
-\n\
-<b>hello world</b>";
+ User-Agent: PHP-SOAP/BeSimpleSoapClient\n\
+ Host: url.com:80\n\
+ Accept: */*\n\
+ Accept-Encoding: deflate, gzip\n\
+ Content-Type:text/xml; charset=utf-8\n\
+ Content-Length: 1108\n\
+ Expect: 100-continue\n\
+ \n\n\
+ <b>hello world</b>";
+
+    parse_http(parser, raw);
+
+    CO_ASSERT(is_str_eq("PHP-SOAP/BeSimpleSoapClient", get_header(parser, "User-Agent")));
+    CO_ASSERT(is_str_eq("url.com:80", get_header(parser, "Host")));
+    CO_ASSERT(is_str_eq("*/*", get_header(parser, "Accept")));
+    CO_ASSERT(is_str_eq("deflate, gzip", get_header(parser, "Accept-Encoding")));
+    CO_ASSERT(is_str_eq("text/xml; charset=utf-8", get_header(parser, "Content-Type")));
+    CO_ASSERT(is_str_eq("1108", get_header(parser, "Content-Length")));
+    CO_ASSERT(is_str_eq("100-continue", get_header(parser, "Expect")));
+    CO_ASSERT(is_str_eq("utf-8", get_variable(parser, "Content-Type", "charset")));
+    CO_ASSERT(is_str_eq("", get_variable(parser, "Expect", "charset")));
+
+    CO_ASSERT(has_header(parser, "Pragma") == false);
+
+    CO_ASSERT(is_str_eq("<b>hello world</b>", parser->body));
+    CO_ASSERT(is_str_eq("one", get_parameter(parser, "free")));
+    CO_ASSERT(is_str_eq("POST", parser->method));
+    CO_ASSERT(is_str_eq("/path", parser->path));
+    CO_ASSERT(is_str_eq("HTTP/1.1", parser->protocol));
 }
-/*
-
-$parser->parse($raw);
-$this->assertEquals("PHP-SOAP/\BeSimple\SoapClient", $parser->getHeader("User-Agent"));
-$this->assertEquals("url.com:80", $parser->getHeader("Host"));
-$this->assertEquals("*//*", $parser->getHeader("Accept"));
-$this->assertEquals("deflate, gzip", $parser->getHeader("Accept-Encoding"));
-$this->assertEquals("text/xml; charset=utf-8", $parser->getHeader("Content-Type"));
-$this->assertEquals("1108", $parser->getHeader("Content-Length"));
-$this->assertEquals("100-continue", $parser->getHeader("Expect"));
-
-$this->assertEquals("utf-8", $parser->getVariable("Content-Type", "charset"));
-$this->assertEquals("", $parser->getVariable("Expect", "charset"));
-$this->assertFalse($parser->hasHeader("Pragma"));
-$this->assertEquals("<b>hello world</b>", $parser->getBody());
-
-$default = $parser->getHeader("n/a");
-$this->assertEquals("", $default);
-
-$this->assertCount(2, $parser->getParameter());
-$this->assertEquals("one", $parser->getParameter("free"));
-$this->assertEquals("POST", $parser->getMethod());
-$this->assertEquals("/path", $parser->getPath());
-$this->assertEquals("HTTP/1.1", $parser->getProtocol());
-*/

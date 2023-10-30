@@ -141,7 +141,7 @@ void parse_http(http_t *this, string headers) {
 
     string *p_headers = co_str_split(this->raw, "\n\n", &count);
     this->body = (count > 1 && !is_empty(p_headers[1]))
-        ? p_headers[1] : NULL;
+        ? trim(p_headers[1]) : NULL;
     string *lines = (count > 0 && !is_empty(p_headers[0]))
         ? co_str_split(p_headers[0], "\n", &count) : NULL;
 
@@ -161,18 +161,18 @@ void parse_http(http_t *this, string headers) {
                 parts = co_str_split(line, ":", NULL);
             } else if (is_str_in(line, "HTTP/") && this->action == HTTP_REQUEST) {
                 params = co_str_split(line, " ", NULL);
-                this->method = params[0];
-                this->path = params[1];
-                this->protocol = params[2];
+                this->method = trim(params[0]);
+                this->path = trim(params[1]);
+                this->protocol = trim(params[2]);
             } else if (is_str_in(line, "HTTP/") && this->action == HTTP_RESPONSE) {
                 params = co_str_split(line, " ", NULL);
-                this->protocol = params[0];
+                this->protocol = trim(params[0]);
                 this->code = atoi(params[1]);
-                this->message = params[2];
+                this->message = trim(params[2]);
             }
 
-            if (found) {
-                hash_put(this->headers, str_tolower(parts[0], strlen(parts[0])), parts[1]);
+            if (found && !is_empty(parts)) {
+                hash_put((hash_t *)this->headers, trim(parts[0]), trim(parts[1]));
             }
         }
 
@@ -180,7 +180,7 @@ void parse_http(http_t *this, string headers) {
         if (this->action == HTTP_REQUEST) {
             // split path and parameters string
             params = co_str_split(this->path, "?", NULL);
-            this->path, params[0];
+            this->path = params[0];
             string parameters = params[1];
 
             // parse the parameters
@@ -194,7 +194,6 @@ void parse_http(http_t *this, string headers) {
 http_t *http_for(http_parser_type action, string hostname, float protocol) {
     http_t *this = co_new_by(1, sizeof(http_t));
 
-    this->headers = NULL;
     this->parameters = NULL;
     this->header = NULL;
     this->path = NULL;
@@ -272,7 +271,7 @@ string http_request(http_t *this,
                     string body_data,
                     string extras
 ) {
-    this->uri = (is_str_in(path, "://")) ? co_concat_by(2, this->hostname, path) : path;
+    this->uri = is_str_in(path, "://") ? path : co_concat_by(2, (is_empty(this->hostname) ? "http://" : this->hostname), path);
     url_t *url_array = parse_url(this->uri);
     string hostname = !is_empty(url_array->host) ? url_array->host : this->hostname;
     if (!is_empty(url_array->path)) {
@@ -287,10 +286,11 @@ string http_request(http_t *this,
     }
 
     char scrape[CO_SCRAPE_SIZE];
-    string headers = co_concat_by(11, method_strings[method], " ", path,
+    string headers = co_concat_by(14, method_strings[method], " ", url_array->path,
                                   " HTTP/", gcvt(this->version, 2, scrape), CRLF,
                                   "Host: ", hostname, CRLF,
-                                  "Accept: */*", CRLF
+                                  "Accept: */*", CRLF,
+                                  "User-Agent: ", HTTP_AGENT, CRLF
     );
 
     if (!is_empty(body_data)) {
@@ -310,8 +310,7 @@ string http_request(http_t *this,
         }
     }
 
-    headers = co_concat_by(8, headers,
-                           "User-Agent: ", HTTP_AGENT, CRLF,
+    headers = co_concat_by(5, headers,
                            "Connection: ", (is_empty(connection) ? "close" : connection), CRLF, CRLF
     );
 
@@ -321,37 +320,37 @@ string http_request(http_t *this,
     return headers;
 }
 
-string get_header(http_t *this, string key, string defaults) {
+string get_header(http_t *this, string key) {
     if (has_header(this, key)) {
-        return hash_get(this->headers, str_tolower(key, strlen(key)));
+        return hash_get((hash_t *)this->headers, key);
     }
 
-    return defaults;
+    return "";
 }
 
-string get_variable(http_t *this, string key, string var, string defaults) {
+string get_variable(http_t *this, string key, string var) {
     if (has_variable(this, key, var)) {
         int count = 1;
-        string line = get_header(this, key, defaults);
+        string line = get_header(this, key);
         string *sections = (is_str_in(line, "; ")) ? co_str_split(line, "; ", &count) : (string *)line;
         for (int x = 0; x < count; x++) {
             string parts = sections[x];
             string *variable = co_str_split(parts, "=", NULL);
             if (is_str_eq(variable[0], var)) {
-                return !is_empty(variable[1]) ? variable[1] : defaults;
+                return !is_empty(variable[1]) ? variable[1] : NULL;
             }
         }
     }
 
-    return defaults;
+    return "";
 }
 
-string get_parameter(http_t *this, string key, string defaults) {
+string get_parameter(http_t *this, string key) {
     if (has_parameter(this, key)) {
         return hash_get(this->parameters, key);
     }
 
-    return defaults;
+    return "";
 }
 
 void put_header(http_t *this, string key, string value, bool force_cap) {
@@ -362,25 +361,25 @@ void put_header(http_t *this, string key, string value, bool force_cap) {
     if (force_cap)
         temp = word_toupper(key, '-');
 
-    hash_put(this->header, temp, value);
+    hash_put(this->header, trim(temp), trim(value));
 }
 
 bool has_header(http_t *this, string key) {
-    return hash_has(this->headers, str_tolower(key, strlen(key)));
+    return hash_has((hash_t *)this->headers, key);
 }
 
 bool has_variable(http_t *this, string key, string var) {
     char temp[64] = {0};
 
     snprintf(temp, 64, "%s%s", var, "=");
-    return is_str_in(get_header(this, key, ""), temp);
+    return is_str_in(get_header(this, key), temp);
 }
 
 bool has_flag(http_t *this, string key, string flag) {
     char flag1[64] = {0};
     char flag2[64] = {0};
     char flag3[64] = {0};
-    string value = get_header(this, key, "");
+    string value = get_header(this, key);
 
     snprintf(flag1, 64, "%s%s", flag, ";");
     snprintf(flag2, 64, "%s%s", flag, ",");

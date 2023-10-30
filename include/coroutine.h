@@ -753,6 +753,9 @@ C_API ht_string_t *co_parse_str(char *lines, char *sep);
 C_API string str_toupper(string s, size_t len);
 C_API string str_tolower(string s, size_t len);
 C_API string word_toupper(string str, char sep);
+C_API string ltrim(string s);
+C_API string rtrim(string s);
+C_API string trim(string s);
 
 C_API int co_array_init(co_array_t *);
 
