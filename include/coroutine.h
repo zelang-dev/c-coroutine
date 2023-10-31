@@ -339,6 +339,9 @@ typedef void *void_t;
 typedef const void *const_t;
 typedef char *string;
 typedef const char *string_t;
+typedef unsigned char *u_string;
+typedef const unsigned char *u_string_t;
+typedef const unsigned char u_char_t;
 typedef struct {
     value_types type;
     void_t value;
@@ -756,6 +759,9 @@ C_API string word_toupper(string str, char sep);
 C_API string ltrim(string s);
 C_API string rtrim(string s);
 C_API string trim(string s);
+
+C_API u_string co_base64_encode(u_string_t src);
+C_API u_string co_base64_decode(u_string_t src);
 
 C_API int co_array_init(co_array_t *);
 
@@ -1345,6 +1351,7 @@ C_API bool is_null(size_t);
 C_API bool is_empty(void_t);
 C_API bool is_str_in(string_t text, string pattern);
 C_API bool is_str_eq(string_t str, string_t str2);
+C_API bool is_base64(u_string_t src);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);
