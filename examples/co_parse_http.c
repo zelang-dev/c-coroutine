@@ -1,7 +1,7 @@
 #include "../include/coroutine.h"
 
 int co_main(int argc, char *argv[]) {
-    http_t *parser = http_for(HTTP_BOTH, NULL, 1.1);
+    http_t *parser = http_for(HTTP_RESPONSE, NULL, 1.1);
 
     char raw[] = "HTTP/1.1 200 OK\n\
 Date: Tue, 12 Apr 2016 13:58:01 GMT\n\
@@ -15,7 +15,7 @@ Pragma: no-cache\n\
 Vary: Accept-Encoding\n\
 Content-Encoding: gzip\n\
 Content-Length: 192\n\
-Content-Type: text/xml";
+Content-Type: text/xml\n\n";
 
     parse_http(parser, raw);
 
@@ -39,4 +39,6 @@ Content-Type: text/xml";
     CO_ASSERT(has_header(parser, "Pragma"));
     CO_ASSERT(has_flag(parser, "Cache-Control", "no-store"));
     CO_ASSERT(has_variable(parser, "Set-Cookie", "PHPSESSID"));
+
+    return 0;
 }
