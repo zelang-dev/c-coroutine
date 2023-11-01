@@ -143,7 +143,7 @@ void parse_http(http_t *this, string headers) {
     this->body = (count > 1 && !is_empty(p_headers[1]))
         ? trim(p_headers[1]) : NULL;
     string *lines = (count > 0 && !is_empty(p_headers[0]))
-        ? co_str_split(p_headers[0], "\n", &count) : NULL;
+        ? str_split(p_headers[0], "\n", &count) : NULL;
 
     if (count >= 1) {
         this->headers = ht_string_init();
@@ -155,10 +155,10 @@ void parse_http(http_t *this, string headers) {
             bool found = false;
             if (is_str_in(line, ": ")) {
                 found = true;
-                parts = co_str_split(line, ": ", NULL);
+                parts = str_split(line, ": ", NULL);
             } else if (is_str_in(line, ":")) {
                 found = true;
-                parts = co_str_split(line, ":", NULL);
+                parts = str_split(line, ":", NULL);
             } else if (is_str_in(line, "HTTP/") && this->action == HTTP_REQUEST) {
                 params = co_str_split(line, " ", NULL);
                 this->method = trim(params[0]);
@@ -173,6 +173,7 @@ void parse_http(http_t *this, string headers) {
 
             if (found && !is_empty(parts)) {
                 hash_put((hash_t *)this->headers, trim(parts[0]), trim(parts[1]));
+                CO_FREE(parts);
             }
         }
 
@@ -188,6 +189,9 @@ void parse_http(http_t *this, string headers) {
                 this->parameters = co_parse_str(parameters, "&");
             }
         }
+
+        if (!is_empty(lines))
+            CO_FREE(lines);
     }
 }
 

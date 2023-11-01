@@ -16,6 +16,7 @@ static thread_local uv_loop_t *co_main_loop_handle = NULL;
 
 static int main_argc;
 static char **main_argv;
+static string system_powered_by = NULL;
 
 /* coroutine unique id generator */
 thread_local int co_id_generate = 0;
@@ -68,6 +69,19 @@ void coroutine_state(char *, ...);
 
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
+
+C_API string co_system_uname(void) {
+    if (is_empty(system_powered_by)) {
+        uv_utsname_t buffer[1];
+        uv_os_uname(buffer);
+        system_powered_by = str_concat_by(6, "Coroutine-System Beta, ",
+                                          buffer->sysname, " ",
+                                          buffer->machine, " ",
+                                          buffer->release);
+    }
+
+    return system_powered_by;
+}
 
 /* called only if routine_t func returns */
 static void co_done() {
@@ -1160,6 +1174,9 @@ void coroutine_cleanup() {
         uv_loop_close(co_main_loop_handle);
         CO_FREE(co_main_loop_handle);
     }
+
+    if (!is_empty(system_powered_by))
+        CO_FREE(system_powered_by);
 #endif
 }
 
@@ -1231,6 +1248,9 @@ static void_t coroutine_main(void_t v) {
 int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
+#ifdef UV_H
+    CO_INFO("System starting up: %s\n\n", co_system_uname());
+#endif
     ex_signal_setup();
     coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
     coroutine_scheduler();

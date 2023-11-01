@@ -751,8 +751,9 @@ C_API char *co_string(string_t str, size_t length);
 C_API char *co_sprintf(string_t, ...);
 C_API string *co_str_split(string_t s, string_t delim, int *count);
 C_API string co_concat_by(int num_args, ...);
-C_API string co_str_concat(string_t header, string_t *words, size_t num_words);
 C_API ht_string_t *co_parse_str(char *lines, char *sep);
+C_API string *str_split(string_t s, string_t delim, int *count);
+C_API string str_concat_by(int num_args, ...);
 C_API string str_toupper(string s, size_t len);
 C_API string str_tolower(string s, size_t len);
 C_API string word_toupper(string str, char sep);
@@ -804,13 +805,17 @@ C_API signed int co_err_code(void);
 /* Pause and reschedule current coroutine. */
 C_API void co_pause(void);
 
+/* Returns the current coroutine's name. */
+C_API string co_get_name(void);
+
+/* Returns library version and OS system info from `uv_os_uname()`. */
+C_API string co_system_uname(void);
+
 /* The current coroutine will be scheduled again once all the
 other currently-ready coroutines have a chance to run. Returns
 the number of other tasks that ran while the current task was waiting. */
 C_API int coroutine_yield(void);
 
-/* Returns the current coroutine's name. */
-C_API char *co_get_name(void);
 
 /* Exit the current coroutine. If this is the last non-system coroutine,
 exit the entire program using the given exit status. */
@@ -1351,6 +1356,7 @@ C_API bool is_null(size_t);
 C_API bool is_empty(void_t);
 C_API bool is_str_in(string_t text, string pattern);
 C_API bool is_str_eq(string_t str, string_t str2);
+C_API bool is_str_empty(string_t str);
 C_API bool is_base64(u_string_t src);
 
 C_API void_t try_calloc(int, size_t);

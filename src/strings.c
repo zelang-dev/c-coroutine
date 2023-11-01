@@ -136,7 +136,7 @@ string co_sprintf(string_t fmt, ...) {
     return tmp_str;
 }
 
-string *co_str_split(string_t s, string_t delim, int *count) {
+string *co_split_ex(string_t s, string_t delim, int *count, bool use_defer) {
     if (is_str_eq(s, ""))
         return NULL;
 
@@ -154,7 +154,11 @@ string *co_str_split(string_t s, string_t delim, int *count) {
     }
 
     ptrsSize = (nbWords + 1) * sizeof(string);
-    ptrs = data = co_new_by(1, ptrsSize + sLen + 1);
+    if(use_defer)
+        ptrs = data = co_new_by(1, ptrsSize + sLen + 1);
+    else
+        ptrs = data = try_calloc(1, ptrsSize + sLen + 1);
+
     if (data) {
         *ptrs = _s = strcpy((string)data + ptrsSize, s);
         if (nbWords > 1) {
@@ -173,16 +177,26 @@ string *co_str_split(string_t s, string_t delim, int *count) {
     return data;
 }
 
-string co_concat_by(int num_args, ...) {
+string *co_str_split(string_t s, string_t delim, int *count) {
+    return co_split_ex(s, delim, count, true);
+}
+
+string *str_split(string_t s, string_t delim, int *count) {
+    return co_split_ex(s, delim, count, false);
+}
+
+string co_concat_ex(bool use_defer, int num_args, va_list ap_copy) {
     int strsize = 0;
     va_list ap;
-    va_start(ap, num_args);
+
+    va_copy(ap, ap_copy);
     for (int i = 0; i < num_args; i++)
         strsize += strlen(va_arg(ap, string));
 
     string res = try_calloc(1, strsize + 1);
     strsize = 0;
-    va_start(ap, num_args);
+
+    va_copy(ap, ap_copy);
     for (int i = 0; i < num_args; i++) {
         string s = va_arg(ap, string);
         strcpy(res + strsize, s);
@@ -190,23 +204,32 @@ string co_concat_by(int num_args, ...) {
     }
     va_end(ap);
 
-    co_defer(CO_FREE, res);
+    if (use_defer)
+        co_defer(CO_FREE, res);
+
     return res;
 }
 
-string co_str_concat(string_t header, string_t *words, size_t num_words) {
-    size_t message_len = strlen(header) + 1; /* + 1 for terminating NULL */
-    string message = (string)try_calloc(1, message_len);
-    strncat(message, header, message_len);
+string co_concat_by(int num_args, ...) {
+    va_list ap;
+    string text;
 
-    for (int i = 0; i < num_words; ++i) {
-        message_len += 1 + strlen(words[i]); /* 1 + for separator ';' */
-        message = (string)CO_REALLOC(message, message_len);
-        strncat(strncat(message, ";", message_len), words[i], message_len);
-    }
+    va_start(ap, num_args);
+    text = co_concat_ex(true, num_args, ap);
+    va_end(ap);
 
-    co_defer(CO_FREE, message);
-    return message;
+    return text;
+}
+
+string str_concat_by(int num_args, ...) {
+    va_list ap;
+    string text;
+
+    va_start(ap, num_args);
+    text = co_concat_ex(false, num_args, ap);
+    va_end(ap);
+
+    return text;
 }
 
 ht_string_t *co_parse_str(string lines, string sep) {
@@ -214,12 +237,17 @@ ht_string_t *co_parse_str(string lines, string sep) {
     defer(hash_free, this);
     int i = 0;
 
-    string *token = co_str_split(lines, sep, &i);
+    string *token = str_split(lines, sep, &i);
     for (int x = 0; x < i; x++) {
-        string *parts = co_str_split(token[x], "=", NULL);
-        if (!is_empty(parts))
+        string *parts = str_split(token[x], "=", NULL);
+        if (!is_empty(parts)) {
             hash_put(this, trim(parts[0]), trim(parts[1]));
+            CO_FREE(parts);
+        }
     }
+
+    if (!is_empty(token))
+        CO_FREE(token);
 
     return this;
 }
