@@ -153,15 +153,15 @@ static void co_deferred_internal(routine_t *coro, defer_func_t *deferred) {
 }
 
 void co_deferred_cancel(routine_t *coro, size_t index) {
-    CO_ASSERT(d >= 0);
+    CO_ASSERT(index >= 0);
 
     return co_deferred_internal(coro, co_deferred_array_get_element(&coro->defer, index));
 }
 
-void co_deferred_fire(routine_t *coro, size_t d) {
-    CO_ASSERT(d >= 0);
+void co_deferred_fire(routine_t *coro, size_t index) {
+    CO_ASSERT(index >= 0);
 
-    defer_func_t *deferred = (defer_func_t *)co_deferred_array_get_element(&coro->defer, d);
+    defer_func_t *deferred = (defer_func_t *)co_deferred_array_get_element(&coro->defer, index);
     CO_ASSERT(coro);
 
     deferred->func(deferred->data);
