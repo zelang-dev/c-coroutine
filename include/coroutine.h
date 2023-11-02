@@ -723,8 +723,10 @@ C_API void co_deferred_free(routine_t *);
 
 /* Defer execution `LIFO` of given function with argument,
 to when current coroutine exits/returns. */
-C_API void co_defer(func_t, void_t);
-C_API void co_deferred(routine_t *, func_t, void_t);
+C_API size_t co_defer(func_t, void_t);
+C_API void co_defer_cancel(size_t index);
+C_API void co_defer_fire(size_t index);
+C_API size_t co_deferred(routine_t *, func_t, void_t);
 C_API void co_deferred_run(routine_t *, size_t);
 C_API size_t co_deferred_count(const routine_t *);
 
