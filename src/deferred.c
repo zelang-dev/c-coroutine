@@ -140,7 +140,7 @@ static void co_deferred_internal(routine_t *coro, defer_func_t *deferred) {
 
     CO_ASSERT(num_defers != 0 && deferred != NULL);
 
-    if (deferred == co_deferred_array_get_element(&coro->defer, num_defers - 1)) {
+    if (deferred == (defer_func_t *)co_deferred_array_get_element(&coro->defer, num_defers - 1)) {
         /* If we're cancelling the last defer we armed, there's no need to waste
          * space of a deferred callback to an empty function like
          * disarmed_defer(). */
@@ -155,7 +155,7 @@ static void co_deferred_internal(routine_t *coro, defer_func_t *deferred) {
 void co_deferred_cancel(routine_t *coro, size_t index) {
     CO_ASSERT(index >= 0);
 
-    return co_deferred_internal(coro, co_deferred_array_get_element(&coro->defer, index));
+    return co_deferred_internal(coro, (defer_func_t *)co_deferred_array_get_element(&coro->defer, index));
 }
 
 void co_deferred_fire(routine_t *coro, size_t index) {
@@ -238,7 +238,7 @@ static size_t co_deferred_any(routine_t *coro, func_t func, void_t data, void_t 
         deferred->data = data;
         deferred->check = check;
 
-        return co_deferred_array_get_index(&coro->defer, deferred);
+        return co_deferred_array_get_index(&coro->defer, (co_array_t *)deferred);
     }
 }
 
