@@ -23,10 +23,9 @@ static void _close_cb(uv_handle_t *handle) {
 
 void uv_close_free(void_t handle) {
     uv_handle_t *h = (uv_handle_t *)handle;
-    /* for "^ctrl-c" bug fix point in co_uv_listen: *** deps/libuv/src/unix/core.c:221: uv_close: Assertion `0' failed.
     if (UV_UNKNOWN_HANDLE == h->type) {
-        return;
-    } */
+        throw(sig_int);
+    }
 
     if (!uv_is_closing(h))
         uv_close(h, _close_cb);

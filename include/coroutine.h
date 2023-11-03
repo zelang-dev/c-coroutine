@@ -217,25 +217,6 @@
   #endif /* = !defined(__STDC_VERSION__) && !defined(__cplusplus) */
 #endif
 
-/* for CMakeLists.txt
-add_definitions(-DUSE_MI_MALLOC)
-option(MI_BUILD_SHARED "Build shared library" OFF)
-option(MI_BUILD_STATIC "Build static library" ON)
-option(MI_BUILD_OBJECT "Build object library" OFF)
-add_subdirectory(deps / mimalloc)
-target_link_libraries(coroutine PUBLIC mimalloc - static)
-
-////
-
-#ifdef USE_MI_MALLOC
-    #include "../include/compat/mimalloc.h"
-    #define CO_MALLOC mi_malloc
-    #define CO_FREE mi_free
-    #define CO_REALLOC mi_realloc
-    #define CO_CALLOC mi_calloc
-#endif
-*/
-
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
   #include <stdlib.h>
   #define CO_MALLOC malloc

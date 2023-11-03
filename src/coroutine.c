@@ -22,7 +22,7 @@ void co_delete(routine_t *co) {
         CO_LOG("attempt to delete an invalid coroutine");
     } else if (!(co->status == CO_NORMAL
                  || co->status == CO_DEAD
-                 // || co->status == CO_ERRED
+                 || co->status == CO_ERRED
                  || co->status == CO_EVENT_DEAD)
                && !co->exiting
                ) {
@@ -45,7 +45,6 @@ void co_delete(routine_t *co) {
             if (co->results && !co->event_active)
                 CO_FREE(co->results);
 
-            //if (co->status != CO_ERRED)
             CO_FREE(co);
         }
     }

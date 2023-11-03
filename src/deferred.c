@@ -18,6 +18,7 @@ int co_array_reset(co_array_t *a) {
     CO_FREE(a->base);
     a->base = NULL;
     a->elements = 0;
+    memset(a, 0, sizeof(value_types));
 
     return 0;
 }
