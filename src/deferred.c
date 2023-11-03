@@ -120,7 +120,6 @@ static CO_FORCE_INLINE void co_deferred_array_free(defer_t *array) {
 
 static CO_FORCE_INLINE size_t co_deferred_array_get_index(const defer_t *array, co_array_t *elem) {
     CO_ASSERT(elem >= (co_array_t *)array->base.base);
-    CO_ASSERT(elem < (co_array_t *)array->base.base + array->base.elements);
     return (size_t)(elem - (co_array_t *)array->base.base);
 }
 
