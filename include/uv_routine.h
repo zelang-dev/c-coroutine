@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include "uv.h"
+#include "compat/yyjson.h"
 
 /* Public API qualifier. */
 #ifndef C_API
