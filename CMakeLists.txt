@@ -32,6 +32,11 @@ target_link_libraries(coroutine PUBLIC uv_a)
 add_subdirectory(deps/yyjson)
 target_link_libraries(coroutine PUBLIC yyjson)
 
+add_definitions(-DLIBRESSL_APPS=OFF)
+add_definitions(-DLIBRESSL_TESTS=OFF)
+add_subdirectory(deps/libressl)
+target_link_libraries(coroutine PUBLIC tls )
+
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D CO_DEBUG -D CO_USE_VALGRIND ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
