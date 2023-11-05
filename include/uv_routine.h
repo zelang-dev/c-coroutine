@@ -362,7 +362,7 @@ typedef struct http_s {
     char *protocol;
 
     /* The protocol version */
-    float version;
+    double version;
 
     /* The requested status code */
     http_status code;
@@ -425,7 +425,7 @@ C_API void parse_http(http_t *, char *headers);
  * - `hostname` for `Host:` header request,  will be ignored on `path/url` setting
  * - `protocol` version for `HTTP/` header
  */
-C_API http_t *http_for(http_parser_type action, char *hostname, float protocol);
+C_API http_t *http_for(http_parser_type action, char *hostname, double protocol);
 
 /**
  * Construct a new response string.

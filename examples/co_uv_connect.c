@@ -5,7 +5,6 @@ int co_main(int argc, char *argv[]) {
     size_t len = sizeof(hostname);
     string_t command, port, http;
     string host_part, headers;
-    struct hostent *host;
 
     if (argc >= 1) {
         if (strcmp(argv[1], "--host") == 0 && is_str_in(argv[2], ".")) {

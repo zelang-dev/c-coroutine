@@ -191,7 +191,7 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
         ex_terminate();
 
 #ifdef _WIN32
-    if (!is_empty(message))
+    if (!is_empty((void_t)message))
         RaiseException(EXCEPTION_PANIC, 0, 0, 0);
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);

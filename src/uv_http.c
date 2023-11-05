@@ -131,12 +131,12 @@ string_t http_status_str(uint16_t const status) {
         case 510: return "Not Extended";               // RFC 2774
         case 511: return "Network Authentication Required"; // RFC 6585
         case 599: return "Network Connect Timeout Error";
-        defaults: return NULL;
+        default: return NULL;
     }
 }
 
 void parse_http(http_t *this, string headers) {
-    int count = 0;
+    int x = 0, count = 0;
     this->raw = headers;
 
     string *p_headers = co_str_split(this->raw, "\n\n", &count);
@@ -149,7 +149,7 @@ void parse_http(http_t *this, string headers) {
         this->headers = ht_string_init();
         string *parts = NULL;
         string *params = NULL;
-        for (int x; x < count; x++) {
+        for (x; x < count; x++) {
             // clean the line
             string line = lines[x];
             bool found = false;
@@ -195,7 +195,7 @@ void parse_http(http_t *this, string headers) {
     }
 }
 
-http_t *http_for(http_parser_type action, string hostname, float protocol) {
+http_t *http_for(http_parser_type action, string hostname, double protocol) {
     http_t *this = co_new_by(1, sizeof(http_t));
 
     this->parameters = NULL;
@@ -239,7 +239,7 @@ string http_response(http_t *this, string body, http_status status, string type,
     // Create a string out of the response data
     string lines = co_concat_by(20,
                         // response status
-                         "HTTP/", (is_empty(this->protocol) ? gcvt(this->version, 2, scrape) : this->protocol), " ",
+                         "HTTP/", (is_empty(this->protocol) ? _gcvt(this->version, 2, scrape) : this->protocol), " ",
                          co_itoa(this->status), " ", http_status_str(this->status), CRLF,
                          // set initial headers
                          "Date: ", http_std_date(0), CRLF,
@@ -291,7 +291,7 @@ string http_request(http_t *this,
 
     char scrape[CO_SCRAPE_SIZE];
     string headers = co_concat_by(14, method_strings[method], " ", url_array->path,
-                                  " HTTP/", gcvt(this->version, 2, scrape), CRLF,
+                                  " HTTP/", _gcvt(this->version, 2, scrape), CRLF,
                                   "Host: ", hostname, CRLF,
                                   "Accept: */*", CRLF,
                                   "User-Agent: ", HTTP_AGENT, CRLF

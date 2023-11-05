@@ -13,4 +13,6 @@ int co_main(int argc, char *argv[]) {
 
     if (is_str_eq(response, http_response(parser, "hello world", STATUS_OK, NULL, "x-powered-by=ZeLang;")))
         printf("\nThey match!\n\n%s\n", response);
+
+    return 0;
 }

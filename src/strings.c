@@ -10,7 +10,7 @@ string_t co_itoa(int64_t number) {
 }
 
 int co_strpos(string_t text, string pattern) {
-    int c, d, e, text_length, pattern_length, position = -1;
+    size_t c, d, e, text_length, pattern_length, position = -1;
 
     text_length = strlen(text);
     pattern_length = strlen(pattern);
@@ -30,7 +30,7 @@ int co_strpos(string_t text, string pattern) {
         }
 
         if (d == pattern_length) {
-            return position;
+            return (int)position;
         }
     }
 
@@ -171,7 +171,7 @@ string *co_split_ex(string_t s, string_t delim, int *count, bool use_defer) {
 
         *++ptrs = NULL;
         if (count)
-            *count = nbWords;
+            *count = (int)nbWords;
     }
 
     return data;
@@ -186,7 +186,7 @@ string *str_split(string_t s, string_t delim, int *count) {
 }
 
 string co_concat_ex(bool use_defer, int num_args, va_list ap_copy) {
-    int strsize = 0;
+    size_t strsize = 0;
     va_list ap;
 
     va_copy(ap, ap_copy);

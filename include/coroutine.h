@@ -24,6 +24,7 @@
 #include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
+    #include "compat/sys/time.h"
     #include "compat/unistd.h"
     #include <excpt.h>
     /* O.S. physical ~input/output~ console `DEVICE`. */
@@ -836,7 +837,6 @@ C_API void channel_free(channel_t *);
 #if defined(_WIN32) || defined(_WIN64)
 C_API int vasprintf(char **, string_t, va_list);
 C_API int asprintf(char **, string_t, ...);
-C_API int gettimeofday(struct timeval *, struct timezone *);
 C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);
 #endif
 

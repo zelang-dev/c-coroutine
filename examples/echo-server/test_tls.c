@@ -91,7 +91,14 @@ int main()
 {
     uv_loop_t *loop = uv_default_loop();
 
-    int ng = tls_engine_inhale("localhost.crt", "localhost.pem", 0);
+    char name[256];
+    char crt[256];
+    char key[256];
+    int len = sizeof(name);
+    uv_os_gethostname(name, &len);
+    snprintf(crt, 256, "%s.crt", name);
+    snprintf(key, 256, "%s.key", name);
+    int ng = tls_engine_inhale(crt, key, 0);
     assert(ng == 0);
 
     uv_tls_t *server = (uv_tls_t*)malloc(sizeof *server);

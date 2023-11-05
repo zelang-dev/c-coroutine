@@ -159,7 +159,7 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) 
     routine_t *co = uv->context;
 
     buf->base = (string)co_calloc_full(co, 1, suggested_size + 1, CO_FREE);
-    buf->len = suggested_size;
+    buf->len = (unsigned int)suggested_size;
 }
 
 static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
@@ -169,7 +169,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     co->halt = true;
     if (nread < 0) {
         if (nread != UV_EOF)
-            fprintf(stderr, "Error: %s\n", uv_strerror(nread));
+            fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
 
         co_result_set(co, (nread == UV_EOF ? 0 : &nread));
     } else {
@@ -566,11 +566,11 @@ string fs_read(uv_file fd, int64_t offset) {
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     uv_args->buffer = co_new_by(1, stat->st_size + 1);
-    uv_args->bufs = uv_buf_init(uv_args->buffer, stat->st_size);
+    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
 
     args = (values_t *)co_new_by(2, sizeof(values_t));
     args[0].value.integer = fd;
-    args[1].value.u_int = offset;
+    args[1].value.u_int = (unsigned int)offset;
 
     return fs_start(uv_args, args, UV_FS_READ, 2, false).char_ptr;
 }
@@ -583,11 +583,11 @@ int fs_write(uv_file fd, string_t text, int64_t offset) {
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     uv_args->buffer = co_new_by(1, size);
     memcpy(uv_args->buffer, text, size);
-    uv_args->bufs = uv_buf_init(uv_args->buffer, size);
+    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
 
     args = (values_t *)co_new_by(2, sizeof(values_t));
     args[0].value.integer = fd;
-    args[1].value.u_int = offset;
+    args[1].value.u_int = (unsigned int)offset;
 
     return fs_start(uv_args, args, UV_FS_WRITE, 2, false).integer;
 }
@@ -630,7 +630,7 @@ int stream_write(uv_stream_t *handle, string_t text) {
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     uv_args->buffer = co_new_by(1, size);
     memcpy(uv_args->buffer, text, size);
-    uv_args->bufs = uv_buf_init(uv_args->buffer, size);
+    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
 
     args = (values_t *)co_new_by(1, sizeof(values_t));
     args[0].value.object = handle;

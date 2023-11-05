@@ -55,3 +55,6 @@ build/
 .frontmatter/
 frontmatter.json
 coroutine-built/
+*.crt
+*.pem
+*.key
