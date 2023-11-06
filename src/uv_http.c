@@ -149,7 +149,7 @@ void parse_http(http_t *this, string headers) {
         this->headers = ht_string_init();
         string *parts = NULL;
         string *params = NULL;
-        for (x; x < count; x++) {
+        for (x = 0; x < count; x++) {
             // clean the line
             string line = lines[x];
             bool found = false;
