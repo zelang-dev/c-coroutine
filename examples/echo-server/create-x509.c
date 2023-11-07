@@ -1,6 +1,27 @@
-#include <coroutine.h>
+
+#include <uv.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+
 #include <openssl/pem.h>
 #include <openssl/x509.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+    #include <compat/unistd.h>
+#else
+    #include <unistd.h>
+#endif
+
+
+void str_ext(char *buffer, const char *name, const char *ext) {
+    int r = snprintf(buffer, strlen(buffer), "%s%s", name, ext);
+#ifdef _WIN32
+#else
+    if (r)
+        (void *)r;
+#endif
+}
 
 /* Generates a 4096-bit RSA key. */
 EVP_PKEY *generate_key() {
@@ -24,7 +45,7 @@ EVP_PKEY *generate_key() {
 }
 
 /* Generates a self-signed x509 certificate. */
-X509 *generate_x509(EVP_PKEY *pkey, string_t country, string_t org, string_t domain) {
+X509 *generate_x509(EVP_PKEY *pkey, const char * country, const char * org, const char * domain) {
     /* Allocate memory for the X509 structure. */
     X509 *x509 = X509_new();
     if (!x509) {
@@ -46,9 +67,9 @@ X509 *generate_x509(EVP_PKEY *pkey, string_t country, string_t org, string_t dom
     X509_NAME *name = X509_get_subject_name(x509);
 
     /* Set the country code and common name. */
-    X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (u_string_t)(is_empty((void_t)country) ? "US" : country), -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (u_string_t)(is_empty((void_t)org) ? "selfSigned" : org), -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (u_string_t)(is_empty((void_t)domain) ? "localhost" : domain), -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (const unsigned char *)(country == NULL ? "US" : country), -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (const unsigned char *)(org == NULL ? "selfSigned" : org), -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (const unsigned char *)(domain == NULL ? "localhost" : domain), -1, -1, 0);
 
     /* Now set the issuer name. */
     X509_set_issuer_name(x509, name);
@@ -63,31 +84,32 @@ X509 *generate_x509(EVP_PKEY *pkey, string_t country, string_t org, string_t dom
     return x509;
 }
 
-bool write_to_disk(EVP_PKEY *pkey, X509 *x509, string_t hostname) {
+int write_to_disk(EVP_PKEY *pkey, X509 *x509, const char * hostname) {
     /* Open the PEM file for writing the key to disk. */
-    char name[256];
-    snprintf(name, 256, "%s.key", hostname);
-    FILE *pkey_file = fopen(name, "wb");
+    char key[256];
+    char crt[256];
+    str_ext(key, hostname, ".key");
+    FILE *pkey_file = fopen(key, "wb");
     if (!pkey_file) {
-        printf("Unable to open \"%s\" for writing.\n", name);
-        return false;
+        printf("Unable to open \"%s\" for writing.\n", key);
+        return -1;
     }
 
     /* Write the key to disk. */
-    bool ret = PEM_write_PrivateKey(pkey_file, pkey, NULL, NULL, 0, NULL, NULL);
+    int ret = PEM_write_PrivateKey(pkey_file, pkey, NULL, NULL, 0, NULL, NULL);
     fclose(pkey_file);
 
     if (!ret) {
         puts("Unable to write private key to disk.");
-        return false;
+        return -1;
     }
 
     /* Open the PEM file for writing the certificate to disk. */
-    snprintf(name, 256, "%s.crt", hostname);
-    FILE *x509_file = fopen(name, "wb");
+    str_ext(crt, hostname, ".crt");
+    FILE *x509_file = fopen(crt, "wb");
     if (!x509_file) {
-        printf("Unable to open \"%s\" for writing.\n", name);
-        return false;
+        printf("Unable to open \"%s\" for writing.\n", crt);
+        return -1;
     }
 
     /* Write the certificate to disk. */
@@ -96,23 +118,23 @@ bool write_to_disk(EVP_PKEY *pkey, X509 *x509, string_t hostname) {
 
     if (!ret) {
         puts("Unable to write certificate to disk.");
-        return false;
+        return -1;
     }
 
-    return true;
+    return 0;
 }
 
-int co_main(int argc, char **argv) {
+int main(int argc, char **argv) {
     char name[256];
-    int len = sizeof(name);
-    gethostname(name, len);
+    size_t len = sizeof(name);
+    uv_os_gethostname(name, &len);
 
     /* Generate the key. */
     puts("Generating RSA key...");
-
     EVP_PKEY *pkey = generate_key();
-    if (!pkey)
+    if (!pkey) {
         return 1;
+    }
 
     /* Generate the certificate. */
     puts("Generating x509 certificate...");
@@ -124,7 +146,7 @@ int co_main(int argc, char **argv) {
 
     /* Write the private key and certificate out to disk. */
     puts("Writing key and certificate to disk...");
-    bool ret = write_to_disk(pkey, x509, name);
+    int ret = write_to_disk(pkey, x509, name);
     EVP_PKEY_free(pkey);
     X509_free(x509);
 

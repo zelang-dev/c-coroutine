@@ -239,7 +239,7 @@ string http_response(http_t *this, string body, http_status status, string type,
     // Create a string out of the response data
     string lines = co_concat_by(20,
                         // response status
-                         "HTTP/", (is_empty(this->protocol) ? _gcvt(this->version, 2, scrape) : this->protocol), " ",
+                         "HTTP/", (is_empty(this->protocol) ? gcvt(this->version, 2, scrape) : this->protocol), " ",
                          co_itoa(this->status), " ", http_status_str(this->status), CRLF,
                          // set initial headers
                          "Date: ", http_std_date(0), CRLF,
@@ -291,7 +291,7 @@ string http_request(http_t *this,
 
     char scrape[CO_SCRAPE_SIZE];
     string headers = co_concat_by(14, method_strings[method], " ", url_array->path,
-                                  " HTTP/", _gcvt(this->version, 2, scrape), CRLF,
+                                  " HTTP/", gcvt(this->version, 2, scrape), CRLF,
                                   "Host: ", hostname, CRLF,
                                   "Accept: */*", CRLF,
                                   "User-Agent: ", HTTP_AGENT, CRLF

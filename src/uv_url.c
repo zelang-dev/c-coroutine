@@ -1,13 +1,15 @@
 #include "../include/coroutine.h"
 
 uv_handle_type scheme_type(string scheme) {
-    if (is_str_eq(scheme, "http")
-        || is_str_eq(scheme, "tcp")
-        || is_str_eq(scheme, "https")
+    if (is_str_eq(scheme, "https")
         || is_str_eq(scheme, "tls")
-        || is_str_eq(scheme, "ftp")
-        || is_str_eq(scheme, "ftps")
-        || is_str_eq(scheme, "ssl")) {
+        || is_str_eq(scheme, "ssl")
+        || is_str_eq(scheme, "wss")
+        || is_str_eq(scheme, "ftps")) {
+        return UV_TLS;
+    } else if(is_str_eq(scheme, "http")
+        || is_str_eq(scheme, "tcp")
+        || is_str_eq(scheme, "ftp")) {
         return UV_TCP;
     } else if (is_str_eq(scheme, "file") || is_str_eq(scheme, "unix")) {
         return UV_NAMED_PIPE;

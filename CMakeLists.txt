@@ -36,6 +36,7 @@ target_link_libraries(coroutine PUBLIC yyjson)
 
 add_definitions(-DLIBRESSL_APPS=OFF)
 add_definitions(-DLIBRESSL_TESTS=OFF)
+add_definitions(-DLIBRESSL_DISABLE_OVERRIDE_WINCRYPT_DEFINES_WARNING)
 add_subdirectory(deps/libressl)
 target_link_libraries(coroutine PUBLIC ssl)
 target_link_libraries(coroutine PUBLIC crypto)

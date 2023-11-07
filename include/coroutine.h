@@ -611,6 +611,7 @@ typedef struct uv_args_s
     uv_buf_t bufs;
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
+    evt_ctx_t ctx;
 
     struct sockaddr_in6 in6[1];
     struct sockaddr_in in4[1];
@@ -759,6 +760,7 @@ C_API string *str_split(string_t s, string_t delim, int *count);
 C_API string str_concat_by(int num_args, ...);
 C_API string str_toupper(string s, size_t len);
 C_API string str_tolower(string s, size_t len);
+C_API void str_merge(string buffer, string_t text, string_t ext);
 C_API string word_toupper(string str, char sep);
 C_API string ltrim(string s);
 C_API string rtrim(string s);
@@ -838,6 +840,7 @@ C_API void channel_free(channel_t *);
 C_API int vasprintf(char **, string_t, va_list);
 C_API int asprintf(char **, string_t, ...);
 C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);
+#define gcvt _gcvt
 #endif
 
 #define HASH_LOAD_FACTOR (0.75)

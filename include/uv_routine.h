@@ -2,7 +2,7 @@
 #define UV_ROUTINE_H
 
 #include <ctype.h>
-#include "uv.h"
+#include "uv_tls.h"
 #include "compat/yyjson.h"
 
 /* Public API qualifier. */
@@ -180,6 +180,8 @@ C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
 
 #define CRLF "\r\n"
+#define UV_TLS UV_HANDLE + UV_STREAM + UV_POLL
+#define UV_SERVER_LISTEN UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP
 
 typedef struct url_s {
     uv_handle_type uv_type;

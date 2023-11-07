@@ -1,114 +1,109 @@
-/*//////////////////////////////////////////////////////////////////////////////
-
- * Copyright (c) 2015 libuv-tls contributors
-
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
-
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
-
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
-**////////////////////////////////////////////////////////////////////////////*/
-
+//%LICENSE////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2015 Devchandra M. Leishangthem (dlmeetei at gmail dot com)
+//
+// Distributed under the MIT License (See accompanying file LICENSE)
+//
+//////////////////////////////////////////////////////////////////////////
+//
+//%///////////////////////////////////////////////////////////////////////////
 
 #include "uv_tls.h"
+#include <assert.h>
 
-void alloc_cb(uv_handle_t *handle, size_t size, uv_buf_t *buf)
+void echo_read(uv_tls_t *strm, ssize_t nrd, const uv_buf_t *bfr)
 {
-    buf->base = (char*)malloc(size);
-    memset(buf->base, 0, size);
-    buf->len = size;
-    assert(buf->base != NULL && "Memory allocation failed");
+    if ( nrd <= 0 ) return;
+    fprintf( stdout, "%s\n", bfr->base);
+
+    uv_tls_close(strm, (uv_tls_close_cb)free);
 }
 
-void echo_read(uv_tls_t *server, int nread, uv_buf_t *buf) {
-    fprintf(stderr, "Entering %s\n", __FUNCTION__);
-
-    if (nread == -1) {
-        fprintf(stderr, "error echo_read");
-        return;
-    }
-     
-     fprintf(stderr, "%s\n", buf->base);
-}
-
-void on_write(uv_write_t *req, int status)
+void on_write(uv_tls_t *utls, int status)
 {
-    if(status ) {
-        return;
+    assert(utls->tcp_hdl->data == utls);
+    if (status == -1) {
+	fprintf(stderr, "error on_write");
+	return;
     }
 
-    uv_tls_read(req->handle->data, alloc_cb, echo_read);
-    free(req);
-    req = 0;
+    uv_tls_read(utls, echo_read);
 }
 
-void on_close(uv_tls_t* h)
+void on_tls_handshake(uv_tls_t *tls, int status)
 {
-    free(h);
-    h = 0;
+    assert(tls->tcp_hdl->data == tls);
+    uv_buf_t dcrypted;
+    dcrypted.base = "Hello from evt-tls";
+    dcrypted.len = (unsigned long)strlen(dcrypted.base);
+
+    if ( 0 == status ) // TLS connection not failed
+    {
+        uv_tls_write(tls, &dcrypted, on_write);
+    }
+    else {
+	uv_tls_close(tls, (uv_tls_close_cb)free);
+    }
 }
 
-
-
-
-//TEST CODE for the lib
 void on_connect(uv_connect_t *req, int status)
 {
-    fprintf( stderr, "Entering tls_connect callback\n");
+    // TCP connection error check
     if( status ) {
-        fprintf( stderr, "TCP connection error\n");
         return;
     }
-    fprintf( stderr, "TCP connection established\n");
 
-    uv_tls_t *clnt = req->handle->data;
-    uv_write_t *rq = (uv_write_t*)malloc(sizeof(*rq));
-    uv_buf_t dcrypted;
-    dcrypted.base = "Hello from lib-tls";
-    dcrypted.len = strlen(dcrypted.base);
-    assert(rq != 0);
-    uv_tls_write(rq, clnt, &dcrypted, on_write);
+    evt_ctx_t *ctx = req->data;
+    uv_tcp_t *tcp = (uv_tcp_t*)req->handle;
+
+    //free on uv_tls_close
+    uv_tls_t *sclient = malloc(sizeof(*sclient));
+    if( uv_tls_init(ctx, tcp, sclient) < 0 ) {
+        free(sclient);
+        return;
+    }
+    assert(tcp->data == sclient);
+    uv_tls_connect(sclient, on_tls_handshake);
 }
 
+void str_ext(char *buffer, char *name, char *ext) {
+    int r = snprintf(buffer, strlen(buffer), "%s%s", name, ext);
+#ifdef _WIN32
+#else
+    if (r)
+        (void *)r;
+#endif
+}
 
 int main()
 {
     uv_loop_t *loop = uv_default_loop();
+    //free on uv_close_cb via uv_tls_close call
+    uv_tcp_t *client = malloc(sizeof *client);
+    uv_tcp_init(loop, client);
+    int port = 8000;
 
-    uv_tls_t *client = (uv_tls_t*)malloc(sizeof *client);
-    if(uv_tls_init(loop, client) < 0) {
-        free(client);
-        client = 0;
-        fprintf( stderr, "TLS setup error\n");
-        return  -1;
-    }
+    evt_ctx_t ctx;
 
-    const int port = 8000;
+    char name[256];
+    char crt[256];
+    char key[256];
+    size_t len = sizeof(name);
+    uv_os_gethostname(name, &len);
+    str_ext(crt, name, ".crt");
+    str_ext(key, name, ".key");
+
+    evt_ctx_init_ex(&ctx, crt, key);
+    evt_ctx_set_nio(&ctx, NULL, uv_tls_writer);
+
     struct sockaddr_in conn_addr;
-    int r = uv_ip4_addr("127.0.0.1", port, &conn_addr);
-    assert(!r);
+    uv_ip4_addr("127.0.0.1", port, &conn_addr);
 
     uv_connect_t req;
-    uv_tls_connect(&req, client, (const struct sockaddr*)&conn_addr, on_connect);
+    req.data = &ctx;
+    uv_tcp_connect(&req, client,(const struct sockaddr*)&conn_addr,on_connect);
 
     uv_run(loop, UV_RUN_DEFAULT);
-
-
-    tls_engine_stop();
-    free (client);
-    client = 0;
-
+    evt_ctx_free(&ctx);
     return 0;
 }

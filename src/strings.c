@@ -319,6 +319,15 @@ string trim(string s) {
     return rtrim(ltrim(s));
 }
 
+void str_merge(string buffer, string_t text, string_t ext) {
+    int r = snprintf(buffer, strlen(buffer), "%s%s", text, ext);
+#ifdef _WIN32
+#else
+    if (r)
+        (void *)r;
+#endif
+}
+
 static u_char_t base64_table[65] =
 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
