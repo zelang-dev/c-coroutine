@@ -46,10 +46,6 @@ void on_connect_cb(uv_stream_t *server, int status) {
     uv_tls_accept(sclient, on_uv_handshake);
 }
 
-void str_ext(char *buffer, char *name, char *ext) {
-    int r = snprintf(buffer, strlen(buffer), "%s%s", name, ext);
-}
-
 int main() {
     uv_loop_t *loop = uv_default_loop();
     int port = 8000, r = 0;
@@ -61,8 +57,13 @@ int main() {
     char key[256];
     size_t len = sizeof(name);
     uv_os_gethostname(name, &len);
-    str_ext(crt, name, ".crt");
-    str_ext(key, name, ".key");
+    int r = snprintf(crt, sizeof(crt), "%s.crt", name);
+    if (r)
+        puts("Invalid hostname");
+
+    r = snprintf(key, sizeof(crt), "%s.key", name);
+    if (r)
+        puts("Invalid hostname");
 
     evt_ctx_init_ex(&ctx, crt, key);
     evt_ctx_set_nio(&ctx, NULL, uv_tls_writer);
