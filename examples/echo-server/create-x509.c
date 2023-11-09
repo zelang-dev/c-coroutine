@@ -13,11 +13,6 @@
     #include <unistd.h>
 #endif
 
-
-void str_ext(char *buffer, const char *name, const char *ext) {
-    int r = snprintf(buffer, strlen(buffer), "%s%s", name, ext);
-}
-
 /* Generates a 4096-bit RSA key. */
 EVP_PKEY *generate_key() {
     /* Allocate memory for the EVP_PKEY structure. */
@@ -60,7 +55,6 @@ X509 *generate_x509(EVP_PKEY *pkey, const char * country, const char * org, cons
 
     /* We want to copy the subject name to the issuer name. */
     X509_NAME *name = X509_get_subject_name(x509);
-
     /* Set the country code and common name. */
     X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (const unsigned char *)(country == NULL ? "US" : country), -1, -1, 0);
     X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (const unsigned char *)(org == NULL ? "selfSigned" : org), -1, -1, 0);
@@ -79,12 +73,13 @@ X509 *generate_x509(EVP_PKEY *pkey, const char * country, const char * org, cons
     return x509;
 }
 
-int write_to_disk(EVP_PKEY *pkey, X509 *x509, const char * hostname) {
+int write_to_disk(EVP_PKEY *pkey, X509 *x509, const char *hostname) {
     /* Open the PEM file for writing the key to disk. */
-    char key[256];
-    char crt[256];
-    str_ext(key, hostname, ".key");
-    FILE *pkey_file = fopen(key, "wb");
+    char key[270];
+    char crt[270];
+
+    int r = snprintf(key, sizeof(key), "%s.key", hostname);
+    FILE *pkey_file = fopen(key, "wb+");
     if (!pkey_file) {
         printf("Unable to open \"%s\" for writing.\n", key);
         return -1;
@@ -100,8 +95,8 @@ int write_to_disk(EVP_PKEY *pkey, X509 *x509, const char * hostname) {
     }
 
     /* Open the PEM file for writing the certificate to disk. */
-    str_ext(crt, hostname, ".crt");
-    FILE *x509_file = fopen(crt, "wb");
+    r = snprintf(crt, sizeof(crt), "%s.crt", hostname);
+    FILE *x509_file = fopen(crt, "wb+");
     if (!x509_file) {
         printf("Unable to open \"%s\" for writing.\n", crt);
         return -1;

@@ -214,7 +214,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     routine_t *co = uv->context;
 
     if (uv->bind_type == UV_TLS) {
-        stream->data = (void_t)uv->tls_temp;
+        uv_handle_set_data((uv_handle_t *)stream, (void_t)uv->tls_temp);
         uv->tls_temp = NULL;
     }
 
@@ -858,8 +858,13 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
                 break;
             case UV_TLS:
                 uv_os_gethostname(name, &len);
-                str_merge(crt, name, ".crt");
-                str_merge(key, name, ".key");
+                r = snprintf(crt, sizeof(crt), "%s.crt", name);
+                if (r)
+                    CO_LOG("Invalid hostname");
+
+                r = snprintf(key, sizeof(key), "%s.key", name);
+                if (r)
+                    CO_LOG("Invalid hostname");
 
                 evt_ctx_init_ex(&uv_args->ctx, crt, key);
                 evt_ctx_set_nio(&uv_args->ctx, NULL, uv_tls_writer);

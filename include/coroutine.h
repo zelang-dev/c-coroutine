@@ -763,7 +763,6 @@ C_API string *str_split(string_t s, string_t delim, int *count);
 C_API string str_concat_by(int num_args, ...);
 C_API string str_toupper(string s, size_t len);
 C_API string str_tolower(string s, size_t len);
-C_API void str_merge(string buffer, string_t text, string_t ext);
 C_API string word_toupper(string str, char sep);
 C_API string ltrim(string s);
 C_API string rtrim(string s);
