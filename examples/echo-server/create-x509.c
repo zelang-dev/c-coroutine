@@ -16,11 +16,6 @@
 
 void str_ext(char *buffer, const char *name, const char *ext) {
     int r = snprintf(buffer, strlen(buffer), "%s%s", name, ext);
-#ifdef _WIN32
-#else
-    if (r)
-        (void *)r;
-#endif
 }
 
 /* Generates a 4096-bit RSA key. */

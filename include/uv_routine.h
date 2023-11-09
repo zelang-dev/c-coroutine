@@ -10,7 +10,7 @@
 #define C_API extern
 #endif
 
-#define stream(handle) ((uv_stream_t *)handle)
+#define STREAM(handle) ((uv_stream_t *)handle)
 
 #ifdef __cplusplus
 extern "C"

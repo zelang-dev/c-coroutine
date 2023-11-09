@@ -70,14 +70,14 @@
     #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
     #define CO_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
 #else
-    #define CO_LOG(s) UNUSED(s)
-    #define CO_INFO(s, ...)  UNUSED(s)
-    #define CO_HERE()  UNUSED(0)
+    #define CO_LOG(s) (void*)s
+    #define CO_INFO(s, ...)  (void*)s
+    #define CO_HERE()  (void*)0
 #endif
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (10 * 1024)
+    #define CO_STACK_SIZE (32 * 1024)
 #endif
 
 #ifndef CO_MAIN_STACK
@@ -536,6 +536,8 @@ struct routine_s {
     bool loop_active;
     bool event_active;
     bool loop_erred;
+    bool is_read;
+    bool plain_result;
     signed int loop_code;
     void_t user_data;
 #if defined(CO_USE_VALGRIND)
@@ -612,6 +614,7 @@ typedef struct uv_args_s
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
     evt_ctx_t ctx;
+    uv_tls_t *tls_temp;
 
     struct sockaddr_in6 in6[1];
     struct sockaddr_in in4[1];
@@ -1363,6 +1366,7 @@ C_API bool is_str_in(string_t text, string pattern);
 C_API bool is_str_eq(string_t str, string_t str2);
 C_API bool is_str_empty(string_t str);
 C_API bool is_base64(u_string_t src);
+C_API bool is_tls(void_t);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);

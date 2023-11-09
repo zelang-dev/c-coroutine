@@ -167,8 +167,8 @@ wait_result_t *co_wait(wait_group_t *wg) {
                             coroutine_yield();
                         } else {
                             if (!is_empty(co->results) && !co->loop_erred) {
-                                hash_put(wgr, co_itoa(co->cid), co->results);
-                                if(!co->event_active)
+                                hash_put(wgr, co_itoa(co->cid), (co->is_read ? &co->results : co->results));
+                                if (!co->event_active && !co->plain_result)
                                     CO_FREE(co->results);
 
                                 co->results = NULL;
@@ -211,7 +211,7 @@ value_t co_group_get_result(wait_result_t *wgr, int cid) {
 }
 
 void co_result_set(routine_t *co, void_t data) {
-    if (data && data != CO_ERROR) {
+    if (!is_empty(data)) {
         if (!is_empty(co->results) && !co->event_active)
             CO_FREE(co->results);
 
@@ -219,7 +219,7 @@ void co_result_set(routine_t *co, void_t data) {
             co->results = data;
         } else {
             co->results = try_calloc(1, sizeof(values_t) + sizeof(data));
-            memcpy(co->results, &data, sizeof(data));
+            memcpy(co->results, data, sizeof(data));
         }
     }
 }
@@ -292,4 +292,8 @@ CO_FORCE_INLINE bool is_str_eq(string_t str, string_t str2) {
 
 CO_FORCE_INLINE bool is_str_empty(string_t str) {
     return is_str_eq(str, "");
+}
+
+CO_FORCE_INLINE bool is_tls(void_t self) {
+    return ((var_t *)self)->type == UV_TLS;
 }

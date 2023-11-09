@@ -48,11 +48,6 @@ void on_connect_cb(uv_stream_t *server, int status) {
 
 void str_ext(char *buffer, char *name, char *ext) {
     int r = snprintf(buffer, strlen(buffer), "%s%s", name, ext);
-#ifdef _WIN32
-#else
-    if (r)
-        (void *)r;
-#endif
 }
 
 int main() {

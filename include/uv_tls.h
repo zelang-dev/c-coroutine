@@ -39,6 +39,7 @@ struct uv_tls_s {
    uv_tcp_t *tcp_hdl;
    evt_tls_t *tls;
    void *data;
+   void *uv_args;
 
    uv_tls_read_cb tls_rd_cb;
    uv_tls_close_cb tls_cls_cb;
