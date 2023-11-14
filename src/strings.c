@@ -232,6 +232,190 @@ string str_concat_by(int num_args, ...) {
     return text;
 }
 
+#ifdef _WIN32
+static bool _is_basename_start(string_t start, string_t pos) {
+    if (pos - start >= 1
+        && *(pos - 1) != '/'
+        && *(pos - 1) != '\\') {
+        if (pos - start == 1) {
+            return true;
+        } else if (*(pos - 2) == '/' || *(pos - 2) == '\\') {
+            return true;
+        } else if (*(pos - 2) == ':'
+                   && _is_basename_start(start, pos - 2)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/* Returns the filename component of the path */
+string basename(string_t s) {
+    string c;
+    string_t comp, cend;
+    size_t inc_len, cnt;
+    size_t len = strlen(s);
+    int state;
+
+    comp = cend = c = (string)s;
+    cnt = len;
+    state = 0;
+    while (cnt > 0) {
+        inc_len = (*c == '\0' ? 1 : mblen(c, cnt));
+        switch (inc_len) {
+            case -2:
+            case -1:
+                inc_len = 1;
+                break;
+            case 0:
+                goto quit_loop;
+            case 1:
+                if (*c == '/' || *c == '\\') {
+                    if (state == 1) {
+                        state = 0;
+                        cend = c;
+                    }
+                    /* Catch relative paths in c:file.txt style. They're not to confuse
+                       with the NTFS streams. This part ensures also, that no drive
+                       letter traversing happens. */
+                } else if ((*c == ':' && (c - comp == 1))) {
+                    if (state == 0) {
+                        comp = c;
+                        state = 1;
+                    } else {
+                        cend = c;
+                        state = 0;
+                    }
+                } else {
+                    if (state == 0) {
+                        comp = c;
+                        state = 1;
+                    }
+                }
+                break;
+            default:
+                if (state == 0) {
+                    comp = c;
+                    state = 1;
+                }
+                break;
+                }
+        c += inc_len;
+        cnt -= inc_len;
+        }
+
+quit_loop:
+    if (state == 1) {
+        cend = c;
+    }
+
+    len = cend - comp;
+    return co_string(comp, len);
+}
+#endif
+
+/* Returns directory name component of path */
+size_t dirname(string path, size_t len) {
+    string end = path + len - 1;
+    unsigned int len_adjust = 0;
+
+#ifdef _WIN32
+    /* Note that on Win32 CWD is per drive (heritage from CP/M).
+     * This means dirname("c:foo") maps to "c:." or "c:" - which means CWD on C: drive.
+     */
+    if ((2 <= len) && isalpha((int)((u_string)path)[0]) && (':' == path[1])) {
+        /* Skip over the drive spec (if any) so as not to change */
+        path += 2;
+        len_adjust += 2;
+        if (2 == len) {
+            /* Return "c:" on Win32 for dirname("c:").
+             * It would be more consistent to return "c:."
+             * but that would require making the string *longer*.
+             */
+            return len;
+        }
+    }
+#endif
+
+    if (len == 0) {
+        /* Illegal use of this function */
+        return 0;
+    }
+
+    /* Strip trailing slashes */
+    while (end >= path && IS_SLASH_P(end)) {
+        end--;
+    }
+    if (end < path) {
+        /* The path only contained slashes */
+        path[0] = SLASH;
+        path[1] = '\0';
+        return 1 + len_adjust;
+    }
+
+    /* Strip filename */
+    while (end >= path && !IS_SLASH_P(end)) {
+        end--;
+    }
+    if (end < path) {
+        /* No slash found, therefore return '.' */
+        path[0] = '.';
+        path[1] = '\0';
+        return 1 + len_adjust;
+    }
+
+    /* Strip slashes which came before the file name */
+    while (end >= path && IS_SLASH_P(end)) {
+        end--;
+    }
+    if (end < path) {
+        path[0] = SLASH;
+        path[1] = '\0';
+        return 1 + len_adjust;
+    }
+    *(end + 1) = '\0';
+
+    return (size_t)(end + 1 - path) + len_adjust;
+}
+
+const_t str_memrchr(const_t s, int c, size_t n) {
+    u_string_t e;
+    if (0 == n) {
+        return NULL;
+    }
+
+    for (e = (u_string_t)s + n - 1; e >= (u_string_t)s; e--) {
+        if (*e == (u_char_t)c) {
+            return (const_t)e;
+        }
+    }
+
+    return NULL;
+}
+
+fileinfo_t *pathinfo(string filepath) {
+    fileinfo_t *file = co_new_by(1, sizeof(fileinfo_t));
+    size_t path_len = strlen(filepath);
+    string dir_name;
+    string_t p;
+    ptrdiff_t idx;
+
+    dir_name = co_strdup(filepath);
+    dirname(dir_name, path_len);
+    file->dirname = dir_name;
+    file->basename = basename(file->dirname);
+    file->filename = basename(filepath);
+
+    p = str_memrchr((const_t)file->filename, '.', strlen(file->filename));
+    if (p) {
+        idx = p - file->filename;
+        file->extension = file->filename + idx + 1;
+    }
+
+    return file;
+}
+
 ht_string_t *co_parse_str(string lines, string sep) {
     ht_string_t *this = ht_string_init();
     defer(hash_free, this);
@@ -361,7 +545,7 @@ bool is_base64(u_string_t src) {
     return true;
 }
 
-u_string co_base64_encode(u_string_t src) {
+u_string base64_encode(u_string_t src) {
     u_string out, pos;
     u_string_t end, begin;
     size_t olen;
@@ -400,7 +584,7 @@ u_string co_base64_encode(u_string_t src) {
     return out;
 }
 
-u_string co_base64_decode(u_string_t src) {
+u_string base64_decode(u_string_t src) {
     u_string out, pos;
     u_char block[4];
     size_t i, count, olen;

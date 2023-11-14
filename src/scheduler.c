@@ -866,8 +866,8 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->loop_active = false;
     co->event_active = false;
     co->loop_erred = false;
-    co->plain_result = false;
-    co->is_read = false;
+    co->is_plain = false;
+    co->is_address = false;
     co->loop_code = 0;
     co->args = args;
     co->results = NULL;
@@ -1224,18 +1224,7 @@ static void coroutine_scheduler(void) {
             } else if (t->channeled) {
                 gc_coroutine(t);
             } else if (t->loop_erred && coroutine_count == 0) {
-                if (uv_server_args) {
-                    if (t->context->wait_group)
-                        hash_free(t->context->wait_group);
-                }
-
-                if (uv_loop_alive(co_loop())) {
-                    uv_walk(co_loop(), (uv_walk_cb)uv_close_free, NULL);
-                    uv_run(co_loop(), UV_RUN_DEFAULT);
-
-                    uv_stop(co_loop());
-                    uv_run(co_loop(), UV_RUN_DEFAULT);
-                }
+                coroutine_event_cleanup(t);
             }
         }
     }

@@ -2,6 +2,7 @@
 
 int co_main(int argc, char *argv[]) {
     url_t *url = parse_url("http://secret:hideout@zelang.dev:80/this/is/a/very/deep/directory/structure/and/file.html?lots=1&of=2&parameters=3&too=4&here=5#some_page_ref123");
+    fileinfo_t *fileinfo = pathinfo(url->path);
 
     printf("[uv_type] => %d\n", url->uv_type);
     printf("[scheme] => %s\n", url->scheme);
@@ -11,9 +12,14 @@ int co_main(int argc, char *argv[]) {
     printf("[port] => %d\n", url->port);
     printf("[path] => %s\n", url->path);
     printf("[query] => %s\n", url->query);
-    printf("[fragment] => %s\n", url->fragment);
+    printf("[fragment] => %s\n\n", url->fragment);
 
-   if (url->query) {
+    printf("[dirname] => %s\n", fileinfo->dirname);
+    printf("[basename] => %s\n", fileinfo->basename);
+    printf("[extension] => %s\n", fileinfo->extension);
+    printf("[filename] => %s\n\n", fileinfo->filename);
+
+    if (url->query) {
        int i = 0;
        char **token = co_str_split(url->query, "&", &i);
 

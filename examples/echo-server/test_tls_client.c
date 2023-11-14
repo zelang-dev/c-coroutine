@@ -8,7 +8,10 @@
 //
 //%///////////////////////////////////////////////////////////////////////////
 
-#include "uv_tls.h"
+#include "../../include/uv_tls.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <assert.h>
 
 void echo_read(uv_tls_t *strm, ssize_t nrd, const uv_buf_t *bfr)
@@ -82,11 +85,11 @@ int main()
     size_t len = sizeof(name);
     uv_os_gethostname(name, &len);
     int r = snprintf(key, sizeof(key), "%s.key", name);
-    if (r)
+    if (r == 0)
         puts("Invalid hostname");
 
     r = snprintf(crt, sizeof(crt), "%s.crt", name);
-    if (r)
+    if (r == 0)
         puts("Invalid hostname");
 
     evt_ctx_init_ex(&ctx, crt, key);

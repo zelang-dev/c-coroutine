@@ -8,7 +8,7 @@
 //
 //%///////////////////////////////////////////////////////////////////////////
 
-#include "uv_routine.h"
+#include "../include/uv_routine.h"
 #ifndef CO_ASSERT
   #if defined(CO_DEBUG)
     #include <assert.h>
@@ -163,6 +163,9 @@ int evt_ctx_init(evt_ctx_t *tls) {
 
     SSL_CTX_set_mode(tls->ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER | SSL_MODE_ENABLE_PARTIAL_WRITE);
 
+    tls->type = UV_CTX;
+    tls->data = NULL;
+    tls->uv_args = NULL;
     tls->cert_set = 0;
     tls->key_set = 0;
     tls->ssl_err_ = 0;

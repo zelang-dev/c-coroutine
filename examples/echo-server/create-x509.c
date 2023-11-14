@@ -1,5 +1,5 @@
 
-#include <uv.h>
+#include "../../include/uv.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -8,7 +8,7 @@
 #include <openssl/x509.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-    #include <compat/unistd.h>
+    #include "../../include/compat/unistd.h"
 #else
     #include <unistd.h>
 #endif

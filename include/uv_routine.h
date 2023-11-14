@@ -52,6 +52,7 @@ typedef struct sockaddr_in6 sock_in6_t;
 
 C_API void coro_uv_close(uv_handle_t *);
 C_API void uv_close_free(void *handle);
+C_API void coroutine_event_cleanup(void *handle);
 
 C_API char *fs_readfile(const char *path);
 C_API uv_file fs_open(const char *path, int flags, int mode);
@@ -118,6 +119,8 @@ C_API void pipe_connect(uv_pipe_t *, const char *name);
 C_API uv_tcp_t *tcp_create(void);
 C_API void tcp_connect(uv_tcp_t *handle, const struct sockaddr *addr);
 
+C_API uv_tcp_t *tls_tcp_create(void *extra);
+
 C_API void coro_async_init(uv_loop_t *, uv_async_t *async, uv_async_cb callback);
 
 /** @return int */
@@ -182,6 +185,57 @@ C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
 #define CRLF "\r\n"
 #define UV_TLS UV_HANDLE + UV_STREAM + UV_POLL
 #define UV_SERVER_LISTEN UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP
+#define UV_CTX UV_SERVER_LISTEN + UV_POLL
+
+#ifdef _WIN32
+#include <sys/utime.h>
+/* mode_t isn't defined on Windows */
+typedef unsigned short mode_t;
+
+#define SLASH '\\'
+#define DIR_SEP	';'
+#define IS_SLASH(c)	((c) == '/' || (c) == '\\')
+#define IS_SLASH_P(c)	(*(c) == '/' || \
+        (*(c) == '\\' && !IsDBCSLeadByte(*(c-1))))
+
+/* COPY_ABS_PATH is 2 under Win32 because by chance both regular absolute paths
+   in the file system and UNC paths need copying of two characters */
+#define COPY_ABS_PATH(path) 2
+#define IS_UNC_PATH(path, len) \
+	(len >= 2 && IS_SLASH(path[0]) && IS_SLASH(path[1]))
+#define IS_ABS_PATH(path, len) \
+	(len >= 2 && (/* is local */isalpha(path[0]) && path[1] == ':' || /* is UNC */IS_SLASH(path[0]) && IS_SLASH(path[1])))
+
+#else
+#include <dirent.h>
+
+#define SLASH '/'
+
+#ifdef __riscos__
+    #define DIR_SEP  ';'
+#else
+    #define DIR_SEP  ':'
+#endif
+
+#define IS_SLASH(c)	((c) == '/')
+#define IS_SLASH_P(c)	(*(c) == '/')
+#endif
+
+#ifndef COPY_ABS_PATH
+#define COPY_ABS_PATH(path) 0
+#endif
+
+#ifndef IS_ABS_PATH
+#define IS_ABS_PATH(path, len) \
+	(IS_SLASH(path[0]))
+#endif
+
+typedef struct fileinfo_s {
+    const char *dirname;
+    const char *basename;
+    const char *extension;
+    const char *filename;
+} fileinfo_t;
 
 typedef struct url_s {
     uv_handle_type uv_type;

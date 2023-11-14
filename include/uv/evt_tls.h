@@ -41,6 +41,10 @@ typedef int (*net_rdr)(evt_tls_t *tls, void *edata, int len);
 
 typedef struct evt_ctx_s
 {
+    int type;
+    void *data;
+    void *uv_args;
+
     //find better place for it , should be one time init
     SSL_CTX *ctx;
 
@@ -61,9 +65,6 @@ typedef struct evt_ctx_s
 
     //function for reading network data and feeding to evt
     net_rdr reader;
-
-    void *data;
-
 } evt_ctx_t;
 
 struct evt_tls_s {

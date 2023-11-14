@@ -51,21 +51,6 @@ static int htoi(string s) {
  */
 static unsigned char hex_chars[] = "0123456789ABCDEF";
 
-static const_t _memrchr(const_t s, int c, size_t n) {
-    u_string_t e;
-    if (0 == n) {
-        return NULL;
-    }
-
-    for (e = (u_string_t)s + n - 1; e >= (u_string_t)s; e--) {
-        if (*e == (u_char_t)c) {
-            return (const_t)e;
-        }
-    }
-
-    return NULL;
-}
-
 static u_char_t tolower_map[256] = {
 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
 0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,
@@ -261,7 +246,7 @@ parse_host:
     e = binary_strcspn(s, ue, "/?#");
 
     /* check for login and password */
-    if ((p = _memrchr(s, '@', (e - s)))) {
+    if ((p = str_memrchr(s, '@', (e - s)))) {
         if ((pp = memchr(s, ':', (p - s)))) {
             ret->user = co_string(s, (pp - s));
             replace_ctrl_ex(ret->user, strlen(ret->user));
@@ -284,7 +269,7 @@ parse_host:
            IPv6 embedded address */
         p = NULL;
     } else {
-        p = _memrchr(s, ':', (e - s));
+        p = str_memrchr(s, ':', (e - s));
     }
 
     if (p) {

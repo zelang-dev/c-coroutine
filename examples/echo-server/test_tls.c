@@ -8,7 +8,10 @@
 //
 //%///////////////////////////////////////////////////////////////////////////
 
-#include "uv_tls.h"
+#include "../../include/uv_tls.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <signal.h>
 
 void on_write(uv_tls_t *tls, int status) {
@@ -20,7 +23,7 @@ void uv_rd_cb( uv_tls_t *strm, ssize_t nrd, const uv_buf_t *bfr) {
     {
         return;
     }
-    uv_tls_write(strm, (uv_buf_t*)bfr, on_write);
+    uv_tls_write(strm, (uv_buf_t *)bfr, on_write);
 }
 
 void on_uv_handshake(uv_tls_t *ut, int status) {
@@ -46,9 +49,12 @@ void on_connect_cb(uv_stream_t *server, int status) {
     uv_tls_accept(sclient, on_uv_handshake);
 }
 
+#ifndef HOSTNAME
+#define HOSTNAME "localhost"
+#endif
 int main() {
     uv_loop_t *loop = uv_default_loop();
-    int port = 8000, r = 0;
+    int port = 9010, r = 0;
     evt_ctx_t ctx;
     struct sockaddr_in bind_local;
 
@@ -56,13 +62,14 @@ int main() {
     char crt[256];
     char key[256];
     size_t len = sizeof(name);
+
     uv_os_gethostname(name, &len);
-    int r = snprintf(crt, sizeof(crt), "%s.crt", name);
-    if (r)
+    r = snprintf(crt, sizeof(crt), "%s.crt", name);
+    if (r == 0)
         puts("Invalid hostname");
 
     r = snprintf(key, sizeof(crt), "%s.key", name);
-    if (r)
+    if (r == 0)
         puts("Invalid hostname");
 
     evt_ctx_init_ex(&ctx, crt, key);
@@ -75,7 +82,7 @@ int main() {
     if ((r = uv_tcp_bind(&listener_local, (struct sockaddr*)&bind_local, 0)))
         fprintf( stderr, "bind: %s\n", uv_strerror(r));
 
-    if ((r = uv_listen((uv_stream_t*)&listener_local, 128, on_connect_cb)))
+    if ((r = uv_listen((uv_stream_t*)&listener_local, 1024, on_connect_cb)))
         fprintf( stderr, "listen: %s\n", uv_strerror(r));
     printf("Listening on %d\n", port);
     uv_run(loop, UV_RUN_DEFAULT);

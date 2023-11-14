@@ -42,8 +42,8 @@ void co_delete(routine_t *co) {
             if (co->err_allocated)
                 CO_FREE(co->err_allocated);
 
-            if (co->results && !co->event_active)
-                CO_FREE(co->results);
+            //if (co->results && !co->event_active && !co->is_address && !co->is_plain)
+                //CO_FREE(co->results);
 
             CO_FREE(co);
         }
@@ -103,8 +103,8 @@ value_t co_await(callable_t fn, void_t arg) {
     wait_group_t *wg = co_wait_group();
     int cid = co_go(fn, arg);
     wait_result_t *wgr = co_wait(wg);
-    // if (is_empty(wgr))
-   //     return;
+    if (is_empty(wgr))
+        return;
 
     return co_group_get_result(wgr, cid);
 }
@@ -128,7 +128,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
 
     co_deferred(c, dtor, handle);
     int r = snprintf(c->name, sizeof(c->name), "handler #%s", key);
-    if (r < 0)
+    if (r == 0)
         CO_LOG("Invalid handler");
 
     co->event_group = NULL;
@@ -149,6 +149,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
     routine_t *c = co_active();
     wait_result_t *wgr = NULL;
     routine_t *co;
+    bool has_erred = false;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_pause();
         wgr = ht_result_init();
@@ -167,21 +168,18 @@ wait_result_t *co_wait(wait_group_t *wg) {
                             coroutine_yield();
                         } else {
                             if (!is_empty(co->results) && !co->loop_erred) {
-                                hash_put(wgr, co_itoa(co->cid), (co->is_read ? &co->results : co->results));
-                                if (!co->event_active && !co->plain_result)
+                                hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
+                                if (!co->event_active && !co->is_plain && !co->is_address)
                                     CO_FREE(co->results);
 
-                                co->results = NULL;
+                                //co->results = NULL;
                             }
 
                             if (co->loop_erred) {
-                                //return NULL;
-                                //hash_remove(wg, pair->key);
-                                //--c->wait_counter;
-                                //break;
-                                //continue;
-                                hash_free(wg);
-                                return wgr;
+                                hash_remove(wg, pair->key);
+                                --c->wait_counter;
+                                has_erred = true;
+                                continue;
                             }
 
                             if (co->loop_active)
@@ -200,12 +198,12 @@ wait_result_t *co_wait(wait_group_t *wg) {
     }
 
     hash_free(wg);
-    return wgr;
+    return has_erred ? NULL : wgr;
 }
 
 value_t co_group_get_result(wait_result_t *wgr, int cid) {
-    //  if (is_empty(wgr))
-   //     return;
+    if (is_empty(wgr))
+        return;
 
     return ((values_t *)hash_get(wgr, co_itoa(cid)))->value;
 }
@@ -215,7 +213,7 @@ void co_result_set(routine_t *co, void_t data) {
         if (!is_empty(co->results) && !co->event_active)
             CO_FREE(co->results);
 
-        if (co->event_active) {
+        if (co->event_active || co->is_address) {
             co->results = data;
         } else {
             co->results = try_calloc(1, sizeof(values_t) + sizeof(data));
@@ -294,6 +292,6 @@ CO_FORCE_INLINE bool is_str_empty(string_t str) {
     return is_str_eq(str, "");
 }
 
-CO_FORCE_INLINE bool is_tls(void_t self) {
+CO_FORCE_INLINE bool is_tls(uv_handle_t *self) {
     return ((var_t *)self)->type == UV_TLS;
 }

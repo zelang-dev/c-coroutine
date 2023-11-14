@@ -373,21 +373,21 @@ bool has_header(http_t *this, string key) {
 }
 
 bool has_variable(http_t *this, string key, string var) {
-    char temp[64] = {0};
+    char temp[CO_SCRAPE_SIZE] = {0};
 
-    snprintf(temp, 64, "%s%s", var, "=");
+    snprintf(temp, CO_SCRAPE_SIZE, "%s%s", var, "=");
     return is_str_in(get_header(this, key), temp);
 }
 
 bool has_flag(http_t *this, string key, string flag) {
-    char flag1[64] = {0};
-    char flag2[64] = {0};
-    char flag3[64] = {0};
+    char flag1[CO_SCRAPE_SIZE] = {0};
+    char flag2[CO_SCRAPE_SIZE] = {0};
+    char flag3[CO_SCRAPE_SIZE] = {0};
     string value = get_header(this, key);
 
-    snprintf(flag1, 64, "%s%s", flag, ";");
-    snprintf(flag2, 64, "%s%s", flag, ",");
-    snprintf(flag3, 64, "%s%s", flag, "\r\n");
+    snprintf(flag1, CO_SCRAPE_SIZE, "%s%s", flag, ";");
+    snprintf(flag2, CO_SCRAPE_SIZE, "%s%s", flag, ",");
+    snprintf(flag3, CO_SCRAPE_SIZE, "%s%s", flag, "\r\n");
     return is_str_in(value, flag1) || is_str_in(value, flag2) || is_str_in(value, flag3);
 }
 

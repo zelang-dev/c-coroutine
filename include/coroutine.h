@@ -21,6 +21,10 @@
     #include <sys/resource.h> /* setrlimit() */
 #endif
 
+#ifndef CERTIFICATE
+    #define CERTIFICATE "localhost"
+#endif
+
 #include "uv_routine.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
@@ -536,8 +540,8 @@ struct routine_s {
     bool loop_active;
     bool event_active;
     bool loop_erred;
-    bool is_read;
-    bool plain_result;
+    bool is_address;
+    bool is_plain;
     signed int loop_code;
     void_t user_data;
 #if defined(CO_USE_VALGRIND)
@@ -614,7 +618,6 @@ typedef struct uv_args_s
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
     evt_ctx_t ctx;
-    uv_tls_t *tls_temp;
 
     struct sockaddr_in6 in6[1];
     struct sockaddr_in in4[1];
@@ -752,13 +755,21 @@ C_API void_t co_malloc(routine_t *, size_t);
 C_API void_t co_malloc_full(routine_t *, size_t, func_t);
 C_API void_t co_memdup(routine_t *, const_t, size_t);
 
-C_API char *co_strdup(string_t);
-C_API char *co_strndup(string_t, size_t);
-C_API char *co_string(string_t str, size_t length);
-C_API char *co_sprintf(string_t, ...);
+C_API string co_strdup(string_t);
+C_API string co_strndup(string_t, size_t);
+C_API string co_string(string_t str, size_t length);
+C_API string co_sprintf(string_t, ...);
 C_API string *co_str_split(string_t s, string_t delim, int *count);
 C_API string co_concat_by(int num_args, ...);
-C_API ht_string_t *co_parse_str(char *lines, char *sep);
+C_API ht_string_t *co_parse_str(string lines, string sep);
+
+/*
+Returns information about a certain file string path
+
+Modifed C code from PHP userland function
+see https://www.php.net/manual/en/function.pathinfo.php */
+C_API fileinfo_t *pathinfo(string filepath);
+C_API const_t str_memrchr(const_t s, int c, size_t n);
 C_API string *str_split(string_t s, string_t delim, int *count);
 C_API string str_concat_by(int num_args, ...);
 C_API string str_toupper(string s, size_t len);
@@ -768,8 +779,8 @@ C_API string ltrim(string s);
 C_API string rtrim(string s);
 C_API string trim(string s);
 
-C_API u_string co_base64_encode(u_string_t src);
-C_API u_string co_base64_decode(u_string_t src);
+C_API u_string base64_encode(u_string_t src);
+C_API u_string base64_decode(u_string_t src);
 
 C_API int co_array_init(co_array_t *);
 
@@ -1198,7 +1209,7 @@ C_API void co_stack_check(int);
 
 C_API string_t co_itoa(int64_t number);
 C_API int co_strpos(string_t text, string pattern);
-C_API void co_strcpy(char *dest, string_t src, size_t len);
+C_API void co_strcpy(string dest, string_t src, size_t len);
 
 C_API void gc_coroutine(routine_t *);
 C_API void gc_channel(channel_t *);
@@ -1365,7 +1376,7 @@ C_API bool is_str_in(string_t text, string pattern);
 C_API bool is_str_eq(string_t str, string_t str2);
 C_API bool is_str_empty(string_t str);
 C_API bool is_base64(u_string_t src);
-C_API bool is_tls(void_t);
+C_API bool is_tls(uv_handle_t *);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);
