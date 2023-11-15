@@ -772,6 +772,7 @@ C_API fileinfo_t *pathinfo(string filepath);
 C_API const_t str_memrchr(const_t s, int c, size_t n);
 C_API string *str_split(string_t s, string_t delim, int *count);
 C_API string str_concat_by(int num_args, ...);
+C_API string str_replace(string_t haystack, string_t needle, string_t replace);
 C_API string str_toupper(string s, size_t len);
 C_API string str_tolower(string s, size_t len);
 C_API string word_toupper(string str, char sep);

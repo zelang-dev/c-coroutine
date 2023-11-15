@@ -232,6 +232,42 @@ string str_concat_by(int num_args, ...) {
     return text;
 }
 
+string str_replace(string_t haystack, string_t needle, string_t replace) {
+    if (!haystack || !needle || !replace)
+        return NULL;
+
+    string result;
+    int i, cnt = 0;
+    int newWlen = strlen(replace);
+    int oldWlen = strlen(needle);
+
+    for (i = 0; haystack[i] != '\0'; i++) {
+        if (strstr(&haystack[i], needle) == &haystack[i]) {
+            cnt++;
+
+            i += oldWlen - 1;
+        }
+    }
+
+    if (cnt == 0)
+        return NULL;
+
+    result = (string)co_new_by(1, i + cnt * (newWlen - oldWlen) + 1);
+    i = 0;
+    while (*haystack) {
+        if (strstr(haystack, needle) == haystack) {
+            strcpy(&result[i], replace);
+            i += newWlen;
+            haystack += oldWlen;
+        } else {
+            result[i++] = *haystack++;
+        }
+    }
+
+    result[i] = '\0';
+    return result;
+}
+
 #ifdef _WIN32
 static bool _is_basename_start(string_t start, string_t pos) {
     if (pos - start >= 1

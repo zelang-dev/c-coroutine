@@ -27,8 +27,11 @@ int co_main(int argc, char *argv[]) {
            char **parts = co_str_split(token[x], "=", NULL);
            printf("%s = %s\n", parts[0], parts[1]);
        }
-   }
+    }
 
-   printf("%s\n", co_concat_by(3, "testing ", "this ", "thing"));
-   return 0;
+    printf("New String: %s\n", str_replace(fileinfo->dirname,
+                                           "directory",
+                                           co_concat_by(3, "testing ", "this ", "thing")));
+
+    return 0;
 }
