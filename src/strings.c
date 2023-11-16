@@ -351,12 +351,13 @@ quit_loop:
 }
 #endif
 
+#ifdef _WIN32
 /* Returns directory name component of path */
-size_t dirname(string path, size_t len) {
+string dirname(string path) {
+    size_t len = strlen(path);
     string end = path + len - 1;
     unsigned int len_adjust = 0;
 
-#ifdef _WIN32
     /* Note that on Win32 CWD is per drive (heritage from CP/M).
      * This means dirname("c:foo") maps to "c:." or "c:" - which means CWD on C: drive.
      */
@@ -372,7 +373,6 @@ size_t dirname(string path, size_t len) {
             return len;
         }
     }
-#endif
 
     if (len == 0) {
         /* Illegal use of this function */
@@ -412,8 +412,9 @@ size_t dirname(string path, size_t len) {
     }
     *(end + 1) = '\0';
 
-    return (size_t)(end + 1 - path) + len_adjust;
+    return path;
 }
+#endif
 
 const_t str_memrchr(const_t s, int c, size_t n) {
     u_string_t e;
@@ -438,10 +439,10 @@ fileinfo_t *pathinfo(string filepath) {
     ptrdiff_t idx;
 
     dir_name = co_strdup(filepath);
-    dirname(dir_name, path_len);
+    dirname(dir_name);
     file->dirname = dir_name;
-    file->basename = basename(file->dirname);
-    file->filename = basename(filepath);
+    file->base = basename((string)file->dirname);
+    file->filename = basename((string)filepath);
 
     p = str_memrchr((const_t)file->filename, '.', strlen(file->filename));
     if (p) {

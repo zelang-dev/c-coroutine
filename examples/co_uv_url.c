@@ -15,7 +15,7 @@ int co_main(int argc, char *argv[]) {
     printf("[fragment] => %s\n\n", url->fragment);
 
     printf("[dirname] => %s\n", fileinfo->dirname);
-    printf("[basename] => %s\n", fileinfo->basename);
+    printf("[base] => %s\n", fileinfo->base);
     printf("[extension] => %s\n", fileinfo->extension);
     printf("[filename] => %s\n\n", fileinfo->filename);
 

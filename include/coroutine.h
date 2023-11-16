@@ -46,6 +46,7 @@
     #define SYS_NULL "/dev/null"
     /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
     #define SYS_PIPE "./"
+    #include <libgen.h>
 #endif
 
 #include <time.h>
