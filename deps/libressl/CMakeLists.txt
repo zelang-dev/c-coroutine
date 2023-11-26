@@ -32,9 +32,7 @@ string(REGEX REPLACE "\\..*" "" TLS_MAJOR_VERSION ${TLS_VERSION})
 
 option(LIBRESSL_SKIP_INSTALL "Skip installation" ${LIBRESSL_SKIP_INSTALL})
 option(LIBRESSL_APPS "Build apps" OFF)
-option(LIBRESSL_TESTS "Build tests" OFF)
 option(ENABLE_ASM "Enable assembly" ON)
-option(ENABLE_EXTRATESTS "Enable extra tests that may be unreliable on some platforms" OFF)
 option(ENABLE_NC "Enable installing TLS-enabled nc(1)" OFF)
 set(OPENSSLDIR ${OPENSSLDIR} CACHE PATH "Set the default openssl directory" FORCE)
 set(LIBRESSL_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/LibreSSL" CACHE STRING "Installation directory for the CMake targets")
@@ -423,9 +421,6 @@ if(NOT MSVC)
 	add_subdirectory(man)
 endif()
 # Tests require the openssl executable and are unavailable when building shared libraries
-if(LIBRESSL_APPS AND LIBRESSL_TESTS)
-	add_subdirectory(tests)
-endif()
 
 if (BUILD_APPLE_XCFRAMEWORK)
 	# Create the super library from object libraries

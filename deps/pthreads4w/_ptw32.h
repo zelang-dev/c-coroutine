@@ -38,18 +38,15 @@
 #ifndef __PTW32_H
 #define __PTW32_H
 
-/* See the README file for an explanation of the pthreads-win32
+/* See the README file for an explanation of the pthreads4w
  * version numbering scheme and how the DLL is named etc.
- *
- * FIXME: consider moving this to <_ptw32.h>; maybe also add a
- * leading underscore to the macro names.
  */
 #define  __PTW32_VERSION_MAJOR 3
 #define  __PTW32_VERSION_MINOR 0
-#define  __PTW32_VERSION_MICRO 0
+#define  __PTW32_VERSION_MICRO 2
 #define  __PTW32_VERION_BUILD 0
-#define  __PTW32_VERSION 3,0,0,0
-#define  __PTW32_VERSION_STRING "3, 0, 0, 0\0"
+#define  __PTW32_VERSION 3,0,3,0
+#define  __PTW32_VERSION_STRING "3, 0, 2, 0\0"
 
 #if defined(__GNUC__)
 # pragma GCC system_header
@@ -149,8 +146,8 @@
 #  define int64_t LONGLONG
 #  define uint64_t ULONGLONG
 #elif !defined(__MINGW32__)
-     typedef _int64 int64_t;
-     typedef unsigned _int64 uint64_t;
+typedef long long int64_t;
+typedef unsigned long long uint64_t;
 #  if defined (__PTW32_CONFIG_MSVC6)
      typedef long intptr_t;
 #  endif
