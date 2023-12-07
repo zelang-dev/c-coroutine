@@ -1077,3 +1077,11 @@ uv_tcp_t *tls_tcp_create(void_t extra) {
 
     return tcp;
 }
+
+spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *uid_gid, int no_containers, ...) {
+    return NULL;
+}
+
+spawn_t *spawn(const char *command, const char *args, spawn_options_t *options) {
+    return NULL;
+}

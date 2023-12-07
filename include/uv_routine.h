@@ -50,6 +50,80 @@ typedef union
 typedef struct sockaddr_in sock_in_t;
 typedef struct sockaddr_in6 sock_in6_t;
 
+typedef struct {
+    int type;
+    int stdio_count;
+    uv_stdio_container_t stdio[4];
+    uv_process_options_t options[1];
+} spawn_options_t;
+
+typedef struct {
+    int type;
+    spawn_options_t *handle;
+    uv_process_t process[1];
+    uv_pid_t pid;
+    int cid;
+} spawn_t;
+
+/**
+ * @param env Environment for the new process. If NULL the parents environment is used.
+ * @param cwd Current working directory for the subprocess.
+ * @param flags  Various process flags that control how `uv_spawn()` behaves:
+ * - On Windows this uses CreateProcess which concatenates the arguments into a string this can
+ * cause some strange errors. See the UV_PROCESS_WINDOWS_VERBATIM_ARGUMENTS flag on uv_process_flags.
+ * - `UV_PROCESS_SETUID`
+ * - `UV_PROCESS_SETGID`
+ * - `UV_PROCESS_WINDOWS_VERBATIM_ARGUMENTS`
+ * - `UV_PROCESS_DETACHED`
+ * - `UV_PROCESS_WINDOWS_HIDE`
+ * - `UV_PROCESS_WINDOWS_HIDE_CONSOLE`
+ * - `UV_PROCESS_WINDOWS_HIDE_GUI`
+ *
+ * @param uid_gid options
+ * Can change the child process’ user/group id. This happens only when the appropriate bits are set in the flags fields.
+ * - Note:  This is not supported on Windows, uv_spawn() will fail and set the error to UV_ENOTSUP.
+ *
+ * @param no_containers Number of containers for each stream or file descriptors to be passed to a child process.
+ * @param stdio fd or streams
+ * - The convention stdio[0] points to `fd 0` for stdin, `fd 1` is used for stdout, and `fd 2` is stderr.
+ * - Note: On Windows file descriptors greater than 2 are available to the child process only if
+ * the child processes uses the MSVCRT runtime.
+ *
+ * @param flag specify how stdio `uv_stdio_flags` should be transmitted to the child process.
+ * - `UV_IGNORE`
+ * - `UV_CREATE_PIPE`
+ * - `UV_INHERIT_FD`
+ * - `UV_INHERIT_STREAM`
+ * - `UV_READABLE_PIPE`
+ * - `UV_WRITABLE_PIPE`
+ * - `UV_NONBLOCK_PIPE`
+ * - `UV_OVERLAPPED_PIPE`
+ */
+C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *uid_gid, int no_containers, ...);
+
+/**
+ * Initializes the process handle and starts the process.
+ * If the process is successfully spawned, this function will return `spawn_t`
+ * handle. Otherwise, the negative error code corresponding to the reason it couldn’t
+ * spawn is returned.
+ *
+ * Possible reasons for failing to spawn would include (but not be limited to) the
+ * file to execute not existing, not having permissions to use the setuid or setgid
+ * specified, or not having enough memory to allocate for the new process.
+ *
+ * @param command Program to be executed.
+ * @param args Command line arguments.
+ * - On Windows this uses CreateProcess which concatenates the arguments into a string this can
+ * cause some strange errors. See the UV_PROCESS_WINDOWS_VERBATIM_ARGUMENTS flag on uv_process_flags.
+ * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
+ */
+C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
+C_API int spawn_signal(spawn_t *handle, int sig);
+C_API uv_stream_t *ipc_in(spawn_t *in);
+C_API uv_stream_t *ipc_out(spawn_t *out);
+C_API uv_stream_t *ipc_err(spawn_t *err);
+C_API uv_stream_t *ipc_other(spawn_t *other);
+
 C_API void coro_uv_close(uv_handle_t *);
 C_API void uv_close_free(void *handle);
 C_API void coroutine_event_cleanup(void *handle);
@@ -134,9 +208,6 @@ C_API void coro_signal_start(uv_signal_t *, uv_signal_cb signal_cb, int signum);
 
 /** @return int */
 C_API void coro_signal_start_oneshot(uv_signal_t *, uv_signal_cb signal_cb, int signum);
-
-/** @return int */
-C_API void coro_spawn(uv_loop_t *, uv_process_t *, uv_process_options_t *options);
 
 /** @return int */
 C_API void coro_queue_work(uv_loop_t *, uv_work_t *, uv_work_cb work_cb, uv_after_work_cb after_work_cb);
