@@ -136,6 +136,28 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     hash_free(eg);
 }
 
+void co_process(func_t fn, void_t handle, func_t dtor) {
+    routine_t *co = co_active();
+    wait_group_t *eg = ht_group_init();
+
+    co->event_group = eg;
+    co->event_active = true;
+    co->process_active = true;
+
+    int cid = co_go((callable_t)fn, handle);
+    string_t key = co_itoa(cid);
+    routine_t *c = (routine_t *)hash_get(eg, key);
+
+    co_deferred(c, dtor, handle);
+    int r = snprintf(c->name, sizeof(c->name), "process #%s", key);
+    if (r == 0)
+        CO_LOG("Invalid process");
+
+    co->event_group = NULL;
+    hash_remove(eg, key);
+    hash_free(eg);
+}
+
 wait_group_t *co_wait_group(void) {
     routine_t *c = co_active();
     wait_group_t *wg = ht_group_init();

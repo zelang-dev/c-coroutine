@@ -333,6 +333,7 @@ typedef enum
     CO_FUTURE,
     CO_FUTURE_ARG,
     CO_EVENT_ARG,
+    CO_PROCESS,
     CO_SCHED,
     CO_CHANNEL,
     CO_STRUCT,
@@ -540,6 +541,7 @@ struct routine_s {
     routine_t *context;
     bool loop_active;
     bool event_active;
+    bool process_active;
     bool loop_erred;
     bool is_address;
     bool is_plain;

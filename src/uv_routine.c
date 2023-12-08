@@ -91,15 +91,6 @@ static void close_cb(uv_handle_t *handle) {
     co_scheduler();
 }
 
-static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) {
-    uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
-    routine_t *co = uv->context;
-
-    co->halt = true;
-    co_resuming(co->context);
-    co_scheduler();
-}
-
 static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
@@ -1103,14 +1094,26 @@ uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
     return stdio;
 }
 
-spawn_options_t *spawn_opts(string env, string_t cwd, int flags, string uid_gid, int no_of_stdio, ...) {
-    spawn_options_t *handle = try_calloc(1, sizeof(spawn_options_t));
+static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) {
+    uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
+    routine_t *co = uv->context;
+    spawn_free(var_cast(spawn_t, uv->args[2]));
 
-    handle->temp = !is_empty(env) ? str_split(env, ";", NULL) : NULL;
-    handle->options->exit_cb = exit_cb;
-    handle->options->env = handle->temp;
+    co->halt = true;
+    co_resuming(co->context);
+    co_scheduler();
+}
+
+spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, uv_gid_t gid, int no_of_stdio, ...) {
+    spawn_options_t *handle = try_calloc(1, sizeof(spawn_options_t));
+    uv_stdio_container_t *p;
+    va_list argp;
+
+    handle->data = !is_empty(env) ? str_split(env, ";", NULL) : NULL;
+    handle->options->env = handle->data;
     handle->options->cwd = cwd;
     handle->options->flags = flags;
+    handle->options->exit_cb = (flags == UV_PROCESS_DETACHED) ? NULL : exit_cb;
     handle->stdio_count = no_of_stdio;
 
 #ifdef _WIN32
@@ -1121,14 +1124,93 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, string uid_gid,
     handle->options->gid = gid;
 #endif
 
+    if (no_of_stdio > 0) {
+        va_start(argp, no_of_stdio);
+        for (int i = 0; i < no_of_stdio; i++) {
+            p = va_arg(argp, uv_stdio_container_t *);
+            memcpy(&handle->stdio[i], p, sizeof(uv_stdio_container_t));
+            CO_FREE(p);
+        }
+        va_end(argp);
+    }
+
     handle->options->stdio = &handle->stdio;
     handle->options->stdio_count = handle->stdio_count;
 
     return handle;
 }
 
+void spawn_free(spawn_t *child) {
+    uv_process_t *handle = child->process;
+    CO_FREE(child->handle);
+    CO_FREE(child);
+    uv_close((uv_handle_t *)handle, NULL);
+}
+
+void process_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
+    co_process(FUNC_VOID(connected), client, spawn_free);
+}
+
+void spawning(const char *command, const char *params, spawn_options_t *handle) {
+    uv_args_t *uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    values_t *args = (values_t *)co_new_by(3, sizeof(values_t));
+
+    args[0].value.char_ptr = (string)command;
+    args[1].value.char_ptr = (string)params;
+    args[2].value.object = handle;
+}
+
 spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
+    spawn_t *spawning = try_calloc(1, sizeof(spawn_t));
+    int has_args = 3;
+
+    if (is_empty(handle)) {
+        handle = spawn_opts(NULL, NULL, 0, 0, 0, 0);
+    }
+
     handle->options->file = command;
-    handle->options->args = args;
-    return NULL;
+    if (is_empty(args))
+        has_args = 2;
+
+    string command_arg = str_concat_by(has_args, command, ",", args);
+    string *command_args = str_split(command_arg, ",", NULL);
+    handle->options->args = command_args;
+
+    spawning->type = CO_PROCESS;
+    spawning->handle = handle;
+
+    int r = uv_spawn(co_loop(), &spawning->process, &handle->options);
+    if (!is_empty(handle->data))
+        CO_FREE(handle->data);
+
+    handle->data = (void_t)spawning;
+    CO_FREE(command_args);
+    CO_FREE(command_arg);
+
+    return (!r) ? spawning : NULL;
+}
+
+CO_FORCE_INLINE int spawn_signal(spawn_t *handle, int sig) {
+    return uv_process_kill(&handle->process, sig);
+}
+
+CO_FORCE_INLINE void spawn_detach(spawn_t *child) {
+    if (child->handle->options->flags == UV_PROCESS_DETACHED)
+        uv_unref((uv_handle_t *)&child->process);
+}
+
+CO_FORCE_INLINE uv_stream_t *ipc_in(spawn_t *in) {
+    return in->handle->stdio[0].data.stream;
+}
+
+CO_FORCE_INLINE uv_stream_t *ipc_out(spawn_t *out) {
+    return out->handle->stdio[1].data.stream;
+}
+
+CO_FORCE_INLINE uv_stream_t *ipc_err(spawn_t *err) {
+    return err->handle->stdio[2].data.stream;
+}
+
+CO_FORCE_INLINE uv_stream_t *ipc_other(spawn_t *other) {
+    return other->handle->stdio[3].data.stream;
 }

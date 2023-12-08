@@ -52,7 +52,7 @@ typedef struct sockaddr_in6 sock_in6_t;
 
 typedef struct {
     int type;
-    void *temp;
+    void *data;
     int stdio_count;
     uv_stdio_container_t stdio[4];
     uv_process_options_t options[1];
@@ -62,12 +62,11 @@ typedef struct {
     int type;
     spawn_options_t *handle;
     uv_process_t process[1];
-    uv_pid_t pid;
     int cid;
 } spawn_t;
 
 /**
-*@param stdio fd or streams
+*@param stdio fd
 * -The convention stdio[0] points to `fd 0` for stdin, `fd 1` is used for stdout, and `fd 2` is stderr.
 * -Note: On Windows file descriptors greater than 2 are available to the child process only if
 *the child processes uses the MSVCRT runtime.
@@ -85,7 +84,7 @@ typedef struct {
 C_API uv_stdio_container_t *stdio_fd(int fd, int flags);
 
 /**
-*@param stdio fd or streams
+*@param stdio streams
 * -The convention stdio[0] points to `fd 0` for stdin, `fd 1` is used for stdout, and `fd 2` is stderr.
 * -Note: On Windows file descriptors greater than 2 are available to the child process only if
 *the child processes uses the MSVCRT runtime.
@@ -103,7 +102,9 @@ C_API uv_stdio_container_t *stdio_fd(int fd, int flags);
 C_API uv_stdio_container_t *stdio_stream(uv_stream_t *handle, int flags);
 
 /**
- * @param env Environment for the new process. If NULL the parents environment is used.
+ * @param env Environment for the new process. Key=value, separated with semicolon like:
+ * `"Key1=Value1;Key=Value2;Key3=Value3"`. If NULL the parents environment is used.
+ *
  * @param cwd Current working directory for the subprocess.
  * @param flags  Various process flags that control how `uv_spawn()` behaves:
  * - On Windows this uses CreateProcess which concatenates the arguments into a string this can
@@ -116,13 +117,14 @@ C_API uv_stdio_container_t *stdio_stream(uv_stream_t *handle, int flags);
  * - `UV_PROCESS_WINDOWS_HIDE_CONSOLE`
  * - `UV_PROCESS_WINDOWS_HIDE_GUI`
  *
- * @param uid_gid options
+ * @param uid options
+ * @param gid options
  * Can change the child process’ user/group id. This happens only when the appropriate bits are set in the flags fields.
  * - Note:  This is not supported on Windows, uv_spawn() will fail and set the error to UV_ENOTSUP.
  *
  * @param no_of_stdio Number of `uv_stdio_container_t` for each stream or file descriptors to be passed to a child process. Use `stdio_stream()` or `stdio_fd()` functions to create.
  */
-C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *uid_gid, int no_of_stdio, ...);
+C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_t uid, uv_gid_t gid, int no_of_stdio, ...);
 
 /**
  * Initializes the process handle and starts the process.
@@ -135,13 +137,15 @@ C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *u
  * specified, or not having enough memory to allocate for the new process.
  *
  * @param command Program to be executed.
- * @param args Command line arguments.
- * - On Windows this uses CreateProcess which concatenates the arguments into a string this can
- * cause some strange errors. See the UV_PROCESS_WINDOWS_VERBATIM_ARGUMENTS flag on uv_process_flags.
+ * @param args Command line arguments, separate with comma like:
+ * `"arg1,arg2,arg3,...,"` MUST END with comma `","`.
+ *
  * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
  */
 C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
-C_API int spawn_signal(spawn_t *handle, int sig);
+C_API void spawn_free(spawn_t *);
+C_API int spawn_signal(spawn_t *, int sig);
+C_API void spawn_detach(spawn_t *);
 C_API uv_stream_t *ipc_in(spawn_t *in);
 C_API uv_stream_t *ipc_out(spawn_t *out);
 C_API uv_stream_t *ipc_err(spawn_t *err);

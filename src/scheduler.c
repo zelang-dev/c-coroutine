@@ -865,6 +865,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->event_group = NULL;
     co->loop_active = false;
     co->event_active = false;
+    co->process_active = false;
     co->loop_erred = false;
     co->is_plain = false;
     co->is_address = false;
