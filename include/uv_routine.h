@@ -52,6 +52,7 @@ typedef struct sockaddr_in6 sock_in6_t;
 
 typedef struct {
     int type;
+    void *temp;
     int stdio_count;
     uv_stdio_container_t stdio[4];
     uv_process_options_t options[1];
@@ -64,6 +65,42 @@ typedef struct {
     uv_pid_t pid;
     int cid;
 } spawn_t;
+
+/**
+*@param stdio fd or streams
+* -The convention stdio[0] points to `fd 0` for stdin, `fd 1` is used for stdout, and `fd 2` is stderr.
+* -Note: On Windows file descriptors greater than 2 are available to the child process only if
+*the child processes uses the MSVCRT runtime.
+*
+*@param flag specify how stdio `uv_stdio_flags` should be transmitted to the child process.
+* -`UV_IGNORE`
+* -`UV_CREATE_PIPE`
+* -`UV_INHERIT_FD`
+* -`UV_INHERIT_STREAM`
+* -`UV_READABLE_PIPE`
+* -`UV_WRITABLE_PIPE`
+* -`UV_NONBLOCK_PIPE`
+* -`UV_OVERLAPPED_PIPE`
+*/
+C_API uv_stdio_container_t *stdio_fd(int fd, int flags);
+
+/**
+*@param stdio fd or streams
+* -The convention stdio[0] points to `fd 0` for stdin, `fd 1` is used for stdout, and `fd 2` is stderr.
+* -Note: On Windows file descriptors greater than 2 are available to the child process only if
+*the child processes uses the MSVCRT runtime.
+*
+*@param flag specify how stdio `uv_stdio_flags` should be transmitted to the child process.
+* -`UV_IGNORE`
+* -`UV_CREATE_PIPE`
+* -`UV_INHERIT_FD`
+* -`UV_INHERIT_STREAM`
+* -`UV_READABLE_PIPE`
+* -`UV_WRITABLE_PIPE`
+* -`UV_NONBLOCK_PIPE`
+* -`UV_OVERLAPPED_PIPE`
+*/
+C_API uv_stdio_container_t *stdio_stream(uv_stream_t *handle, int flags);
 
 /**
  * @param env Environment for the new process. If NULL the parents environment is used.
@@ -83,23 +120,9 @@ typedef struct {
  * Can change the child process’ user/group id. This happens only when the appropriate bits are set in the flags fields.
  * - Note:  This is not supported on Windows, uv_spawn() will fail and set the error to UV_ENOTSUP.
  *
- * @param no_containers Number of containers for each stream or file descriptors to be passed to a child process.
- * @param stdio fd or streams
- * - The convention stdio[0] points to `fd 0` for stdin, `fd 1` is used for stdout, and `fd 2` is stderr.
- * - Note: On Windows file descriptors greater than 2 are available to the child process only if
- * the child processes uses the MSVCRT runtime.
- *
- * @param flag specify how stdio `uv_stdio_flags` should be transmitted to the child process.
- * - `UV_IGNORE`
- * - `UV_CREATE_PIPE`
- * - `UV_INHERIT_FD`
- * - `UV_INHERIT_STREAM`
- * - `UV_READABLE_PIPE`
- * - `UV_WRITABLE_PIPE`
- * - `UV_NONBLOCK_PIPE`
- * - `UV_OVERLAPPED_PIPE`
+ * @param no_of_stdio Number of `uv_stdio_container_t` for each stream or file descriptors to be passed to a child process. Use `stdio_stream()` or `stdio_fd()` functions to create.
  */
-C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *uid_gid, int no_containers, ...);
+C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *uid_gid, int no_of_stdio, ...);
 
 /**
  * Initializes the process handle and starts the process.

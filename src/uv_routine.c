@@ -91,6 +91,15 @@ static void close_cb(uv_handle_t *handle) {
     co_scheduler();
 }
 
+static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) {
+    uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
+    routine_t *co = uv->context;
+
+    co->halt = true;
+    co_resuming(co->context);
+    co_scheduler();
+}
+
 static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
@@ -1078,10 +1087,48 @@ uv_tcp_t *tls_tcp_create(void_t extra) {
     return tcp;
 }
 
-spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, char *uid_gid, int no_containers, ...) {
-    return NULL;
+uv_stdio_container_t *stdio_fd(int fd, int flags) {
+    uv_stdio_container_t *stdio = try_calloc(1, sizeof(uv_stdio_container_t));
+    stdio->flags = flags;
+    stdio->data.fd = fd;
+
+    return stdio;
 }
 
-spawn_t *spawn(const char *command, const char *args, spawn_options_t *options) {
+uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
+    uv_stdio_container_t *stdio = try_calloc(1, sizeof(uv_stdio_container_t));
+    stdio->flags = flags;
+    stdio->data.stream = (uv_stream_t *)handle;
+
+    return stdio;
+}
+
+spawn_options_t *spawn_opts(string env, string_t cwd, int flags, string uid_gid, int no_of_stdio, ...) {
+    spawn_options_t *handle = try_calloc(1, sizeof(spawn_options_t));
+
+    handle->temp = !is_empty(env) ? str_split(env, ";", NULL) : NULL;
+    handle->options->exit_cb = exit_cb;
+    handle->options->env = handle->temp;
+    handle->options->cwd = cwd;
+    handle->options->flags = flags;
+    handle->stdio_count = no_of_stdio;
+
+#ifdef _WIN32
+    handle->options->uid = NULL;
+    handle->options->gid = NULL;
+#else
+    handle->options->uid = uid;
+    handle->options->gid = gid;
+#endif
+
+    handle->options->stdio = &handle->stdio;
+    handle->options->stdio_count = handle->stdio_count;
+
+    return handle;
+}
+
+spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
+    handle->options->file = command;
+    handle->options->args = args;
     return NULL;
 }
