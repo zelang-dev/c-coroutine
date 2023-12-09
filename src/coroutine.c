@@ -142,11 +142,11 @@ void co_process(func_t fn, void_t args) {
 
     co->event_group = eg;
     co->event_active = true;
-    co->process_active = true;
 
     int cid = co_go((callable_t)fn, args);
     string_t key = co_itoa(cid);
     routine_t *c = (routine_t *)hash_get(eg, key);
+    c->process_active = true;
 
     int r = snprintf(c->name, sizeof(c->name), "process #%s", key);
     if (r == 0)

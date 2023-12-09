@@ -1153,6 +1153,7 @@ uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
 
     return stdio;
 }
+
 spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, uv_gid_t gid, int no_of_stdio, ...) {
     spawn_options_t *handle = try_calloc(1, sizeof(spawn_options_t));
     uv_stdio_container_t *p;
