@@ -871,6 +871,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->is_address = false;
     co->loop_code = 0;
     co->args = args;
+    co->user_data = NULL;
     co->results = NULL;
     co->magic_number = CO_MAGIC_NUMBER;
     co->stack_base = (unsigned char *)(co + 1);

@@ -815,6 +815,7 @@ C_API value_t co_event(callable_t, void_t arg);
 C_API value_t co_await(callable_t fn, void_t arg);
 
 C_API void co_handler(func_t fn, void_t handle, func_t dtor);
+C_API void co_process(func_t fn, void_t args);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */

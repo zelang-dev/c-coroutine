@@ -49,12 +49,14 @@ typedef union
 
 typedef struct sockaddr_in sock_in_t;
 typedef struct sockaddr_in6 sock_in6_t;
+typedef void (*spawn_cb)(int64_t status, int signal);
 
 typedef struct {
     int type;
     void *data;
     int stdio_count;
-    uv_stdio_container_t stdio[4];
+    spawn_cb exiting_cb;
+    uv_stdio_container_t stdio[3];
     uv_process_options_t options[1];
 } spawn_options_t;
 
@@ -62,7 +64,6 @@ typedef struct {
     int type;
     spawn_options_t *handle;
     uv_process_t process[1];
-    int cid;
 } spawn_t;
 
 /**
@@ -143,13 +144,12 @@ C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_
  * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
  */
 C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
-C_API void spawn_free(spawn_t *);
+C_API void spawn_exit(spawn_t *, spawn_cb exit_func);
 C_API int spawn_signal(spawn_t *, int sig);
 C_API void spawn_detach(spawn_t *);
 C_API uv_stream_t *ipc_in(spawn_t *in);
 C_API uv_stream_t *ipc_out(spawn_t *out);
 C_API uv_stream_t *ipc_err(spawn_t *err);
-C_API uv_stream_t *ipc_other(spawn_t *other);
 
 C_API void coro_uv_close(uv_handle_t *);
 C_API void uv_close_free(void *handle);
