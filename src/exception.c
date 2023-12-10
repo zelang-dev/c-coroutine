@@ -88,7 +88,7 @@ static volatile sig_atomic_t got_uncaught_exception = false;
 static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
     fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
-            !is_empty(exception->co->panic) ? exception->co->panic : exception->ex, exception->function);
+            !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex, exception->function);
 #else
     fprintf(stderr, "\n%s: %s\n", message, !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex);
     if (!is_empty((void_t)exception->file)) {

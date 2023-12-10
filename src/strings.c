@@ -237,9 +237,9 @@ string str_replace(string_t haystack, string_t needle, string_t replace) {
         return NULL;
 
     string result;
-    int i, cnt = 0;
-    int newWlen = strlen(replace);
-    int oldWlen = strlen(needle);
+    size_t i, cnt = 0;
+    size_t newWlen = strlen(replace);
+    size_t oldWlen = strlen(needle);
 
     for (i = 0; haystack[i] != '\0'; i++) {
         if (strstr(&haystack[i], needle) == &haystack[i]) {
@@ -370,13 +370,13 @@ string dirname(string path) {
              * It would be more consistent to return "c:."
              * but that would require making the string *longer*.
              */
-            return len;
+            return path;
         }
     }
 
     if (len == 0) {
         /* Illegal use of this function */
-        return 0;
+        return NULL;
     }
 
     /* Strip trailing slashes */
@@ -387,7 +387,7 @@ string dirname(string path) {
         /* The path only contained slashes */
         path[0] = SLASH;
         path[1] = '\0';
-        return 1 + len_adjust;
+        return path;
     }
 
     /* Strip filename */
@@ -398,7 +398,7 @@ string dirname(string path) {
         /* No slash found, therefore return '.' */
         path[0] = '.';
         path[1] = '\0';
-        return 1 + len_adjust;
+        return path;
     }
 
     /* Strip slashes which came before the file name */
@@ -408,7 +408,7 @@ string dirname(string path) {
     if (end < path) {
         path[0] = SLASH;
         path[1] = '\0';
-        return 1 + len_adjust;
+        return path;
     }
     *(end + 1) = '\0';
 

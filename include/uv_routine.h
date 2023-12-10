@@ -100,7 +100,7 @@ C_API uv_stdio_container_t *stdio_fd(int fd, int flags);
 * -`UV_NONBLOCK_PIPE`
 * -`UV_OVERLAPPED_PIPE`
 */
-C_API uv_stdio_container_t *stdio_stream(uv_stream_t *handle, int flags);
+C_API uv_stdio_container_t *stdio_stream(void *handle, int flags);
 
 /**
  * @param env Environment for the new process. Key=value, separated with semicolon like:

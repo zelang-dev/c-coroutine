@@ -734,7 +734,7 @@ string fs_read(uv_file fd, int64_t offset) {
     uv_args_t *uv_args = NULL;
 
     uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    uv_args->buffer = co_new_by(1, stat->st_size + 1);
+    uv_args->buffer = co_new_by(1, (size_t)stat->st_size + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
 
     args = (values_t *)co_new_by(2, sizeof(values_t));
@@ -1079,7 +1079,7 @@ uv_tcp_t *tls_tcp_create(void_t extra) {
 }
 
 static void spawn_free(spawn_t *child) {
-    uv_handle_t *handle = (uv_handle_t *)child->process;
+    uv_handle_t *handle = (uv_handle_t *)&child->process;
 
     CO_FREE(child->handle);
     CO_FREE(child);
@@ -1089,12 +1089,12 @@ static void spawn_free(spawn_t *child) {
 }
 
 static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) {
-    spawn_t *child = (spawn_t *)uv_handle_get_data(handle);
+    spawn_t *child = (spawn_t *)uv_handle_get_data((uv_handle_t *)handle);
     routine_t *co = (routine_t *)child->handle->data;
 
     if (!is_empty(child->handle->exiting_cb)) {
         co->user_data = (void_t)child->handle->exiting_cb;
-        co->loop_code = exit_status;
+        co->loop_code = (signed int)exit_status;
         co->results = &term_signal;
     }
 
@@ -1111,7 +1111,7 @@ static void spawning(void_t uv_args) {
     routine_t *co = co_active();
 
     uv_handle_set_data((uv_handle_t *)&child->process, (void_t)child);
-    int r = uv_spawn(co_loop(), &child->process, &child->handle->options);
+    int r = uv_spawn(co_loop(), child->process, child->handle->options);
     defer(spawn_free, child);
     if (!is_empty(child->handle->data))
         CO_FREE(child->handle->data);
@@ -1168,8 +1168,8 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, u
     handle->stdio_count = no_of_stdio;
 
 #ifdef _WIN32
-    handle->options->uid = NULL;
-    handle->options->gid = NULL;
+    handle->options->uid = 0;
+    handle->options->gid = 0;
 #else
     handle->options->uid = uid;
     handle->options->gid = gid;
@@ -1185,7 +1185,7 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, u
         va_end(argp);
     }
 
-    handle->options->stdio = &handle->stdio;
+    handle->options->stdio = (uv_stdio_container_t *)&handle->stdio;
     handle->options->stdio_count = handle->stdio_count;
 
     return handle;
@@ -1200,7 +1200,7 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
     }
 
     handle->options->file = command;
-    if (is_empty(args))
+    if (is_empty((void_t)args))
         has_args = 2;
 
     string command_arg = str_concat_by(has_args, command, ",", args);
@@ -1223,7 +1223,7 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
 }
 
 CO_FORCE_INLINE int spawn_signal(spawn_t *handle, int sig) {
-    return uv_process_kill(&handle->process, sig);
+    return uv_process_kill(&handle->process[0], sig);
 }
 
 CO_FORCE_INLINE void spawn_detach(spawn_t *child) {
