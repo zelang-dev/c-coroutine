@@ -1195,15 +1195,22 @@ void coroutine_cleanup() {
         }
     }
 
-    CO_FREE(all_coroutine);
+    if (!is_empty(all_coroutine)) {
+        CO_FREE(all_coroutine);
+        all_coroutine = NULL;
+    }
 #ifdef UV_H
     if (!is_empty(co_main_loop_handle)) {
-        uv_loop_close(co_main_loop_handle);
+        if (uv_loop_alive(co_main_loop_handle))
+            uv_loop_close(co_main_loop_handle);
         CO_FREE(co_main_loop_handle);
+        co_main_loop_handle = NULL;
     }
 
-    if (!is_empty(system_powered_by))
+    if (!is_empty(system_powered_by)) {
         CO_FREE(system_powered_by);
+        system_powered_by = NULL;
+    }
 #endif
 }
 

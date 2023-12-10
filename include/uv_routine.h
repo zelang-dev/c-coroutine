@@ -144,7 +144,7 @@ C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_
  * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
  */
 C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
-C_API void spawn_exit(spawn_t *, spawn_cb exit_func);
+C_API int spawn_exit(spawn_t *, spawn_cb exit_func);
 C_API int spawn_signal(spawn_t *, int sig);
 C_API void spawn_detach(spawn_t *);
 C_API uv_stream_t *ipc_in(spawn_t *in);

@@ -1111,7 +1111,7 @@ static void spawning(void_t uv_args) {
     routine_t *co = co_active();
 
     uv_handle_set_data((uv_handle_t *)&child->process, (void_t)child);
-    int r = uv_spawn(co_loop(), child->process, child->handle->options);
+    co->loop_code = uv_spawn(co_loop(), child->process, child->handle->options);
     defer(spawn_free, child);
     if (!is_empty(child->handle->data))
         CO_FREE(child->handle->data);
@@ -1121,8 +1121,7 @@ static void spawning(void_t uv_args) {
     CO_FREE(args);
     CO_FREE(uv);
 
-    if (!r) {
-        co_pause();
+    if (!co->loop_code) {
         while (true) {
             if (!co_terminated(co)) {
                 coroutine_yield();
@@ -1135,6 +1134,8 @@ static void spawning(void_t uv_args) {
                 break;
             }
         }
+    } else {
+        CO_INFO("Process launch failed with: %s\n", uv_strerror(co->loop_code));
     }
 }
 
@@ -1231,8 +1232,11 @@ CO_FORCE_INLINE void spawn_detach(spawn_t *child) {
         uv_unref((uv_handle_t *)&child->process);
 }
 
-CO_FORCE_INLINE void spawn_exit(spawn_t *child, spawn_cb exit_func) {
+CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
+    co_pause();
+
+    return ((routine_t *)child->handle->data)->loop_code;
 }
 
 CO_FORCE_INLINE uv_stream_t *ipc_in(spawn_t *in) {

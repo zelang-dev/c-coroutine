@@ -986,29 +986,32 @@ C_API void delete(void_t ptr);
     __try                                     \
     {                                         \
         if (ex_err.state == ex_try_st)        \
-        {                                     \
             {
 
 #define ex_catch_any                    \
     }                                \
     }                                \
-    }                                \
     __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {\
     if (ex_err.state == ex_throw_st) \
-    {                                \
         {                            \
             EX_MAKE();               \
             ex_err.state = ex_catch_st;
 
-#define ex_end_try                            \
+#define ex_finally                          \
     }                                      \
+    }                                    \
+        {                                \
+            EX_MAKE();                   \
+            /* global context updated */ \
+            ex_context = ex_err.next;
+
+#define ex_end_try                            \
     }                                      \
     if (ex_context == &ex_err)             \
         /* global context updated */       \
         ex_context = ex_err.next;          \
     if ((ex_err.state & ex_throw_st) != 0) \
         rethrow();                         \
-    }                                      \
     }
 
 #else
@@ -1039,6 +1042,15 @@ C_API void delete(void_t ptr);
             EX_MAKE();               \
             ex_err.state = ex_catch_st;
 
+#define ex_finally                          \
+    }                                    \
+    }                                    \
+    {                                    \
+        {                                \
+            EX_MAKE();                   \
+            /* global context updated */ \
+            ex_context = ex_err.next;
+
 #define ex_end_try                            \
     }                                      \
     }                                      \
@@ -1049,15 +1061,6 @@ C_API void delete(void_t ptr);
         rethrow();                         \
     }
 #endif
-
-#define ex_finally                          \
-    }                                    \
-    }                                    \
-    {                                    \
-        {                                \
-            EX_MAKE();                   \
-            /* global context updated */ \
-            ex_context = ex_err.next;
 
 #define ex_catch(E)                        \
     }                                   \
