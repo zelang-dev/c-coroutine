@@ -5,6 +5,7 @@ project(c-coroutine LANGUAGES C)
 set(C_STANDARD 89)
 
 include(CMakeDependentOption)
+include(GNUInstallDirs)
 cmake_dependent_option(CO_BUILD_TESTS
   "Build the unit tests when BUILD_TESTING is enabled and we are the root project" ON
   "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
