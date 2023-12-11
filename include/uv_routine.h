@@ -66,6 +66,7 @@ typedef struct {
 
 typedef struct {
     int type;
+    bool is_detach;
     spawn_options_t *handle;
     uv_process_t process[1];
 } spawn_t;

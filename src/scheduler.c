@@ -895,6 +895,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->loop_code = 0;
     co->args = args;
     co->user_data = NULL;
+    co->cycles = 0;
     co->results = NULL;
     co->magic_number = CO_MAGIC_NUMBER;
     co->stack_base = (unsigned char *)(co + 1);
@@ -1235,12 +1236,14 @@ static void coroutine_scheduler(void) {
         co_running = t;
         n_co_switched++;
         if (scheduler_info_log)
-            CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d\n", co_async_self(), t->cid,
-                    ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status);
+            CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d cycles: %zu\n", co_async_self(), t->cid,
+                    ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status, t->cycles);
 
         coroutine_interrupt();
-        if (!is_status_invalid(t) && !t->halt)
+        if (!is_status_invalid(t) && !t->halt) {
+            t->cycles++;
             co_switch(t);
+        }
 
         if (scheduler_info_log)
             CO_LOG("Back at coroutine scheduling");

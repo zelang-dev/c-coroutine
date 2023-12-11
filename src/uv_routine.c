@@ -58,8 +58,7 @@ void coroutine_event_cleanup(void_t t) {
     }
 }
 
-static value_t fs_start(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, size_t n_args, bool is_path) {
-    uv_args->args = args;
+static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->type = CO_EVENT_ARG;
     uv_args->fs_type = fs_type;
     uv_args->n_args = n_args;
@@ -68,8 +67,7 @@ static value_t fs_start(uv_args_t *uv_args, values_t *args, uv_fs_type fs_type, 
     return co_event(fs_init, uv_args);
 }
 
-static value_t uv_start(uv_args_t *uv_args, values_t *args, int type, size_t n_args, bool is_request) {
-    uv_args->args = args;
+static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_request) {
     uv_args->type = CO_EVENT_ARG;
     uv_args->is_request = is_request;
     if (is_request)
@@ -682,94 +680,67 @@ static void_t uv_init(void_t uv_args) {
 }
 
 uv_file fs_open(string_t path, int flags, int mode) {
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(3, true);
+    uv_args->args[0].value.char_ptr = (string)path;
+    uv_args->args[1].value.integer = flags;
+    uv_args->args[2].value.integer = mode;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(3, sizeof(values_t));
-
-    args[0].value.char_ptr = (string)path;
-    args[1].value.integer = flags;
-    args[2].value.integer = mode;
-
-    return (uv_file)fs_start(uv_args, args, UV_FS_OPEN, 3, true).integer;
+    return (uv_file)fs_start(uv_args, UV_FS_OPEN, 3, true).integer;
 }
 
 int fs_unlink(string_t path) {
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(1, true);
+    uv_args->args[0].value.char_ptr = (string)path;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(1, sizeof(values_t));
-    args[0].value.char_ptr = (string)path;
-
-    return (uv_file)fs_start(uv_args, args, UV_FS_UNLINK, 1, true).integer;
+    return (uv_file)fs_start(uv_args, UV_FS_UNLINK, 1, true).integer;
 }
 
 uv_stat_t *fs_fstat(uv_file fd) {
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(1, true);
+    uv_args->args[0].value.integer = fd;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(1, sizeof(values_t));
-    args[0].value.integer = fd;
-
-    return (uv_stat_t *)fs_start(uv_args, args, UV_FS_FSTAT, 1, false).object;
+    return (uv_stat_t *)fs_start(uv_args, UV_FS_FSTAT, 1, false).object;
 }
 
 int fs_fsync(uv_file fd) {
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(1, true);
+    uv_args->args[0].value.integer = fd;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(1, sizeof(values_t));
-    args[0].value.integer = fd;
-
-    return fs_start(uv_args, args, UV_FS_FSYNC, 1, false).integer;
+    return fs_start(uv_args, UV_FS_FSYNC, 1, false).integer;
 }
 
 string fs_read(uv_file fd, int64_t offset) {
     uv_stat_t *stat = fs_fstat(fd);
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(2, true);
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     uv_args->buffer = co_new_by(1, (size_t)stat->st_size + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
 
-    args = (values_t *)co_new_by(2, sizeof(values_t));
-    args[0].value.integer = fd;
-    args[1].value.u_int = (unsigned int)offset;
+    uv_args->args[0].value.integer = fd;
+    uv_args->args[1].value.u_int = (unsigned int)offset;
 
-    return fs_start(uv_args, args, UV_FS_READ, 2, false).char_ptr;
+    return fs_start(uv_args, UV_FS_READ, 2, false).char_ptr;
 }
 
 int fs_write(uv_file fd, string_t text, int64_t offset) {
     size_t size = sizeof(text) + 1;
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(2, true);
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     uv_args->buffer = co_new_by(1, size);
     memcpy(uv_args->buffer, text, size);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
 
-    args = (values_t *)co_new_by(2, sizeof(values_t));
-    args[0].value.integer = fd;
-    args[1].value.u_int = (unsigned int)offset;
+    uv_args->args[0].value.integer = fd;
+    uv_args->args[1].value.u_int = (unsigned int)offset;
 
-    return fs_start(uv_args, args, UV_FS_WRITE, 2, false).integer;
+    return fs_start(uv_args, UV_FS_WRITE, 2, false).integer;
 }
 
 int fs_close(uv_file fd) {
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(1, true);
+    uv_args->args[0].value.integer = fd;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(1, sizeof(values_t));
-
-    args[0].value.integer = fd;
-    return fs_start(uv_args, args, UV_FS_CLOSE, 1, false).integer;
+    return fs_start(uv_args, UV_FS_CLOSE, 1, false).integer;
 }
 
 string fs_readfile(string_t path) {
@@ -796,32 +767,29 @@ int stream_write(uv_stream_t *handle, string_t text) {
         return -1;
 
     size_t size = strlen(text) + 1;
-    uv_args_t *uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    uv_args_t *uv_args = co_arguments(1, false);
     uv_args->buffer = co_new_by(1, size);
     memcpy(uv_args->buffer, text, size);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
-
-    values_t *args = (values_t *)co_new_by(1, sizeof(values_t));
-    args[0].value.object = handle;
+    uv_args->args[0].value.object = handle;
 
     if (is_tls((uv_handle_t *)handle))
         uv_args->bind_type = UV_TLS;
 
-    return uv_start(uv_args, args, UV_WRITE, 1, true).integer;
+    return uv_start(uv_args, UV_WRITE, 1, true).integer;
 }
 
 string stream_read(uv_stream_t *handle) {
     if (is_empty(handle))
         return NULL;
 
-    uv_args_t *uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    values_t *args = (values_t *)co_new_by(1, sizeof(values_t));
-    args[0].value.object = handle;
+    uv_args_t *uv_args = co_arguments(1, true);
+    uv_args->args[0].value.object = handle;
 
     if (is_tls((uv_handle_t *)handle))
         uv_args->bind_type = UV_TLS;
 
-    return uv_start(uv_args, args, UV_STREAM, 1, false).char_ptr;
+    return uv_start(uv_args, UV_STREAM, 1, false).char_ptr;
 }
 
 uv_stream_t *stream_connect(string_t address) {
@@ -836,8 +804,7 @@ uv_stream_t *stream_connect(string_t address) {
 }
 
 uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port) {
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(4, true);
     void_t addr_set = NULL;
     void_t handle = NULL;
     char name[UV_MAXHOSTNAMESIZE] = CERTIFICATE;
@@ -846,7 +813,6 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     size_t len = sizeof(name);
     int r = 0;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
     uv_args->type = CO_EVENT_ARG;
     if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
@@ -894,13 +860,12 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
             break;
     }
 
-    args = (values_t *)co_new_by(4, sizeof(values_t));
-    args[0].value.object = handle;
-    args[1].value.object = addr_set;
-    args[2].value.integer = scheme;
-    args[3].value.char_ptr = (string)address;
+    uv_args->args[0].value.object = handle;
+    uv_args->args[1].value.object = addr_set;
+    uv_args->args[2].value.integer = scheme;
+    uv_args->args[3].value.char_ptr = (string)address;
 
-    return (uv_stream_t *)uv_start(uv_args, args, UV_CONNECT, 4, true).object;
+    return (uv_stream_t *)uv_start(uv_args, UV_CONNECT, 4, true).object;
 }
 
 uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
@@ -915,11 +880,10 @@ uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
         uv_args = (uv_args_t *)((evt_ctx_t *)check)->data;
     }
 
-    values_t *args = uv_args->args;
-    args[0].value.object = stream;
-    args[1].value.integer = backlog;
+    uv_args->args[0].value.object = stream;
+    uv_args->args[1].value.integer = backlog;
 
-    value_t handle = uv_start(uv_args, args, UV_SERVER_LISTEN, 5, false);
+    value_t handle = uv_start(uv_args, UV_SERVER_LISTEN, 5, false);
     if (is_empty(handle.object))
         return NULL;
 
@@ -945,7 +909,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
     char key[UV_MAXHOSTNAMESIZE];
     size_t len = sizeof(name);
 
-    uv_args_t *uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+    uv_args_t *uv_args = co_arguments(5, true);
     uv_args->type = CO_EVENT_ARG;
     co_defer_recover(error_catch, uv_args);
     if (is_str_in(address, ":")) {
@@ -995,15 +959,12 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
         return uv_error_post(co_active(), r);
     }
 
-    values_t *args = (values_t *)co_new_by(5, sizeof(values_t));
-
-    args[0].value.object = handle;
-    args[2].value.object = addr_set;
-    args[3].value.char_ptr = (string)address;
-    args[4].value.integer = port;
+    uv_args->args[0].value.object = handle;
+    uv_args->args[2].value.object = addr_set;
+    uv_args->args[3].value.char_ptr = (string)address;
+    uv_args->args[4].value.integer = port;
 
     uv_args->bind_type = scheme;
-    uv_args->args = args;
     if (scheme == UV_TLS)
         uv_args->ctx.data = (void_t)uv_args;
     else
@@ -1017,14 +978,10 @@ void coro_uv_close(uv_handle_t *handle) {
     if (is_empty(handle))
         return;
 
-    values_t *args = NULL;
-    uv_args_t *uv_args = NULL;
+    uv_args_t *uv_args = co_arguments(1, true);
+    uv_args->args[0].value.object = handle;
 
-    uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-    args = (values_t *)co_new_by(1, sizeof(values_t));
-    args[0].value.object = handle;
-
-    uv_start(uv_args, args, UV_HANDLE, 1, false);
+    uv_start(uv_args, UV_HANDLE, 1, false);
 }
 
 uv_udp_t *udp_create() {
@@ -1103,7 +1060,7 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
     co_scheduler();
 }
 
-static void stdio_handler(void_t uv_args) {
+static void_t stdio_handler(void_t uv_args) {
     uv_args_t *uv = (uv_args_t *)uv_args;
     values_t *args = uv->args;
     spawn_t *child = var_cast(spawn_t, args[0]);
@@ -1111,8 +1068,7 @@ static void stdio_handler(void_t uv_args) {
     uv_stream_t *io = var_cast(uv_stream_t, args[2]);
     routine_t *co = (routine_t *)child->handle->data;
 
-    CO_FREE(args);
-    CO_FREE(uv);
+    co_arguments_free(uv);
 
     while (true) {
         if (co_terminated(co))
@@ -1122,6 +1078,8 @@ static void stdio_handler(void_t uv_args) {
         if (!is_str_empty(data))
             std((string_t)data);
     }
+
+    return NULL;
 }
 
 static void spawning(void_t uv_args) {
@@ -1139,8 +1097,7 @@ static void spawning(void_t uv_args) {
 
     child->handle->data = (void_t)co;
     CO_FREE(var_ptr(args[1]));
-    CO_FREE(args);
-    CO_FREE(uv);
+    co_arguments_free(uv);
 
     if (!co->loop_code) {
         while (true) {
@@ -1232,15 +1189,13 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
 
     process->type = CO_PROCESS;
     process->handle = handle;
+    process->is_detach = false;
 
-    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-    values_t *params = (values_t *)try_calloc(2, sizeof(values_t));
-
-    params[0].value.object = process;
-    params[1].value.object = command_args;
-    uv_args->args = params;
-
+    uv_args_t *uv_args = co_arguments(2, false);
+    uv_args->args[0].value.object = process;
+    uv_args->args[1].value.object = command_args;
     co_process(spawning, uv_args);
+
     return process;
 }
 
@@ -1249,8 +1204,11 @@ CO_FORCE_INLINE int spawn_signal(spawn_t *handle, int sig) {
 }
 
 CO_FORCE_INLINE void spawn_detach(spawn_t *child) {
-    if (child->handle->options->flags == UV_PROCESS_DETACHED)
+    if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref((uv_handle_t *)&child->process);
+        child->is_detach = true;
+        --coroutine_count;
+    }
 }
 
 CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
@@ -1260,40 +1218,34 @@ CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     return ((routine_t *)child->handle->data)->loop_code;
 }
 
-CO_FORCE_INLINE int spawn_in(spawn_t *child, stdin_cb std_func) {
-    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-    values_t *params = (values_t *)try_calloc(3, sizeof(values_t));
+int spawn_in(spawn_t *child, stdin_cb std_func) {
+    uv_args_t *uv_args = co_arguments(3, false);
 
-    params[0].value.object = child;
-    params[1].value.func = std_func;
-    params[2].value.object = ipc_in(child);
-    uv_args->args = params;
+    uv_args->args[0].value.object = child;
+    uv_args->args[1].value.func = (callable_t)std_func;
+    uv_args->args[2].value.object = ipc_in(child);
     co_go(stdio_handler, uv_args);
 
     return ((routine_t *)child->handle->data)->loop_code;
 }
 
-CO_FORCE_INLINE int spawn_out(spawn_t *child, stdout_cb std_func) {
-    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-    values_t *params = (values_t *)try_calloc(3, sizeof(values_t));
+int spawn_out(spawn_t *child, stdout_cb std_func) {
+    uv_args_t *uv_args = co_arguments(3, false);
 
-    params[0].value.object = child;
-    params[1].value.func = std_func;
-    params[2].value.object = ipc_out(child);
-    uv_args->args = params;
+    uv_args->args[0].value.object = child;
+    uv_args->args[1].value.func = (callable_t)std_func;
+    uv_args->args[2].value.object = ipc_out(child);
     co_go(stdio_handler, uv_args);
 
     return ((routine_t *)child->handle->data)->loop_code;
 }
 
-CO_FORCE_INLINE int spawn_err(spawn_t *child, stderr_cb std_func) {
-    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-    values_t *params = (values_t *)try_calloc(3, sizeof(values_t));
+int spawn_err(spawn_t *child, stderr_cb std_func) {
+    uv_args_t *uv_args = co_arguments(3, false);
 
-    params[0].value.object = child;
-    params[1].value.func = std_func;
-    params[2].value.object = ipc_err(child);
-    uv_args->args = params;
+    uv_args->args[0].value.object = child;
+    uv_args->args[1].value.func = (callable_t)std_func;
+    uv_args->args[2].value.object = ipc_err(child);
     co_go(stdio_handler, uv_args);
 
     return ((routine_t *)child->handle->data)->loop_code;

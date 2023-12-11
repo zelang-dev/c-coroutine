@@ -525,6 +525,7 @@ struct routine_s {
     /* unique coroutine id */
     int cid;
     size_t alarm_time;
+    size_t cycles;
     routine_t *next;
     routine_t *prev;
     bool channeled;
@@ -686,7 +687,10 @@ struct channel_co_s
     channel_co_t *x_msg;
 };
 
-uv_loop_t *co_loop(void);
+C_API uv_loop_t *co_loop(void);
+
+C_API uv_args_t *co_arguments(int count, bool auto_free);
+C_API void co_arguments_free(uv_args_t *);
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);

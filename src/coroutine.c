@@ -1,5 +1,25 @@
 #include "../include/coroutine.h"
 
+void co_arguments_free(uv_args_t *uv_args) {
+    CO_FREE(uv_args->args);
+    CO_FREE(uv_args);
+}
+
+uv_args_t *co_arguments(int count, bool auto_free) {
+    uv_args_t *uv_args = NULL;
+    values_t *params = NULL;
+    if (auto_free) {
+        uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
+        params = (values_t *)co_new_by(count, sizeof(values_t));
+    } else {
+        uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
+        params = (values_t *)try_calloc(count, sizeof(values_t));
+    }
+
+    uv_args->args = params;
+    return uv_args;
+}
+
 void delete(void_t ptr) {
     match(ptr) {
         and (CO_CHANNEL)
