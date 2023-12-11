@@ -89,5 +89,5 @@ set(CPACK_PACKAGE_VERSION 0.0.0)
 include(CPack)
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
-install(TARGETS ${coroutine} ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS ${coroutine} DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include)

@@ -50,6 +50,10 @@ typedef union
 typedef struct sockaddr_in sock_in_t;
 typedef struct sockaddr_in6 sock_in6_t;
 typedef void (*spawn_cb)(int64_t status, int signal);
+typedef void (*stdio_cb)(const char *buf);
+typedef stdio_cb stdin_cb;
+typedef stdio_cb stdout_cb;
+typedef stdio_cb stderr_cb;
 
 typedef struct {
     int type;
@@ -145,6 +149,10 @@ C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_
  */
 C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
 C_API int spawn_exit(spawn_t *, spawn_cb exit_func);
+C_API int spawn_in(spawn_t *, stdin_cb std_func);
+C_API int spawn_out(spawn_t *, stdout_cb std_func);
+C_API int spawn_err(spawn_t *, stderr_cb std_func);
+C_API int spawn_pid(spawn_t *child);
 C_API int spawn_signal(spawn_t *, int sig);
 C_API void spawn_detach(spawn_t *);
 C_API uv_stream_t *ipc_in(spawn_t *in);

@@ -1103,6 +1103,27 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
     co_scheduler();
 }
 
+static void stdio_handler(void_t uv_args) {
+    uv_args_t *uv = (uv_args_t *)uv_args;
+    values_t *args = uv->args;
+    spawn_t *child = var_cast(spawn_t, args[0]);
+    stdio_cb std = (stdio_cb)var_func(args[1]);
+    uv_stream_t *io = var_cast(uv_stream_t, args[2]);
+    routine_t *co = (routine_t *)child->handle->data;
+
+    CO_FREE(args);
+    CO_FREE(uv);
+
+    while (true) {
+        if (co_terminated(co))
+            break;
+
+        string data = stream_read(io);
+        if (!is_str_empty(data))
+            std((string_t)data);
+    }
+}
+
 static void spawning(void_t uv_args) {
     uv_args_t *uv = (uv_args_t *)uv_args;
     values_t *args = uv->args;
@@ -1237,6 +1258,49 @@ CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     co_pause();
 
     return ((routine_t *)child->handle->data)->loop_code;
+}
+
+CO_FORCE_INLINE int spawn_in(spawn_t *child, stdin_cb std_func) {
+    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
+    values_t *params = (values_t *)try_calloc(3, sizeof(values_t));
+
+    params[0].value.object = child;
+    params[1].value.func = std_func;
+    params[2].value.object = ipc_in(child);
+    uv_args->args = params;
+    co_go(stdio_handler, uv_args);
+
+    return ((routine_t *)child->handle->data)->loop_code;
+}
+
+CO_FORCE_INLINE int spawn_out(spawn_t *child, stdout_cb std_func) {
+    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
+    values_t *params = (values_t *)try_calloc(3, sizeof(values_t));
+
+    params[0].value.object = child;
+    params[1].value.func = std_func;
+    params[2].value.object = ipc_out(child);
+    uv_args->args = params;
+    co_go(stdio_handler, uv_args);
+
+    return ((routine_t *)child->handle->data)->loop_code;
+}
+
+CO_FORCE_INLINE int spawn_err(spawn_t *child, stderr_cb std_func) {
+    uv_args_t *uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
+    values_t *params = (values_t *)try_calloc(3, sizeof(values_t));
+
+    params[0].value.object = child;
+    params[1].value.func = std_func;
+    params[2].value.object = ipc_err(child);
+    uv_args->args = params;
+    co_go(stdio_handler, uv_args);
+
+    return ((routine_t *)child->handle->data)->loop_code;
+}
+
+CO_FORCE_INLINE int spawn_pid(spawn_t *child) {
+    return child->process->pid;
 }
 
 CO_FORCE_INLINE uv_stream_t *ipc_in(spawn_t *in) {
