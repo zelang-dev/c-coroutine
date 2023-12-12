@@ -751,9 +751,6 @@ C_API value_t get_args(void_t *params, int item);
 */
 C_API value_t args_in(args_t *params, int index);
 
-C_API uv_args_t *uv_arguments(int count, bool auto_free);
-C_API void uv_arguments_free(uv_args_t *);
-
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);
 

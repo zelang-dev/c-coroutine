@@ -5,12 +5,12 @@ static void_t uv_init(void_t);
 
 thread_local uv_args_t *uv_server_args = NULL;
 
-void uv_arguments_free(uv_args_t *uv_args) {
+static void uv_arguments_free(uv_args_t *uv_args) {
     CO_FREE(uv_args->args);
     CO_FREE(uv_args);
 }
 
-uv_args_t *uv_arguments(int count, bool auto_free) {
+static uv_args_t *uv_arguments(int count, bool auto_free) {
     uv_args_t *uv_args = NULL;
     values_t *params = NULL;
     if (auto_free) {
