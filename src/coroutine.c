@@ -1,23 +1,73 @@
 #include "../include/coroutine.h"
 
-void co_arguments_free(uv_args_t *uv_args) {
-    CO_FREE(uv_args->args);
-    CO_FREE(uv_args);
+void args_free(args_t *params) {
+    CO_FREE(params->args);
+    CO_FREE(params);
 }
 
-uv_args_t *co_arguments(int count, bool auto_free) {
-    uv_args_t *uv_args = NULL;
-    values_t *params = NULL;
-    if (auto_free) {
-        uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-        params = (values_t *)co_new_by(count, sizeof(values_t));
-    } else {
-        uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-        params = (values_t *)try_calloc(count, sizeof(values_t));
+value_t get_args(void_t *params, int item) {
+    args_t *co_args = (args_t *)params;
+    if (!co_args->defer_set) {
+        defer(args_free, co_args);
+        co_args->defer_set = true;
     }
 
-    uv_args->args = params;
-    return uv_args;
+    return (item < co_args->n_args)
+        ? co_args->args[item].value
+        : ((generics_t *)0)->value;
+}
+
+value_t get_args_for(void_t *params, int item) {
+    args_t *co_args = (args_t *)params;
+
+    return (item < co_args->n_args)
+        ? co_args->args[item].value
+        : ((generics_t *)0)->value;
+}
+
+args_t *args_for(string_t desc, ...) {
+    int count = (int)strlen(desc);
+    args_t *params = (args_t *)try_calloc(1, sizeof(args_t));
+    generics_t *args = (generics_t *)try_calloc(count, sizeof(generics_t));
+    va_list argp;
+
+    va_start(argp, desc);
+    for (int i = 0; i < count; i++) {
+        switch (*desc++) {
+            case 'i':
+                // integer argument
+                args[i].value.max_size = va_arg(argp, size_t);
+                break;
+            case 'c':
+                // character argument
+                args[i].value.schar = (char)va_arg(argp, int);
+                break;
+            case 's':
+                // string argument
+                args[i].value.char_ptr = va_arg(argp, char *);
+                break;
+            case 'x':
+                // executable argument
+                args[i].value.func = (callable_t)va_arg(argp, any_func_t);
+                break;
+            case 'f':
+                // float argument
+                args[i].value.precision = va_arg(argp, double);
+                break;
+            case 'p':
+                // void pointer (any arbitrary pointer) argument
+                args[i].value.object = va_arg(argp, void_t);
+                break;
+            default:
+                break;
+        }
+    }
+    va_end(argp);
+
+    params->args = args;
+    params->defer_set = false;
+    params->n_args = count;
+    return params;
 }
 
 void delete(void_t ptr) {

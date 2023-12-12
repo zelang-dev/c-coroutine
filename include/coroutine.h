@@ -356,6 +356,7 @@ typedef struct {
 
 typedef void_t(*callable_t)(void_t);
 typedef void (*func_t)(void_t);
+typedef void (*any_func_t)(void_t, ...);
 typedef struct {
     value_types type;
     void_t value;
@@ -601,6 +602,12 @@ typedef struct values_s
     value_types type;
 } values_t;
 
+typedef struct
+{
+    value_types type;
+    value_t value;
+} generics_t;
+
 typedef enum {
     ZE_OK = CO_NONE,
     ZE_ERR = CO_NULL,
@@ -640,6 +647,19 @@ typedef struct uv_args_s
     /* total number of args in set */
     size_t n_args;
 } uv_args_t;
+
+typedef struct args_s
+{
+    value_types type;
+    /* allocated array of arguments */
+    generics_t *args;
+    routine_t *context;
+    string buffer;
+
+    /* total number of args in set */
+    size_t n_args;
+    bool defer_set;
+} args_t;
 
 /*
  * channel communication
@@ -689,8 +709,13 @@ struct channel_co_s
 
 C_API uv_loop_t *co_loop(void);
 
-C_API uv_args_t *co_arguments(int count, bool auto_free);
-C_API void co_arguments_free(uv_args_t *);
+C_API void args_free(args_t *params);
+C_API args_t *args_for(string_t desc, ...);
+C_API value_t get_args(void_t *params, int item);
+C_API value_t get_args_for(void_t *params, int item);
+
+C_API uv_args_t *uv_arguments(int count, bool auto_free);
+C_API void uv_arguments_free(uv_args_t *);
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);
@@ -1354,10 +1379,6 @@ Must also closed out with `select_break()`. */
 
 /* Cast argument to generic union values_t storage type */
 #define args_cast(x) (values_t *)((x))
-
-#define args_by(variable, number_of, variable_type) variable_type *variable[number_of]
-#define args_set(variable, index, value) variable[index] = value
-#define args_get(variable, func_args, index, variable_type) variable_type *variable = ((variable_type **)func_args)[index]
 
 #define var(data) co_var((data))->value
 #define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)co_new_by(1, sizeof(var_t)); \
