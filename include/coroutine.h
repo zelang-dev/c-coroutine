@@ -333,6 +333,7 @@ typedef enum
     CO_FUTURE,
     CO_FUTURE_ARG,
     CO_EVENT_ARG,
+    CO_ARGS,
     CO_PROCESS,
     CO_SCHED,
     CO_CHANNEL,
@@ -712,7 +713,7 @@ C_API uv_loop_t *co_loop(void);
 C_API void args_free(args_t *params);
 C_API args_t *args_for(string_t desc, ...);
 C_API value_t get_args(void_t *params, int item);
-C_API value_t get_args_for(void_t *params, int item);
+C_API value_t args_in(args_t *params, int index);
 
 C_API uv_args_t *uv_arguments(int count, bool auto_free);
 C_API void uv_arguments_free(uv_args_t *);

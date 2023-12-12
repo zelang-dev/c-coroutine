@@ -1,8 +1,11 @@
 #include "../include/coroutine.h"
 
 void args_free(args_t *params) {
-    CO_FREE(params->args);
-    CO_FREE(params);
+    if (is_type(params, CO_ARGS)) {
+        CO_FREE(params->args);
+        memset(params, 0, sizeof(value_types));
+        CO_FREE(params);
+    }
 }
 
 value_t get_args(void_t *params, int item) {
@@ -17,11 +20,9 @@ value_t get_args(void_t *params, int item) {
         : ((generics_t *)0)->value;
 }
 
-value_t get_args_for(void_t *params, int item) {
-    args_t *co_args = (args_t *)params;
-
-    return (item < co_args->n_args)
-        ? co_args->args[item].value
+CO_FORCE_INLINE value_t args_in(args_t *params, int index) {
+    return (index < params->n_args)
+        ? params->args[index].value
         : ((generics_t *)0)->value;
 }
 
@@ -64,6 +65,7 @@ args_t *args_for(string_t desc, ...) {
     }
     va_end(argp);
 
+    params->type = CO_ARGS;
     params->args = args;
     params->defer_set = false;
     params->n_args = count;
