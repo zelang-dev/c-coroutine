@@ -710,9 +710,45 @@ struct channel_co_s
 
 C_API uv_loop_t *co_loop(void);
 
+/**
+* `Release/free` allocated memory, must be called if not using `get_args()` function.
+*
+* @param params arbitrary arguments
+*/
 C_API void args_free(args_t *params);
+
+/**
+* Creates an container for arbitrary arguments passing to an `coroutine` or `thread`.
+* Use `get_args()` or `args_in()` for retrieval.
+*
+* @param desc format, similar to `printf()`:
+* - `i` integer
+* - `c` character
+* - `s` string
+* - `x` function
+* - `f` double/float
+* - `p` void pointer for any arbitrary object
+* @param arguments indexed by `desc` format order
+*/
 C_API args_t *args_for(string_t desc, ...);
+
+/**
+* Returns generic union `value_t` of argument, will auto `release/free`
+* allocated memory when `coroutine` return/exit by `co_defer()`.
+*
+* Must be called at least once to release `allocated` memory.
+*
+* @param params arbitrary arguments
+* @param item index number
+*/
 C_API value_t get_args(void_t *params, int item);
+
+/**
+* Returns generic union `value_t` of argument.
+*
+* @param params arguments instance
+* @param index item number
+*/
 C_API value_t args_in(args_t *params, int index);
 
 C_API uv_args_t *uv_arguments(int count, bool auto_free);
