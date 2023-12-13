@@ -15,9 +15,7 @@ value_t get_args(void_t *params, int item) {
         co_args->defer_set = true;
     }
 
-    return (item > -1 && item < co_args->n_args)
-        ? co_args->args[item].value
-        : ((generics_t *)0)->value;
+    return args_in(co_args, item);
 }
 
 CO_FORCE_INLINE value_t args_in(args_t *params, int index) {
