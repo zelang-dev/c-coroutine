@@ -722,12 +722,13 @@ C_API void args_free(args_t *params);
 * Use `get_args()` or `args_in()` for retrieval.
 *
 * @param desc format, similar to `printf()`:
-* - `i` integer
-* - `c` character
-* - `s` string
-* - `x` function
-* - `f` double/float
-* - `p` void pointer for any arbitrary object
+* * `i` integer,
+* * `c` character,
+* * `s` string,
+* * `a` array,
+* * `x` function,
+* * `f` double/float,
+* * `p` void pointer for any arbitrary object
 * @param arguments indexed by `desc` format order
 */
 C_API args_t *args_for(string_t desc, ...);

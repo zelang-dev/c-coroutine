@@ -47,6 +47,10 @@ args_t *args_for(string_t desc, ...) {
                 // string argument
                 args[i].value.char_ptr = va_arg(argp, char *);
                 break;
+            case 'a':
+                // array argument
+                args[i].value.array = va_arg(argp, char **);
+                break;
             case 'x':
                 // executable argument
                 args[i].value.func = (callable_t)va_arg(argp, any_func_t);
@@ -60,6 +64,7 @@ args_t *args_for(string_t desc, ...) {
                 args[i].value.object = va_arg(argp, void_t);
                 break;
             default:
+                args[i].value.object = NULL;
                 break;
         }
     }
