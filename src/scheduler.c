@@ -1169,7 +1169,7 @@ void coroutine_info() {
         else
             extra = "";
 
-        fprintf(stderr, "%6d%c %-20s %s%s %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->status);
+        fprintf(stderr, "%6d%c %-20s %s%s cycles: %zu %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->cycles, t->status);
     }
 }
 
