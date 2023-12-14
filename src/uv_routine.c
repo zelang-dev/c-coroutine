@@ -1223,17 +1223,20 @@ CO_FORCE_INLINE int spawn_signal(spawn_t *handle, int sig) {
     return uv_process_kill(&handle->process[0], sig);
 }
 
-CO_FORCE_INLINE void spawn_detach(spawn_t *child) {
+int spawn_detach(spawn_t *child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref((uv_handle_t *)&child->process);
         child->is_detach = true;
         --coroutine_count;
+        co_yield();
     }
+
+    return ((routine_t *)child->handle->data)->loop_code;
 }
 
-CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
+int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
-    co_pause();
+    co_yield();
 
     return ((routine_t *)child->handle->data)->loop_code;
 }

@@ -247,7 +247,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
     routine_t *co;
     bool has_erred = false;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
-        co_pause();
+        co_yield();
         wgr = ht_result_init();
         co_deferred(c, FUNC_VOID(hash_free), wgr);
         oa_pair *pair;

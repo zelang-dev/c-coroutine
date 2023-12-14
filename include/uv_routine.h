@@ -155,7 +155,7 @@ C_API int spawn_out(spawn_t *, stdout_cb std_func);
 C_API int spawn_err(spawn_t *, stderr_cb std_func);
 C_API int spawn_pid(spawn_t *child);
 C_API int spawn_signal(spawn_t *, int sig);
-C_API void spawn_detach(spawn_t *);
+C_API int spawn_detach(spawn_t *);
 C_API uv_stream_t *ipc_in(spawn_t *in);
 C_API uv_stream_t *ipc_out(spawn_t *out);
 C_API uv_stream_t *ipc_err(spawn_t *err);

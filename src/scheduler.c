@@ -991,14 +991,14 @@ CO_FORCE_INLINE int co_go(callable_t fn, void_t arg) {
     return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
-void co_pause() {
+void co_yield() {
     coroutine_schedule(co_running);
     co_suspend();
 }
 
 CO_FORCE_INLINE void co_execute(func_t fn, void_t arg) {
     coroutine_create((callable_t)fn, arg, CO_STACK_SIZE);
-    co_pause();
+    co_yield();
 }
 
 static size_t nsec(void) {

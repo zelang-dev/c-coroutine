@@ -889,8 +889,8 @@ C_API unsigned int co_sleep(unsigned int ms);
 C_API unsigned int co_id(void);
 C_API signed int co_err_code(void);
 
-/* Pause and reschedule current coroutine. */
-C_API void co_pause(void);
+/* Yield execution to another coroutine and reschedule current. */
+C_API void co_yield(void);
 
 /* Returns the current coroutine's name. */
 C_API string co_get_name(void);
