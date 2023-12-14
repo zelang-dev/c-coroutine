@@ -1195,7 +1195,10 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
     int has_args = 3;
 
     if (is_empty(handle)) {
-        handle = spawn_opts(NULL, NULL, 0, 0, 0, 0);
+        handle = spawn_opts(NULL, NULL, 0, 0, 0, 3,
+                            stdio_fd(0, UV_IGNORE),
+                            stdio_fd(1, UV_IGNORE),
+                            stdio_fd(2, UV_INHERIT_FD));
     }
 
     handle->options->file = command;

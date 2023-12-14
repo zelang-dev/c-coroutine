@@ -143,10 +143,9 @@ C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_
  * specified, or not having enough memory to allocate for the new process.
  *
  * @param command Program to be executed.
- * @param args Command line arguments, separate with comma like:
- * `"arg1,arg2,arg3,...,"` MUST END with comma `","`.
- *
+ * @param args Command line arguments, separate with comma like: `"arg1,arg2,arg3,..."`
  * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
+ * If `NULL` defaults `stderr` of subprocess to parent.
  */
 C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
 C_API int spawn_exit(spawn_t *, spawn_cb exit_func);
