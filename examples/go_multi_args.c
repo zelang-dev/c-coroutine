@@ -1,5 +1,5 @@
 
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 void *worker(void *arg) {
     int count = get_args(arg, 0).integer;

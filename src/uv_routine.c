@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 static void_t fs_init(void_t);
 static void_t uv_init(void_t);
@@ -6,8 +6,11 @@ static void_t uv_init(void_t);
 thread_local uv_args_t *uv_server_args = NULL;
 
 static void uv_arguments_free(uv_args_t *uv_args) {
-    CO_FREE(uv_args->args);
-    CO_FREE(uv_args);
+    if (is_type(uv_args, CO_EVENT_ARG)) {
+        CO_FREE(uv_args->args);
+        memset(uv_args, 0, sizeof(value_types));
+        CO_FREE(uv_args);
+    }
 }
 
 static uv_args_t *uv_arguments(int count, bool auto_free) {
@@ -21,6 +24,7 @@ static uv_args_t *uv_arguments(int count, bool auto_free) {
         params = (values_t *)try_calloc(count, sizeof(values_t));
     }
 
+    uv_args->type = CO_EVENT_ARG;
     uv_args->args = params;
     return uv_args;
 }
@@ -79,7 +83,6 @@ void coroutine_event_cleanup(void_t t) {
 }
 
 static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, bool is_path) {
-    uv_args->type = CO_EVENT_ARG;
     uv_args->fs_type = fs_type;
     uv_args->n_args = n_args;
     uv_args->is_path = is_path;
@@ -88,7 +91,6 @@ static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, b
 }
 
 static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_request) {
-    uv_args->type = CO_EVENT_ARG;
     uv_args->is_request = is_request;
     if (is_request)
         uv_args->req_type = type;
@@ -833,7 +835,6 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     size_t len = sizeof(name);
     int r = 0;
 
-    uv_args->type = CO_EVENT_ARG;
     if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
         addr_set = uv_args->in6;
@@ -930,7 +931,6 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
     size_t len = sizeof(name);
 
     uv_args_t *uv_args = uv_arguments(5, true);
-    uv_args->type = CO_EVENT_ARG;
     co_defer_recover(error_catch, uv_args);
     if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);

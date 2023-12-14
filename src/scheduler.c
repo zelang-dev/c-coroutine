@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
@@ -1235,13 +1235,13 @@ static void coroutine_scheduler(void) {
         t->ready = 0;
         co_running = t;
         n_co_switched++;
+        t->cycles++;
         if (scheduler_info_log)
             CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d cycles: %zu\n", co_async_self(), t->cid,
                     ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status, t->cycles);
 
         coroutine_interrupt();
         if (!is_status_invalid(t) && !t->halt) {
-            t->cycles++;
             co_switch(t);
         }
 
