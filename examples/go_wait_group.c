@@ -1,16 +1,16 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 void *worker(void *arg) {
-    // int id = c_int(arg);
+    int wid = get_args(arg, 0).integer;
     int id = co_id();
-    printf("Worker %d starting\n", id);
+    printf("Worker %d starting\n", wid);
 
     co_sleep(1000);
-    printf("Worker %d done\n", id);
+    printf("Worker %d done\n", wid);
     if (id == 4)
-        return (void *)32;
+        return 32;
     else if (id == 3)
-        return (void *)"hello world\0";
+        return "hello world";
 
     return 0;
 }
@@ -19,7 +19,7 @@ int co_main(int argc, char **argv) {
     int cid[5];
     wait_group_t *wg = co_wait_group();
     for (int i = 1; i <= 5; i++) {
-        cid[i - 1] = co_go(worker, &i);
+        cid[i - 1] = co_go(worker, args_for("i", i));
     }
     wait_result_t *wgr = co_wait(wg);
 

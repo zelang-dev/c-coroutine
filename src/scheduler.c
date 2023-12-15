@@ -974,6 +974,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
         c->event_active = false;
     } else if (c->wait_active && !is_empty(c->wait_group)) {
         t->synced = true;
+        t->is_address = true;
         hash_put(c->wait_group, co_itoa(id), t);
         c->wait_counter++;
     }

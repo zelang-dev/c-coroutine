@@ -265,10 +265,10 @@ wait_result_t *co_wait(wait_group_t *wg) {
                         } else {
                             if (!is_empty(co->results) && !co->loop_erred) {
                                 hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
-                                if (!co->event_active && !co->is_plain && !co->is_address)
+                                if (!co->event_active && !co->is_plain && !co->is_address) {
                                     CO_FREE(co->results);
-
-                                //co->results = NULL;
+                                    co->results = NULL;
+                                }
                             }
 
                             if (co->loop_erred) {
