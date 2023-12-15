@@ -584,7 +584,7 @@ static void_t uv_init(void_t uv_args) {
                 switch (scheme) {
                     case UV_NAMED_PIPE:
                         uv->handle_type = UV_NAMED_PIPE;
-                        uv_pipe_connect((uv_connect_t *)req, (uv_pipe_t *)stream, var_const_char_512(args[3]), connect_cb);
+                        uv_pipe_connect((uv_connect_t *)req, (uv_pipe_t *)stream, var_const_char(args[3]), connect_cb);
                         result = 0;
                         break;
                     case UV_TLS:

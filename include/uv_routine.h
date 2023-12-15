@@ -12,6 +12,27 @@
 
 #define STREAM(handle) ((uv_stream_t *)handle)
 
+#define var_int(arg) (arg).value.integer
+#define var_long(arg) (arg).value.s_long
+#define var_long_long(arg) (arg).value.long_long
+#define var_unsigned_int(arg) (arg).value.u_int
+#define var_unsigned_long(arg) (arg).value.u_long
+#define var_size_t(arg) (arg).value.max_size
+#define var_const_char(arg) (arg).value.const_char
+#define var_char(arg) (arg).value.schar
+#define var_char_ptr(arg) (arg).value.char_ptr
+#define var_bool(arg) (arg).value.boolean
+#define var_float(arg) (arg).value.point
+#define var_double(arg) (arg).value.precision
+#define var_unsigned_char(arg) (arg).value.uchar
+#define var_char_array(arg) (arg).value.array
+#define var_unsigned_char_ptr(arg) (arg).value.uchar_ptr
+#define var_signed_short(arg) (arg).value.s_short
+#define var_unsigned_short(arg) (arg).value.u_short
+#define var_ptr(arg) (arg).value.object
+#define var_func(arg) (arg).value.func
+#define var_cast(type, arg) (type *)(arg).value.object
+
 #ifdef __cplusplus
 extern "C"
 {

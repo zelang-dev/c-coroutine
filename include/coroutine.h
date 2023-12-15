@@ -594,7 +594,7 @@ typedef union
     char **array;
     void_t object;
     callable_t func;
-    const char str[512];
+    const char const_char[512];
 } value_t;
 
 typedef struct values_s
@@ -1353,7 +1353,7 @@ Must also closed out with `select_break()`. */
 #define c_unsigned_int(data) co_value((data)).u_int
 #define c_unsigned_long(data) co_value((data)).u_long
 #define c_size_t(data) co_value((data)).max_size
-#define c_const_char(data) co_value((data)).str
+#define c_const_char(data) co_value((data)).const_char
 #define c_char(data) co_value((data)).schar
 #define c_char_ptr(data) co_value((data)).char_ptr
 #define c_bool(data) co_value((data)).boolean
@@ -1374,7 +1374,7 @@ Must also closed out with `select_break()`. */
 #define c_unsigned_integer(value) co_data((value)).u_int
 #define c_unsigned_long_int(value) co_data((value)).u_long
 #define c_unsigned_long_long(value) co_data((value)).max_size
-#define c_string(value) co_data((value)).str
+#define c_string(value) co_data((value)).const_char
 #define c_signed_chars(value) co_data((value)).schar
 #define c_const_chars(value) co_data((value)).char_ptr
 #define c_boolean(value) co_data((value)).boolean
@@ -1388,27 +1388,6 @@ Must also closed out with `select_break()`. */
 #define c_object(value) co_data((value)).object
 #define c_func(value) co_data((value)).func
 #define c_cast_of(type, value) (type *)co_data((value)).object
-
-#define var_int(arg) (arg).value.integer
-#define var_long(arg) (arg).value.s_long
-#define var_long_long(arg) (arg).value.long_long
-#define var_unsigned_int(arg) (arg).value.u_int
-#define var_unsigned_long(arg) (arg).value.u_long
-#define var_size_t(arg) (arg).value.max_size
-#define var_const_char_512(arg) (arg).value.str
-#define var_char(arg) (arg).value.schar
-#define var_char_ptr(arg) (arg).value.char_ptr
-#define var_bool(arg) (arg).value.boolean
-#define var_float(arg) (arg).value.point
-#define var_double(arg) (arg).value.precision
-#define var_unsigned_char(arg) (arg).value.uchar
-#define var_char_array(arg) (arg).value.array
-#define var_unsigned_char_ptr(arg) (arg).value.uchar_ptr
-#define var_signed_short(arg) (arg).value.s_short
-#define var_unsigned_short(arg) (arg).value.u_short
-#define var_ptr(arg) (arg).value.object
-#define var_func(arg) (arg).value.func
-#define var_cast(type, arg) (type *)(arg).value.object
 
 #define defer(func, arg) co_defer(FUNC_VOID(func), arg)
 
