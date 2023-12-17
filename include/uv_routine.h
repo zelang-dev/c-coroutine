@@ -3,7 +3,8 @@
 
 #include <ctype.h>
 #include "uv_tls.h"
-#include "compat/yyjson.h"
+#include "compat/parson.h"
+#include <stdbool.h>
 
 /* Public API qualifier. */
 #ifndef C_API
