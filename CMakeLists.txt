@@ -29,9 +29,6 @@ add_definitions(-DHASH_INIT_CAPACITY=512)
 add_library(coroutine STATIC ${lib_files})
 target_link_libraries(coroutine PUBLIC uv_a)
 
-add_subdirectory(deps/yyjson)
-target_link_libraries(coroutine PUBLIC yyjson)
-
 find_package(OpenSSL)
 if(OPENSSL_FOUND)
     target_include_directories(coroutine BEFORE PUBLIC ${OPENSSL_INCLUDE_DIR})
