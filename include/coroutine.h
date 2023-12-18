@@ -722,7 +722,8 @@ C_API void args_free(args_t *params);
 * Use `get_args()` or `args_in()` for retrieval.
 *
 * @param desc format, similar to `printf()`:
-* * `i` integer,
+* * `i` unsigned integer,
+* * `d` signed integer,
 * * `c` character,
 * * `s` string,
 * * `a` array,

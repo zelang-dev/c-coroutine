@@ -34,8 +34,12 @@ args_t *args_for(string_t desc, ...) {
     for (int i = 0; i < count; i++) {
         switch (*desc++) {
             case 'i':
-                // integer argument
+                // unsigned integer argument
                 args[i].value.max_size = va_arg(argp, size_t);
+                break;
+            case 'd':
+                // signed integer argument
+                args[i].value.long_long = va_arg(argp, int64_t);
                 break;
             case 'c':
                 // character argument
