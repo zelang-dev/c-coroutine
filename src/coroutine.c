@@ -87,6 +87,8 @@ void delete(void_t ptr) {
             ((object_t *)ptr)->dtor(ptr);
         or (CO_OA_HASH)
             hash_free(ptr);
+        or (CO_ARGS)
+            args_free(ptr);
         otherwise {
             if (is_valid(ptr))
                 CO_FREE(ptr);
@@ -120,9 +122,6 @@ void co_delete(routine_t *co) {
         } else {
             if (co->err_allocated)
                 CO_FREE(co->err_allocated);
-
-            //if (co->results && !co->event_active && !co->is_address && !co->is_plain)
-                //CO_FREE(co->results);
 
             CO_FREE(co);
         }
