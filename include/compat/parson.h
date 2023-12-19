@@ -244,6 +244,8 @@ JSON_Value *json_value_init_array(void);
 JSON_Value *json_value_init_string(const char *string); /* copies passed string */
 JSON_Value *json_value_init_string_with_len(const char *string, size_t length); /* copies passed string, length shouldn't include last null character */
 JSON_Value *json_value_init_number(double number);
+JSON_Value *json_value_init_number_as_string(const char *number);
+JSON_Value *json_value_init_number_as_string_with_len(const char *number_as_string, size_t number_as_string_length);
 JSON_Value *json_value_init_boolean(int boolean);
 JSON_Value *json_value_init_null(void);
 JSON_Value *json_value_deep_copy(const JSON_Value *value);
@@ -255,6 +257,9 @@ JSON_Array *json_value_get_array(const JSON_Value *value);
 const char *json_value_get_string(const JSON_Value *value);
 size_t          json_value_get_string_len(const JSON_Value *value); /* doesn't account for last null character */
 double          json_value_get_number(const JSON_Value *value);
+const char *json_value_get_number_as_string(const JSON_Value *value);
+size_t          json_value_get_number_as_string_len(const JSON_Value *value);
+
 int             json_value_get_boolean(const JSON_Value *value);
 JSON_Value *json_value_get_parent(const JSON_Value *value);
 
