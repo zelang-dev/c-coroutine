@@ -1,5 +1,12 @@
 #include "coroutine.h"
 
+JSON_Status is_json(json_t *schema) {
+    if (is_empty(schema) || json_value_get_type(schema) == JSONFailure)
+        return JSONFailure;
+
+    return JSONSuccess;
+}
+
 string json_serialize(json_t *json, bool is_pretty) {
     string json_string = NULL;
     if (is_pretty)
