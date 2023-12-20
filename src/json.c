@@ -12,12 +12,12 @@ string json_serialize(json_t *json, bool is_pretty) {
     return json_string;
 }
 
-JSON_Status json_write(string_t filename, json_t *json, bool is_pretty) {
-    JSON_Status return_code = JSONSuccess;
-    if (fs_write_file(filename, json_serialize(json, is_pretty)))
-        return JSONFailure;
+CO_FORCE_INLINE int json_write(string_t filename, string_t text) {
+    return fs_write_file(filename, text);
+}
 
-    return return_code;
+CO_FORCE_INLINE json_t *json_parse(string_t text) {
+   return json_parse_string(text);
 }
 
 json_t *json_read(string_t filename) {
@@ -25,11 +25,7 @@ json_t *json_read(string_t filename) {
     if (is_empty(file_contents))
         return NULL;
 
-    return json_parse_string(file_contents);
-}
-
-CO_FORCE_INLINE json_t *json_parse(string_t text) {
-   return json_parse_string(text);
+    return json_parse(file_contents);
 }
 
 json_t *json_encode(string_t desc, ...) {
@@ -41,6 +37,7 @@ json_t *json_encode(string_t desc, ...) {
     va_list argp;
     string key, value_char;
     int value_bool;
+    JSON_Status status = JSONSuccess;
     void_t value_any = NULL;
     JSON_Array *value_array = NULL;
     double value_number = 0;
@@ -62,7 +59,7 @@ json_t *json_encode(string_t desc, ...) {
             case 'a':
                 if (!is_array) {
                     key = va_arg(argp, string);
-                    json_object_set_value(json_object, key, json_value_init_array());
+                    status = json_object_set_value(json_object, key, json_value_init_array());
                     value_array = json_object_get_array(json_object, key);
                     is_array = true;
                     is_dot = false;
@@ -73,11 +70,11 @@ json_t *json_encode(string_t desc, ...) {
                     key = va_arg(argp, string);
 
                 if (is_array)
-                    json_array_append_null(value_array);
+                    status = json_array_append_null(value_array);
                 else if (is_dot)
-                    json_object_dotset_null(json_object, key);
+                    status = json_object_dotset_null(json_object, key);
                 else
-                    json_object_set_null(json_object, key);
+                    status = json_object_set_null(json_object, key);
                 is_dot = false;
                 break;
             case 'd':
@@ -86,11 +83,11 @@ json_t *json_encode(string_t desc, ...) {
 
                 value_number = va_arg(argp, double);
                 if (is_array)
-                    json_array_append_number(value_array, value_number);
+                    status = json_array_append_number(value_array, value_number);
                 else if (is_dot)
-                    json_object_dotset_number(json_object, key, value_number);
+                    status = json_object_dotset_number(json_object, key, value_number);
                 else
-                    json_object_set_number(json_object, key, value_number);
+                    status = json_object_set_number(json_object, key, value_number);
                 is_dot = false;
                 break;
             case 'b':
@@ -99,11 +96,11 @@ json_t *json_encode(string_t desc, ...) {
 
                 value_bool = va_arg(argp, int);
                 if (is_array)
-                    json_array_append_boolean(value_array, value_bool);
+                    status = json_array_append_boolean(value_array, value_bool);
                 else if (is_dot)
-                    json_object_dotset_boolean(json_object, key, value_bool);
+                    status = json_object_dotset_boolean(json_object, key, value_bool);
                 else
-                    json_object_set_boolean(json_object, key, value_bool);
+                    status = json_object_set_boolean(json_object, key, value_bool);
                 is_dot = false;
                 break;
             case 's':
@@ -112,11 +109,11 @@ json_t *json_encode(string_t desc, ...) {
 
                 value_char = va_arg(argp, string);
                 if (is_array)
-                    json_array_append_string(value_array, value_char);
+                    status = json_array_append_string(value_array, value_char);
                 else if (is_dot)
-                    json_object_dotset_string(json_object, key, value_char);
+                    status = json_object_dotset_string(json_object, key, value_char);
                 else
-                    json_object_set_string(json_object, key, value_char);
+                    status = json_object_set_string(json_object, key, value_char);
                 is_dot = false;
                 break;
             case 'v':
@@ -125,11 +122,11 @@ json_t *json_encode(string_t desc, ...) {
 
                 value_any = va_arg(argp, void_t);
                 if (is_array)
-                    json_array_append_value(value_array, value_any);
+                    status = json_array_append_value(value_array, value_any);
                 else if (is_dot)
-                    json_object_dotset_value(json_object, key, value_any);
+                    status = json_object_dotset_value(json_object, key, value_any);
                 else
-                    json_object_set_value(json_object, key, value_any);
+                    status = json_object_set_value(json_object, key, value_any);
                 is_dot = false;
                 break;
             default:

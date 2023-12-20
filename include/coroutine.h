@@ -1292,6 +1292,12 @@ C_API gc_coroutine_t *gc_coroutine_list(void);
 C_API void gc_coroutine_free(void);
 C_API void gc_channel_free(void);
 
+C_API string json_serialize(json_t *json, bool is_pretty);
+C_API json_t *json_parse(string_t text);
+C_API json_t *json_read(string_t filename);
+C_API int json_write(string_t filename, string_t text);
+C_API json_t *json_encode(string_t desc, ...);
+
 #define try ex_try
 #define catch_any ex_catch_any
 #define catch(e) ex_catch(e)

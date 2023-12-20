@@ -779,10 +779,11 @@ string fs_readfile(string_t path) {
 
 int fs_write_file(string_t path, string_t text) {
     int status;
-    uv_file fd = fs_open(path, O_WRONLY, 0);
+    uv_file fd = fs_open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd) {
         status = fs_write(fd, text, 0);
-        fs_close(fd);
+        if (!fs_close(fd))
+            return status;
     }
 
     return co_err_code();
