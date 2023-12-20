@@ -186,6 +186,7 @@ C_API void uv_close_free(void *handle);
 C_API void coroutine_event_cleanup(void *handle);
 
 C_API char *fs_readfile(const char *path);
+C_API int fs_write_file(const char *path, const char *text);
 C_API uv_file fs_open(const char *path, int flags, int mode);
 C_API int fs_close(uv_file fd);
 C_API uv_stat_t *fs_fstat(uv_file fd);

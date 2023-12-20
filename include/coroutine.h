@@ -398,6 +398,7 @@ typedef struct routine_s routine_t;
 typedef struct oa_hash_s hash_t;
 typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
+typedef struct json_value_t json_t;
 typedef hash_t ht_string_t;
 typedef hash_t wait_group_t;
 typedef hash_t wait_result_t;
