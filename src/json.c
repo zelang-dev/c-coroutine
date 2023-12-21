@@ -1,20 +1,19 @@
 #include "coroutine.h"
 
-JSON_Status is_json(json_t *schema) {
-    if (is_empty(schema) || json_value_get_type(schema) == JSONFailure)
-        return JSONFailure;
-
-    return JSONSuccess;
+CO_FORCE_INLINE bool is_json(json_t *schema) {
+    return (is_empty(schema) || json_value_get_type(schema) == JSONError) ? false : true;
 }
 
 string json_serialize(json_t *json, bool is_pretty) {
     string json_string = NULL;
-    if (is_pretty)
-        json_string = json_serialize_to_string_pretty((const json_t *)json);
-    else
-        json_string = json_serialize_to_string((const json_t *)json);
+    if (!is_empty(json)) {
+        if (is_pretty)
+            json_string = json_serialize_to_string_pretty((const json_t *)json);
+        else
+            json_string = json_serialize_to_string((const json_t *)json);
 
-    defer(json_free_serialized_string, json_string);
+        defer(json_free_serialized_string, json_string);
+    }
 
     return json_string;
 }
@@ -24,7 +23,7 @@ CO_FORCE_INLINE int json_write(string_t filename, string_t text) {
 }
 
 CO_FORCE_INLINE json_t *json_parse(string_t text) {
-   return json_parse_string(text);
+    return json_parse_string(text);
 }
 
 json_t *json_read(string_t filename) {
@@ -47,8 +46,10 @@ json_t *json_encode(string_t desc, ...) {
     JSON_Status status = JSONSuccess;
     void_t value_any = NULL;
     JSON_Array *value_array = NULL;
-    double value_number = 0;
-    bool is_dot = false, is_array = false;
+    double value_float = 0;
+    int64_t value_int = 0;
+    size_t value_max = 0;
+    bool is_dot = false, is_array = false, is_double = false, is_int = false, is_max = false;
 
     va_start(argp, desc);
     for (int i = 0; i < count; i++) {
@@ -85,17 +86,41 @@ json_t *json_encode(string_t desc, ...) {
                 is_dot = false;
                 break;
             case 'd':
+                is_int = true;
+            case 'f':
+                if (!is_int)
+                    is_double = true;
+            case 'i':
+                if (!is_double && !is_int)
+                    is_max = true;
+
                 if (!is_array)
                     key = va_arg(argp, string);
 
-                value_number = va_arg(argp, double);
-                if (is_array)
-                    status = json_array_append_number(value_array, value_number);
-                else if (is_dot)
-                    status = json_object_dotset_number(json_object, key, value_number);
+                if (is_double)
+                    value_float = va_arg(argp, double);
+                else if (is_int)
+                    value_int = va_arg(argp, int64_t);
                 else
-                    status = json_object_set_number(json_object, key, value_number);
+                    value_max = va_arg(argp, size_t);
+
+                if (is_array)
+                    status = json_array_append_number(value_array, (is_double ? value_float
+                                                                    : is_int ? (int)value_int
+                                                                    : (unsigned long)value_max));
+                else if (is_dot)
+                    status = json_object_dotset_number(json_object, key, (is_double ? value_float
+                                                                          : is_int ? (int)value_int
+                                                                          : (unsigned long)value_max));
+                else
+                    status = json_object_set_number(json_object, key, (is_double ? value_float
+                                                                       : is_int ? (int)value_int
+                                                                       : (unsigned long)value_max));
+
                 is_dot = false;
+                is_double = false;
+                is_int = false;
+                is_max = false;
                 break;
             case 'b':
                 if (!is_array)

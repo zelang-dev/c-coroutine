@@ -1292,6 +1292,7 @@ C_API gc_coroutine_t *gc_coroutine_list(void);
 C_API void gc_coroutine_free(void);
 C_API void gc_channel_free(void);
 
+C_API bool is_json(json_t *schema);
 C_API string json_serialize(json_t *json, bool is_pretty);
 C_API json_t *json_parse(string_t text);
 C_API json_t *json_read(string_t filename);
@@ -1354,6 +1355,10 @@ Must also closed out with `select_break()`. */
 #define and(ENUM) case ENUM:
 #define or(ENUM) break; case ENUM:
 #define otherwise break; default:
+
+#ifndef kv
+#define kv(key, value) (key), (value)
+#endif
 
 #define c_int(data) co_value((data)).integer
 #define c_long(data) co_value((data)).s_long
