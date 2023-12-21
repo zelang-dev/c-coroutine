@@ -169,3 +169,70 @@ json_t *json_encode(string_t desc, ...) {
 
     return json_root;
 }
+
+string json_for(string_t desc, ...) {
+    int count = (int)strlen(desc);
+    json_t *json_root = json_value_init_object();
+    defer(json_value_free, json_root);
+    JSON_Object *json_object = json_value_get_object(json_root);
+    JSON_Status status = json_object_set_value(json_object, "array", json_value_init_array());
+    JSON_Array *value_array = json_object_get_array(json_object, "array");
+
+    va_list argp;
+    string value_char;
+    int value_bool;
+    void_t value_any = NULL;
+    double value_float = 0;
+    int64_t value_int = 0;
+    size_t value_max = 0;
+    bool is_double = false, is_int = false, is_max = false;
+
+    va_start(argp, desc);
+    for (int i = 0; i < count; i++) {
+        switch (*desc++) {
+            case 'n':
+                status = json_array_append_null(value_array);
+                break;
+            case 'd':
+                is_int = true;
+            case 'f':
+                if (!is_int)
+                    is_double = true;
+            case 'i':
+                if (!is_double && !is_int)
+                    is_max = true;
+
+                if (is_double)
+                    value_float = va_arg(argp, double);
+                else if (is_int)
+                    value_int = va_arg(argp, int64_t);
+                else
+                    value_max = va_arg(argp, size_t);
+
+                status = json_array_append_number(value_array, (is_double ? value_float
+                                                                    : is_int ? (int)value_int
+                                                                    : (unsigned long)value_max));
+                is_double = false;
+                is_int = false;
+                is_max = false;
+                break;
+            case 'b':
+                value_bool = va_arg(argp, int);
+                status = json_array_append_boolean(value_array, value_bool);
+                break;
+            case 's':
+                value_char = va_arg(argp, string);
+                status = json_array_append_string(value_array, value_char);
+                break;
+            case 'v':
+                value_any = va_arg(argp, void_t);
+                status = json_array_append_value(value_array, value_any);
+                break;
+            default:
+                break;
+        }
+    }
+    va_end(argp);
+
+    return json_serialize(json_array_get_wrapping_value(value_array), false);
+}

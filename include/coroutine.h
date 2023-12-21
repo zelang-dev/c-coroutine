@@ -1298,6 +1298,7 @@ C_API json_t *json_parse(string_t text);
 C_API json_t *json_read(string_t filename);
 C_API int json_write(string_t filename, string_t text);
 C_API json_t *json_encode(string_t desc, ...);
+C_API string json_for(string_t desc, ...);
 
 #define try ex_try
 #define catch_any ex_catch_any

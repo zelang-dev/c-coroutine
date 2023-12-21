@@ -1279,6 +1279,7 @@ int main(int argc, char **argv) {
     CO_INFO("System starting up: %s\n\n", co_system_uname());
 #endif
     ex_signal_setup();
+    json_set_allocation_functions(try_malloc, CO_FREE);
     coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
     coroutine_scheduler();
     fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
