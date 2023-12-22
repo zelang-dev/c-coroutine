@@ -22,16 +22,19 @@ CO_FORCE_INLINE int json_write(string_t filename, string_t text) {
     return fs_write_file(filename, text);
 }
 
-CO_FORCE_INLINE json_t *json_parse(string_t text) {
-    return json_parse_string(text);
+CO_FORCE_INLINE json_t *json_decode(string_t text, bool is_commented) {
+    if (is_commented)
+        return json_parse_string_with_comments(text);
+    else
+        return json_parse_string(text);
 }
 
-json_t *json_read(string_t filename) {
+json_t *json_read(string_t filename, bool is_commented) {
     string file_contents = fs_readfile(filename);
     if (is_empty(file_contents))
         return NULL;
 
-    return json_parse(file_contents);
+    return json_decode(file_contents, is_commented);
 }
 
 json_t *json_encode(string_t desc, ...) {
@@ -53,6 +56,9 @@ json_t *json_encode(string_t desc, ...) {
 
     va_start(argp, desc);
     for (int i = 0; i < count; i++) {
+        if (status == JSONFailure)
+            return NULL;
+
         switch (*desc++) {
             case '.':
                 is_dot = true;
@@ -189,6 +195,9 @@ string json_for(string_t desc, ...) {
 
     va_start(argp, desc);
     for (int i = 0; i < count; i++) {
+        if (status == JSONFailure)
+            return NULL;
+
         switch (*desc++) {
             case 'n':
                 status = json_array_append_null(value_array);

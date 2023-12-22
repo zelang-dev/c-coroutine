@@ -5,7 +5,8 @@ int co_main(int argc, char **argv) {
                                   kv("name", "John Smith"),
                                   kv("age", 25),
                                   kv("address.city", "Cupertino"),
-                                  kv("contact.emails", json_parse(json_for("ss", "email@example.com", "email2@example.com"))));
+                                  kv("contact.emails",
+                                     json_decode(json_for("ss", "email@example.com", "email2@example.com"), false)));
 
     if (is_json(encoded))
         puts(json_serialize(encoded, true));
