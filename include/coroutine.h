@@ -1293,19 +1293,19 @@ C_API void gc_coroutine_free(void);
 C_API void gc_channel_free(void);
 
 /* Check if validated by json type */
-C_API bool is_json(json_t *schema);
+C_API bool is_json(json_t *);
 
 /**
 * @param value Serialization of value to string.
 * @param is_pretty Pretty serialization, if set `true`.
 */
-C_API string json_serialize(json_t *json, bool is_pretty);
+C_API string json_serialize(json_t *, bool is_pretty);
 
 /**
 * @param text Parses first JSON value in a text, returns NULL in case of error.
 * @param is_commented Ignores comments (/ * * / and //), if set `true`.
 */
-C_API json_t *json_decode(string_t text, bool is_commented);
+C_API json_t *json_decode(string_t, bool is_commented);
 
 C_API json_t *json_read(string_t filename, bool is_commented);
 C_API int json_write(string_t filename, string_t text);
