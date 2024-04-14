@@ -1281,6 +1281,11 @@ C_API unsigned long co_async_self(void);
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
+/* C++ string style "itoa", differs from `co_itoa()` by also passing a buffer for result, and
+a base other than 10, Credit http://www.strudel.org.uk/itoa/ */
+C_API string itoa_by(int64_t value, string result, int base);
+
+/* Generic "itoa" using current coroutine scrape buffer and `snprintf` */
 C_API string_t co_itoa(int64_t number);
 C_API int co_strpos(string_t text, string pattern);
 C_API void co_strcpy(string dest, string_t src, size_t len);

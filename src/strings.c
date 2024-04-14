@@ -9,6 +9,33 @@ string_t co_itoa(int64_t number) {
     return co_active()->scrape;
 }
 
+string itoa_by(int64_t value, string result, int base) {
+    // check that the base if valid
+    if (base < 2 || base > 36) { *result = '\0'; return result; }
+
+    string ptr = result, *ptr1 = result, tmp_char;
+    int64_t tmp_value;
+
+    do {
+        tmp_value = value;
+        value /= base;
+        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + (tmp_value - value * base)];
+    } while (value);
+
+    // Apply negative sign
+    if (tmp_value < 0) *ptr++ = '-';
+    *ptr-- = '\0';
+
+    // Reverse the string
+    while (ptr1 < ptr) {
+        tmp_char = *ptr;
+        *ptr-- = *ptr1;
+        *ptr1++ = tmp_char;
+    }
+
+    return result;
+}
+
 int co_strpos(string_t text, string pattern) {
     size_t c, d, e, text_length, pattern_length, position = -1;
 
