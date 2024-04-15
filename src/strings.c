@@ -36,6 +36,10 @@ string itoa_by(int64_t value, string result, int base) {
     return result;
 }
 
+CO_FORCE_INLINE string_t co_itoa_by(int64_t number) {
+    return (string_t)itoa_by(number, co_active()->scrape, 10);
+}
+
 int co_strpos(string_t text, string pattern) {
     size_t c, d, e, text_length, pattern_length, position = -1;
 
