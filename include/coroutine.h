@@ -1289,7 +1289,7 @@ C_API string itoa_by(int64_t value, string result, int base);
 C_API string_t co_itoa(int64_t number);
 
 /* C++ string style "itoa", using current coroutine scrape buffer, Credit http://www.strudel.org.uk/itoa/ */
-C_API string_t co_itoa_by(int64_t number);
+C_API string_t co_itoa_by(int64_t number, int base);
 
 C_API int co_strpos(string_t text, string pattern);
 C_API void co_strcpy(string dest, string_t src, size_t len);
