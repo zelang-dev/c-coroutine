@@ -84,23 +84,26 @@ thread_local ex_context_t *ex_context = 0;
 thread_local char ex_message[ 256 ] = { 0 };
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
+static volatile sig_atomic_t got_ctrl_c = false;
+static volatile sig_atomic_t can_free = true;
+static volatile sig_atomic_t can_malloc = true;
 
 static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
-    fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
+    printf_stderr("\nFatal Error: %s in function(%s)\n\n",
             !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex, exception->function);
 #else
-    fprintf(stderr, "\n%s: %s\n", message, !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex);
+    printf_stderr("\n%s: %s\n", message, !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex);
     if (!is_empty((void_t)exception->file)) {
         if (!is_empty((void_t)exception->function)) {
-            fprintf(stderr, "    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
+            printf_stderr("    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
         } else {
-            fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
+            printf_stderr("    thrown at %s:%d\n\n", exception->file, exception->line);
         }
     }
 #endif
-
-    (void)fflush(stderr);
+    if (!can_free)
+        printf_stderr("Signal execution interrupted during stack unwinding on %s,\nwhile on unsafe `free()` execution.\n\n", exception->ex);
 }
 
 ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t)) {
@@ -115,14 +118,19 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t)) {
     return *const_ptr;
 }
 
-static void unwind_stack(ex_context_t *ctx) {
+void ex_unwind_stack(ex_context_t *ctx) {
     ex_ptr_t *p = ctx->stack;
     void_t temp = NULL;
 
+    if (ctx->unstack)
+        ex_terminate();
+
     ctx->unstack = 1;
 
-    if (ctx->co->err_protected) {
+    if (ctx->co->err_protected && can_free) {
+        can_free = false;
         co_deferred_free(ctx->co);
+        can_free = true;
     } else {
         while (p) {
             if (*p->ptr) {
@@ -131,7 +139,12 @@ static void unwind_stack(ex_context_t *ctx) {
                     break;
                 }
 
-                p->func(*p->ptr);
+                if (can_free) {
+                    can_free = false;
+                    p->func(*p->ptr);
+                    can_free = true;
+                }
+
                 temp = *p->ptr;
             }
 
@@ -141,6 +154,9 @@ static void unwind_stack(ex_context_t *ctx) {
 
     ctx->unstack = 0;
     ctx->stack = 0;
+
+    if (ctx == &ex_context_buffer)
+        ex_terminate();
 }
 
 void ex_init(void) {
@@ -156,7 +172,11 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
-    fflush(stdout);
+    if (got_ctrl_c) {
+        got_ctrl_c = false;
+        coroutine_info();
+    }
+
     if (ex_uncaught_exception() || got_uncaught_exception)
         ex_print(ex_context, "Coroutine-system, exception during stack unwinding leading to an undefined behavior");
     else
@@ -182,13 +202,7 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     ctx->co = co_active();
     ctx->co->err = (void_t)ctx->ex;
     ctx->co->panic = message;
-    if (ctx->unstack)
-        ex_terminate();
-
-    unwind_stack(ctx);
-
-    if (ctx == &ex_context_buffer)
-        ex_terminate();
+    ex_unwind_stack(ctx);
 
 #ifdef _WIN32
     if (!is_empty((void_t)message))
@@ -262,7 +276,7 @@ void ex_signal_seh(DWORD sig, string_t ex) {
             break;
 
     if (i == max_ex_sig)
-        fprintf(stderr,
+        printf_stderr(
                 "Coroutine-system, cannot install exception handler for signal no %d (%s), "
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
@@ -295,11 +309,11 @@ void ex_handler(int sig) {
         }
 
     if (old == SIG_ERR)
-        fprintf(stderr, "Coroutine-system, cannot reinstall handler for signal no %d (%s)\n",
+        printf_stderr("Coroutine-system, cannot reinstall handler for signal no %d (%s)\n",
                 sig, ex);
 
     if (sig == SIGINT)
-        coroutine_info();
+        got_ctrl_c = true;
 
     ex_throw(ex, "unknown", 0, NULL, NULL);
 }
@@ -313,7 +327,7 @@ void (*ex_signal(int sig, string_t ex))(int) {
             break;
 
     if (i == max_ex_sig) {
-        fprintf(stderr,
+        printf_stderr(
                 "Coroutine-system, cannot install exception handler for signal no %d (%s), "
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
@@ -333,7 +347,7 @@ void (*ex_signal(int sig, string_t ex))(int) {
     old = sigaction(sig, &sa, &osa);
 #endif
     if (old == SIG_ERR)
-        fprintf(stderr, "Coroutine-system, cannot install handler for signal no %d (%s)\n",
+        printf_stderr("Coroutine-system, cannot install handler for signal no %d (%s)\n",
                 sig, ex);
     else
         ex_sig[ i ].ex = ex, ex_sig[ i ].sig = sig;

@@ -19,8 +19,12 @@
    These may be OR'd together.  */
 #define R_OK    4       /* Test for read permission.  */
 #define W_OK    2       /* Test for write permission.  */
-//#define   X_OK    1       /* execute permission - unsupported in windows*/
+// #define X_OK    1       /* execute permission - unsupported in windows*/
 #define F_OK    0       /* Test for existence.  */
+
+#define SEEK_SET        0
+#define SEEK_CUR        1
+#define SEEK_END        2
 
 #define access _access
 #define dup2 _dup2
@@ -32,6 +36,8 @@
 #define chdir _chdir
 #define isatty _isatty
 #define lseek _lseek
+#define write _write
+#define fsync _commit
 /* read, write, and close are NOT being #defined here, because while there are file handle specific versions for Windows, they probably don't work for sockets. You need to look at your app and consider whether to call e.g. closesocket(). */
 
 #ifdef _WIN64

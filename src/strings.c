@@ -2,42 +2,11 @@
 
 string_t co_itoa(int64_t number) {
 #ifdef _WIN32
-    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
+    snprintf_(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
 #else
-    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
+    snprintf_(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
 #endif
     return co_active()->scrape;
-}
-
-string itoa_by(int64_t value, string result, int base) {
-    // check that the base if valid
-    if (base < 2 || base > 36) { *result = '\0'; return result; }
-
-    string ptr = result, *ptr1 = result, tmp_char;
-    int64_t tmp_value;
-
-    do {
-        tmp_value = value;
-        value /= base;
-        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + (tmp_value - value * base)];
-    } while (value);
-
-    // Apply negative sign
-    if (tmp_value < 0) *ptr++ = '-';
-    *ptr-- = '\0';
-
-    // Reverse the string
-    while (ptr1 < ptr) {
-        tmp_char = *ptr;
-        *ptr-- = *ptr1;
-        *ptr1++ = tmp_char;
-    }
-
-    return result;
-}
-
-CO_FORCE_INLINE string_t co_itoa_by(int64_t number, int base) {
-    return (string_t)itoa_by(number, co_active()->scrape, base);
 }
 
 int co_strpos(string_t text, string pattern) {
@@ -94,70 +63,13 @@ CO_FORCE_INLINE string co_string(string_t str, size_t length) {
     return co_memdup(co_active(), str, length);
 }
 
-#if defined(_WIN32) || defined(_WIN64)
-int vasprintf(string *str_p, string_t fmt, va_list ap) {
-    va_list ap_copy;
-    int formattedLength, actualLength;
-    size_t requiredSize;
-
-    // be paranoid
-    *str_p = NULL;
-
-    // copy va_list, as it is used twice
-    va_copy(ap_copy, ap);
-
-    // compute length of formatted string, without NULL terminator
-    formattedLength = _vscprintf(fmt, ap_copy);
-    va_end(ap_copy);
-
-    // bail out on error
-    if (formattedLength < 0) {
-        return -1;
-    }
-
-    // allocate buffer, with NULL terminator
-    requiredSize = ((size_t)formattedLength) + 1;
-    *str_p = (string)CO_MALLOC(requiredSize);
-
-    // bail out on failed memory allocation
-    if (is_empty(*str_p)) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    // write formatted string to buffer, use security hardened _s function
-    actualLength = vsnprintf_s(*str_p, requiredSize, requiredSize - 1, fmt, ap);
-
-    // again, be paranoid
-    if (actualLength != formattedLength) {
-        CO_FREE(*str_p);
-        *str_p = NULL;
-        errno = EOTHER;
-        return -1;
-    }
-
-    return formattedLength;
-}
-
-int asprintf(string *str_p, string_t fmt, ...) {
-    int result;
-
-    va_list ap;
-    va_start(ap, fmt);
-    result = vasprintf(str_p, fmt, ap);
-    va_end(ap);
-
-    return result;
-}
-#endif
-
 string co_sprintf(string_t fmt, ...) {
     va_list values;
     int len;
     string tmp_str;
 
     va_start(values, fmt);
-    len = vasprintf(&tmp_str, fmt, values);
+    len = vasprintf_(&tmp_str, fmt, values);
     va_end(values);
 
     if (UNLIKELY(len < 0))

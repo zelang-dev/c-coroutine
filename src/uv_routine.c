@@ -33,7 +33,7 @@ void_t uv_error_post(routine_t *co, int r) {
     co->loop_erred = true;
     co->loop_code = r;
     co->status = CO_ERRED;
-    fprintf(stderr, "failed: %s\n", uv_strerror(r));
+    printf_stderr("failed: %s\n", uv_strerror(r));
     return NULL;
 }
 
@@ -132,7 +132,7 @@ static void connect_cb(uv_connect_t *client, int status) {
     routine_t *co = uv->context;
 
     if (status) {
-        fprintf(stderr, "Error: %s\n", uv_strerror(status));
+        printf_stderr("Error: %s\n", uv_strerror(status));
     }
 
     co->halt = true;
@@ -244,7 +244,7 @@ static void connection_cb(uv_stream_t *server, int status) {
     }
 
     if (r) {
-        fprintf(stderr, "Error: %s\n", uv_strerror(r));
+        printf_stderr("Error: %s\n", uv_strerror(r));
         if (!is_empty(handle))
             CO_FREE(handle);
 
@@ -263,7 +263,7 @@ static void write_cb(uv_write_t *req, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
     routine_t *co = uv->context;
     if (status < 0) {
-        fprintf(stderr, "Error: %s\n", uv_strerror(status));
+        printf_stderr("Error: %s\n", uv_strerror(status));
     }
 
     co->halt = true;
@@ -277,7 +277,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
     uv_args_t *uv = (uv_args_t *)tls->uv_args;
     routine_t *co = uv->context;
     if (status < 0) {
-        fprintf(stderr, "Error: %s\n", uv_strerror(status));
+        printf_stderr("Error: %s\n", uv_strerror(status));
     }
 
     co->halt = true;
@@ -303,7 +303,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     co->is_plain = true;
     if (nread < 0) {
         if (nread != UV_EOF)
-            fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
+            printf_stderr("Error: %s\n", uv_strerror((int)nread));
 
         co->results = (nread == UV_EOF ? 0 : &nread);
         uv_read_stop(stream);
@@ -328,7 +328,7 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     co->is_plain = true;
     if (nread < 0) {
         if (nread != UV_EOF)
-            fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
+            printf_stderr("Error: %s\n", uv_strerror((int)nread));
 
         co->results = (nread == UV_EOF ? 0 : &nread);
     } else {
@@ -351,7 +351,7 @@ static void fs_cb(uv_fs_t *req) {
     bool override = false;
 
     if (result < 0) {
-        fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
+        printf_stderr("Error: %s\n", uv_strerror((int)result));
     } else {
         void_t fs_ptr = uv_fs_get_ptr(req);
         uv_fs_type fs_type = uv_fs_get_type(req);
@@ -396,7 +396,7 @@ static void fs_cb(uv_fs_t *req) {
             case UV_FS_UNKNOWN:
             case UV_FS_CUSTOM:
             default:
-                fprintf(stderr, "type; %d not supported.\n", fs_type);
+                printf_stderr("type; %d not supported.\n", fs_type);
                 break;
         }
     }
@@ -489,7 +489,7 @@ static void_t fs_init(void_t uv_args) {
             case UV_FS_UNKNOWN:
             case UV_FS_CUSTOM:
             default:
-                fprintf(stderr, "type; %d not supported.\n", fs->fs_type);
+                printf_stderr("type; %d not supported.\n", fs->fs_type);
                 break;
         }
     } else {
@@ -542,7 +542,7 @@ static void_t fs_init(void_t uv_args) {
             case UV_FS_UNKNOWN:
             case UV_FS_CUSTOM:
             default:
-                fprintf(stderr, "type; %d not supported.\n", fs->fs_type);
+                printf_stderr("type; %d not supported.\n", fs->fs_type);
                 break;
         }
     }
@@ -607,7 +607,7 @@ static void_t uv_init(void_t uv_args) {
                 break;
             case UV_UNKNOWN_REQ:
             default:
-                fprintf(stderr, "type; %d not supported.\n", uv->req_type);
+                printf_stderr("type; %d not supported.\n", uv->req_type);
                 break;
         }
 
@@ -687,7 +687,7 @@ static void_t uv_init(void_t uv_args) {
                 break;
             case UV_UNKNOWN_HANDLE:
             default:
-                fprintf(stderr, "type; %d not supported.\n", uv->handle_type);
+                printf_stderr("type; %d not supported.\n", uv->handle_type);
                 break;
         }
     }
@@ -874,11 +874,11 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
             if (is_str_eq(name, "localhost"))
                 uv_os_gethostname(name, &len);
 
-            r = snprintf(crt, sizeof(crt), "%s.crt", name);
+            r = snprintf_(crt, sizeof(crt), "%s.crt", name);
             if (r == 0)
                 CO_LOG("Invalid hostname");
 
-            r = snprintf(key, sizeof(key), "%s.key", name);
+            r = snprintf_(key, sizeof(key), "%s.key", name);
             if (r == 0)
                 CO_LOG("Invalid hostname");
 
@@ -966,11 +966,11 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
                 if (is_str_eq(name, "localhost"))
                     uv_os_gethostname(name, &len);
 
-                r = snprintf(crt, sizeof(crt), "%s.crt", name);
+                r = snprintf_(crt, sizeof(crt), "%s.crt", name);
                 if (r == 0)
                     CO_LOG("Invalid hostname");
 
-                r = snprintf(key, sizeof(key), "%s.key", name);
+                r = snprintf_(key, sizeof(key), "%s.key", name);
                 if (r == 0)
                     CO_LOG("Invalid hostname");
 

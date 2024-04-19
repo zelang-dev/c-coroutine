@@ -839,7 +839,7 @@ void co_stack_check(int n) {
 
     t = co_running;
     if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER) {
-        snprintf(ex_message, 256, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
+        snprintf_(ex_message, 256, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
         co_panic(ex_message);
     }
 }
@@ -868,7 +868,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
         co_main_loop_handle = try_calloc(1, sizeof(uv_loop_t));
         int r = uv_loop_init(co_main_loop_handle);
         if (r)
-            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+            printf_stderr("Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
     }
 #endif
 
@@ -1122,7 +1122,7 @@ void coroutine_state(char *fmt, ...) {
 
     t = co_running;
     va_start(args, fmt);
-    vsnprintf(t->state, sizeof t->name, fmt, args);
+    vsnprintf_(t->state, sizeof t->name, fmt, args);
     va_end(args);
 }
 
@@ -1133,7 +1133,7 @@ void coroutine_name(char *fmt, ...) {
 
     t = co_running;
     va_start(args, fmt);
-    vsnprintf(t->name, sizeof t->name, fmt, args);
+    vsnprintf_(t->name, sizeof t->name, fmt, args);
     va_end(args);
 }
 
@@ -1160,7 +1160,7 @@ void coroutine_info() {
     routine_t *t;
     char *extra;
 
-    fprintf(stderr, "coroutine list:\n");
+    printf_stderr("coroutine list:\n");
     for (i = 0; i < n_all_coroutine; i++) {
         t = all_coroutine[i];
         if (t == co_running)
@@ -1170,7 +1170,7 @@ void coroutine_info() {
         else
             extra = "";
 
-        fprintf(stderr, "%6d%c %-20s %s%s cycles: %zu %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->cycles, t->status);
+        printf_stderr("%6d%c %-20s %s%s cycles: %zu %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->cycles, t->status);
     }
 }
 
@@ -1223,7 +1223,7 @@ static void coroutine_scheduler(void) {
         if (coroutine_count == 0 || !coroutine_active()) {
             coroutine_cleanup();
             if (coroutine_count > 0) {
-                fprintf(stderr, "No runnable coroutines! %d stalled\n", coroutine_count);
+                CO_INFO("No runnable coroutines! %d stalled\n", coroutine_count);
                 exit(1);
             } else {
                 CO_LOG("Coroutine scheduler exited");
@@ -1282,6 +1282,6 @@ int main(int argc, char **argv) {
     json_set_allocation_functions(try_malloc, CO_FREE);
     coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
     coroutine_scheduler();
-    fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
+    printf_stderr("Coroutine scheduler returned to main, when it shouldn't have!");
     return exiting;
 }

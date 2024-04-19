@@ -205,7 +205,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     routine_t *c = (routine_t *)hash_get(eg, key);
 
     co_deferred(c, dtor, handle);
-    int r = snprintf(c->name, sizeof(c->name), "handler #%s", key);
+    int r = snprintf_(c->name, sizeof(c->name), "handler #%s", key);
     if (r == 0)
         CO_LOG("Invalid handler");
 
@@ -226,7 +226,7 @@ void co_process(func_t fn, void_t args) {
     routine_t *c = (routine_t *)hash_get(eg, key);
     c->process_active = true;
 
-    int r = snprintf(c->name, sizeof(c->name), "process #%s", key);
+    int r = snprintf_(c->name, sizeof(c->name), "process #%s", key);
     if (r == 0)
         CO_LOG("Invalid process");
 

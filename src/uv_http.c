@@ -44,7 +44,7 @@ string http_std_date(time_t t) {
         return str;
     }
 
-    snprintf(str, 80, "%s, %02d %s %04d %02d:%02d:%02d GMT",
+    snprintf_(str, 80, "%s, %02d %s %04d %02d:%02d:%02d GMT",
              day_short_names[tm1->tm_wday],
              tm1->tm_mday,
              mon_short_names[tm1->tm_mon],
@@ -234,7 +234,7 @@ string http_response(http_t *this, string body, http_status status, string type,
 
     char scrape[CO_SCRAPE_SIZE];
     char scrape2[CO_SCRAPE_SIZE];
-    snprintf(scrape2, CO_SCRAPE_SIZE, "%zu", strlen(this->body));
+    snprintf_(scrape2, CO_SCRAPE_SIZE, "%zu", strlen(this->body));
 
     // Create a string out of the response data
     string lines = co_concat_by(20,
@@ -375,7 +375,7 @@ bool has_header(http_t *this, string key) {
 bool has_variable(http_t *this, string key, string var) {
     char temp[CO_SCRAPE_SIZE] = {0};
 
-    snprintf(temp, CO_SCRAPE_SIZE, "%s%s", var, "=");
+    snprintf_(temp, CO_SCRAPE_SIZE, "%s%s", var, "=");
     return is_str_in(get_header(this, key), temp);
 }
 
@@ -385,9 +385,9 @@ bool has_flag(http_t *this, string key, string flag) {
     char flag3[CO_SCRAPE_SIZE] = {0};
     string value = get_header(this, key);
 
-    snprintf(flag1, CO_SCRAPE_SIZE, "%s%s", flag, ";");
-    snprintf(flag2, CO_SCRAPE_SIZE, "%s%s", flag, ",");
-    snprintf(flag3, CO_SCRAPE_SIZE, "%s%s", flag, "\r\n");
+    snprintf_(flag1, CO_SCRAPE_SIZE, "%s%s", flag, ";");
+    snprintf_(flag2, CO_SCRAPE_SIZE, "%s%s", flag, ",");
+    snprintf_(flag3, CO_SCRAPE_SIZE, "%s%s", flag, "\r\n");
     return is_str_in(value, flag1) || is_str_in(value, flag2) || is_str_in(value, flag3);
 }
 

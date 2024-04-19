@@ -35,16 +35,20 @@ void gc_coroutine_free() {
 
 void_t try_calloc(int count, size_t size) {
     void_t ptr = CO_CALLOC(count, size);
-    if (is_empty(ptr))
+    if (is_empty(ptr)) {
+        errno = ENOMEM;
         co_panic("Memory allocation failed!");
+    }
 
     return ptr;
 }
 
 void_t try_malloc(size_t size) {
     void_t ptr = CO_MALLOC(size);
-    if (is_empty(ptr))
+    if (is_empty(ptr)) {
+        errno = ENOMEM;
         co_panic("Memory allocation failed!");
+    }
 
     return ptr;
 }

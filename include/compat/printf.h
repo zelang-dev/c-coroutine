@@ -198,8 +198,10 @@ int vsnprintf_(char* s, size_t count, const char* format, va_list arg) ATTR_VPRI
 PRINTF_VISIBILITY
 int fctprintf(void (*out)(char c, void* extra_arg), void* extra_arg, const char* format, ...) ATTR_PRINTF(3, 4);
 PRINTF_VISIBILITY
-int vfctprintf(void (*out)(char c, void* extra_arg), void* extra_arg, const char* format, va_list arg) ATTR_VPRINTF(3);
+int vfctprintf(void (*out)(char c, void *extra_arg), void *extra_arg, const char *format, va_list arg) ATTR_VPRINTF(3);
 
+int printf_stderr(const char *_format, ...);
+int vasprintf_(char **, const char *, va_list);
 #ifdef __cplusplus
 } // extern "C"
 #endif
@@ -214,11 +216,10 @@ int vfctprintf(void (*out)(char c, void* extra_arg), void* extra_arg, const char
 #else
 #if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_SOFT
 # define printf     printf_
+# define vprintf    vprintf_
 # define sprintf    sprintf_
 # define vsprintf   vsprintf_
-# define snprintf   snprintf_
-# define vsnprintf  vsnprintf_
-# define vprintf    vprintf_
+# define vasprintf  vasprintf_
 #endif
 #endif
 

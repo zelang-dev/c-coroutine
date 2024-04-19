@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <stdio.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdint.h>
@@ -26,10 +25,11 @@
 #endif
 
 #include "uv_routine.h"
+#define PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_SOFT 1
+#include "compat/printf.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/sys/time.h"
-    #include "compat/unistd.h"
     #include <excpt.h>
     /* O.S. physical ~input/output~ console `DEVICE`. */
     #define SYS_CONSOLE "\\\\?\\CON"
@@ -39,7 +39,6 @@
     #define SYS_PIPE "\\\\.\\pipe\\"
 #else
     #include <pthread.h>
-    #include <unistd.h>
     /* O.S. physical ~input/output~ console `DEVICE`. */
     #define SYS_CONSOLE "/dev/tty"
     /* O.S. physical ~null~ `DEVICE`. */
@@ -71,9 +70,9 @@
 #endif
 
 #ifdef CO_DEBUG
-    #define CO_LOG(s) puts(s)
-    #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
-    #define CO_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
+    #define CO_LOG(s) printf_("%s\n", s)
+    #define CO_INFO(s, ...) printf_(s, __VA_ARGS__ )
+    #define CO_HERE() printf_stderr("Here %s:%d\n", __FILE__, __LINE__)
 #else
     #define CO_LOG(s) (void)s
     #define CO_INFO(s, ...)  (void)s
@@ -804,7 +803,6 @@ C_API size_t co_defer(func_t, void_t);
 C_API void co_defer_cancel(size_t index);
 C_API void co_defer_fire(size_t index);
 C_API size_t co_deferred(routine_t *, func_t, void_t);
-C_API void co_deferred_run(routine_t *, size_t);
 C_API size_t co_deferred_count(const routine_t *);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
@@ -921,8 +919,6 @@ C_API channel_t *channel_create(int, int);
 C_API void channel_free(channel_t *);
 
 #if defined(_WIN32) || defined(_WIN64)
-C_API int vasprintf(char **, string_t, va_list);
-C_API int asprintf(char **, string_t, ...);
 C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);
 #define gcvt _gcvt
 #endif
@@ -1162,6 +1158,7 @@ C_API void ex_throw(string_t, string_t, int, string_t, string_t);
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API void ex_init(void);
+C_API void ex_unwind_stack(ex_context_t *ctx);
 C_API void (*ex_signal(int sig, string_t ex))(int);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t));
 #ifdef _WIN32
@@ -1219,6 +1216,7 @@ struct ex_context_s
 };
 
 C_API thread_local ex_context_t *ex_context;
+C_API ex_context_t *ex_context_co;
 C_API thread_local char ex_message[256];
 C_API thread_local int coroutine_count;
 C_API thread_local bool scheduler_info_log;
@@ -1281,15 +1279,8 @@ C_API unsigned long co_async_self(void);
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
-/* C++ string style "itoa", differs from `co_itoa()` by also passing a buffer for result, and
-a base other than 10, Credit http://www.strudel.org.uk/itoa/ */
-C_API string itoa_by(int64_t value, string result, int base);
-
-/* Generic "itoa" using current coroutine scrape buffer and `snprintf` */
+/* Generic "itoa" using current coroutine scrape buffer and `snprintf_` */
 C_API string_t co_itoa(int64_t number);
-
-/* C++ string style "itoa", using current coroutine scrape buffer, Credit http://www.strudel.org.uk/itoa/ */
-C_API string_t co_itoa_by(int64_t number, int base);
 
 C_API int co_strpos(string_t text, string pattern);
 C_API void co_strcpy(string dest, string_t src, size_t len);

@@ -29,7 +29,7 @@ add_definitions(-DHASH_INIT_CAPACITY=512)
 add_library(coroutine STATIC ${lib_files})
 target_link_libraries(coroutine PUBLIC uv_a)
 
-find_package(OpenSSL)
+find_package(OpenSSL 0.9.8...<3.0.0)
 if(OPENSSL_FOUND)
     target_include_directories(coroutine BEFORE PUBLIC ${OPENSSL_INCLUDE_DIR})
     add_definitions(-DOPENSSL_USE_STATIC_LIBS=TRUE)

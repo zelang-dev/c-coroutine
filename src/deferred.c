@@ -152,13 +152,13 @@ static void co_deferred_internal(routine_t *coro, defer_func_t *deferred) {
     }
 }
 
-void co_deferred_cancel(routine_t *coro, size_t index) {
+static void co_deferred_cancel(routine_t *coro, size_t index) {
     CO_ASSERT(index >= 0);
 
     co_deferred_internal(coro, (defer_func_t *)co_deferred_array_get_element(&coro->defer, index));
 }
 
-void co_deferred_fire(routine_t *coro, size_t index) {
+static void co_deferred_fire(routine_t *coro, size_t index) {
     CO_ASSERT(index >= 0);
 
     defer_func_t *deferred = (defer_func_t *)co_deferred_array_get_element(&coro->defer, index);
@@ -169,7 +169,7 @@ void co_deferred_fire(routine_t *coro, size_t index) {
     co_deferred_internal(coro, deferred);
 }
 
-void co_deferred_run(routine_t *coro, size_t generation) {
+static void co_deferred_run(routine_t *coro, size_t generation) {
     co_array_t *array = (co_array_t *)&coro->defer;
     defer_func_t *defers = array->base;
     size_t i;

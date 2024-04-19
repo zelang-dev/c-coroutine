@@ -43,16 +43,7 @@
 #include "printf_config.h"
 #endif
 
-#include "compat/printf.h"
-
-#ifdef __cplusplus
-#include <cstdint>
-#include <climits>
-#else
-#include <stdint.h>
-#include <limits.h>
-#include <stdbool.h>
-#endif // __cplusplus
+#include "coroutine.h"
 
 #if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD
 # define printf_    printf
@@ -372,11 +363,6 @@ static inline void append_termination_with_gadget(output_gadget_t* gadget)
   }
   printf_size_t null_char_pos = gadget->pos < gadget->max_chars ? gadget->pos : gadget->max_chars - 1;
   gadget->buffer[null_char_pos] = '\0';
-}
-
-void putchar_(char c)
-{
-    _write(STDOUT_FILENO, &c, 1);
 }
 
 // We can't use putchar_ as is, since our output gadget
@@ -1471,4 +1457,58 @@ int fctprintf(void (*out)(char c, void* extra_arg), void* extra_arg, const char*
   const int ret = vfctprintf(out, extra_arg, format, args);
   va_end(args);
   return ret;
+}
+
+void putchar_(char c) {
+    write(STDOUT_FILENO, &c, 1);
+}
+
+static void err_putchar_(char c, void *arg) {
+    write(STDERR_FILENO, &c, 1);
+}
+
+int printf_stderr(const char *_format, ...) {
+    va_list args;
+    va_start(args, _format);
+    const int ret = vfctprintf(&err_putchar_, NULL, _format, args);
+    va_end(args);
+    return ret;
+}
+
+int vasprintf_(string *str_p, string_t fmt, va_list ap) {
+    va_list ap_copy;
+    int formattedLength, actualLength = 0;
+    size_t requiredSize;
+
+    // be paranoid
+    *str_p = NULL;
+
+    // copy va_list, as it is used twice
+    va_copy(ap_copy, ap);
+
+    // compute length of formatted string, without NULL terminator
+    formattedLength = snprintf_(NULL, actualLength, fmt, ap_copy);
+    va_end(ap_copy);
+
+    // bail out on error
+    if (formattedLength < 0) {
+        return -1;
+    }
+
+    // allocate buffer, with NULL terminator
+    requiredSize = ((size_t)formattedLength) + 1;
+    // bail out on failed memory allocation
+    *str_p = try_malloc(requiredSize);
+
+    // write formatted string to buffer
+    actualLength = vsnprintf_(*str_p, requiredSize - 1, fmt, ap);
+
+    // again, be paranoid
+    if (actualLength != formattedLength) {
+        CO_FREE(*str_p);
+        *str_p = NULL;
+        return -1;
+    }
+
+    return formattedLength;
 }
