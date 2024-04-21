@@ -24,8 +24,8 @@ static uv_args_t *uv_arguments(int count, bool auto_free) {
         params = (values_t *)try_calloc(count, sizeof(values_t));
     }
 
-    uv_args->type = CO_EVENT_ARG;
     uv_args->args = params;
+    uv_args->type = CO_EVENT_ARG;
     return uv_args;
 }
 
@@ -1222,9 +1222,9 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
     CO_FREE(command_arg);
     handle->options->args = command_args;
 
-    process->type = CO_PROCESS;
     process->handle = handle;
     process->is_detach = false;
+    process->type = CO_PROCESS;
 
     uv_args_t *uv_args = uv_arguments(2, false);
     uv_args->args[0].value.object = process;

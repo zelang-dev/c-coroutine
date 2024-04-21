@@ -43,7 +43,16 @@
 #include "printf_config.h"
 #endif
 
-#include "coroutine.h"
+#include "compat/printf.h"
+
+#ifdef __cplusplus
+#include <cstdint>
+#include <climits>
+#else
+#include <stdint.h>
+#include <limits.h>
+#include <stdbool.h>
+#endif // __cplusplus
 
 #if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD
 # define printf_    printf
@@ -1473,42 +1482,4 @@ int printf_stderr(const char *_format, ...) {
     const int ret = vfctprintf(&err_putchar_, NULL, _format, args);
     va_end(args);
     return ret;
-}
-
-int vasprintf_(string *str_p, string_t fmt, va_list ap) {
-    va_list ap_copy;
-    int formattedLength, actualLength = 0;
-    size_t requiredSize;
-
-    // be paranoid
-    *str_p = NULL;
-
-    // copy va_list, as it is used twice
-    va_copy(ap_copy, ap);
-
-    // compute length of formatted string, without NULL terminator
-    formattedLength = snprintf_(NULL, actualLength, fmt, ap_copy);
-    va_end(ap_copy);
-
-    // bail out on error
-    if (formattedLength < 0) {
-        return -1;
-    }
-
-    // allocate buffer, with NULL terminator
-    requiredSize = ((size_t)formattedLength) + 1;
-    // bail out on failed memory allocation
-    *str_p = try_malloc(requiredSize);
-
-    // write formatted string to buffer
-    actualLength = vsnprintf_(*str_p, requiredSize - 1, fmt, ap);
-
-    // again, be paranoid
-    if (actualLength != formattedLength) {
-        CO_FREE(*str_p);
-        *str_p = NULL;
-        return -1;
-    }
-
-    return formattedLength;
 }

@@ -7,13 +7,13 @@ channel_t *channel_create(int elem_size, int bufsize) {
     values_t *s = try_calloc(1, sizeof(values_t));
 
     c->id = channel_id_generate++;
-    c->type = CO_CHANNEL;
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;
     c->tmp = s;
     c->select_ready = false;
     c->buf = (unsigned char *)(c + 1);
+    c->type = CO_CHANNEL;
 
     gc_channel(c);
     return c;

@@ -90,13 +90,6 @@ void json_set_float_serialization_format(const char *format);
    If function is null then the default serialization function is used. */
 void json_set_number_serialization_function(JSON_Number_Serialization_Function fun);
 
-/* Parses first JSON value in a file, returns NULL in case of error */
-JSON_Value *json_parse_file(const char *filename);
-
-/* Parses first JSON value in a file and ignores comments (/ * * / and //),
-   returns NULL in case of error */
-JSON_Value *json_parse_file_with_comments(const char *filename);
-
 /*  Parses first JSON value in a string, returns NULL in case of error */
 JSON_Value *json_parse_string(const char *string);
 
@@ -107,13 +100,11 @@ JSON_Value *json_parse_string_with_comments(const char *string);
 /* Serialization */
 size_t      json_serialization_size(const JSON_Value *value); /* returns 0 on fail */
 JSON_Status json_serialize_to_buffer(const JSON_Value *value, char *buf, size_t buf_size_in_bytes);
-JSON_Status json_serialize_to_file(const JSON_Value *value, const char *filename);
 char *json_serialize_to_string(const JSON_Value *value);
 
 /* Pretty serialization */
 size_t      json_serialization_size_pretty(const JSON_Value *value); /* returns 0 on fail */
 JSON_Status json_serialize_to_buffer_pretty(const JSON_Value *value, char *buf, size_t buf_size_in_bytes);
-JSON_Status json_serialize_to_file_pretty(const JSON_Value *value, const char *filename);
 char *json_serialize_to_string_pretty(const JSON_Value *value);
 
 void        json_free_serialized_string(char *string); /* frees string from json_serialize_to_string and json_serialize_to_string_pretty */

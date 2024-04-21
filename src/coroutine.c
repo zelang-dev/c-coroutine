@@ -72,10 +72,10 @@ args_t *args_for(string_t desc, ...) {
     }
     va_end(argp);
 
-    params->type = CO_ARGS;
     params->args = args;
     params->defer_set = false;
     params->n_args = count;
+    params->type = CO_ARGS;
     return params;
 }
 

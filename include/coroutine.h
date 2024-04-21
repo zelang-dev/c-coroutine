@@ -70,7 +70,7 @@
 #endif
 
 #ifdef CO_DEBUG
-    #define CO_LOG(s) printf_("%s\n", s)
+    #define CO_LOG(s) puts_(s)
     #define CO_INFO(s, ...) printf_(s, __VA_ARGS__ )
     #define CO_HERE() printf_stderr("Here %s:%d\n", __FILE__, __LINE__)
 #else
@@ -825,7 +825,6 @@ C_API void_t co_memdup(routine_t *, const_t, size_t);
 C_API string co_strdup(string_t);
 C_API string co_strndup(string_t, size_t);
 C_API string co_string(string_t str, size_t length);
-C_API string co_sprintf(string_t, ...);
 C_API string *co_str_split(string_t s, string_t delim, int *count);
 C_API string co_concat_by(int num_args, ...);
 C_API ht_string_t *co_parse_str(string lines, string sep);

@@ -201,7 +201,7 @@ PRINTF_VISIBILITY
 int vfctprintf(void (*out)(char c, void *extra_arg), void *extra_arg, const char *format, va_list arg) ATTR_VPRINTF(3);
 
 int printf_stderr(const char *_format, ...);
-int vasprintf_(char **, const char *, va_list);
+#define puts_(s)  printf_("%s\n", s)
 #ifdef __cplusplus
 } // extern "C"
 #endif
@@ -219,7 +219,7 @@ int vasprintf_(char **, const char *, va_list);
 # define vprintf    vprintf_
 # define sprintf    sprintf_
 # define vsprintf   vsprintf_
-# define vasprintf  vasprintf_
+# define puts       puts_
 #endif
 #endif
 

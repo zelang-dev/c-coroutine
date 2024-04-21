@@ -28,7 +28,7 @@
 #endif /* _CRT_SECURE_NO_WARNINGS */
 #endif /* _MSC_VER */
 
-#include "compat/parson.h"
+#include "coroutine.h"
 
 #define PARSON_IMPL_VERSION_MAJOR 1
 #define PARSON_IMPL_VERSION_MINOR 5
@@ -40,13 +40,8 @@
 #error "parson version mismatch between parson.c and parson.h"
 #endif
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
 #include <math.h>
-#include <errno.h>
 
 /* Apparently sscanf is not implemented in some "standard" libraries, so don't use it, if you
  * don't have to. */
@@ -79,7 +74,7 @@
 #define SIZEOF_TOKEN(a)       (sizeof(a) - 1)
 #define SKIP_CHAR(str)        ((*str)++)
 #define SKIP_WHITESPACES(str) while (isspace((unsigned char)(**str))) { SKIP_CHAR(str); }
-#define MAX(a, b)             ((a) > (b) ? (a) : (b))
+//#define MAX(a, b)             ((a) > (b) ? (a) : (b))
 
 #undef malloc
 #undef free
@@ -154,7 +149,6 @@ struct json_array_t {
 };
 
 /* Various */
-static char *read_file(const char *filename);
 static void   remove_comments(char *string, const char *start_token, const char *end_token);
 static char *parson_strndup(const char *string, size_t n);
 static char *parson_strdup(const char *string);
@@ -207,40 +201,6 @@ static JSON_Value *parse_value(const char **string, size_t nesting);
 /* Serialization */
 static int json_serialize_to_buffer_r(const JSON_Value *value, char *buf, int level, parson_bool_t is_pretty, char *num_buf);
 static int json_serialize_string(const char *string, size_t len, int quotes, char *buf);
-
-/* Various */
-static char *read_file(const char *filename) {
-    FILE *fp = fopen(filename, "r");
-    size_t size_to_read = 0;
-    size_t size_read = 0;
-    long pos;
-    char *file_contents;
-    if (!fp) {
-        return NULL;
-    }
-    fseek(fp, 0L, SEEK_END);
-    pos = ftell(fp);
-    if (pos < 0) {
-        fclose(fp);
-        return NULL;
-    }
-    size_to_read = pos;
-    rewind(fp);
-    file_contents = (char *)parson_malloc(sizeof(char) * (size_to_read + 1));
-    if (!file_contents) {
-        fclose(fp);
-        return NULL;
-    }
-    size_read = fread(file_contents, 1, size_to_read, fp);
-    if (size_read == 0 || ferror(fp)) {
-        fclose(fp);
-        parson_free(file_contents);
-        return NULL;
-    }
-    fclose(fp);
-    file_contents[size_read] = '\0';
-    return file_contents;
-}
 
 static void remove_comments(char *string, const char *start_token, const char *end_token) {
     parson_bool_t in_string = PARSON_FALSE, escaped = PARSON_FALSE;
@@ -783,9 +743,9 @@ static JSON_Value *json_value_init_string_no_copy(char *string, size_t length) {
         return NULL;
     }
     new_value->parent = NULL;
-    new_value->type = JSONString;
     new_value->value.string.chars = string;
     new_value->value.string.length = length;
+    new_value->type = JSONString;
     return new_value;
 }
 
@@ -795,10 +755,10 @@ static JSON_Value *json_value_init_number_as_string_no_copy(double number, char 
         return NULL;
     }
     new_value->parent = NULL;
-    new_value->type = JSONNumber;
     new_value->value.number.number = number;
     new_value->value.number.number_as_string.chars = number_as_string;
     new_value->value.number.number_as_string.length = number_as_string_length;
+    new_value->type = JSONNumber;
     return new_value;
 }
 
@@ -1382,29 +1342,6 @@ static int json_serialize_string(const char *string, size_t len, int quotes, cha
 #undef APPEND_STRING
 #undef APPEND_INDENT
 
-/* Parser API */
-JSON_Value *json_parse_file(const char *filename) {
-    char *file_contents = read_file(filename);
-    JSON_Value *output_value = NULL;
-    if (file_contents == NULL) {
-        return NULL;
-    }
-    output_value = json_parse_string(file_contents);
-    parson_free(file_contents);
-    return output_value;
-}
-
-JSON_Value *json_parse_file_with_comments(const char *filename) {
-    char *file_contents = read_file(filename);
-    JSON_Value *output_value = NULL;
-    if (file_contents == NULL) {
-        return NULL;
-    }
-    output_value = json_parse_string_with_comments(file_contents);
-    parson_free(file_contents);
-    return output_value;
-}
-
 JSON_Value *json_parse_string(const char *string) {
     if (string == NULL) {
         return NULL;
@@ -1917,28 +1854,6 @@ JSON_Status json_serialize_to_buffer(const JSON_Value *value, char *buf, size_t 
     return JSONSuccess;
 }
 
-JSON_Status json_serialize_to_file(const JSON_Value *value, const char *filename) {
-    JSON_Status return_code = JSONSuccess;
-    FILE *fp = NULL;
-    char *serialized_string = json_serialize_to_string(value);
-    if (serialized_string == NULL) {
-        return JSONFailure;
-    }
-    fp = fopen(filename, "w");
-    if (fp == NULL) {
-        json_free_serialized_string(serialized_string);
-        return JSONFailure;
-    }
-    if (fputs(serialized_string, fp) == EOF) {
-        return_code = JSONFailure;
-    }
-    if (fclose(fp) == EOF) {
-        return_code = JSONFailure;
-    }
-    json_free_serialized_string(serialized_string);
-    return return_code;
-}
-
 char *json_serialize_to_string(const JSON_Value *value) {
     JSON_Status serialization_result = JSONFailure;
     size_t buf_size_bytes = json_serialization_size(value);
@@ -1975,28 +1890,6 @@ JSON_Status json_serialize_to_buffer_pretty(const JSON_Value *value, char *buf, 
         return JSONFailure;
     }
     return JSONSuccess;
-}
-
-JSON_Status json_serialize_to_file_pretty(const JSON_Value *value, const char *filename) {
-    JSON_Status return_code = JSONSuccess;
-    FILE *fp = NULL;
-    char *serialized_string = json_serialize_to_string_pretty(value);
-    if (serialized_string == NULL) {
-        return JSONFailure;
-    }
-    fp = fopen(filename, "w");
-    if (fp == NULL) {
-        json_free_serialized_string(serialized_string);
-        return JSONFailure;
-    }
-    if (fputs(serialized_string, fp) == EOF) {
-        return_code = JSONFailure;
-    }
-    if (fclose(fp) == EOF) {
-        return_code = JSONFailure;
-    }
-    json_free_serialized_string(serialized_string);
-    return return_code;
 }
 
 char *json_serialize_to_string_pretty(const JSON_Value *value) {

@@ -69,12 +69,12 @@ oa_hash *oa_hash_new(
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx)) {
     oa_hash *htable = try_calloc(1, sizeof(*htable));
 
-    htable->type = CO_OA_HASH;
     htable->size = 0;
     htable->capacity = HASH_INIT_CAPACITY;
     htable->val_ops = val_ops;
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
+    htable->type = CO_OA_HASH;
 
     htable->buckets = try_calloc(1, sizeof(*(htable->buckets)) * htable->capacity);
 

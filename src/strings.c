@@ -63,22 +63,6 @@ CO_FORCE_INLINE string co_string(string_t str, size_t length) {
     return co_memdup(co_active(), str, length);
 }
 
-string co_sprintf(string_t fmt, ...) {
-    va_list values;
-    int len;
-    string tmp_str;
-
-    va_start(values, fmt);
-    len = vasprintf_(&tmp_str, fmt, values);
-    va_end(values);
-
-    if (UNLIKELY(len < 0))
-        return NULL;
-
-    co_deferred(co_active(), CO_FREE, tmp_str);
-    return tmp_str;
-}
-
 string *co_split_ex(string_t s, string_t delim, int *count, bool use_defer) {
     if (is_str_eq(s, ""))
         return NULL;

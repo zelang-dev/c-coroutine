@@ -454,7 +454,6 @@ int uv_tls_init(evt_ctx_t *ctx, uv_tcp_t *tcp, uv_tls_t *endpt)
     //Replace the NULL with a meaningful error later
     CO_ASSERT( t != NULL );
 
-    endpt->type = UV_TLS;
     t->data = endpt;
     tcp->data = endpt;
 
@@ -464,6 +463,7 @@ int uv_tls_init(evt_ctx_t *ctx, uv_tcp_t *tcp, uv_tls_t *endpt)
     endpt->tls_cls_cb = NULL;
     endpt->tls_hsk_cb = NULL;
     endpt->tls_wr_cb  = NULL;
+    endpt->type = UV_TLS;
     return r;
 }
 

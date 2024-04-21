@@ -88,6 +88,10 @@ static volatile sig_atomic_t got_ctrl_c = false;
 static volatile sig_atomic_t can_free = true;
 static volatile sig_atomic_t can_malloc = true;
 
+#if !defined(_WIN32)
+static struct sigaction ex_sig_sa, ex_sig_osa;
+#endif
+
 static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
     printf_stderr("\nFatal Error: %s in function(%s)\n\n",
@@ -133,19 +137,19 @@ void ex_unwind_stack(ex_context_t *ctx) {
         can_free = true;
     } else {
         while (p) {
-            if (*p->ptr) {
-                if (temp == *p->ptr) {
-                    got_uncaught_exception = true;
-                    break;
-                }
+            if (!can_free && got_signal)
+                ex_terminate();
 
+            if (got_uncaught_exception = (temp == *p->ptr))
+                break;
+
+            if (*p->ptr) {
                 if (can_free) {
                     can_free = false;
                     p->func(*p->ptr);
                     can_free = true;
+                    temp = *p->ptr;
                 }
-
-                temp = *p->ptr;
             }
 
             p = p->next;
@@ -172,6 +176,7 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
+    close(STDOUT_FILENO);
     if (got_ctrl_c) {
         got_ctrl_c = false;
         coroutine_info();
@@ -290,14 +295,15 @@ void ex_handler(int sig) {
 #ifdef _WIN32
     void (*old)(int) = signal(sig, ex_handler);
 #else
-    static struct sigaction sa;
     // Setup the handler
-    sa.sa_handler = &ex_handler;
-    // Restart the system call, if at all possible
-    sa.sa_flags = SA_RESTART;
+    ex_sig_sa.sa_handler = ex_handler;
+    if (sig == SIGINT || sig == SIGTERM)
+        ex_sig_sa.sa_flags = 0;
+    else
+        ex_sig_sa.sa_flags = SA_RESTART; // Restart the system call, if at all possible unless ctrl-c
     // Block every signal during the handler
-    sigfillset(&sa.sa_mask);
-    void (*old)(int) = sigaction(sig, &sa, NULL);
+    sigfillset(&ex_sig_sa.sa_mask);
+    void (*old)(int) = sigaction(sig, &ex_sig_sa, NULL);
 #endif
     string_t ex = 0;
     int i;
@@ -337,14 +343,15 @@ void (*ex_signal(int sig, string_t ex))(int) {
 #if defined(_WIN32) || defined(_WIN64)
     old = signal(sig, ex_handler);
 #else
-    static struct sigaction sa, osa;
     // Setup the handler
-    sa.sa_handler = ex_handler;
-    // Restart the system call, if at all possible
-    sa.sa_flags = SA_RESTART;
+    ex_sig_sa.sa_handler = ex_handler;
+    if (sig == SIGINT || sig == SIGTERM)
+        ex_sig_sa.sa_flags = 0;
+    else
+        ex_sig_sa.sa_flags = SA_RESTART;// Restart the system call, if at all possible
     // Block every signal during the handler
-    sigfillset(&sa.sa_mask);
-    old = sigaction(sig, &sa, &osa);
+    sigfillset(&ex_sig_sa.sa_mask);
+    old = sigaction(sig, &ex_sig_sa, &ex_sig_osa);
 #endif
     if (old == SIG_ERR)
         printf_stderr("Coroutine-system, cannot install handler for signal no %d (%s)\n",

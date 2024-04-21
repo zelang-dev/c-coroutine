@@ -4,9 +4,9 @@ int co_array_init(co_array_t *a) {
     if (UNLIKELY(!a))
         return -EINVAL;
 
-    a->type = CO_DEF_ARR;
     a->base = NULL;
     a->elements = 0;
+    a->type = CO_DEF_ARR;
 
     return 0;
 }

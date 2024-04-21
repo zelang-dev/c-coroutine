@@ -20,9 +20,9 @@ future *future_create(callable_t start_routine) {
     pthread_attr_setdetachstate(&f->attr, PTHREAD_CREATE_JOINABLE);
 
     f->func = start_routine;
-    f->type = CO_FUTURE;
     srand((unsigned int)time(NULL));
     f->id = rand();
+    f->type = CO_FUTURE;
 
     return f;
 }
@@ -31,7 +31,9 @@ void_t future_func_wrapper(void_t arg) {
     future_arg *f = (future_arg *)arg;
     f->type = CO_FUTURE_ARG;
     void_t res = f->func(f->arg);
-    CO_FREE(f);
+    if (f->type == CO_FUTURE_ARG)
+        CO_FREE(f);
+
     pthread_exit(res);
     return res;
 }
@@ -41,7 +43,9 @@ void_t future_wrapper(void_t arg) {
     f->type = CO_FUTURE_ARG;
     void_t res = f->func(f->arg);
     promise_set(f->value, res);
-    CO_FREE(f);
+    if (f->type == CO_FUTURE_ARG)
+        CO_FREE(f);
+
     pthread_exit(res);
     return res;
 }
@@ -111,9 +115,9 @@ promise *promise_create() {
     pthread_mutex_init(&p->mutex, NULL);
     pthread_cond_init(&p->cond, NULL);
     srand((unsigned int)time(NULL));
-    p->type = CO_PROMISE;
     p->id = rand();
     p->done = false;
+    p->type = CO_PROMISE;
     CO_INFO("promise id(%d) created in thread #%lx\n", p->id, co_async_self());
 
     return p;

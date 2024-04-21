@@ -6,13 +6,17 @@ static thread_local gc_coroutine_t *coroutine_list = NULL;
 void gc_coroutine(routine_t *co) {
     if (!coroutine_list)
         coroutine_list = (gc_coroutine_t *)ht_group_init();
-    hash_put(coroutine_list, co_itoa(co->cid), co);
+
+    if (co->magic_number == CO_MAGIC_NUMBER)
+        hash_put(coroutine_list, co_itoa(co->cid), co);
 }
 
 void gc_channel(channel_t *ch) {
     if (!channel_list)
         channel_list = ht_channel_init();
-    hash_put(channel_list, co_itoa(ch->id), ch);
+
+    if (is_type(ch, CO_CHANNEL))
+        hash_put(channel_list, co_itoa(ch->id), ch);
 }
 
 CO_FORCE_INLINE gc_channel_t *gc_channel_list() {

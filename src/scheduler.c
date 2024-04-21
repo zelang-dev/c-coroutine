@@ -897,8 +897,8 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->user_data = NULL;
     co->cycles = 0;
     co->results = NULL;
-    co->magic_number = CO_MAGIC_NUMBER;
     co->stack_base = (unsigned char *)(co + 1);
+    co->magic_number = CO_MAGIC_NUMBER;
 
     return co;
 }
@@ -1160,7 +1160,7 @@ void coroutine_info() {
     routine_t *t;
     char *extra;
 
-    printf_stderr("coroutine list:\n");
+    printf_stderr("\nCoroutine list:\n");
     for (i = 0; i < n_all_coroutine; i++) {
         t = all_coroutine[i];
         if (t == co_running)
