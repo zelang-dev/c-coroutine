@@ -190,13 +190,14 @@ static void co_deferred_run(routine_t *coro, size_t generation) {
         if (!ex_context)
             ex_init();
 
+        coro->err_protected = false;
+        coro->err_allocated->type = -1;
         if (!is_empty(*coro->err_allocated->ptr)) {
             coro->err_allocated->func(*coro->err_allocated->ptr);
             *coro->err_allocated->ptr = NULL;
         }
 
         ex_context->stack = coro->err_allocated->next;
-        coro->err_protected = false;
     }
 
     array->elements = generation;

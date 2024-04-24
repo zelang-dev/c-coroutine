@@ -36,7 +36,6 @@
 */
 
 /* Some common exception */
-#define EXCEPTION_PANIC       0xE0000001
 EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(divide_by_zero);
@@ -57,6 +56,7 @@ EX_EXCEPTION(sig_trap);
 EX_EXCEPTION(sig_hup);
 EX_EXCEPTION(sig_break);
 EX_EXCEPTION(sig_winch);
+EX_EXCEPTION(sig_info);
 EX_EXCEPTION(access_violation);
 EX_EXCEPTION(array_bounds_exceeded);
 EX_EXCEPTION(breakpoint);
@@ -85,12 +85,27 @@ thread_local char ex_message[ 256 ] = { 0 };
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
 static volatile sig_atomic_t got_ctrl_c = false;
-static volatile sig_atomic_t can_free = true;
-static volatile sig_atomic_t can_malloc = true;
+static volatile sig_atomic_t can_terminate = true;
 
 #if !defined(_WIN32)
-static struct sigaction ex_sig_sa, ex_sig_osa;
+static struct sigaction ex_sig_sa = {0}, ex_sig_osa = {0};
 #endif
+
+enum {
+    max_ex_sig = 32
+};
+
+static struct {
+    string_t ex;
+    int sig;
+#ifdef _WIN32
+    DWORD seh;
+#endif
+} ex_sig[max_ex_sig];
+
+int ex_uncaught_exception(void);
+void ex_terminate(void);
+void ex_unwind_stack(ex_context_t *ctx);
 
 static void ex_print(ex_context_t *exception, string_t message) {
 #ifndef CO_DEBUG
@@ -106,19 +121,17 @@ static void ex_print(ex_context_t *exception, string_t message) {
         }
     }
 #endif
-    if (!can_free)
-        printf_stderr("Signal execution interrupted during stack unwinding on %s,\nwhile on unsafe `free()` execution.\n\n", exception->ex);
 }
 
 ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t)) {
     if (!ex_context)
         ex_init();
 
-    const_ptr->type = CO_ERR_PTR;
     const_ptr->next = ex_context->stack;
     const_ptr->func = func;
     const_ptr->ptr = ptr;
     ex_context->stack = const_ptr;
+    const_ptr->type = CO_ERR_PTR;
     return *const_ptr;
 }
 
@@ -126,46 +139,48 @@ void ex_unwind_stack(ex_context_t *ctx) {
     ex_ptr_t *p = ctx->stack;
     void_t temp = NULL;
 
-    if (ctx->unstack)
-        ex_terminate();
-
     ctx->unstack = 1;
 
-    if (ctx->co->err_protected && can_free) {
-        can_free = false;
+    if (ctx->co->err_protected) {
         co_deferred_free(ctx->co);
-        can_free = true;
     } else {
-        while (p) {
-            if (!can_free && got_signal)
-                ex_terminate();
-
+        while (p && p->type == CO_ERR_PTR) {
             if (got_uncaught_exception = (temp == *p->ptr))
                 break;
 
             if (*p->ptr) {
-                if (can_free) {
-                    can_free = false;
-                    p->func(*p->ptr);
-                    can_free = true;
-                    temp = *p->ptr;
-                }
+                p->type = -1;
+                p->func(*p->ptr);
             }
 
+            temp = *p->ptr;
             p = p->next;
         }
     }
 
     ctx->unstack = 0;
     ctx->stack = 0;
-
-    if (ctx == &ex_context_buffer)
-        ex_terminate();
 }
 
 void ex_init(void) {
+#if !defined(_WIN32)
+    sigset_t block_all, defaults;
+    sigfillset(&block_all);
+    pthread_sigmask(SIG_SETMASK, &block_all, &defaults);
+#else
+    pthread_mutex_t block_all = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&block_all);
+#endif
+
     ex_context = &ex_context_buffer;
     ex_context->type = CO_ERR_CONTEXT;
+
+#if !defined(_WIN32)
+    pthread_sigmask(SIG_SETMASK, &defaults, NULL);
+#else
+    pthread_mutex_unlock(&block_all);
+    pthread_mutex_destroy(&block_all);
+#endif
 }
 
 int ex_uncaught_exception(void) {
@@ -176,28 +191,40 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
-    close(STDOUT_FILENO);
-    if (got_ctrl_c) {
-        got_ctrl_c = false;
+    if (!can_terminate)
+        return;
+
+    can_terminate = false;
+    if (got_ctrl_c)
         coroutine_info();
-    }
 
     if (ex_uncaught_exception() || got_uncaught_exception)
-        ex_print(ex_context, "Coroutine-system, exception during stack unwinding leading to an undefined behavior");
+        ex_print(ex_context, "Exception during stack unwinding leading to an undefined behavior");
     else
-        ex_print(ex_context, "Coroutine-system, exiting with uncaught exception");
+        ex_print(ex_context, "Exiting with uncaught exception");
 
-    coroutine_cleanup();
-    exit(EXIT_FAILURE);
+    if (!got_signal)
+        coroutine_cleanup();
+
+    if (got_signal)
+        _Exit(EXIT_FAILURE);
+    else
+        exit(EXIT_FAILURE);
 }
 
 void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message) {
     ex_context_t *ctx = ex_context;
+#if !defined(_WIN32)
+    sigset_t block_all, defaults;
+#endif
 
     if (!ctx) {
         ex_init();
         ctx = ex_context;
     }
+
+    if (ctx->unstack)
+        ex_terminate();
 
     ctx->ex = exception;
     ctx->file = file;
@@ -207,7 +234,28 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     ctx->co = co_active();
     ctx->co->err = (void_t)ctx->ex;
     ctx->co->panic = message;
+
+#if !defined(_WIN32)
+    sigfillset(&block_all);
+    pthread_sigmask(SIG_SETMASK, &block_all, &defaults);
+#else
+    pthread_mutex_t block_all = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&block_all);
+#endif
+
     ex_unwind_stack(ctx);
+
+#if !defined(_WIN32)
+    pthread_sigmask(SIG_SETMASK, &defaults, NULL);
+#else
+    pthread_mutex_unlock(&block_all);
+    pthread_mutex_destroy(&block_all);
+#endif
+
+    if (ctx == &ex_context_buffer || !ctx->co->err_recovered && got_signal)
+        ex_terminate();
+    else if (ctx->co->err_recovered && got_signal)
+        got_signal = false;
 
 #ifdef _WIN32
     if (!is_empty((void_t)message))
@@ -215,18 +263,6 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);
 }
-
-enum {
-    max_ex_sig = 32
-};
-
-static struct {
-    string_t ex;
-    int sig;
-#ifdef _WIN32
-    DWORD seh;
-#endif
-} ex_sig[ max_ex_sig ];
 
 #ifdef _WIN32
 int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
@@ -282,7 +318,7 @@ void ex_signal_seh(DWORD sig, string_t ex) {
 
     if (i == max_ex_sig)
         printf_stderr(
-                "Coroutine-system, cannot install exception handler for signal no %d (%s), "
+                "Cannot install exception handler for signal no %d (%s), "
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
     else
@@ -291,75 +327,69 @@ void ex_signal_seh(DWORD sig, string_t ex) {
 #endif
 
 void ex_handler(int sig) {
-    got_signal = true;
-#ifdef _WIN32
-    void (*old)(int) = signal(sig, ex_handler);
-#else
-    // Setup the handler
-    ex_sig_sa.sa_handler = ex_handler;
-    if (sig == SIGINT || sig == SIGTERM)
-        ex_sig_sa.sa_flags = 0;
-    else
-        ex_sig_sa.sa_flags = SA_RESTART; // Restart the system call, if at all possible unless ctrl-c
-    // Block every signal during the handler
-    sigfillset(&ex_sig_sa.sa_mask);
-    void (*old)(int) = sigaction(sig, &ex_sig_sa, NULL);
-#endif
-    string_t ex = 0;
+    string_t ex = NULL;
     int i;
 
-    for (i = 0; i < max_ex_sig; i++)
-        if (ex_sig[ i ].sig == sig) {
-            ex = ex_sig[ i ].ex;
-            break;
-        }
-
-    if (old == SIG_ERR)
-        printf_stderr("Coroutine-system, cannot reinstall handler for signal no %d (%s)\n",
-                sig, ex);
-
+    got_signal = true;
     if (sig == SIGINT)
         got_ctrl_c = true;
+
+#ifdef _WIN32
+    /*
+     * Make signal handlers persistent.
+     */
+    if (signal(sig, ex_handler) == SIG_ERR)
+        printf_stderr("Cannot reinstall handler for signal no %d (%s)\n",
+                sig, ex);
+#endif
+
+    for (i = 0; i < max_ex_sig; i++) {
+        if (ex_sig[i].sig == sig) {
+            ex = ex_sig[i].ex;
+            break;
+        }
+    }
 
     ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
-void (*ex_signal(int sig, string_t ex))(int) {
-    void (*old)(int);
+void ex_signal(int sig, string_t ex) {
     int i;
 
-    for (i = 0; i < max_ex_sig; i++)
-        if (!ex_sig[ i ].ex || ex_sig[ i ].sig == sig)
+    for (i = 0; i < max_ex_sig; i++) {
+        if (!ex_sig[i].ex || ex_sig[i].sig == sig)
             break;
+    }
 
     if (i == max_ex_sig) {
         printf_stderr(
-                "Coroutine-system, cannot install exception handler for signal no %d (%s), "
+                "Cannot install exception handler for signal no %d (%s), "
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
-        return SIG_ERR;
+        return;
     }
 
 #if defined(_WIN32) || defined(_WIN64)
-    old = signal(sig, ex_handler);
-#else
-    // Setup the handler
-    ex_sig_sa.sa_handler = ex_handler;
-    if (sig == SIGINT || sig == SIGTERM)
-        ex_sig_sa.sa_flags = 0;
+    if (signal(sig, ex_handler) == SIG_ERR)
+        printf_stderr("Cannot install handler for signal no %d (%s)\n",
+                      sig, ex);
     else
-        ex_sig_sa.sa_flags = SA_RESTART;// Restart the system call, if at all possible
-    // Block every signal during the handler
-    sigfillset(&ex_sig_sa.sa_mask);
-    old = sigaction(sig, &ex_sig_sa, &ex_sig_osa);
-#endif
-    if (old == SIG_ERR)
-        printf_stderr("Coroutine-system, cannot install handler for signal no %d (%s)\n",
+        ex_sig[i].ex = ex, ex_sig[i].sig = sig;
+#else
+    /*
+     * Make signal handlers persistent.
+     */
+    ex_sig_sa.sa_handler = ex_handler;
+    ex_sig_sa.sa_flags = 0;
+    if (sigemptyset(&ex_sig_sa.sa_mask) != 0)
+        printf_stderr("Cannot setup handler for signal no %d (%s)\n",
+                      sig, ex);
+    else if (sigaction(sig, &ex_sig_sa, NULL) != 0)
+        printf_stderr("Cannot install handler for signal no %d (%s)\n",
                 sig, ex);
     else
         ex_sig[ i ].ex = ex, ex_sig[ i ].sig = sig;
-
-    return old;
+#endif
 }
 
 void ex_signal_setup(void) {
@@ -372,8 +402,8 @@ void ex_signal_setup(void) {
     ex_signal_seh(EXCEPTION_INT_OVERFLOW, EX_NAME(int_overflow));
     ex_signal_seh(EXCEPTION_STACK_OVERFLOW, EX_NAME(stack_overflow));
     ex_signal_seh(EXCEPTION_INVALID_HANDLE, EX_NAME(invalid_handle));
-
     ex_signal_seh(EXCEPTION_PANIC, EX_NAME(panic));
+    ex_signal_seh(CONTROL_C_EXIT, EX_NAME(sig_int));
 #endif
 #ifdef SIGSEGV
     ex_signal(SIGSEGV, EX_NAME(sig_segv));
@@ -403,11 +433,11 @@ void ex_signal_setup(void) {
     ex_signal(SIGTERM, EX_NAME(sig_term));
 #endif
 
-#if !defined(_WIN32)
 #ifdef SIGQUIT
     ex_signal(SIGQUIT, EX_NAME(sig_quit));
 #endif
 
+#if !defined(_WIN32)
 #ifdef SIGHUP
     ex_signal(SIGHUP, EX_NAME(sig_hup));
 #endif

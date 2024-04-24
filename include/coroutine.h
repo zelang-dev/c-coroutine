@@ -1153,20 +1153,38 @@ throws an exception of given message. */
         ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message)); \
     } while (0)
 
+C_API void ex_handler(int sig);
 C_API void ex_throw(string_t, string_t, int, string_t, string_t);
-C_API int ex_uncaught_exception(void);
-C_API void ex_terminate(void);
 C_API void ex_init(void);
-C_API void ex_unwind_stack(ex_context_t *ctx);
-C_API void (*ex_signal(int sig, string_t ex))(int);
+C_API void ex_signal(int sig, string_t ex);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t));
 #ifdef _WIN32
+#define EXCEPTION_PANIC       0xE0000001
+C_API void ex_signal_seh(DWORD sig, string_t ex);
 C_API int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
 C_API int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
 #endif
 
 /* Convert signals into exceptions */
 C_API void ex_signal_setup(void);
+
+/* 'void' validate() return value */
+#define NOTHING
+#define validate(e, r)                                                  \
+        if (e) {                                                        \
+        /* prevent dangling 'if' */                                     \
+        } else {                                                        \
+            CO_ASSERT(e);                                               \
+            return r;                                                   \
+        }
+
+#define check(e, n)                                                     \
+        if (e) {                                                        \
+        /* prevent dangling 'if' */                                     \
+        } else {                                                        \
+            CO_ASSERT(e);                                               \
+            throw(n);                                                   \
+        }
 
 enum
 {

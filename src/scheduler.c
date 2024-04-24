@@ -1,5 +1,6 @@
 #include "coroutine.h"
 
+static volatile sig_atomic_t can_cleanup = true;
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
 static thread_local routine_t co_active_buffer[4];
@@ -1182,16 +1183,20 @@ void coroutine_update(routine_t *t) {
 
 void coroutine_cleanup() {
     routine_t *t;
+    if (!can_cleanup)
+        return;
+
+    can_cleanup = false;
     gc_channel_free();
     gc_coroutine_free();
-
     if (n_all_coroutine) {
         if (coroutine_count)
             n_all_coroutine--;
 
         for (int i = 0; i < (n_all_coroutine + (coroutine_count != 0)); i++) {
             t = all_coroutine[n_all_coroutine - i];
-            if (t) {
+            if (t && t->magic_number == CO_MAGIC_NUMBER) {
+                t->magic_number = -1;
                 CO_FREE(t);
             }
         }

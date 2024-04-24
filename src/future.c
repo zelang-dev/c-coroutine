@@ -31,8 +31,10 @@ void_t future_func_wrapper(void_t arg) {
     future_arg *f = (future_arg *)arg;
     f->type = CO_FUTURE_ARG;
     void_t res = f->func(f->arg);
-    if (f->type == CO_FUTURE_ARG)
+    if (f->type == CO_FUTURE_ARG) {
+        memset(f, 0, sizeof(value_types));
         CO_FREE(f);
+    }
 
     pthread_exit(res);
     return res;
@@ -43,8 +45,10 @@ void_t future_wrapper(void_t arg) {
     f->type = CO_FUTURE_ARG;
     void_t res = f->func(f->arg);
     promise_set(f->value, res);
-    if (f->type == CO_FUTURE_ARG)
+    if (f->type == CO_FUTURE_ARG) {
+        memset(f, 0, sizeof(value_types));
         CO_FREE(f);
+    }
 
     pthread_exit(res);
     return res;
@@ -106,7 +110,10 @@ void future_close(future *f) {
     void_t status;
     int rc = pthread_join(f->thread, &status);
     pthread_attr_destroy(&f->attr);
-    CO_FREE(f);
+    if (f->type == CO_FUTURE_ARG) {
+        memset(f, 0, sizeof(value_types));
+        CO_FREE(f);
+    }
 }
 
 promise *promise_create() {
@@ -153,8 +160,11 @@ bool promise_done(promise *p) {
 }
 
 void promise_close(promise *p) {
-    pthread_mutex_destroy(&p->mutex);
-    pthread_cond_destroy(&p->cond);
-    CO_FREE(p->result);
-    CO_FREE(p);
+    if (p->type == CO_PROMISE) {
+        pthread_mutex_destroy(&p->mutex);
+        pthread_cond_destroy(&p->cond);
+        CO_FREE(p->result);
+        memset(p, 0, sizeof(value_types));
+        CO_FREE(p);
+    }
 }

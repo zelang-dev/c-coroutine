@@ -90,9 +90,10 @@ void delete(void_t ptr) {
         or (CO_ARGS)
             args_free(ptr);
         otherwise {
-            if (is_valid(ptr))
+            if (is_valid(ptr)) {
+                memset(ptr, 0, sizeof(ptr));
                 CO_FREE(ptr);
-            else
+            } else
                 CO_LOG("Pointer not freed, possible double free attempt!");
         }
     }
@@ -119,10 +120,11 @@ void co_delete(routine_t *co) {
             co->status = CO_EVENT_DEAD;
             co->loop_active = false;
             co->synced = false;
-        } else {
+        } else if (co->magic_number == CO_MAGIC_NUMBER) {
             if (co->err_allocated)
                 CO_FREE(co->err_allocated);
 
+            co->magic_number = -1;
             CO_FREE(co);
         }
     }
