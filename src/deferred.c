@@ -172,12 +172,14 @@ static void co_deferred_fire(routine_t *coro, size_t index) {
 static void co_deferred_run(routine_t *coro, size_t generation) {
     co_array_t *array = (co_array_t *)&coro->defer;
     defer_func_t *defers = array->base;
+    bool defer_ran = false;
     size_t i;
 
     coro->err_recovered = is_empty(coro->err);
 
     for (i = array->elements; i != generation; i--) {
-        defer_func_t *defer = &defers[ i - 1 ];
+        defer_func_t *defer = &defers[i - 1];
+        defer_ran = true;
 
         if (!is_empty(coro->err) && !is_empty(defer->check))
             coro->err_recovered = false;
@@ -192,7 +194,7 @@ static void co_deferred_run(routine_t *coro, size_t generation) {
 
         coro->err_protected = false;
         coro->err_allocated->type = -1;
-        if (!is_empty(*coro->err_allocated->ptr)) {
+        if (!defer_ran) {
             coro->err_allocated->func(*coro->err_allocated->ptr);
             *coro->err_allocated->ptr = NULL;
         }

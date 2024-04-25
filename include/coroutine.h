@@ -1027,7 +1027,7 @@ C_API void delete(void_t ptr);
     const char EX_NAME(E)[] = EX_STR(E)
 
 #define rethrow() \
-    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, NULL)
+    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, "rethrow")
 
 #ifdef _WIN32
 #define ex_try                                   \
@@ -1156,6 +1156,7 @@ throws an exception of given message. */
 C_API void ex_handler(int sig);
 C_API void ex_throw(string_t, string_t, int, string_t, string_t);
 C_API void ex_init(void);
+C_API void ex_flags_reset(void);
 C_API void ex_signal(int sig, string_t ex);
 C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t));
 #ifdef _WIN32

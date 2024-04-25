@@ -3,7 +3,7 @@
 static volatile sig_atomic_t can_cleanup = true;
 /* Store/hold the registers of the default coroutine thread state,
 allows the ability to switch from any function, non coroutine context. */
-static thread_local routine_t co_active_buffer[4];
+static thread_local routine_t co_active_buffer[1];
 /* Variable holding the current running coroutine per thread. */
 static thread_local routine_t *co_active_handle = NULL;
 /* Variable holding the main target that gets called once an coroutine
@@ -13,11 +13,12 @@ static thread_local routine_t *co_main_handle = NULL;
 static thread_local routine_t *co_current_handle = NULL;
 static void(fastcall *co_swap)(routine_t *, routine_t *) = 0;
 
-static thread_local uv_loop_t *co_main_loop_handle = NULL;
+static thread_local uv_loop_t co_interrupt_buffer[1];
+static thread_local uv_loop_t *co_interrupt_handle = NULL;
 
 static int main_argc;
 static char **main_argv;
-static string system_powered_by = NULL;
+static string co_powered_by = NULL;
 
 /* coroutine unique id generator */
 thread_local int co_id_generate = 0;
@@ -95,16 +96,16 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 #endif
 
 C_API string co_system_uname(void) {
-    if (is_empty(system_powered_by)) {
+    if (is_empty(co_powered_by)) {
         uv_utsname_t buffer[1];
         uv_os_uname(buffer);
-        system_powered_by = str_concat_by(6, "Coroutine-System Beta, ",
+        co_powered_by = str_concat_by(6, "Coroutine-System Beta, ",
                                           buffer->sysname, " ",
                                           buffer->machine, " ",
                                           buffer->release);
     }
 
-    return system_powered_by;
+    return co_powered_by;
 }
 
 /* called only if routine_t func returns */
@@ -130,6 +131,8 @@ static void co_awaitable() {
         co_deferred_free(co);
         if (!co->err_recovered)
             rethrow();
+        else
+            ex_flags_reset();
     } finally {
         if (co->loop_erred) {
             co->halt = true;
@@ -160,8 +163,8 @@ static CO_FORCE_INLINE int co_deferred_array_init(defer_t *array) {
 }
 
 uv_loop_t *co_loop() {
-    if (!is_empty(co_main_loop_handle))
-        return co_main_loop_handle;
+    if (!is_empty(co_interrupt_handle))
+        return co_interrupt_handle;
 
     return uv_default_loop();
 }
@@ -865,10 +868,9 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
         co_main_handle = co_active_handle;
 
 #ifdef UV_H
-    if (!co_main_loop_handle) {
-        co_main_loop_handle = try_calloc(1, sizeof(uv_loop_t));
-        int r = uv_loop_init(co_main_loop_handle);
-        if (r)
+    if (!co_interrupt_handle) {
+        co_interrupt_handle = co_interrupt_buffer;
+        if (uv_loop_init(co_interrupt_handle))
             printf_stderr("Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
     }
 #endif
@@ -1207,16 +1209,14 @@ void coroutine_cleanup() {
         all_coroutine = NULL;
     }
 #ifdef UV_H
-    if (!is_empty(co_main_loop_handle)) {
-        if (uv_loop_alive(co_main_loop_handle))
-            uv_loop_close(co_main_loop_handle);
-        CO_FREE(co_main_loop_handle);
-        co_main_loop_handle = NULL;
+    if (!is_empty(co_interrupt_handle)) {
+        uv_loop_close(co_interrupt_handle);
+        co_interrupt_handle = NULL;
     }
 
-    if (!is_empty(system_powered_by)) {
-        CO_FREE(system_powered_by);
-        system_powered_by = NULL;
+    if (!is_empty(co_powered_by)) {
+        CO_FREE(co_powered_by);
+        co_powered_by = NULL;
     }
 #endif
 }

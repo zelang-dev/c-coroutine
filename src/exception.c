@@ -162,6 +162,11 @@ void ex_unwind_stack(ex_context_t *ctx) {
     ctx->stack = 0;
 }
 
+void ex_flags_reset(void) {
+    got_signal = false;
+    got_ctrl_c = false;
+}
+
 void ex_init(void) {
 #if !defined(_WIN32)
     sigset_t block_all, defaults;
@@ -203,9 +208,7 @@ void ex_terminate(void) {
     else
         ex_print(ex_context, "Exiting with uncaught exception");
 
-    if (!got_signal)
-        coroutine_cleanup();
-
+    coroutine_cleanup();
     if (got_signal)
         _Exit(EXIT_FAILURE);
     else
@@ -214,6 +217,7 @@ void ex_terminate(void) {
 
 void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message) {
     ex_context_t *ctx = ex_context;
+    bool ex_rethrow = false;
 #if !defined(_WIN32)
     sigset_t block_all, defaults;
 #endif
@@ -234,6 +238,10 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     ctx->co = co_active();
     ctx->co->err = (void_t)ctx->ex;
     ctx->co->panic = message;
+    if (message != NULL && strcmp(message, "rethrow") == 0) {
+        ctx->co->panic = NULL;
+        ex_rethrow = got_signal;
+    }
 
 #if !defined(_WIN32)
     sigfillset(&block_all);
@@ -252,10 +260,8 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     pthread_mutex_destroy(&block_all);
 #endif
 
-    if (ctx == &ex_context_buffer || !ctx->co->err_recovered && got_signal)
+    if (ctx == &ex_context_buffer || ex_rethrow)
         ex_terminate();
-    else if (ctx->co->err_recovered && got_signal)
-        got_signal = false;
 
 #ifdef _WIN32
     if (!is_empty((void_t)message))
@@ -380,7 +386,7 @@ void ex_signal(int sig, string_t ex) {
      * Make signal handlers persistent.
      */
     ex_sig_sa.sa_handler = ex_handler;
-    ex_sig_sa.sa_flags = 0;
+    ex_sig_sa.sa_flags = SA_RESTART;
     if (sigemptyset(&ex_sig_sa.sa_mask) != 0)
         printf_stderr("Cannot setup handler for signal no %d (%s)\n",
                       sig, ex);
