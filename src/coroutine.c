@@ -386,7 +386,7 @@ CO_FORCE_INLINE bool is_str_in(string_t text, string pattern) {
 }
 
 CO_FORCE_INLINE bool is_str_eq(string_t str, string_t str2) {
-    return strcmp(str, str2) == 0;
+    return (str != NULL && str2 != NULL) && (strcmp(str, str2) == 0);
 }
 
 CO_FORCE_INLINE bool is_str_empty(string_t str) {
