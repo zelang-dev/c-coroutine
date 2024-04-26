@@ -1030,7 +1030,16 @@ C_API void delete(void_t ptr);
     ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, "rethrow")
 
 #ifdef _WIN32
-#define ex_try                                   \
+#define ex_signal_block(ctrl)                  \
+    CRITICAL_SECTION ctrl##__FUNCTION__; \
+    InitializeCriticalSection(&ctrl##__FUNCTION__); \
+    EnterCriticalSection(&ctrl##__FUNCTION__);
+
+#define ex_signal_unblock(ctrl)                  \
+    LeaveCriticalSection(&ctrl##__FUNCTION__); \
+    DeleteCriticalSection(&ctrl##__FUNCTION__);
+
+#define ex_try                                \
     {                                         \
         /* local context */                   \
         ex_context_t ex_err;                  \
@@ -1076,6 +1085,15 @@ C_API void delete(void_t ptr);
     }
 
 #else
+#define ex_signal_block(ctrl)                  \
+    sigset_t ctrl##__FUNCTION__, ctrl_all##__FUNCTION__; \
+    sigfillset(&ctrl##__FUNCTION__); \
+    pthread_sigmask(SIG_SETMASK, &ctrl##__FUNCTION__, &ctrl_all##__FUNCTION__);
+
+#define ex_signal_unblock(ctrl)                  \
+    pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL); \
+    ctrl##__FUNCTION__ = 0;
+
 #define ex_try                               \
     {                                         \
         /* local context */                   \
@@ -1168,24 +1186,6 @@ C_API int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
 
 /* Convert signals into exceptions */
 C_API void ex_signal_setup(void);
-
-/* 'void' validate() return value */
-#define NOTHING
-#define validate(e, r)                                                  \
-        if (e) {                                                        \
-        /* prevent dangling 'if' */                                     \
-        } else {                                                        \
-            CO_ASSERT(e);                                               \
-            return r;                                                   \
-        }
-
-#define check(e, n)                                                     \
-        if (e) {                                                        \
-        /* prevent dangling 'if' */                                     \
-        } else {                                                        \
-            CO_ASSERT(e);                                               \
-            throw(n);                                                   \
-        }
 
 enum
 {

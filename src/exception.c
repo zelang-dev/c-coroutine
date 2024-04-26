@@ -168,24 +168,10 @@ void ex_flags_reset(void) {
 }
 
 void ex_init(void) {
-#if !defined(_WIN32)
-    sigset_t block_all, defaults;
-    sigfillset(&block_all);
-    pthread_sigmask(SIG_SETMASK, &block_all, &defaults);
-#else
-    pthread_mutex_t block_all = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&block_all);
-#endif
-
+    ex_signal_block(block_all);
     ex_context = &ex_context_buffer;
     ex_context->type = CO_ERR_CONTEXT;
-
-#if !defined(_WIN32)
-    pthread_sigmask(SIG_SETMASK, &defaults, NULL);
-#else
-    pthread_mutex_unlock(&block_all);
-    pthread_mutex_destroy(&block_all);
-#endif
+    ex_signal_unblock(block_all);
 }
 
 int ex_uncaught_exception(void) {
@@ -218,9 +204,6 @@ void ex_terminate(void) {
 void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message) {
     ex_context_t *ctx = ex_context;
     bool ex_rethrow = false;
-#if !defined(_WIN32)
-    sigset_t block_all, defaults;
-#endif
 
     if (!ctx) {
         ex_init();
@@ -230,6 +213,7 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     if (ctx->unstack)
         ex_terminate();
 
+    ex_signal_block(block_all);
     ctx->ex = exception;
     ctx->file = file;
     ctx->line = line;
@@ -243,22 +227,8 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
         ex_rethrow = got_signal;
     }
 
-#if !defined(_WIN32)
-    sigfillset(&block_all);
-    pthread_sigmask(SIG_SETMASK, &block_all, &defaults);
-#else
-    pthread_mutex_t block_all = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&block_all);
-#endif
-
     ex_unwind_stack(ctx);
-
-#if !defined(_WIN32)
-    pthread_sigmask(SIG_SETMASK, &defaults, NULL);
-#else
-    pthread_mutex_unlock(&block_all);
-    pthread_mutex_destroy(&block_all);
-#endif
+    ex_signal_unblock(block_all);
 
     if (ctx == &ex_context_buffer || ex_rethrow)
         ex_terminate();
@@ -439,11 +409,11 @@ void ex_signal_setup(void) {
     ex_signal(SIGTERM, EX_NAME(sig_term));
 #endif
 
+#if !defined(_WIN32)
 #ifdef SIGQUIT
     ex_signal(SIGQUIT, EX_NAME(sig_quit));
 #endif
 
-#if !defined(_WIN32)
 #ifdef SIGHUP
     ex_signal(SIGHUP, EX_NAME(sig_hup));
 #endif
