@@ -1,11 +1,11 @@
 ## aclocal.m4
 ## --------------------------------------------------------------------------
 ##
-##      Pthreads4w - POSIX Threads for Windows
+##      pthreads-win32 / pthreads4w - POSIX Threads for Windows
 ##      Copyright 1998 John E. Bossom
-##      Copyright 1999-2018, Pthreads4w contributors
+##      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
 ##
-##      Homepage: https://sourceforge.net/projects/pthreads4w/
+##      Homepage: http://sources.redhat.com/pthreads-win32
 ##
 ##      The current list of contributors is contained
 ##      in the file CONTRIBUTORS included with the source

@@ -2,54 +2,57 @@
  * Module: _ptw32.h
  *
  * Purpose:
- *      Pthreads4w internal macros, to be shared by other headers
+ *      pthreads-win32 internal macros, to be shared by other headers
  *      comprising the pthreads4w package.
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
- *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
  * --------------------------------------------------------------------------
  */
 
-#ifndef __PTW32_H
-#define __PTW32_H
+#ifndef PTW32_H
+#define PTW32_H
 
-/* See the README file for an explanation of the pthreads-win32
+/* See the README file for an explanation of the pthreads4w
  * version numbering scheme and how the DLL is named etc.
- *
- * FIXME: consider moving this to <_ptw32.h>; maybe also add a
- * leading underscore to the macro names.
  */
-#define  __PTW32_VERSION_MAJOR 3
-#define  __PTW32_VERSION_MINOR 0
-#define  __PTW32_VERSION_MICRO 0
-#define  __PTW32_VERION_BUILD 0
-#define  __PTW32_VERSION 3,0,0,0
-#define  __PTW32_VERSION_STRING "3, 0, 0, 0\0"
+#define  PTW32_VERSION_MAJOR 3
+#define  PTW32_VERSION_MINOR 0
+#define  PTW32_VERSION_MICRO 3
+#define  PTW32_VERION_BUILD 1
+#define  PTW32_VERSION 3,0,3,1
+#define  PTW32_VERSION_STRING "3, 0, 3, 1\0"
+
+// skip the rest when running this through the Microsoft Resource Compiler, which is a VERY brittle piece of machinery! -> RC2188 & RC1116 cryptic failures will be your part! 
+#ifndef RC_INVOKED
 
 #if defined(__GNUC__)
 # pragma GCC system_header
@@ -59,25 +62,24 @@
 #endif
 
 #if defined (__cplusplus)
-# define __PTW32_BEGIN_C_DECLS  extern "C" {
-# define __PTW32_END_C_DECLS    }
+# define PTW32_BEGIN_C_DECLS  extern "C" {
+# define PTW32_END_C_DECLS    }
 #else
-# define __PTW32_BEGIN_C_DECLS
-# define __PTW32_END_C_DECLS
+# define PTW32_BEGIN_C_DECLS
+# define PTW32_END_C_DECLS
 #endif
 
-#if defined __PTW32_STATIC_LIB
-# define __PTW32_DLLPORT
+#if defined PTW32_STATIC_LIB
+# define PTW32_DLLPORT
 
-#elif defined  __PTW32_BUILD
-# define  __PTW32_DLLPORT __declspec (dllexport)
+#elif defined  PTW32_BUILD
+# define  PTW32_DLLPORT __declspec (dllexport)
 #else
-# define  __PTW32_DLLPORT /*__declspec (dllimport)*/
+# define  PTW32_DLLPORT /*__declspec (dllimport)*/
 #endif
 
-#ifndef  __PTW32_CDECL
-/* FIXME: another internal macro; should have two initial underscores;
- * Nominally, we prefer to use __cdecl calling convention for all our
+#ifndef  PTW32_CDECL
+/* Nominally, we prefer to use __cdecl calling convention for all our
  * functions, but we map it through this macro alias to facilitate the
  * possible choice of alternatives; for example:
  */
@@ -95,9 +97,9 @@
    * remember that this must be defined consistently, for both the DLL
    * build, and the application build.
    */
-#  define  __PTW32_CDECL
+#  define  PTW32_CDECL
 # else
-#  define  __PTW32_CDECL __cdecl
+#  define  PTW32_CDECL __cdecl
 # endif
 #endif
 
@@ -106,8 +108,8 @@
  * which is only used when building the pthreads4w libraries.
  */
 
-#if !defined (__PTW32_CONFIG_H) && !defined(__PTW32_PSEUDO_CONFIG_H_SOURCED)
-#  define __PTW32_PSEUDO_CONFIG_H_SOURCED
+#if !defined (PTW32_CONFIG_H) && !defined(PTW32_PSEUDO_CONFIG_H_SOURCED)
+#  define PTW32_PSEUDO_CONFIG_H_SOURCED
 #  if defined(WINCE)
 #    undef  HAVE_CPU_AFFINITY
 #    define NEED_DUPLICATEHANDLE
@@ -122,15 +124,24 @@
 #    if _MSC_VER >= 1900
 #      define HAVE_STRUCT_TIMESPEC
 #    elif _MSC_VER < 1300
-#      define  __PTW32_CONFIG_MSVC6
+#      define  PTW32_CONFIG_MSVC6
 #    elif _MSC_VER < 1400
-#      define  __PTW32_CONFIG_MSVC7
+#      define  PTW32_CONFIG_MSVC7
 #    endif
 #  elif defined(_UWIN)
 #    define HAVE_MODE_T
 #    define HAVE_STRUCT_TIMESPEC
 #    define HAVE_SIGNAL_H
+#  elif defined(__MINGW64__)
+#    define HAVE_STRUCT_TIMESPEC
+#    define HAVE_MODE_T
+#  elif defined(__MINGW32__)
+#    define HAVE_MODE_T
 #  endif
+#endif
+
+#if !defined(_WIN32_WINNT)
+# define _WIN32_WINNT 0x0400
 #endif
 
 /*
@@ -151,7 +162,7 @@
 #elif !defined(__MINGW32__)
      typedef _int64 int64_t;
      typedef unsigned _int64 uint64_t;
-#  if defined (__PTW32_CONFIG_MSVC6)
+#  if defined (PTW32_CONFIG_MSVC6)
      typedef long intptr_t;
 #  endif
 #elif defined(HAVE_STDINT_H) && HAVE_STDINT_H == 1
@@ -183,6 +194,10 @@
 #  define ENOTSUP 48   /* This is the value in Solaris. */
 #endif
 
+#if !defined(ETIMEDOUT)
+#  define ETIMEDOUT 10060 /* Same as WSAETIMEDOUT */
+#endif
+
 #if !defined(ENOSYS)
 #  define ENOSYS 140     /* Semi-arbitrary value */
 #endif
@@ -196,7 +211,7 @@
 #endif
 
 /* POSIX 2008 - related to robust mutexes */
-#if  __PTW32_VERSION_MAJOR > 2
+#if  PTW32_VERSION_MAJOR > 2
 #  if !defined(EOWNERDEAD)
 #    define EOWNERDEAD 1000
 #  endif
@@ -212,4 +227,6 @@
 #  endif
 #endif
 
-#endif	/* !__PTW32_H */
+#endif // RC_INVOKED
+
+#endif	/* !PTW32_H */

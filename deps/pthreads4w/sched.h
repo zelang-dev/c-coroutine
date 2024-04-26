@@ -9,36 +9,42 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * --------------------------------------------------------------------------
  */
+#pragma once
 #if !defined(_SCHED_H)
 #define _SCHED_H
 #define __SCHED_H_SOURCED__
 
-#include "_ptw32.h"
+#include "./_ptw32.h"
 
 /* We need a typedef for pid_t, (and POSIX requires <sched.h> to
  * define it, as it is defined in <sys/types.h>, but it does NOT
@@ -50,13 +56,13 @@
  */
 #if ! defined __MINGW32__ || ! defined __have_typedef_pid_t
 
-# if defined __MINGW64__
+# if defined __MINGW64__ || defined WIN64 || defined _WIN64
     typedef __int64 pid_t;
 # else
     typedef int pid_t;
 #endif
 
-#if __GNUC__ < 4
+#if ! defined __GNUC__ || __GNUC__ < 4
 /* GCC v4.0 and later, (as used by MinGW), allows us to repeat a
  * typedef, provided every duplicate is consistent; only set this
  * multiple definition guard when we cannot be certain that it is
@@ -104,7 +110,7 @@ struct timespec
 /*
  * Microsoft VC++6.0 lacks these *_PTR types
  */
-#if defined(_MSC_VER) && _MSC_VER < 1300 && !defined (__PTW32_HAVE_DWORD_PTR)
+#if defined(_MSC_VER) && _MSC_VER < 1300 && !defined(PTW32_HAVE_DWORD_PTR)
 typedef unsigned long ULONG_PTR;
 typedef ULONG_PTR DWORD_PTR;
 #endif
@@ -112,7 +118,8 @@ typedef ULONG_PTR DWORD_PTR;
 /* Thread scheduling policies */
 
 enum
-{ SCHED_OTHER = 0,
+{ 
+  SCHED_OTHER = 0,
   SCHED_FIFO,
   SCHED_RR,
   SCHED_MIN   = SCHED_OTHER,
@@ -120,7 +127,8 @@ enum
 };
 
 struct sched_param
-{ int  sched_priority;
+{ 
+  int  sched_priority;
 };
 
 /*
@@ -157,22 +165,25 @@ struct sched_param
 #define CPU_EQUAL(set1ptr, set2ptr) (_sched_affinitycpuequal((set1ptr),(set2ptr)))
 
 typedef union
-{ char     cpuset[CPU_SETSIZE/8];
+{ 
+  char     cpuset[CPU_SETSIZE/8];
   size_t  _align;
 } cpu_set_t;
 
-__PTW32_BEGIN_C_DECLS
+PTW32_BEGIN_C_DECLS
 
-__PTW32_DLLPORT int  __PTW32_CDECL sched_yield (void);
+PTW32_DLLPORT int PTW32_CDECL sched_yield (void);
 
-__PTW32_DLLPORT int  __PTW32_CDECL sched_get_priority_min (int policy);
+PTW32_DLLPORT int PTW32_CDECL sched_get_priority_min (int policy);
 
-__PTW32_DLLPORT int  __PTW32_CDECL sched_get_priority_max (int policy);
+PTW32_DLLPORT int PTW32_CDECL sched_get_priority_max (int policy);
 
 /* FIXME: this declaration of sched_setscheduler() is NOT as prescribed
  * by POSIX; it lacks const struct sched_param * as third argument.
  */
-__PTW32_DLLPORT int  __PTW32_CDECL sched_setscheduler (pid_t pid, int policy);
+PTW32_DLLPORT int PTW32_CDECL sched_setscheduler (pid_t pid, int policy);
+
+PTW32_DLLPORT int PTW32_CDECL sched_getscheduler (pid_t pid);
 
 /* FIXME: In addition to the above five functions, POSIX also requires:
  *
@@ -185,30 +196,30 @@ __PTW32_DLLPORT int  __PTW32_CDECL sched_setscheduler (pid_t pid, int policy);
 /* Compatibility with Linux - not standard in POSIX
  * FIXME: consider occluding within a _GNU_SOURCE (or similar) feature test.
  */
-__PTW32_DLLPORT int  __PTW32_CDECL sched_setaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *mask);
+PTW32_DLLPORT int PTW32_CDECL sched_setaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *mask);
 
-__PTW32_DLLPORT int  __PTW32_CDECL sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *mask);
+PTW32_DLLPORT int PTW32_CDECL sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *mask);
 
 /*
  * Support routines and macros for cpu_set_t
  */
-__PTW32_DLLPORT int  __PTW32_CDECL _sched_affinitycpucount (const cpu_set_t *set);
+PTW32_DLLPORT int PTW32_CDECL _sched_affinitycpucount (const cpu_set_t *set);
 
-__PTW32_DLLPORT void  __PTW32_CDECL _sched_affinitycpuzero (cpu_set_t *pset);
+PTW32_DLLPORT void PTW32_CDECL _sched_affinitycpuzero (cpu_set_t *pset);
 
-__PTW32_DLLPORT void  __PTW32_CDECL _sched_affinitycpuset (int cpu, cpu_set_t *pset);
+PTW32_DLLPORT void PTW32_CDECL _sched_affinitycpuset (int cpu, cpu_set_t *pset);
 
-__PTW32_DLLPORT void  __PTW32_CDECL _sched_affinitycpuclr (int cpu, cpu_set_t *pset);
+PTW32_DLLPORT void PTW32_CDECL _sched_affinitycpuclr (int cpu, cpu_set_t *pset);
 
-__PTW32_DLLPORT int  __PTW32_CDECL _sched_affinitycpuisset (int cpu, const cpu_set_t *pset);
+PTW32_DLLPORT int PTW32_CDECL _sched_affinitycpuisset (int cpu, const cpu_set_t *pset);
 
-__PTW32_DLLPORT void  __PTW32_CDECL _sched_affinitycpuand(cpu_set_t *pdestset, const cpu_set_t *psrcset1, const cpu_set_t *psrcset2);
+PTW32_DLLPORT void PTW32_CDECL _sched_affinitycpuand(cpu_set_t *pdestset, const cpu_set_t *psrcset1, const cpu_set_t *psrcset2);
 
-__PTW32_DLLPORT void  __PTW32_CDECL _sched_affinitycpuor(cpu_set_t *pdestset, const cpu_set_t *psrcset1, const cpu_set_t *psrcset2);
+PTW32_DLLPORT void PTW32_CDECL _sched_affinitycpuor(cpu_set_t *pdestset, const cpu_set_t *psrcset1, const cpu_set_t *psrcset2);
 
-__PTW32_DLLPORT void  __PTW32_CDECL _sched_affinitycpuxor(cpu_set_t *pdestset, const cpu_set_t *psrcset1, const cpu_set_t *psrcset2);
+PTW32_DLLPORT void PTW32_CDECL _sched_affinitycpuxor(cpu_set_t *pdestset, const cpu_set_t *psrcset1, const cpu_set_t *psrcset2);
 
-__PTW32_DLLPORT int  __PTW32_CDECL _sched_affinitycpuequal (const cpu_set_t *pset1, const cpu_set_t *pset2);
+PTW32_DLLPORT int PTW32_CDECL _sched_affinitycpuequal (const cpu_set_t *pset1, const cpu_set_t *pset2);
 
 /* Note that this macro returns ENOTSUP rather than ENOSYS, as
  * might be expected. However, returning ENOSYS should mean that
@@ -229,7 +240,7 @@ __PTW32_DLLPORT int  __PTW32_CDECL _sched_affinitycpuequal (const cpu_set_t *pse
 #define sched_rr_get_interval(_pid, _interval) \
   ( errno = ENOTSUP, (int) -1 )
 
-__PTW32_END_C_DECLS
+PTW32_END_C_DECLS
 
 #undef __SCHED_H_SOURCED__
 #endif	/* !_SCHED_H */

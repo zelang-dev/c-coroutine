@@ -6,34 +6,39 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * --------------------------------------------------------------------------
  */
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+# include "config.h"
 #endif
 
 #include "pthread.h"
@@ -58,12 +63,12 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
   /*
    * We do a quick check to see if we need to do more work
    * to initialise a static mutex. We check
-   * again inside the guarded section of __ptw32_mutex_check_need_init()
+   * again inside the guarded section of ptw32_mutex_check_need_init()
    * to avoid race conditions.
    */
   if (mx >= PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
     {
-      if ((result = __ptw32_mutex_check_need_init (mutex)) != 0)
+      if ((result = ptw32_mutex_check_need_init (mutex)) != 0)
 	{
 	  return (result);
 	}
@@ -75,10 +80,10 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
   if (kind >= 0)
     {
       /* Non-robust */
-      if (0 ==  (__PTW32_INTERLOCKED_LONG)  __PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG (
-		          (__PTW32_INTERLOCKED_LONGPTR) &mx->lock_idx,
-		          (__PTW32_INTERLOCKED_LONG) 1,
-		          (__PTW32_INTERLOCKED_LONG) 0))
+      if (0 == (PTW32_INTERLOCKED_LONG) PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG (
+		         (PTW32_INTERLOCKED_LONGPTR) &mx->lock_idx,
+		         (PTW32_INTERLOCKED_LONG) 1,
+		         (PTW32_INTERLOCKED_LONG) 0))
         {
           if (kind != PTHREAD_MUTEX_NORMAL)
 	    {
@@ -107,12 +112,12 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
        * The mutex is added to a per thread list when ownership is acquired.
        */
       pthread_t self;
-      __ptw32_robust_state_t* statePtr = &mx->robustNode->stateInconsistent;
+      ptw32_robust_state_t* statePtr = &mx->robustNode->stateInconsistent;
 
-      if  ((__PTW32_INTERLOCKED_LONG)__PTW32_ROBUST_NOTRECOVERABLE ==
-                   __PTW32_INTERLOCKED_EXCHANGE_ADD_LONG(
-                     (__PTW32_INTERLOCKED_LONGPTR)statePtr,
-                     (__PTW32_INTERLOCKED_LONG)0))
+      if ((PTW32_INTERLOCKED_LONG)PTW32_ROBUST_NOTRECOVERABLE ==
+                  PTW32_INTERLOCKED_EXCHANGE_ADD_LONG(
+                    (PTW32_INTERLOCKED_LONGPTR)statePtr,
+                    (PTW32_INTERLOCKED_LONG)0))
         {
           return ENOTRECOVERABLE;
         }
@@ -120,16 +125,16 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
       self = pthread_self();
       kind = -kind - 1; /* Convert to non-robust range */
 
-      if (0 ==  (__PTW32_INTERLOCKED_LONG)  __PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG (
-        	          (__PTW32_INTERLOCKED_LONGPTR) &mx->lock_idx,
-        	          (__PTW32_INTERLOCKED_LONG) 1,
-        	          (__PTW32_INTERLOCKED_LONG) 0))
+      if (0 == (PTW32_INTERLOCKED_LONG) PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG (
+        	         (PTW32_INTERLOCKED_LONGPTR) &mx->lock_idx,
+        	         (PTW32_INTERLOCKED_LONG) 1,
+        	         (PTW32_INTERLOCKED_LONG) 0))
         {
           if (kind != PTHREAD_MUTEX_NORMAL)
             {
               mx->recursive_count = 1;
             }
-          __ptw32_robust_mutex_add(mutex, self);
+          ptw32_robust_mutex_add(mutex, self);
         }
       else
         {
@@ -140,10 +145,10 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
             }
           else
             {
-              if (EOWNERDEAD == (result = __ptw32_robust_mutex_inherit(mutex)))
+              if (EOWNERDEAD == (result = ptw32_robust_mutex_inherit(mutex)))
                 {
                   mx->recursive_count = 1;
-                  __ptw32_robust_mutex_add(mutex, self);
+                  ptw32_robust_mutex_add(mutex, self);
                 }
               else
                 {

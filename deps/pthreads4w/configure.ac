@@ -1,11 +1,11 @@
 # configure.ac
 # --------------------------------------------------------------------------
 #
-#      Pthreads4w - POSIX Threads for Windows
+#      pthreads-win32 / pthreads4w - POSIX Threads for Windows
 #      Copyright 1998 John E. Bossom
-#      Copyright 1999-2018, Pthreads4w contributors
+#      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
 #
-#      Homepage: https://sourceforge.net/projects/pthreads4w/
+#      Homepage: http://sources.redhat.com/pthreads-win32
 #
 #      The current list of contributors is contained
 #      in the file CONTRIBUTORS included with the source
@@ -48,8 +48,8 @@ AC_PROG_RANLIB
 # not normally support it.
 #
 AH_TOP(dnl
-[#ifndef __PTW32_CONFIG_H]
-[#define __PTW32_CONFIG_H]dnl
+[#ifndef PTW32_CONFIG_H]
+[#define PTW32_CONFIG_H]dnl
 )
 # FIXME: AC_C_INLINE defines 'inline' to work with any C compiler,
 # whether or not it supports inline code expansion, but it does NOT

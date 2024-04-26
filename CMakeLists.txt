@@ -60,7 +60,7 @@ if(WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D__PTW32_STATIC_LIB")
     add_definitions(-D__PTW32_STATIC_LIB -D_CRT_SECURE_NO_DEPRECATE)
     add_subdirectory(deps/pthreads4w)
-    target_link_libraries(coroutine PUBLIC libpthreadVSE3)
+    target_link_libraries(coroutine PUBLIC pthreadVSE3)
 endif()
 
 if(CO_BUILD_TESTS)

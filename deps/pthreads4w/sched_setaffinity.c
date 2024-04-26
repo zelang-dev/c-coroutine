@@ -6,34 +6,39 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * --------------------------------------------------------------------------
  */
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+# include "config.h"
 #endif
 
 #include "pthread.h"
@@ -94,12 +99,13 @@ sched_setaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
       */
 {
 #if ! defined(NEED_PROCESS_AFFINITY_MASK)
-
   DWORD_PTR vProcessMask;
   DWORD_PTR vSystemMask;
   HANDLE h;
   int targetPid = (int)(size_t) pid;
   int result = 0;
+
+  cpusetsize = sizeof(cpu_set_t);
 
   if (NULL == set)
 	{
@@ -112,7 +118,7 @@ sched_setaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
 		  targetPid = (int) GetCurrentProcessId ();
 		}
 
-	  h = OpenProcess (PROCESS_QUERY_INFORMATION|PROCESS_SET_INFORMATION,  __PTW32_FALSE, (DWORD) targetPid);
+	  h = OpenProcess (PROCESS_QUERY_INFORMATION|PROCESS_SET_INFORMATION, PTW32_FALSE, (DWORD) targetPid);
 
 	  if (NULL == h)
 		{
@@ -157,13 +163,13 @@ sched_setaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
 			{
 			  result = EAGAIN;
 			}
+          CloseHandle(h);
 		}
-	  CloseHandle(h);
 	}
 
   if (result != 0)
     {
-	   __PTW32_SET_ERRNO(result);
+	  PTW32_SET_ERRNO(result);
 	  return -1;
     }
   else
@@ -173,7 +179,7 @@ sched_setaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
 
 #else
 
-   __PTW32_SET_ERRNO(ENOSYS);
+  PTW32_SET_ERRNO(ENOSYS);
   return -1;
 
 #endif
@@ -228,6 +234,8 @@ sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
   int targetPid = (int)(size_t) pid;
   int result = 0;
 
+  cpusetsize = sizeof(cpu_set_t);
+
   if (NULL == set)
     {
 	  result = EFAULT;
@@ -242,7 +250,7 @@ sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
 		  targetPid = (int) GetCurrentProcessId ();
 	    }
 
-	  h = OpenProcess (PROCESS_QUERY_INFORMATION,  __PTW32_FALSE, (DWORD) targetPid);
+	  h = OpenProcess (PROCESS_QUERY_INFORMATION, PTW32_FALSE, (DWORD) targetPid);
 
 	  if (NULL == h)
 	    {
@@ -258,8 +266,8 @@ sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
 		    {
 			  result = EAGAIN;
 		    }
+          CloseHandle(h);
 	    }
-	  CloseHandle(h);
 
 #else
 	  ((_sched_cpu_set_vector_*)set)->_cpuset = (size_t)0x1;
@@ -269,7 +277,7 @@ sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *set)
 
   if (result != 0)
     {
-	   __PTW32_SET_ERRNO(result);
+	  PTW32_SET_ERRNO(result);
 	  return -1;
     }
   else

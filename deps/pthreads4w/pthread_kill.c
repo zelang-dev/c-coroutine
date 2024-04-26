@@ -6,34 +6,39 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * --------------------------------------------------------------------------
  */
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+# include "config.h"
 #endif
 
 #include "pthread.h"
@@ -78,31 +83,79 @@ pthread_kill (pthread_t thread, int sig)
       */
 {
   int result = 0;
+  ptw32_thread_t * tp;
+  ptw32_mcs_local_node_t node;
 
-  if (0 != sig)
+  ptw32_mcs_lock_acquire(&ptw32_thread_reuse_lock, &node);
+
+  tp = (ptw32_thread_t *) thread.p;
+
+  if (NULL == tp
+      || thread.x != tp->ptHandle.x
+      || NULL == tp->threadH)
+    {
+      result = ESRCH;
+    }
+
+  ptw32_mcs_lock_release(&node);
+
+  if (0 == result && 0 != sig)
     {
       /*
-       * Currently does not support any signals.
+       * Currently only supports direct thread termination via SIGABRT.
        */
-      result = EINVAL;
-    }
-  else
-    {
-      __ptw32_mcs_local_node_t node;
-      __ptw32_thread_t * tp;
+      switch (sig)
+      {
+      default:
+          result = EINVAL;
+          break;
+#ifdef SIGINT
+      case SIGINT:
+#endif      
+#ifdef SIGTERM
+      case SIGTERM:
+#endif      
+#ifdef SIGBREAK
+      case SIGBREAK:
+#endif            
+#ifdef SIGABRT
+      case SIGABRT:
+#endif
+#ifdef SIGABRT_COMPAT
+      case SIGABRT_COMPAT:
+#endif
+      {
+          ptw32_mcs_local_node_t stateLock;
 
-      __ptw32_mcs_lock_acquire(&__ptw32_thread_reuse_lock, &node);
+          /*
+           * Lock for async-cancel safety.
+           */
+          ptw32_mcs_lock_acquire(&tp->stateLock, &stateLock);
 
-      tp = (__ptw32_thread_t *) thread.p;
+          // Only terminate the thread when it is still running:
+          if (tp->state < PThreadStateLast)
+          {
+              tp->state = PThreadStateLast;
+              tp->cancelState = PTHREAD_CANCEL_DISABLE;
+              ptw32_mcs_lock_release(&stateLock);
 
-      if (NULL == tp
-	  || thread.x != tp->ptHandle.x
-	  || tp->state < PThreadStateRunning)
-	{
-	  result = ESRCH;
-	}
+              result = TerminateThread(tp->threadH, (DWORD)(ptrdiff_t)PTHREAD_CANCELED);
+              result = (result != 0) ? 0 : EINVAL;
 
-      __ptw32_mcs_lock_release(&node);
+              // Set exit to CANCELED (KILLED) when it hasn't been set already.
+              if (tp->exitStatus == NULL)
+                  tp->exitStatus = PTHREAD_CANCELED;
+          }
+          else
+          {
+              ptw32_mcs_lock_release(&stateLock);
+
+              // TODO: ? flag the call as not-necessary-any-more because thread has already terminated ?
+              result = 0;
+          }
+      }
+          break;
+      }
     }
 
   return result;

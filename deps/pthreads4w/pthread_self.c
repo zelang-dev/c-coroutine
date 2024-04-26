@@ -6,34 +6,39 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * --------------------------------------------------------------------------
  */
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+# include "config.h"
 #endif
 
 #include "pthread.h"
@@ -63,14 +68,17 @@ pthread_self (void)
 {
   pthread_t self;
   pthread_t nil = {NULL, 0};
-  __ptw32_thread_t * sp;
+  ptw32_thread_t * sp;
+
+  if (!ptw32_processInitialize())
+	return nil;
 
 #if defined(_UWIN)
-  if (!__ptw32_selfThreadKey)
+  if (!ptw32_selfThreadKey)
     return nil;
 #endif
 
-  sp = (__ptw32_thread_t *) pthread_getspecific (__ptw32_selfThreadKey);
+  sp = (ptw32_thread_t *) pthread_getspecific (ptw32_selfThreadKey);
 
   if (sp != NULL)
     {
@@ -78,14 +86,14 @@ pthread_self (void)
     }
   else
     {
-      int fail =  __PTW32_FALSE;
+	  int fail = PTW32_FALSE;
 
       /*
        * Need to create an implicit 'self' for the currently
        * executing thread.
        */
-      self = __ptw32_new ();
-      sp = (__ptw32_thread_t *) self.p;
+      self = ptw32_new ();
+      sp = (ptw32_thread_t *) self.p;
 
       if (sp != NULL)
         {
@@ -117,7 +125,7 @@ pthread_self (void)
 				&sp->threadH,
 				0, FALSE, DUPLICATE_SAME_ACCESS))
     	    {
-    		  fail =  __PTW32_TRUE;
+    		  fail = PTW32_TRUE;
     	    }
 #endif
 
@@ -141,16 +149,20 @@ pthread_self (void)
     	                {
     	                  sp->cpuset = (size_t) vThreadMask;
     	                }
-    	              else fail =  __PTW32_TRUE;
+    	              else fail = PTW32_TRUE;
     	            }
-    	          else fail =  __PTW32_TRUE;
+    	          else fail = PTW32_TRUE;
     	        }
-    	      else fail =  __PTW32_TRUE;
+    	      else fail = PTW32_TRUE;
 
 #endif
 
+    	      /*
+    	       * No need to explicitly serialise access to sched_priority
+    	       * because the new handle is not yet public.
+    	       */
     	      sp->sched_priority = GetThreadPriority (sp->threadH);
-    	      pthread_setspecific (__ptw32_selfThreadKey, (void *) sp);
+    	      pthread_setspecific (ptw32_selfThreadKey, (void *) sp);
     	    }
         }
 
@@ -160,7 +172,8 @@ pthread_self (void)
     	   * Thread structs are never freed but are reused so if this
     	   * continues to fail at least we don't leak memory.
     	   */
-    	  __ptw32_threadReusePush (self);
+		  sp->threadH = 0;	// [i_a]
+    	  ptw32_threadReusePush (self);
     	  /*
     	   * As this is a win32 thread calling us and we have failed,
     	   * return a value that makes sense to win32.

@@ -8,36 +8,39 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
- *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
  * --------------------------------------------------------------------------
  */
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+# include "config.h"
 #endif
 
 #include "pthread.h"
@@ -45,13 +48,13 @@
 
 
 /*
- * The functions __ptw32_pop_cleanup and __ptw32_push_cleanup
+ * The functions ptw32_pop_cleanup and ptw32_push_cleanup
  * are implemented here for applications written in C with no
  * SEH or C++ destructor support. 
  */
 
-__ptw32_cleanup_t *
-__ptw32_pop_cleanup (int execute)
+ptw32_cleanup_t *
+ptw32_pop_cleanup (int execute)
      /*
       * ------------------------------------------------------
       * DOCPUBLIC
@@ -77,9 +80,12 @@ __ptw32_pop_cleanup (int execute)
       * ------------------------------------------------------
       */
 {
-  __ptw32_cleanup_t *cleanup;
+  ptw32_cleanup_t *cleanup;
 
-  cleanup = (__ptw32_cleanup_t *) pthread_getspecific (__ptw32_cleanupKey);
+  if (!ptw32_processInitialized)
+    ptw32_processInitialize();
+
+  cleanup = (ptw32_cleanup_t *) pthread_getspecific (ptw32_cleanupKey);
 
   if (cleanup != NULL)
     {
@@ -90,18 +96,18 @@ __ptw32_pop_cleanup (int execute)
 
 	}
 
-      pthread_setspecific (__ptw32_cleanupKey, (void *) cleanup->prev);
+      pthread_setspecific (ptw32_cleanupKey, (void *) cleanup->prev);
 
     }
 
   return (cleanup);
 
-}				/* __ptw32_pop_cleanup */
+}				/* ptw32_pop_cleanup */
 
 
 void
-__ptw32_push_cleanup (__ptw32_cleanup_t * cleanup,
-		    __ptw32_cleanup_callback_t routine, void *arg)
+ptw32_push_cleanup (ptw32_cleanup_t * cleanup,
+		    ptw32_cleanup_callback_t routine, void *arg)
      /*
       * ------------------------------------------------------
       * DOCPUBLIC
@@ -132,7 +138,7 @@ __ptw32_push_cleanup (__ptw32_cleanup_t * cleanup,
       *              b) when the thread acts on a cancellation request,
       *              c) or when the thrad calls pthread_cleanup_pop with a nonzero
       *                 'execute' argument
-      *      NOTE: pthread_push_cleanup, __ptw32_pop_cleanup must be paired
+      *      NOTE: pthread_push_cleanup, ptw32_pop_cleanup must be paired
       *                in the same lexical scope.
       *
       * RESULTS
@@ -142,11 +148,14 @@ __ptw32_push_cleanup (__ptw32_cleanup_t * cleanup,
       * ------------------------------------------------------
       */
 {
+  if (!ptw32_processInitialized)
+    ptw32_processInitialize();
+
   cleanup->routine = routine;
   cleanup->arg = arg;
 
-  cleanup->prev = (__ptw32_cleanup_t *) pthread_getspecific (__ptw32_cleanupKey);
+  cleanup->prev = (ptw32_cleanup_t *) pthread_getspecific (ptw32_cleanupKey);
 
-  pthread_setspecific (__ptw32_cleanupKey, (void *) cleanup);
+  pthread_setspecific (ptw32_cleanupKey, (void *) cleanup);
 
-}				/* __ptw32_push_cleanup */
+}				/* ptw32_push_cleanup */

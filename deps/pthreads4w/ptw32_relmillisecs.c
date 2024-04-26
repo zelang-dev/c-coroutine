@@ -6,34 +6,39 @@
  *
  * --------------------------------------------------------------------------
  *
- *      Pthreads4w - POSIX Threads for Windows
- *      Copyright 1998 John E. Bossom
- *      Copyright 1999-2018, Pthreads4w contributors
+ *      pthreads-win32 - POSIX Threads Library for Win32
+ *      Copyright(C) 1998 John E. Bossom
+ *      Copyright(C) 1999-2021 pthreads-win32 / pthreads4w contributors
  *
- *      Homepage: https://sourceforge.net/projects/pthreads4w/
+ *      Homepage1: http://sourceware.org/pthreads-win32/
+ *      Homepage2: http://sourceforge.net/projects/pthreads4w/
  *
  *      The current list of contributors is contained
  *      in the file CONTRIBUTORS included with the source
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
+ *      http://sources.redhat.com/pthreads-win32/contributors.html
+ * 
+ *      This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2 of the License, or (at your option) any later version.
+ * 
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *      Lesser General Public License for more details.
+ * 
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library in the file COPYING.LIB;
+ *      if not, write to the Free Software Foundation, Inc.,
+ *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- *      https://sourceforge.net/p/pthreads4w/wiki/Contributors/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * --------------------------------------------------------------------------
  */
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+# include "config.h"
 #endif
 
 #include "pthread.h"
@@ -43,11 +48,11 @@ static const int64_t NANOSEC_PER_SEC = 1000000000;
 static const int64_t NANOSEC_PER_MILLISEC = 1000000;
 static const int64_t MILLISEC_PER_SEC = 1000;
 
-#if defined (__PTW32_BUILD_INLINED)
-INLINE
-#endif /*  __PTW32_BUILD_INLINED */
+#if defined(PTW32_BUILD_INLINED)
+INLINE 
+#endif /* PTW32_BUILD_INLINED */
 DWORD
-__ptw32_relmillisecs (const struct timespec * abstime)
+ptw32_relmillisecs (const struct timespec * abstime)
 {
   DWORD milliseconds;
   int64_t tmpAbsNanoseconds;
@@ -82,7 +87,7 @@ __ptw32_relmillisecs (const struct timespec * abstime)
   GetSystemTimeAsFileTime(&ft);
 # endif
 
-  __ptw32_filetime_to_timespec(&ft, &currSysTime);
+  ptw32_filetime_to_timespec(&ft, &currSysTime);
 
   tmpCurrNanoseconds = (int64_t)currSysTime.tv_nsec + ((int64_t)currSysTime.tv_sec * NANOSEC_PER_SEC);
 
@@ -135,7 +140,6 @@ pthread_win32_getabstime_np (struct timespec * abstime, const struct timespec * 
   /* get current system time */
 
 # if defined(WINCE)
-
   SYSTEMTIME st;
   GetSystemTime(&st);
   SystemTimeToFileTime(&st, &ft);
@@ -143,7 +147,7 @@ pthread_win32_getabstime_np (struct timespec * abstime, const struct timespec * 
   GetSystemTimeAsFileTime(&ft);
 # endif
 
-  __ptw32_filetime_to_timespec(&ft, &currSysTime);
+  ptw32_filetime_to_timespec(&ft, &currSysTime);
 
   sec = currSysTime.tv_sec;
   nsec = currSysTime.tv_nsec;
