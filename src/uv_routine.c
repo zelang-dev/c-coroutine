@@ -114,7 +114,8 @@ static void close_cb(uv_handle_t *handle) {
 static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
-    if (!is_empty((void_t)co_recover())) {
+    if (!is_empty((void_t)co_message())) {
+        co->err_recovered = true;
         if (uv_loop_alive(co_loop()) && uv_server_args) {
             co->halt = true;
             co->loop_erred = true;
@@ -943,7 +944,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
     size_t len = sizeof(name);
 
     uv_args_t *uv_args = uv_arguments(5, true);
-    co_defer_recover(error_catch, uv_args);
+    co_recover(error_catch, uv_args);
     if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->in6);
         addr_set = uv_args->in6;

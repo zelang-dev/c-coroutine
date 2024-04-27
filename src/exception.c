@@ -182,19 +182,21 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
-    if (!can_terminate)
-        return;
-
-    can_terminate = false;
-    if (got_ctrl_c)
+    if (got_ctrl_c) {
+        got_ctrl_c = false;
         coroutine_info();
+    }
 
     if (ex_uncaught_exception() || got_uncaught_exception)
         ex_print(ex_context, "Exception during stack unwinding leading to an undefined behavior");
     else
         ex_print(ex_context, "Exiting with uncaught exception");
 
-    coroutine_cleanup();
+    if (can_terminate) {
+        can_terminate = false;
+        coroutine_cleanup();
+    }
+
     if (got_signal)
         _Exit(EXIT_FAILURE);
     else

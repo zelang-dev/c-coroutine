@@ -806,9 +806,12 @@ C_API size_t co_deferred(routine_t *, func_t, void_t);
 C_API size_t co_deferred_count(const routine_t *);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
-you must call `co_recover` to retrieve error message and mark Error condition handled. */
-C_API void co_defer_recover(func_t, void_t);
-C_API string_t co_recover(void);
+you must call `co_catch` inside function to mark Error condition handled. */
+C_API void co_recover(func_t, void_t);
+/* Compare `err` to current error condition of coroutine, will mark exception handled, if `true`. */
+C_API bool co_catch(string_t err);
+/* Get current error condition string. */
+C_API string_t co_message(void);
 
 /* Call `CO_CALLOC` to allocate memory array of given count and size in current coroutine,
 will auto free `LIFO` on function exit/return, do not free! */

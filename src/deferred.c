@@ -249,13 +249,19 @@ CO_FORCE_INLINE size_t co_defer(func_t func, void_t data) {
     return co_deferred(co_active(), func, data);
 }
 
-CO_FORCE_INLINE void co_defer_recover(func_t func, void_t data) {
+CO_FORCE_INLINE void co_recover(func_t func, void_t data) {
     co_deferred_any(co_active(), func, data, (void_t)"err");
 }
 
-string_t co_recover() {
+bool co_catch(string_t err) {
     routine_t *co = co_active();
-    co->err_recovered = true;
+    string_t exception = (string_t)(!is_empty((void_t)co->panic) ? co->panic : co->err);
+    co->err_recovered = is_str_eq(err, exception);
+    return co->err_recovered;
+}
+
+string_t co_message(void) {
+    routine_t *co = co_active();
     return !is_empty((void_t)co->panic) ? co->panic : co->err;
 }
 

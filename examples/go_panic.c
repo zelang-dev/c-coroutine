@@ -9,13 +9,12 @@ int mul(int x, int y) {
 }
 
 void func(void *arg) {
-    const char *err = co_recover();
-    if (NULL != err)
-        printf("panic occurred: %s\n", err);
+    if (co_catch(co_message()))
+        printf("panic occurred: %s\n", co_message());
 }
 
 void divByZero(void *arg) {
-    co_defer_recover(func, arg);
+    co_recover(func, arg);
     printf("%d", div_err(1, 0));
 }
 
