@@ -1091,8 +1091,7 @@ C_API void delete(void_t ptr);
     pthread_sigmask(SIG_SETMASK, &ctrl##__FUNCTION__, &ctrl_all##__FUNCTION__);
 
 #define ex_signal_unblock(ctrl)                  \
-    pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL); \
-    ctrl##__FUNCTION__ = 0;
+    pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
 
 #define ex_try                               \
     {                                         \
