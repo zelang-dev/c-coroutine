@@ -1,7 +1,7 @@
 #if defined(__GNUC__) || !defined(_WIN32)
 #undef _FORTIFY_SOURCE
 #endif
-#include "../include/coroutine.h"
+#include "raii.h"
 /*
  o---------------------------------------------------------------------o
  |
@@ -80,13 +80,20 @@ EX_EXCEPTION(stack_overflow);
 EX_EXCEPTION(invalid_handle);
 
 static thread_local ex_context_t ex_context_buffer;
-thread_local ex_context_t *ex_context = 0;
-thread_local char ex_message[ 256 ] = { 0 };
+thread_local ex_context_t *ex_context = NULL;
+thread_local char ex_message[256] = {0};
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
 static volatile sig_atomic_t got_ctrl_c = false;
 static volatile sig_atomic_t can_terminate = true;
 
+ex_setup_func exception_setup_func = NULL;
+ex_unwind_func exception_unwind_func = NULL;
+ex_terminate_func exception_ctrl_c_func = NULL;
+ex_terminate_func exception_terminate_func = NULL;
+bool exception_signal_set = false;
+
+static void ex_handler(int sig);
 #if !defined(_WIN32)
 static struct sigaction ex_sig_sa = {0}, ex_sig_osa = {0};
 #endif
@@ -96,55 +103,38 @@ enum {
 };
 
 static struct {
-    string_t ex;
+    const char *ex;
     int sig;
 #ifdef _WIN32
     DWORD seh;
 #endif
 } ex_sig[max_ex_sig];
 
-int ex_uncaught_exception(void);
-void ex_terminate(void);
-void ex_unwind_stack(ex_context_t *ctx);
-
-static void ex_print(ex_context_t *exception, string_t message) {
-#ifndef CO_DEBUG
-    printf_stderr("\nFatal Error: %s in function(%s)\n\n",
-            !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex, exception->function);
-#else
-    printf_stderr("\n%s: %s\n", message, !is_empty((void_t)exception->co->panic) ? exception->co->panic : exception->ex);
-    if (!is_empty((void_t)exception->file)) {
-        if (!is_empty((void_t)exception->function)) {
-            printf_stderr("    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
-        } else {
-            printf_stderr("    thrown at %s:%d\n\n", exception->file, exception->line);
-        }
-    }
-#endif
-}
-
-ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t)) {
-    if (!ex_context)
-        ex_init();
-
-    const_ptr->next = ex_context->stack;
+ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
+    ex_context_t *ctx = ex_init();
+    const_ptr->next = ctx->stack;
     const_ptr->func = func;
     const_ptr->ptr = ptr;
-    ex_context->stack = const_ptr;
-    const_ptr->type = CO_ERR_PTR;
+    const_ptr->type = ex_protected_st;
+    ctx->stack = const_ptr;
     return *const_ptr;
 }
 
-void ex_unwind_stack(ex_context_t *ctx) {
+void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
+    const_ptr->type = -1;
+    ex_context->stack = const_ptr->next;
+}
+
+static void ex_unwind_stack(ex_context_t *ctx) {
     ex_ptr_t *p = ctx->stack;
-    void_t temp = NULL;
+    void *temp = NULL;
 
     ctx->unstack = 1;
 
-    if (ctx->co->err_protected) {
-        co_deferred_free(ctx->co);
+    if (ctx->is_unwind && exception_unwind_func) {
+        exception_unwind_func(ctx->data);
     } else {
-        while (p && p->type == CO_ERR_PTR) {
+        while (p && p->type == ex_protected_st) {
             if (got_uncaught_exception = (temp == *p->ptr))
                 break;
 
@@ -162,39 +152,79 @@ void ex_unwind_stack(ex_context_t *ctx) {
     ctx->stack = 0;
 }
 
+static void ex_print(ex_context_t *exception, const char *message) {
+#ifndef NDEBUG
+    printf_stderr("\nFatal Error: %s in function(%s)\n\n",
+                  ((void *)exception->panic != NULL ? exception->panic : exception->ex), exception->function);
+#else
+    printf_stderr("\n%s: %s\n", message, (exception->panic != NULL ? exception->panic : exception->ex));
+    if (exception->file != NULL) {
+        if (exception->function != NULL) {
+            printf_stderr("    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
+        } else {
+            printf_stderr("    thrown at %s:%d\n\n", exception->file, exception->line);
+        }
+    }
+#endif
+}
+
+void ex_unwind_set(ex_context_t *ctx, bool flag) {
+    ctx->is_unwind = flag;
+}
+
+void ex_data_set(ex_context_t *ctx, void *data) {
+    ctx->data = data;
+}
+
+void *ex_data_get(ex_context_t *ctx, void *data) {
+    return ctx->data;
+}
+
+void ex_swap_set(ex_context_t *ctx, void *data) {
+    ctx->prev = ctx->data;
+    ctx->data = data;
+}
+
+void ex_swap_reset(ex_context_t *ctx) {
+    ctx->data = ctx->prev;
+}
+
 void ex_flags_reset(void) {
     got_signal = false;
     got_ctrl_c = false;
 }
 
-void ex_init(void) {
-    ex_signal_block(block_all);
+ex_context_t *ex_init(void) {
+    if (ex_context != NULL)
+        return ex_context;
+
+    ex_signal_block(all);
     ex_context = &ex_context_buffer;
-    ex_context->type = CO_ERR_CONTEXT;
-    ex_signal_unblock(block_all);
+    ex_context->is_unwind = false;
+    ex_context->type = ex_context_st;
+    ex_signal_unblock(all);
+
+    return ex_context;
 }
 
 int ex_uncaught_exception(void) {
-    if (!ex_context)
-        ex_init();
-
-    return ex_context->unstack;
+    return ex_init()->unstack;
 }
 
 void ex_terminate(void) {
-    if (got_ctrl_c) {
-        got_ctrl_c = false;
-        coroutine_info();
-    }
-
     if (ex_uncaught_exception() || got_uncaught_exception)
         ex_print(ex_context, "Exception during stack unwinding leading to an undefined behavior");
     else
         ex_print(ex_context, "Exiting with uncaught exception");
 
-    if (can_terminate) {
+    if (got_ctrl_c && exception_ctrl_c_func) {
+        got_ctrl_c = false;
+        exception_ctrl_c_func();
+    }
+
+    if (can_terminate && exception_terminate_func) {
         can_terminate = false;
-        coroutine_cleanup();
+        exception_terminate_func();
     }
 
     if (got_signal)
@@ -203,52 +233,42 @@ void ex_terminate(void) {
         exit(EXIT_FAILURE);
 }
 
-void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message) {
-    ex_context_t *ctx = ex_context;
-    bool ex_rethrow = false;
-
-    if (!ctx) {
-        ex_init();
-        ctx = ex_context;
-    }
+void ex_throw(const char *exception, const char *file, int line, const char *function, const char *message) {
+    ex_context_t *ctx = ex_init();
 
     if (ctx->unstack)
         ex_terminate();
 
-    ex_signal_block(block_all);
+    ex_signal_block(all);
     ctx->ex = exception;
     ctx->file = file;
     ctx->line = line;
     ctx->function = function;
+    ctx->panic = message;
 
-    ctx->co = co_active();
-    ctx->co->err = (void_t)ctx->ex;
-    ctx->co->panic = message;
-    if (message != NULL && strcmp(message, "rethrow") == 0) {
-        ctx->co->panic = NULL;
-        ex_rethrow = got_signal;
-    }
+    if (exception_setup_func)
+        exception_setup_func(ctx, ctx->ex, ctx->panic);
 
     ex_unwind_stack(ctx);
-    ex_signal_unblock(block_all);
+    ex_signal_unblock(all);
 
-    if (ctx == &ex_context_buffer || ex_rethrow)
+    if (ctx == &ex_context_buffer)
         ex_terminate();
 
 #ifdef _WIN32
-    if (!is_empty((void_t)message))
+    if (!is_empty((void *)message))
         RaiseException(EXCEPTION_PANIC, 0, 0, 0);
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);
 }
 
 #ifdef _WIN32
-int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
-    string_t ex = 0;
+int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
+    const char *ex = 0;
     int i;
 
     for (i = 0; i < max_ex_sig; i++) {
-        if (ex_sig[ i ].ex == exception)
+        if (ex_sig[i].ex == exception)
             return EXCEPTION_EXECUTE_HANDLER;
     }
 
@@ -256,13 +276,8 @@ int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
 }
 
 int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
-    ex_context_t *ctx = ex_context;
-    if (!ctx) {
-        ex_init();
-        ctx = ex_context;
-    }
-
-    string_t ex = 0;
+    ex_context_t *ctx = ex_init();
+    const char *ex = 0;
     int i;
 
     if (code == EXCEPTION_PANIC) {
@@ -271,15 +286,15 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     }
 
     for (i = 0; i < max_ex_sig; i++) {
-        if (ex_sig[ i ].seh == code) {
+        if (ex_sig[i].seh == code) {
             ctx->state = ex_throw_st;
-            ctx->ex = ex_sig[ i ].ex;
+            ctx->ex = ex_sig[i].ex;
             ctx->file = "unknown";
             ctx->line = 0;
             ctx->function = NULL;
 
-            ctx->co = co_active();
-            ctx->co->err = (void_t)ctx->ex;
+            if (exception_setup_func)
+                exception_setup_func(ctx, ctx->ex, NULL);
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }
@@ -287,25 +302,25 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-void ex_signal_seh(DWORD sig, string_t ex) {
+void ex_signal_seh(DWORD sig, const char *ex) {
     int i;
 
     for (i = 0; i < max_ex_sig; i++)
-        if (!ex_sig[ i ].ex || ex_sig[ i ].seh == sig)
+        if (!ex_sig[i].ex || ex_sig[i].seh == sig)
             break;
 
     if (i == max_ex_sig)
         printf_stderr(
-                "Cannot install exception handler for signal no %d (%s), "
-                "too many signal exception handlers installed (max %d)\n",
-                sig, ex, max_ex_sig);
+            "Cannot install exception handler for signal no %d (%s), "
+            "too many signal exception handlers installed (max %d)\n",
+            sig, ex, max_ex_sig);
     else
-        ex_sig[ i ].ex = ex, ex_sig[ i ].seh = sig;
+        ex_sig[i].ex = ex, ex_sig[i].seh = sig;
 }
 #endif
 
 void ex_handler(int sig) {
-    string_t ex = NULL;
+    const char *ex = NULL;
     int i;
 
     got_signal = true;
@@ -331,7 +346,7 @@ void ex_handler(int sig) {
     ex_throw(ex, "unknown", 0, NULL, NULL);
 }
 
-void ex_signal(int sig, string_t ex) {
+void ex_signal(int sig, const char *ex) {
     int i;
 
     for (i = 0; i < max_ex_sig; i++) {
@@ -366,7 +381,9 @@ void ex_signal(int sig, string_t ex) {
         printf_stderr("Cannot install handler for signal no %d (%s)\n",
                 sig, ex);
     else
-        ex_sig[ i ].ex = ex, ex_sig[ i ].sig = sig;
+        ex_sig[i].ex = ex, ex_sig[i].sig = sig;
+
+    exception_signal_set = true;
 #endif
 }
 

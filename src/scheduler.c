@@ -72,6 +72,14 @@ void coroutine_state(char *, ...);
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
 
+void coroutine_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
+    routine_t *co = co_active();
+    co->scope->err = (void_t)ex;
+    co->scope->panic = message;
+    ex_data_set(ctx, (void_t)co);
+    ex_unwind_set(ctx, co->scope->is_protected);
+}
+
 #if defined(_MSC_VER) && defined(NO_GETTIMEOFDAY)
 int gettimeofday(struct timeval *tp, struct timezone *tzp) {
     /*
@@ -129,7 +137,7 @@ static void co_awaitable() {
         }
     } catch_any {
         co_deferred_free(co);
-        if (!co->err_recovered)
+        if (!co->scope->is_recovered)
             rethrow();
         else
             ex_flags_reset();
@@ -156,10 +164,6 @@ static void co_func() {
 /* Utility for aligning addresses. */
 static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align) {
     return (addr + (align - 1)) & ~(align - 1);
-}
-
-static CO_FORCE_INLINE int co_deferred_array_init(defer_t *array) {
-    return co_array_init((co_array_t *)array);
 }
 
 uv_loop_t *co_loop() {
@@ -875,7 +879,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     }
 #endif
 
-    if (UNLIKELY(co_deferred_array_init(&co->defer) < 0)) {
+    if (UNLIKELY(raii_deferred_init(&co->scope->defer) < 0)) {
         CO_FREE(co);
         return (routine_t *)-1;
     }
@@ -900,6 +904,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->user_data = NULL;
     co->cycles = 0;
     co->results = NULL;
+    co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CO_MAGIC_NUMBER;
 
@@ -1163,7 +1168,7 @@ void coroutine_info() {
     routine_t *t;
     char *extra;
 
-    printf_stderr("\nCoroutine list:\n");
+    printf_stderr("Coroutine list:\n");
     for (i = 0; i < n_all_coroutine; i++) {
         t = all_coroutine[i];
         if (t == co_running)
@@ -1175,6 +1180,7 @@ void coroutine_info() {
 
         printf_stderr("%6d%c %-20s %s%s cycles: %zu %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->cycles, t->status);
     }
+    printf_stderr("\n\n");
 }
 
 void coroutine_update(routine_t *t) {
@@ -1280,6 +1286,10 @@ static void_t coroutine_main(void_t v) {
 int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
+    exception_setup_func = coroutine_unwind_setup;
+    exception_unwind_func = (ex_unwind_func)co_deferred_free;
+    exception_ctrl_c_func = (ex_terminate_func)coroutine_info;
+    exception_terminate_func = (ex_terminate_func)coroutine_cleanup;
 #ifdef UV_H
     CO_INFO("System starting up: %s\n\n", co_system_uname());
 #endif

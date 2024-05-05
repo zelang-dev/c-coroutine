@@ -49,7 +49,7 @@ extern "C" {
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
-    #include "unistd.h"
+    #include "compat/unistd.h"
 #else
     #include <unistd.h>
 #endif
@@ -201,26 +201,21 @@ PRINTF_VISIBILITY
 int vfctprintf(void (*out)(char c, void *extra_arg), void *extra_arg, const char *format, va_list arg) ATTR_VPRINTF(3);
 
 int printf_stderr(const char *_format, ...);
+
 #define puts_(s)  printf_("%s\n", s)
-#ifdef __cplusplus
-} // extern "C"
+#define printf     printf_
+#define vprintf    vprintf_
+#define sprintf    sprintf_
+#define vsprintf   vsprintf_
+#define puts       puts_
+#if !defined(_WIN32)
+    #define snprintf snprintf_
+    #define vsnprintf vsnprintf_
+    #define vprintf vprintf_
 #endif
 
-#if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD
-# undef printf_
-# undef sprintf_
-# undef vsprintf_
-# undef snprintf_
-# undef vsnprintf_
-# undef vprintf_
-#else
-#if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_SOFT
-# define printf     printf_
-# define vprintf    vprintf_
-# define sprintf    sprintf_
-# define vsprintf   vsprintf_
-# define puts       puts_
-#endif
+#ifdef __cplusplus
+} // extern "C"
 #endif
 
 #endif  // PRINTF_H_

@@ -115,7 +115,7 @@ static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
     if (!is_empty((void_t)co_message())) {
-        co->err_recovered = true;
+        co->scope->is_recovered = true;
         if (uv_loop_alive(co_loop()) && uv_server_args) {
             co->halt = true;
             co->loop_erred = true;

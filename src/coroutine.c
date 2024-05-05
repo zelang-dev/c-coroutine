@@ -1,5 +1,24 @@
 #include "../include/coroutine.h"
 
+static thread_local gc_coroutine_t *coroutine_list = NULL;
+
+void gc_coroutine(routine_t *co) {
+    if (!coroutine_list)
+        coroutine_list = (gc_coroutine_t *)ht_group_init();
+
+    if (co->magic_number == CO_MAGIC_NUMBER)
+        hash_put(coroutine_list, co_itoa(co->cid), co);
+}
+
+void gc_coroutine_free() {
+    if (coroutine_list)
+        hash_free(coroutine_list);
+}
+
+CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
+    return coroutine_list;
+}
+
 void args_free(args_t *params) {
     if (is_type(params, CO_ARGS)) {
         CO_FREE(params->args);
@@ -19,7 +38,7 @@ value_t get_args(void_t *params, int item) {
 }
 
 CO_FORCE_INLINE value_t args_in(args_t *params, int index) {
-    return (index > -1 && index < params->n_args)
+    return (index > -1 && index < (int)params->n_args)
         ? params->args[index].value
         : ((generics_t *)0)->value;
 }
@@ -121,9 +140,6 @@ void co_delete(routine_t *co) {
             co->loop_active = false;
             co->synced = false;
         } else if (co->magic_number == CO_MAGIC_NUMBER) {
-            if (co->err_allocated)
-                CO_FREE(co->err_allocated);
-
             co->magic_number = -1;
             CO_FREE(co);
         }
@@ -333,66 +349,88 @@ struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
 }
 #endif
 
-unsigned int co_id() {
+CO_FORCE_INLINE unsigned int co_id() {
     return co_active()->cid;
 }
 
-signed int co_err_code() {
+CO_FORCE_INLINE signed int co_err_code() {
     return co_active()->loop_code;
 }
 
-char *co_get_name() {
+CO_FORCE_INLINE char *co_get_name() {
     return co_active()->name;
-}
-
-CO_FORCE_INLINE value_types type_of(void_t self) {
-    return ((var_t *)self)->type;
-}
-
-CO_FORCE_INLINE bool is_type(void_t self, value_types check) {
-    return type_of(self) == check;
-}
-
-CO_FORCE_INLINE bool is_instance_of(void_t self, void_t check) {
-    return type_of(self) == type_of(check);
-}
-
-CO_FORCE_INLINE bool is_value(void_t self) {
-    return (type_of(self) > CO_NULL) && (type_of(self) < CO_NONE);
-}
-
-CO_FORCE_INLINE bool is_instance(void_t self) {
-    return (type_of(self) > CO_NONE) && (type_of(self) < CO_NO_INSTANCE);
-}
-
-CO_FORCE_INLINE bool is_valid(void_t self) {
-    return is_value(self) || is_instance(self);
 }
 
 CO_FORCE_INLINE bool is_status_invalid(routine_t *task) {
     return (task->status > CO_EVENT || task->status < 0);
 }
 
-CO_FORCE_INLINE bool is_null(size_t self) {
-    return self == 0;
-}
-
-CO_FORCE_INLINE bool is_empty(void_t self) {
-    return self == NULL;
-}
-
-CO_FORCE_INLINE bool is_str_in(string_t text, string pattern) {
-    return co_strpos(text, pattern) >= 0;
-}
-
-CO_FORCE_INLINE bool is_str_eq(string_t str, string_t str2) {
-    return (str != NULL && str2 != NULL) && (strcmp(str, str2) == 0);
-}
-
-CO_FORCE_INLINE bool is_str_empty(string_t str) {
-    return is_str_eq(str, "");
-}
-
 CO_FORCE_INLINE bool is_tls(uv_handle_t *self) {
     return ((var_t *)self)->type == UV_TLS;
+}
+
+CO_FORCE_INLINE size_t co_deferred_count(routine_t *coro) {
+    return raii_deferred_count(coro->scope);
+}
+
+CO_FORCE_INLINE void co_deferred_free(routine_t *coro) {
+    raii_deferred_free(coro->scope);
+}
+
+CO_FORCE_INLINE size_t co_defer(func_t func, void_t data) {
+    return raii_deferred(co_active()->scope, func, data);
+}
+
+CO_FORCE_INLINE void co_recover(func_t func, void_t data) {
+    raii_recover_by(co_active()->scope, func, data);
+}
+
+bool co_catch(string_t err) {
+    routine_t *co = co_active();
+    string_t exception = (string_t)(!is_empty((void_t)co->scope->panic) ? co->scope->panic : co->scope->err);
+    co->scope->is_recovered = is_str_eq(err, exception);
+    return co->scope->is_recovered;
+}
+
+string_t co_message(void) {
+    routine_t *co = co_active();
+    return !is_empty((void_t)co->scope->panic) ? co->scope->panic : co->scope->err;
+}
+
+CO_FORCE_INLINE size_t co_deferred(routine_t *coro, func_t func, void_t data) {
+    return raii_deferred(coro->scope, func, data);
+}
+
+CO_FORCE_INLINE void co_defer_cancel(size_t index) {
+    raii_deferred_cancel(co_active()->scope, index);
+}
+
+CO_FORCE_INLINE void co_defer_fire(size_t index) {
+    raii_deferred_fire(co_active()->scope, index);
+}
+
+CO_FORCE_INLINE void_t co_malloc_full(routine_t *coro, size_t size, func_t func) {
+    return malloc_full(coro->scope, size, func);
+}
+
+CO_FORCE_INLINE void_t co_calloc_full(routine_t *coro, int count, size_t size, func_t func) {
+    return calloc_full(coro->scope, count, size, func);
+}
+
+CO_FORCE_INLINE void_t co_new_by(int count, size_t size) {
+    return co_calloc_full(co_active(), count, size, CO_FREE);
+}
+
+CO_FORCE_INLINE void_t co_new(size_t size) {
+    return co_malloc_full(co_active(), size, CO_FREE);
+}
+
+CO_FORCE_INLINE void_t co_malloc(routine_t *coro, size_t size) {
+    return co_malloc_full(coro, size, CO_FREE);
+}
+
+CO_FORCE_INLINE void_t co_memdup(routine_t *coro, const_t src, size_t len) {
+    void_t ptr = co_new_by(1, len + 1);
+
+    return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;
 }

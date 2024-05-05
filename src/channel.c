@@ -1,6 +1,24 @@
 #include "../include/coroutine.h"
 
 static thread_local int channel_id_generate = 0;
+static thread_local gc_channel_t *channel_list = NULL;
+
+void gc_channel(channel_t *ch) {
+    if (!channel_list)
+        channel_list = ht_channel_init();
+
+    if (is_type(ch, CO_CHANNEL))
+        hash_put(channel_list, co_itoa(ch->id), ch);
+}
+
+CO_FORCE_INLINE gc_channel_t *gc_channel_list() {
+    return channel_list;
+}
+
+void gc_channel_free() {
+    if (channel_list)
+        hash_free(channel_list);
+}
 
 channel_t *channel_create(int elem_size, int bufsize) {
     channel_t *c = try_calloc(1, sizeof(channel_t) + bufsize * elem_size);
@@ -238,7 +256,7 @@ static int channel_proc(channel_co_t *a) {
         c = a[ i ].c;
 
         CO_INFO(" %c:", "esrnb"[ a[ i ].op ]);
-#ifdef CO_DEBUG
+#ifdef NDEBUG
         if (c->name)
             printf("%s", c->name);
         else
@@ -257,7 +275,7 @@ static int channel_proc(channel_co_t *a) {
                 if (j-- == 0) {
                     c = a[ i ].c;
                     CO_INFO(" => %c:", "esrnb"[ a[ i ].op ]);
-#ifdef CO_DEBUG
+#ifdef NDEBUG
                     if (c->name)
                         printf("%s", c->name);
                     else

@@ -6,8 +6,6 @@
 #endif
 
 #include <errno.h>
-#include <setjmp.h>
-#include <signal.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdint.h>
@@ -25,8 +23,7 @@
 #endif
 
 #include "uv_routine.h"
-#define PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_SOFT 1
-#include "compat/printf.h"
+#include "raii.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/sys/time.h"
@@ -69,7 +66,7 @@
     #endif
 #endif
 
-#ifdef CO_DEBUG
+#ifdef NDEBUG
     #define CO_LOG(s) puts_(s)
     #define CO_INFO(s, ...) printf_(s, __VA_ARGS__ )
     #define CO_HERE() printf_stderr("Here %s:%d\n", __FILE__, __LINE__)
@@ -104,7 +101,7 @@
 #endif
 
 #ifndef CO_ASSERT
-  #if defined(CO_DEBUG)
+  #if defined(NDEBUG)
     #include <assert.h>
     #define CO_ASSERT(c) assert(c)
   #else
@@ -250,15 +247,6 @@
 #include <valgrind/valgrind.h>
 #endif
 
-#ifndef __builtin_expect
-#define __builtin_expect(x, y) (x)
-#endif
-
-#define LIKELY_IS(x, y) __builtin_expect((x), (y))
-#define LIKELY(x) LIKELY_IS(!!(x), 1)
-#define UNLIKELY(x) LIKELY_IS((x), 0)
-#define INCREMENT 16
-
 #ifndef MAX
 # define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
@@ -349,37 +337,9 @@ typedef const char *string_t;
 typedef unsigned char *u_string;
 typedef const unsigned char *u_string_t;
 typedef const unsigned char u_char_t;
-typedef struct {
-    value_types type;
-    void_t value;
-} var_t;
 
 typedef void_t(*callable_t)(void_t);
-typedef void (*func_t)(void_t);
 typedef void (*any_func_t)(void_t, ...);
-typedef struct {
-    value_types type;
-    void_t value;
-    func_t dtor;
-} object_t;
-
-typedef struct {
-    value_types type;
-    void_t base;
-    size_t elements;
-} co_array_t;
-
-typedef struct {
-    value_types type;
-    co_array_t base;
-} defer_t;
-
-typedef struct {
-    value_types type;
-    func_t func;
-    void_t data;
-    void_t check;
-} defer_func_t;
 
 /* Coroutine states. */
 typedef enum co_state
@@ -395,8 +355,6 @@ typedef enum co_state
 
 typedef struct routine_s routine_t;
 typedef struct oa_hash_s hash_t;
-typedef struct ex_ptr_s ex_ptr_t;
-typedef struct ex_context_s ex_context_t;
 typedef struct json_value_t json_t;
 typedef hash_t ht_string_t;
 typedef hash_t wait_group_t;
@@ -520,7 +478,6 @@ struct routine_s {
     size_t stack_size;
     co_state status;
     callable_t func;
-    defer_t defer;
     char name[ 64 ];
     char state[ 64 ];
     char scrape[ CO_SCRAPE_SIZE ];
@@ -556,11 +513,7 @@ struct routine_s {
     void_t args;
     /* Coroutine result of function return/exit. */
     void_t results;
-    void_t volatile err;
-    const char *volatile panic;
-    bool err_recovered;
-    bool err_protected;
-    ex_ptr_t *err_allocated;
+    memory_t scope[1];
     /* Used to check stack overflow. */
     size_t magic_number;
 };
@@ -803,7 +756,7 @@ C_API size_t co_defer(func_t, void_t);
 C_API void co_defer_cancel(size_t index);
 C_API void co_defer_fire(size_t index);
 C_API size_t co_deferred(routine_t *, func_t, void_t);
-C_API size_t co_deferred_count(const routine_t *);
+C_API size_t co_deferred_count(routine_t *);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
 you must call `co_catch` inside function to mark Error condition handled. */
@@ -852,7 +805,6 @@ C_API string trim(string s);
 C_API u_string base64_encode(u_string_t src);
 C_API u_string base64_decode(u_string_t src);
 
-C_API int co_array_init(co_array_t *);
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *channel(void);
@@ -1003,241 +955,6 @@ C_API void co_result_set(routine_t *, void_t);
 
 C_API void delete(void_t ptr);
 
-#define EX_CAT(a, b) a ## b
-
-#define EX_STR_(a) #a
-#define EX_STR(a) EX_STR_(a)
-
-#define EX_NAME(e) EX_CAT(ex_err_, e)
-#define EX_PNAME(p) EX_CAT(ex_protected_, p)
-
-#define EX_MAKE()                                              \
-    string_t const err = ((void)err, ex_err.ex);             \
-    string_t const err_file = ((void)err_file, ex_err.file); \
-    const int err_line = ((void)err_line, ex_err.line)
-
-#ifdef sigsetjmp
-    #define ex_jmp_buf         sigjmp_buf
-    #define ex_setjmp(buf)    sigsetjmp(buf,1)
-    #define ex_longjmp(buf,st) siglongjmp(buf,st)
-#else
-    #define ex_jmp_buf         jmp_buf
-    #define ex_setjmp(buf)    setjmp(buf)
-    #define ex_longjmp(buf,st) longjmp(buf,st)
-#endif
-
-#define EX_EXCEPTION(E) \
-    const char EX_NAME(E)[] = EX_STR(E)
-
-#define rethrow() \
-    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, "rethrow")
-
-#ifdef _WIN32
-#define ex_signal_block(ctrl)                  \
-    CRITICAL_SECTION ctrl##__FUNCTION__; \
-    InitializeCriticalSection(&ctrl##__FUNCTION__); \
-    EnterCriticalSection(&ctrl##__FUNCTION__);
-
-#define ex_signal_unblock(ctrl)                  \
-    LeaveCriticalSection(&ctrl##__FUNCTION__); \
-    DeleteCriticalSection(&ctrl##__FUNCTION__);
-
-#define ex_try                                \
-    {                                         \
-        /* local context */                   \
-        ex_context_t ex_err;                  \
-        if (!ex_context)                      \
-            ex_init();                        \
-        ex_err.next = ex_context;             \
-        ex_err.stack = 0;                     \
-        ex_err.ex = 0;                        \
-        ex_err.unstack = 0;                   \
-        /* global context updated */          \
-        ex_context = &ex_err;                 \
-        /* save jump location */              \
-        ex_err.state = ex_setjmp(ex_err.buf); \
-    __try                                     \
-    {                                         \
-        if (ex_err.state == ex_try_st)        \
-            {
-
-#define ex_catch_any                    \
-    }                                \
-    }                                \
-    __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {\
-    if (ex_err.state == ex_throw_st) \
-        {                            \
-            EX_MAKE();               \
-            ex_err.state = ex_catch_st;
-
-#define ex_finally                          \
-    }                                      \
-    }                                    \
-        {                                \
-            EX_MAKE();                   \
-            /* global context updated */ \
-            ex_context = ex_err.next;
-
-#define ex_end_try                            \
-    }                                      \
-    if (ex_context == &ex_err)             \
-        /* global context updated */       \
-        ex_context = ex_err.next;          \
-    if ((ex_err.state & ex_throw_st) != 0) \
-        rethrow();                         \
-    }
-
-#else
-#define ex_signal_block(ctrl)                  \
-    sigset_t ctrl##__FUNCTION__, ctrl_all##__FUNCTION__; \
-    sigfillset(&ctrl##__FUNCTION__); \
-    pthread_sigmask(SIG_SETMASK, &ctrl##__FUNCTION__, &ctrl_all##__FUNCTION__);
-
-#define ex_signal_unblock(ctrl)                  \
-    pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
-
-#define ex_try                               \
-    {                                         \
-        /* local context */                   \
-        ex_context_t ex_err;                  \
-        if (!ex_context)                      \
-            ex_init();                        \
-        ex_err.next = ex_context;             \
-        ex_err.stack = 0;                     \
-        ex_err.ex = 0;                        \
-        ex_err.unstack = 0;                   \
-        /* global context updated */          \
-        ex_context = &ex_err;                 \
-        /* save jump location */              \
-        ex_err.state = ex_setjmp(ex_err.buf); \
-        if (ex_err.state == ex_try_st)        \
-        {                                     \
-            {
-
-#define ex_catch_any                    \
-    }                                \
-    }                                \
-    if (ex_err.state == ex_throw_st) \
-    {                                \
-        {                            \
-            EX_MAKE();               \
-            ex_err.state = ex_catch_st;
-
-#define ex_finally                          \
-    }                                    \
-    }                                    \
-    {                                    \
-        {                                \
-            EX_MAKE();                   \
-            /* global context updated */ \
-            ex_context = ex_err.next;
-
-#define ex_end_try                            \
-    }                                      \
-    }                                      \
-    if (ex_context == &ex_err)             \
-        /* global context updated */       \
-        ex_context = ex_err.next;          \
-    if ((ex_err.state & ex_throw_st) != 0) \
-        rethrow();                         \
-    }
-#endif
-
-#define ex_catch(E)                        \
-    }                                   \
-    }                                   \
-    if (ex_err.state == ex_throw_st)    \
-    {                                   \
-        extern const char EX_NAME(E)[]; \
-        if (ex_err.ex == EX_NAME(E))    \
-        {                               \
-            EX_MAKE();                  \
-            ex_err.state = ex_catch_st;
-
-#define ex_throw_loc(E, F, L, C)           \
-    do                                  \
-    {                                   \
-        extern const char EX_NAME(E)[]; \
-        ex_throw(EX_NAME(E), F, L, C, NULL);     \
-    } while (0)
-
-#define throw(E) \
-    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
-
-/* An macro that stops the ordinary flow of control and begins panicking,
-throws an exception of given message. */
-#define co_panic(message)                                                      \
-    do                                                                         \
-    {                                                                          \
-        extern const char EX_NAME(panic)[];                                    \
-        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message)); \
-    } while (0)
-
-C_API void ex_handler(int sig);
-C_API void ex_throw(string_t, string_t, int, string_t, string_t);
-C_API void ex_init(void);
-C_API void ex_flags_reset(void);
-C_API void ex_signal(int sig, string_t ex);
-C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void_t ptr, void (*func)(void_t));
-#ifdef _WIN32
-#define EXCEPTION_PANIC       0xE0000001
-C_API void ex_signal_seh(DWORD sig, string_t ex);
-C_API int catch_seh(string_t exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
-C_API int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
-#endif
-
-/* Convert signals into exceptions */
-C_API void ex_signal_setup(void);
-
-enum
-{
-    ex_try_st,
-    ex_throw_st,
-    ex_catch_st
-};
-
-/* stack of protected pointer */
-struct ex_ptr_s
-{
-    value_types type;
-    ex_ptr_t *next;
-    func_t func;
-    void_t *ptr;
-};
-
-/* stack of exception */
-struct ex_context_s
-{
-    value_types type;
-    /* The handler in the stack (which is a FILO container). */
-    ex_context_t *next;
-    ex_ptr_t *stack;
-    routine_t *co;
-
-    /** The function from which the exception was thrown */
-    const char *volatile function;
-
-    /** The name of this exception */
-    const char *volatile ex;
-
-    /* The file from whence this handler was made, in order to backtrace it later (if we want to). */
-    const char *volatile file;
-
-    /* The line from whence this handler was made, in order to backtrace it later (if we want to). */
-    int volatile line;
-
-    /* Which is our active state? */
-    int volatile state;
-
-    int unstack;
-
-    /* The program state in which the handler was created, and the one to which it shall return. */
-    ex_jmp_buf buf;
-};
-
-C_API thread_local ex_context_t *ex_context;
-C_API ex_context_t *ex_context_co;
-C_API thread_local char ex_message[256];
 C_API thread_local int coroutine_count;
 C_API thread_local bool scheduler_info_log;
 C_API thread_local uv_args_t *uv_server_args;
@@ -1368,16 +1085,7 @@ C_API string json_for(string_t desc, ...);
 #define catch(e) ex_catch(e)
 #define end_try ex_end_try
 #define finally ex_finally
-
-/* Protects dynamically allocated memory against exceptions.
-If the object pointed by `ptr` changes before `unprotected()`,
-the new object will be automatically protected.
-
-If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
-#define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_protect_ptr(&EX_PNAME(ptr), &ptr, func)
-
-/* Remove memory pointer protection, does not free the memory. */
-#define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
+#define co_panic raii_panic
 
 /* invalid address indicator */
 #define CO_ERROR ((void_t)-1)
@@ -1486,24 +1194,9 @@ Must also closed out with `select_break()`. */
 #define as_instance(variable, variable_type) variable_type *variable = (variable_type *)co_new_by(1, sizeof(variable_type)); \
     variable->type = CO_STRUCT;
 
-C_API value_types type_of(void_t);
-C_API bool is_type(void_t, value_types);
-C_API bool is_instance_of(void_t, void_t);
-C_API bool is_value(void_t);
-C_API bool is_instance(void_t);
-C_API bool is_valid(void_t);
-
-C_API bool is_status_invalid(routine_t *);
-C_API bool is_null(size_t);
-C_API bool is_empty(void_t);
-C_API bool is_str_in(string_t text, string pattern);
-C_API bool is_str_eq(string_t str, string_t str2);
-C_API bool is_str_empty(string_t str);
 C_API bool is_base64(u_string_t src);
 C_API bool is_tls(uv_handle_t *);
-
-C_API void_t try_calloc(int, size_t);
-C_API void_t try_malloc(size_t);
+C_API bool is_status_invalid(routine_t *);
 
 /* Write this function instead of `main`, this library provides its own main, the scheduler,
 which call this function as an coroutine! */

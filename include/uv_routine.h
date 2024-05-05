@@ -3,7 +3,7 @@
 
 #include <ctype.h>
 #include "uv_tls.h"
-#include "compat/parson.h"
+#include "parson.h"
 #include <stdbool.h>
 
 /* Public API qualifier. */

@@ -213,11 +213,11 @@ http_t *http_for(http_parser_type action, string hostname, double protocol) {
 }
 
 string http_response(http_t *this, string body, http_status status, string type, string extras) {
-    if (!is_null(status)) {
+    if (!is_zero(status)) {
         this->status = status;
     }
 
-    if (is_empty(body) && is_null(status)) {
+    if (is_empty(body) && is_zero(status)) {
         this->status = status = STATUS_NOT_FOUND;
     }
 
