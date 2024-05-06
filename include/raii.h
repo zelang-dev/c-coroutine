@@ -2,7 +2,32 @@
 #define RAII_H
 
 #include "exception.h"
+#if defined(_WIN32) || defined(_WIN64)
+    #include "compat/pthread.h"
+    #include "compat/sys/time.h"
+    #include <excpt.h>
+    #ifndef SYS_CONSOLE
+        /* O.S. physical ~input/output~ console `DEVICE`. */
+        #define SYS_CONSOLE "\\\\?\\CON"
+        /* O.S. physical ~null~ `DEVICE`. */
+        #define SYS_NULL "\\\\?\\NUL"
+        /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
+        #define SYS_PIPE "\\\\.\\pipe\\"
+    #endif
+#else
+    #include <pthread.h>
+    #ifndef SYS_CONSOLE
+        /* O.S. physical ~input/output~ console `DEVICE`. */
+        #define SYS_CONSOLE "/dev/tty"
+        /* O.S. physical ~null~ `DEVICE`. */
+        #define SYS_NULL "/dev/null"
+        /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
+        #define SYS_PIPE "./"
+    #endif
+    #include <libgen.h>
+#endif
 
+#include <time.h>
 #ifdef __cplusplus
     extern "C" {
 #endif
@@ -93,12 +118,12 @@ typedef union {
     void *object;
     func_t func;
     const char const_char[256];
-} raii_union_t;
+} values_type;
 
 typedef struct {
+    values_type value[1];
     raii_type type;
-    raii_union_t *value;
-} raii_value_t;
+} raii_values_t;
 
 typedef struct {
     raii_type type;
@@ -174,6 +199,9 @@ C_API bool raii_catch_by(memory_t *scope, const char *err);
 /* Get current error condition string. */
 C_API const char *raii_message(void);
 
+/* Get scoped error condition string. */
+C_API const char *raii_message_by(memory_t *scope);
+
 /* Defer execution `LIFO` of given function with argument,
 to the given `scoped smart pointer` destruction. */
 C_API size_t raii_deferred(memory_t *, func_t, void *);
@@ -201,7 +229,7 @@ C_API memory_t *raii_calloc_init(void);
 C_API void *malloc_arena(size_t size);
 C_API void *calloc_arena(int count, size_t size);
 
-
+C_API values_type *raii_value(void *);
 C_API raii_type type_of(void *);
 C_API bool is_type(void *, raii_type);
 C_API bool is_instance_of(void *, void *);
@@ -237,7 +265,11 @@ execution begins when current `guard` scope exits or panic/throw. */
 #define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _recover(scope, err)    raii_catch_by(scope, err)
+#define _recover(err)   raii_catch_by(raii_init()->arena, err)
+
+/* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
+#define _get_message()  raii_message_by(raii_init()->arena)
+#define _panic          raii_panic
 
 /* Makes a reference assignment of current scoped smart pointer. */
 #define _assign_ptr(scope)      memory_t *scope = _$##__FUNCTION__
@@ -278,7 +310,7 @@ to pass scope to `_recover`. */
 /* This ends an scoped guard section, it replaces `}`.
 On exit will begin executing deferred functions,
 return given `result` when done, use `NONE` for no return. */
-#define unguard(result)     \
+#define unguarded(result)     \
         } while (false);    \
         raii_deferred_free(_$##__FUNCTION__);   \
     } ex_catch_any {        \

@@ -448,6 +448,10 @@ const char *raii_message(void) {
     return !is_empty((void *)scope->panic) ? scope->panic : scope->err;
 }
 
+RAII_INLINE const char *raii_message_by(memory_t *scope) {
+    return !is_empty((void *)scope->panic) ? scope->panic : scope->err;
+}
+
 RAII_INLINE void raii_defer_cancel(size_t index) {
     raii_deferred_cancel(raii_init(), index);
 }
@@ -477,6 +481,14 @@ void guard_delete(memory_t *ptr) {
         RAII_FREE(ptr);
         ptr = NULL;
     }
+}
+
+values_type *raii_value(void *data) {
+    if (data)
+        return ((raii_values_t *)data)->value;
+
+    RAII_LOG("attempt to get value on null");
+    return ((raii_values_t *)0)->value;
 }
 
 int strpos(const char *text, char *pattern) {
