@@ -55,6 +55,16 @@
   #endif
 #endif
 
+#ifndef RAII_NO_INLINE
+  #ifdef __GNUC__
+    #define RAII_NO_INLINE __attribute__((noinline))
+  #elif defined(_MSC_VER)
+    #define RAII_NO_INLINE __declspec(noinline)
+  #else
+    #define RAII_NO_INLINE
+  #endif
+#endif
+
 #ifndef __builtin_expect
     #define __builtin_expect(x, y) (x)
 #endif
@@ -168,7 +178,7 @@ enum {
     ex_throw_st,
     ex_catch_st,
     ex_protected_st,
-    ex_context_st,
+    ex_context_st
 };
 
 /* some useful macros
@@ -218,7 +228,7 @@ enum {
     DeleteCriticalSection(&ctrl##__FUNCTION__);
 
 #define ex_try                                \
-    {                                         \
+{                                             \
         /* local context */                   \
         ex_context_t ex_err;                  \
         if (!ex_context)                      \
@@ -233,34 +243,53 @@ enum {
         ex_err.state = ex_setjmp(ex_err.buf); \
     __try                                     \
     {                                         \
-        if (ex_err.state == ex_try_st)        \
-            {
+        if (ex_err.state == ex_try_st)  {
 
-#define ex_catch_any                    \
-    }                                \
-    }                                \
-    __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {\
-    if (ex_err.state == ex_throw_st) \
-        {                            \
-            EX_MAKE();               \
+#define ex_catch(E)                     \
+        }                               \
+    } __except(catch_seh(E, GetExceptionCode(), GetExceptionInformation())) {   \
+        if (ex_err.state == ex_throw_st) {  \
+            EX_MAKE();                  \
             ex_err.state = ex_catch_st;
 
-#define ex_finally                          \
-    }                                       \
-    }                                    \
-        {                                \
-            EX_MAKE();                   \
-            /* global context updated */ \
+#define ex_catch_any                    \
+        }                               \
+    } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
+        if (ex_err.state == ex_throw_st) {  \
+            EX_MAKE();                  \
+            ex_err.state = ex_catch_st;
+
+#define ex_catch_if                     \
+        }                               \
+    } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
+        if (ex_err.state == ex_throw_st) {  \
+            EX_MAKE();
+
+#define ex_finally                      \
+    }                                   \
+    }                                   \
+        {                               \
+            EX_MAKE();                  \
+            /* global context updated */\
             ex_context = ex_err.next;
 
+#define ex_finality                      \
+        }                               \
+    } __finally  {                      \
+        EX_MAKE();                      \
+        /* global context updated */    \
+        ex_context = ex_err.next;
+
 #define ex_end_try                          \
-    }                                      \
-    if (ex_context == &ex_err)             \
-        /* global context updated */       \
-        ex_context = ex_err.next;          \
-    if ((ex_err.state & ex_throw_st) != 0) \
-        rethrow();                         \
+        }                                   \
+    if (ex_context == &ex_err)              \
+        /* global context updated */        \
+        ex_context = ex_err.next;           \
+    if ((ex_err.state & ex_throw_st) != 0)  \
+        rethrow();                          \
     }
+
+#define ex_end_trying   ex_end_try }
 
 #else
 #define ex_signal_block(ctrl)                  \
@@ -298,6 +327,14 @@ enum {
             EX_MAKE();               \
             ex_err.state = ex_catch_st;
 
+#define ex_catch_if                    \
+    }                                \
+    }                                \
+    if (ex_err.state == ex_throw_st) \
+    {                                \
+        {                            \
+            EX_MAKE();               \
+
 #define ex_finally                          \
     }                                    \
     }                                    \
@@ -316,7 +353,6 @@ enum {
     if ((ex_err.state & ex_throw_st) != 0) \
         rethrow();                         \
     }
-#endif
 
 #define ex_catch(E)                        \
     }                                   \
@@ -328,6 +364,7 @@ enum {
         {                               \
             EX_MAKE();                  \
             ex_err.state = ex_catch_st;
+#endif
 
 #define ex_throw_loc(E, F, L, C)           \
     do                                  \

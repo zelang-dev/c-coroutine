@@ -24,28 +24,6 @@
 
 #include "uv_routine.h"
 #include "raii.h"
-#if defined(_WIN32) || defined(_WIN64)
-    #include "compat/pthread.h"
-    #include "compat/sys/time.h"
-    #include <excpt.h>
-    /* O.S. physical ~input/output~ console `DEVICE`. */
-    #define SYS_CONSOLE "\\\\?\\CON"
-    /* O.S. physical ~null~ `DEVICE`. */
-    #define SYS_NULL "\\\\?\\NUL"
-    /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
-    #define SYS_PIPE "\\\\.\\pipe\\"
-#else
-    #include <pthread.h>
-    /* O.S. physical ~input/output~ console `DEVICE`. */
-    #define SYS_CONSOLE "/dev/tty"
-    /* O.S. physical ~null~ `DEVICE`. */
-    #define SYS_NULL "/dev/null"
-    /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
-    #define SYS_PIPE "./"
-    #include <libgen.h>
-#endif
-
-#include <time.h>
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
@@ -156,29 +134,11 @@
 #endif
 
 #ifndef CO_FORCE_INLINE
-  #ifdef _MSC_VER
-    #define CO_FORCE_INLINE __forceinline
-  #elif defined(__GNUC__)
-    #if defined(__STRICT_ANSI__)
-      #define CO_FORCE_INLINE __inline__ __attribute__((always_inline))
-    #else
-      #define CO_FORCE_INLINE inline __attribute__((always_inline))
-    #endif
-  #elif defined(__BORLANDC__) || defined(__DMC__) || defined(__SC__) || defined(__WATCOMC__) || defined(__LCC__) ||  defined(__DECC)
-    #define CO_FORCE_INLINE __inline
-  #else /* No inline support. */
-    #define CO_FORCE_INLINE
-  #endif
+    #define CO_FORCE_INLINE RAII_INLINE
 #endif
 
 #ifndef CO_NO_INLINE
-  #ifdef __GNUC__
-    #define CO_NO_INLINE __attribute__((noinline))
-  #elif defined(_MSC_VER)
-    #define CO_NO_INLINE __declspec(noinline)
-  #else
-    #define CO_NO_INLINE
-  #endif
+    #define CO_NO_INLINE RAII_NO_INLINE
 #endif
 
 /* In alignas(a), 'a' should be a power of two that is at least the type's
@@ -220,11 +180,10 @@
 #endif
 
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
-  #include <stdlib.h>
-  #define CO_MALLOC malloc
-  #define CO_FREE free
-  #define CO_REALLOC realloc
-  #define CO_CALLOC calloc
+    #define CO_MALLOC RAII_MALLOC
+    #define CO_FREE RAII_FREE
+    #define CO_REALLOC RAII_REALLOC
+    #define CO_CALLOC RAII_CALLOC
 #endif
 
 #if defined(__clang__)
@@ -1080,11 +1039,6 @@ C_API json_t *json_encode(string_t desc, ...);
 */
 C_API string json_for(string_t desc, ...);
 
-#define try ex_try
-#define catch_any ex_catch_any
-#define catch(e) ex_catch(e)
-#define end_try ex_end_try
-#define finally ex_finally
 #define co_panic raii_panic
 
 /* invalid address indicator */

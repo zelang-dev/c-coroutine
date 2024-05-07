@@ -1,7 +1,6 @@
 #ifndef RAII_H
 #define RAII_H
 
-#include "exception.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/pthread.h"
     #include "compat/sys/time.h"
@@ -27,6 +26,7 @@
     #include <libgen.h>
 #endif
 
+#include "exception.h"
 #include <time.h>
 #ifdef __cplusplus
     extern "C" {
@@ -35,6 +35,7 @@
 /* Smart memory pointer, the alloacted memory requested in `arena` field,
 all other fields private, this object binds any additional requests to it's lifetime. */
 typedef struct memory_s memory_t;
+typedef memory_t unique_t;
 typedef void (*func_t)(void *);
 
 typedef enum {
@@ -191,10 +192,10 @@ you must call `raii_catch` inside function to mark Error condition handled. */
 C_API void raii_recover_by(memory_t *, func_t, void *);
 
 /* Compare `err` to current error condition, will mark exception handled, if `true`. */
-C_API bool raii_catch(const char *err);
+C_API bool raii_caught(const char *err);
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-C_API bool raii_catch_by(memory_t *scope, const char *err);
+C_API bool raii_is_caught(unique_t *scope, const char *err);
 
 /* Get current error condition string. */
 C_API const char *raii_message(void);
@@ -214,8 +215,8 @@ C_API void *new_arena(memory_t *scope, size_t size);
 
 C_API memory_t *raii_calloc_full(int count, size_t size, func_t func);
 C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
-C_API memory_t *raii_new_by(int count, size_t size);
-C_API void *new_arena_by(memory_t *scope, int count, size_t size);
+C_API memory_t *raii_calloc(int count, size_t size);
+C_API void *calloc_by(memory_t *scope, int count, size_t size);
 
 C_API void raii_delete(memory_t *ptr);
 C_API void raii_destroy(void);
@@ -223,8 +224,8 @@ C_API void raii_destroy(void);
 C_API void raii_deferred_free(memory_t *);
 C_API void raii_deferred_clean(void);
 
-C_API memory_t *raii_malloc_init(void);
-C_API memory_t *raii_calloc_init(void);
+
+C_API unique_t *unique_init(void);
 
 C_API void *malloc_arena(size_t size);
 C_API void *calloc_arena(int count, size_t size);
@@ -268,11 +269,14 @@ execution begins when current `guard` scope exits or panic/throw. */
 #define _recover(err)   raii_catch_by(raii_init()->arena, err)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
+#define _is_caught(err)   raii_is_caught(raii_init()->arena, err)
+
+/* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
 #define _get_message()  raii_message_by(raii_init()->arena)
 #define _panic          raii_panic
 
 /* Makes a reference assignment of current scoped smart pointer. */
-#define _assign_ptr(scope)      memory_t *scope = _$##__FUNCTION__
+#define _assign_ptr(scope)      unique_t *scope = _$##__FUNCTION__
 
 /* Exit `guarded` section, begin executing deferred functions,
 return given `value` when done, use `NONE` for no return. */
@@ -284,7 +288,6 @@ return given `value` when done, use `NONE` for no return. */
         ex_context = ex_err.next;   \
     return value;
 
-#define block(type, name, ...)   type name(__VA_ARGS__)
 
 /* This creates an scoped guard section, it replaces `{`.
 Usage of: `_defer`, `_malloc`, `_calloc`, `_assign_ptr`
@@ -301,8 +304,8 @@ to pass scope to `_recover`. */
     ex_unwind_func uf##__FUNCTION__ = exception_unwind_func;    \
     exception_unwind_func = (ex_unwind_func)raii_deferred_free; \
     exception_setup_func = guard_set;                   \
-    memory_t *_$##__FUNCTION__ = raii_calloc_init();    \
-    (_$##__FUNCTION__)->status = RAII_GUARDED_STATUS; \
+    unique_t *_$##__FUNCTION__ = unique_init();         \
+    (_$##__FUNCTION__)->status = RAII_GUARDED_STATUS;   \
     raii_init()->arena = (void *)_$##__FUNCTION__;      \
     ex_try {                                            \
         do {
@@ -310,20 +313,64 @@ to pass scope to `_recover`. */
 /* This ends an scoped guard section, it replaces `}`.
 On exit will begin executing deferred functions,
 return given `result` when done, use `NONE` for no return. */
-#define unguarded(result)     \
-        } while (false);    \
-        raii_deferred_free(_$##__FUNCTION__);   \
-    } ex_catch_any {        \
-        if (!(_$##__FUNCTION__)->is_recovered)  \
-            ex_err.state = ex_throw_st;         \
-        if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR))) \
-            raii_deferred_free(_$##__FUNCTION__);   \
-    } ex_finally {      \
+#define unguarded(result)                                           \
+        } while (false);                                            \
+        raii_deferred_free(_$##__FUNCTION__);                       \
+    } ex_catch_if {                                                 \
+        if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
+            raii_deferred_free(_$##__FUNCTION__);                   \
+        if ((_$##__FUNCTION__)->is_recovered)                      \
+            ex_err.state = ex_catch_st;                             \
+    } ex_finally {                                                  \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
-        guard_delete(_$##__FUNCTION__); \
-    } ex_end_try;       \
-    return result;      \
+        guard_delete(_$##__FUNCTION__);                             \
+    } ex_end_try;                                                   \
+    return result;                                                  \
 }
+
+/* This ends an scoped guard section, it replaces `}`.
+On exit will begin executing deferred functions.
+    if (scope->is_recovered = is_str_eq(err, exception))
+        ex_init()->state = ex_catch_st; */
+#define guarded                                                     \
+        } while (false);                                            \
+        raii_deferred_free(_$##__FUNCTION__);                       \
+    } ex_catch_if {                                                \
+        if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
+            raii_deferred_free(_$##__FUNCTION__);                   \
+        if ((_$##__FUNCTION__)->is_recovered)                      \
+            ex_err.state = ex_catch_st;                             \
+    } ex_finally {                                                  \
+        guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
+        guard_delete(_$##__FUNCTION__);                             \
+    } ex_end_try;                                                   \
+}
+
+
+#define block(type, name, ...)          \
+    type name(__VA_ARGS__)              \
+    guard
+
+#define unblocked(result)               \
+    unguarded(result)
+
+#define blocked                         \
+    guarded
+
+#define try ex_try
+#define catch_any ex_catch_any
+#define catch_if ex_catch_if
+#define catch(e) ex_catch(e)
+#define end_try ex_end_try
+#define finally ex_finally
+
+#ifdef _WIN32
+    #define finality ex_finality
+    #define end_trying ex_end_trying
+#else
+    #define finality ex_finally
+    #define end_trying ex_end_try
+#endif
 
 C_API thread_local memory_t *raii_context;
 

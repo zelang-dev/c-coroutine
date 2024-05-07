@@ -78,6 +78,7 @@ EX_EXCEPTION(priv_instruction);
 EX_EXCEPTION(single_step);
 EX_EXCEPTION(stack_overflow);
 EX_EXCEPTION(invalid_handle);
+EX_EXCEPTION(bad_alloc);
 
 static thread_local ex_context_t ex_context_buffer;
 thread_local ex_context_t *ex_context = NULL;
@@ -264,12 +265,22 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
 
 #ifdef _WIN32
 int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
+    ex_context_t *ctx = ex_init();
     const char *ex = 0;
     int i;
 
     for (i = 0; i < max_ex_sig; i++) {
-        if (ex_sig[i].ex == exception)
+        if (ex_sig[i].ex == exception) {
+            ctx->state = ex_throw_st;
+            ctx->ex = ex_sig[i].ex;
+            ctx->file = "unknown";
+            ctx->line = 0;
+            ctx->function = NULL;
+
+            if (exception_setup_func)
+                exception_setup_func(ctx, ctx->ex, NULL);
             return EXCEPTION_EXECUTE_HANDLER;
+        }
     }
 
     return EXCEPTION_CONTINUE_SEARCH;

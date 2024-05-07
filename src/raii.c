@@ -134,24 +134,14 @@ void *try_malloc(size_t size) {
     return ptr;
 }
 
-memory_t *raii_malloc_init(void) {
-    memory_t *raii = try_malloc(sizeof(memory_t));
+unique_t *unique_init(void) {
+    unique_t *raii = try_calloc(1, sizeof(unique_t));
     if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
         raii_panic("Deferred initialization failed!");
 
     raii->arena = NULL;
     raii->protector = NULL;
     raii->is_protected = false;
-    raii->mid = -1;
-
-    return raii;
-}
-
-memory_t *raii_calloc_init(void) {
-    memory_t *raii = try_calloc(1, sizeof(memory_t));
-    if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
-        raii_panic("Deferred initialization failed!");
-
     raii->mid = -1;
     return raii;
 }
@@ -226,11 +216,11 @@ RAII_INLINE void *calloc_arena(int count, size_t size) {
     return calloc_full(raii_init(), count, size, RAII_FREE);
 }
 
-RAII_INLINE memory_t *raii_new_by(int count, size_t size) {
+RAII_INLINE memory_t *raii_calloc(int count, size_t size) {
     return raii_calloc_full(count, size, RAII_FREE);
 }
 
-RAII_INLINE void *new_arena_by(memory_t *scope, int count, size_t size) {
+RAII_INLINE void *calloc_by(memory_t *scope, int count, size_t size) {
     return calloc_full(scope, count, size, RAII_FREE);
 }
 
@@ -424,23 +414,15 @@ RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void *data) {
     raii_deferred_any(scope, func, data, (void *)"err");
 }
 
-bool raii_catch(const char *err) {
+bool raii_caught(const char *err) {
     memory_t *scope = raii_init();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    scope->is_recovered = is_str_eq(err, exception);
-    if (scope->is_recovered)
-        ex_init()->state = ex_catch_st;
-
-    return scope->is_recovered;
+    return scope->is_recovered = is_str_eq(err, exception);
 }
 
-bool raii_catch_by(memory_t *scope, const char *err) {
+bool raii_is_caught(unique_t *scope, const char *err) {
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    scope->is_recovered = is_str_eq(err, exception);
-    if (scope->is_recovered)
-        ex_init()->state = ex_catch_st;
-
-    return scope->is_recovered;
+    return scope->is_recovered = is_str_eq(err, exception);
 }
 
 const char *raii_message(void) {
@@ -520,7 +502,7 @@ RAII_INLINE raii_type type_of(void *self) {
 }
 
 RAII_INLINE bool is_guard(void *self) {
-    return !is_empty(self) && ((memory_t *)self)->status == RAII_GUARDED_STATUS;
+    return !is_empty(self) && ((unique_t *)self)->status == RAII_GUARDED_STATUS;
 }
 
 RAII_INLINE bool is_type(void *self, raii_type check) {
