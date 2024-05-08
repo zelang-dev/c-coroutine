@@ -27,6 +27,7 @@ file(GLOB lib_files
 add_definitions(-DCO_SCRAPE_SIZE=64)
 add_definitions(-DHASH_INIT_CAPACITY=512)
 add_library(coroutine STATIC ${lib_files})
+set_property(TARGET coroutine PROPERTY POSITION_INDEPENDENT_CODE True)
 target_link_libraries(coroutine PUBLIC uv_a)
 
 find_package(OpenSSL 0.9.8...<3.0.0)
@@ -48,21 +49,20 @@ endif()
 
 target_include_directories(coroutine
     AFTER PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D NDEBUG -D CO_USE_VALGRIND ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
-    find_package(Threads)
-    target_link_libraries(coroutine PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 if(WIN32)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D NDEBUG")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DPTW32_STATIC_LIB")
-    add_definitions(-DPTW32_STATIC_LIB -D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
-    add_subdirectory(deps/pthreads4w)
-    target_link_libraries(coroutine PUBLIC pthreadVSE3)
 endif()
+
+find_package(Threads REQUIRED)
+target_link_libraries(coroutine ${CMAKE_THREAD_LIBS_INIT})
 
 if(CO_BUILD_TESTS)
     add_subdirectory(examples)

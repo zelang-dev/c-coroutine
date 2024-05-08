@@ -154,19 +154,21 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 }
 
 static void ex_print(ex_context_t *exception, const char *message) {
+    fflush(stdout);
 #ifndef NDEBUG
-    printf_stderr("\nFatal Error: %s in function(%s)\n\n",
+    fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
                   ((void *)exception->panic != NULL ? exception->panic : exception->ex), exception->function);
 #else
-    printf_stderr("\n%s: %s\n", message, (exception->panic != NULL ? exception->panic : exception->ex));
+    fprintf(stderr, "\n%s: %s\n", message, (exception->panic != NULL ? exception->panic : exception->ex));
     if (exception->file != NULL) {
         if (exception->function != NULL) {
-            printf_stderr("    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
+            fprintf(stderr, "    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
         } else {
-            printf_stderr("    thrown at %s:%d\n\n", exception->file, exception->line);
+            fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
         }
     }
 #endif
+    fflush(stderr);
 }
 
 void ex_unwind_set(ex_context_t *ctx, bool flag) {
@@ -214,9 +216,9 @@ int ex_uncaught_exception(void) {
 
 void ex_terminate(void) {
     if (ex_uncaught_exception() || got_uncaught_exception)
-        ex_print(ex_context, "Exception during stack unwinding leading to an undefined behavior");
+        ex_print(ex_context, "\nException during stack unwinding leading to an undefined behavior");
     else
-        ex_print(ex_context, "Exiting with uncaught exception");
+        ex_print(ex_context, "\nExiting with uncaught exception");
 
     if (got_ctrl_c && exception_ctrl_c_func) {
         got_ctrl_c = false;
@@ -321,7 +323,7 @@ void ex_signal_seh(DWORD sig, const char *ex) {
             break;
 
     if (i == max_ex_sig)
-        printf_stderr(
+        fprintf(stderr,
             "Cannot install exception handler for signal no %d (%s), "
             "too many signal exception handlers installed (max %d)\n",
             sig, ex, max_ex_sig);
@@ -343,7 +345,7 @@ void ex_handler(int sig) {
      * Make signal handlers persistent.
      */
     if (signal(sig, ex_handler) == SIG_ERR)
-        printf_stderr("Cannot reinstall handler for signal no %d (%s)\n",
+        fprintf(stderr, "Cannot reinstall handler for signal no %d (%s)\n",
                 sig, ex);
 #endif
 
@@ -366,7 +368,7 @@ void ex_signal(int sig, const char *ex) {
     }
 
     if (i == max_ex_sig) {
-        printf_stderr(
+        fprintf(stderr,
                 "Cannot install exception handler for signal no %d (%s), "
                 "too many signal exception handlers installed (max %d)\n",
                 sig, ex, max_ex_sig);
@@ -375,7 +377,7 @@ void ex_signal(int sig, const char *ex) {
 
 #if defined(_WIN32) || defined(_WIN64)
     if (signal(sig, ex_handler) == SIG_ERR)
-        printf_stderr("Cannot install handler for signal no %d (%s)\n",
+        fprintf(stderr, "Cannot install handler for signal no %d (%s)\n",
                       sig, ex);
     else
         ex_sig[i].ex = ex, ex_sig[i].sig = sig;
@@ -386,10 +388,10 @@ void ex_signal(int sig, const char *ex) {
     ex_sig_sa.sa_handler = ex_handler;
     ex_sig_sa.sa_flags = SA_RESTART;
     if (sigemptyset(&ex_sig_sa.sa_mask) != 0)
-        printf_stderr("Cannot setup handler for signal no %d (%s)\n",
+        fprintf(stderr, "Cannot setup handler for signal no %d (%s)\n",
                       sig, ex);
     else if (sigaction(sig, &ex_sig_sa, NULL) != 0)
-        printf_stderr("Cannot install handler for signal no %d (%s)\n",
+        fprintf(stderr, "Cannot install handler for signal no %d (%s)\n",
                 sig, ex);
     else
         ex_sig[i].ex = ex, ex_sig[i].sig = sig;

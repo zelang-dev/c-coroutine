@@ -2,9 +2,9 @@
 
 string_t co_itoa(int64_t number) {
 #ifdef _WIN32
-    snprintf_(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
+    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
 #else
-    snprintf_(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
+    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
 #endif
     return co_active()->scrape;
 }

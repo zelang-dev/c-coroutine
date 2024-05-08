@@ -16,8 +16,6 @@
     #include <sys/resource.h> /* setrlimit() */
 #endif
 
-#include "printf.h"
-
 /* exception config
  */
 #if defined(__GNUC__) && (!defined(_WIN32) || !defined(_WIN64))
@@ -88,9 +86,9 @@
 #endif
 
 #ifdef NDEBUG
-    #define RAII_LOG(s) puts_(s)
-    #define RAII_INFO(s, ...) printf_(s, __VA_ARGS__ )
-    #define RAII_HERE() printf_stderr("Here %s:%d\n", __FILE__, __LINE__)
+    #define RAII_LOG(s) puts(s)
+    #define RAII_INFO(s, ...) printf(s, __VA_ARGS__ )
+    #define RAII_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
 #else
     #define RAII_LOG(s) (void)s
     #define RAII_INFO(s, ...)  (void)s

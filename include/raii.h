@@ -2,7 +2,6 @@
 #define RAII_H
 
 #if defined(_WIN32) || defined(_WIN64)
-    #include "compat/pthread.h"
     #include "compat/sys/time.h"
     #include <excpt.h>
     #ifndef SYS_CONSOLE
@@ -14,7 +13,6 @@
         #define SYS_PIPE "\\\\.\\pipe\\"
     #endif
 #else
-    #include <pthread.h>
     #ifndef SYS_CONSOLE
         /* O.S. physical ~input/output~ console `DEVICE`. */
         #define SYS_CONSOLE "/dev/tty"
@@ -27,6 +25,7 @@
 #endif
 
 #include "exception.h"
+#include <stdio.h>
 #include <time.h>
 #ifdef __cplusplus
     extern "C" {

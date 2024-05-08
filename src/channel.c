@@ -130,7 +130,7 @@ static void channel_co_dequeue(channel_co_t *a) {
 
     ar = channel_msg(a->c, a->op);
     if (is_empty(ar)) {
-        snprintf_(ex_message, 256, "bad use of channel_co_dequeue op=%d\n", a->op);
+        snprintf(ex_message, 256, "bad use of channel_co_dequeue op=%d\n", a->op);
         co_panic(ex_message);
     }
 

@@ -24,6 +24,7 @@
 
 #include "uv_routine.h"
 #include "raii.h"
+#include "cthread.h"
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
@@ -45,9 +46,9 @@
 #endif
 
 #ifdef NDEBUG
-    #define CO_LOG(s) puts_(s)
-    #define CO_INFO(s, ...) printf_(s, __VA_ARGS__ )
-    #define CO_HERE() printf_stderr("Here %s:%d\n", __FILE__, __LINE__)
+    #define CO_LOG(s) puts(s)
+    #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
+    #define CO_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
 #else
     #define CO_LOG(s) (void)s
     #define CO_INFO(s, ...)  (void)s
@@ -298,6 +299,7 @@ typedef const unsigned char *u_string_t;
 typedef const unsigned char u_char_t;
 
 typedef void_t(*callable_t)(void_t);
+typedef int (*thrd_func_t)(void *);
 typedef void (*any_func_t)(void_t, ...);
 
 /* Coroutine states. */
@@ -922,8 +924,8 @@ typedef struct _promise
 {
     value_types type;
     values_t *result;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
+    mtx_t mutex;
+    cnd_t cond;
     bool done;
     int id;
 } promise;
@@ -931,9 +933,8 @@ typedef struct _promise
 typedef struct _future
 {
     value_types type;
-    pthread_t thread;
-    pthread_attr_t attr;
-    callable_t func;
+    thrd_t thread;
+    thrd_func_t func;
     int id;
     promise *value;
 } future;
@@ -941,23 +942,22 @@ typedef struct _future
 typedef struct _future_arg
 {
     value_types type;
-    callable_t func;
+    thrd_func_t func;
     void_t arg;
     promise *value;
 } future_arg;
 
 C_API future *future_create(callable_t);
 C_API void future_start(future *, void_t);
-C_API void future_stop(future *);
 C_API void future_close(future *);
 
 C_API promise *promise_create();
 C_API value_t promise_get(promise *);
-C_API void promise_set(promise *, void_t);
+C_API void promise_set(promise *, int);
 C_API bool promise_done(promise *);
 C_API void promise_close(promise *);
 
-/* Calls fn (with args as arguments) in separated thread, returning without waiting
+/* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed through
  the future object returned (by calling `co_async_get()`). */
 C_API future *co_async(callable_t, void_t);
@@ -975,7 +975,7 @@ C_API unsigned long co_async_self(void);
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
-/* Generic "itoa" using current coroutine scrape buffer and `snprintf_` */
+/* Generic "itoa" using current coroutine scrape buffer and `snprintf` */
 C_API string_t co_itoa(int64_t number);
 
 C_API int co_strpos(string_t text, string pattern);

@@ -847,7 +847,7 @@ void co_stack_check(int n) {
 
     t = co_running;
     if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER) {
-        snprintf_(ex_message, 256, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
+        snprintf(ex_message, 256, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
         co_panic(ex_message);
     }
 }
@@ -875,7 +875,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     if (!co_interrupt_handle) {
         co_interrupt_handle = co_interrupt_buffer;
         if (uv_loop_init(co_interrupt_handle))
-            printf_stderr("Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
     }
 #endif
 
@@ -1130,10 +1130,9 @@ void coroutine_state(char *fmt, ...) {
 
     t = co_running;
     va_start(args, fmt);
-    vsnprintf_(t->state, sizeof t->name, fmt, args);
+    vsnprintf(t->state, sizeof t->name, fmt, args);
     va_end(args);
 }
-
 
 void coroutine_name(char *fmt, ...) {
     va_list args;
@@ -1141,7 +1140,7 @@ void coroutine_name(char *fmt, ...) {
 
     t = co_running;
     va_start(args, fmt);
-    vsnprintf_(t->name, sizeof t->name, fmt, args);
+    vsnprintf(t->name, sizeof t->name, fmt, args);
     va_end(args);
 }
 
@@ -1168,7 +1167,7 @@ void coroutine_info() {
     routine_t *t;
     char *extra;
 
-    printf_stderr("Coroutine list:\n");
+    fprintf(stderr, "Coroutine list:\n");
     for (i = 0; i < n_all_coroutine; i++) {
         t = all_coroutine[i];
         if (t == co_running)
@@ -1178,9 +1177,9 @@ void coroutine_info() {
         else
             extra = "";
 
-        printf_stderr("%6d%c %-20s %s%s cycles: %zu %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->cycles, t->status);
+        fprintf(stderr, "%6d%c %-20s %s%s cycles: %zu %d\n", t->cid, t->system ? 's' : ' ', t->name, t->state, extra, t->cycles, t->status);
     }
-    printf_stderr("\n\n");
+    fprintf(stderr, "\n\n");
 }
 
 void coroutine_update(routine_t *t) {
@@ -1297,6 +1296,6 @@ int main(int argc, char **argv) {
     json_set_allocation_functions(try_malloc, CO_FREE);
     coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
     coroutine_scheduler();
-    printf_stderr("Coroutine scheduler returned to main, when it shouldn't have!");
+    fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
     return exiting;
 }
