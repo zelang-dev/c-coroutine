@@ -204,6 +204,7 @@ ex_context_t *ex_init(void) {
     ex_signal_block(all);
     ex_context = &ex_context_buffer;
     ex_context->is_unwind = false;
+    ex_context->caught = -1;
     ex_context->type = ex_context_st;
     ex_signal_unblock(all);
 
@@ -259,8 +260,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
         ex_terminate();
 
 #ifdef _WIN32
-    if (!is_empty((void *)message))
-        RaiseException(EXCEPTION_PANIC, 0, 0, 0);
+    RaiseException(EXCEPTION_PANIC, 0, 0, 0);
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);
 }
@@ -272,7 +272,10 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     int i;
 
     for (i = 0; i < max_ex_sig; i++) {
-        if (ex_sig[i].ex == exception || is_str_eq(ctx->panic, exception)) {
+        if (is_str_eq(ex_sig[i].ex, exception)
+            || is_str_eq(ctx->panic, exception)
+            || ex_sig[i].seh == code
+            || ctx->caught == ex_sig[i].seh) {
             ctx->state = ex_throw_st;
             ctx->ex = ex_sig[i].ex;
             ctx->file = "unknown";
@@ -299,7 +302,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     }
 
     for (i = 0; i < max_ex_sig; i++) {
-        if (ex_sig[i].seh == code) {
+        if (ex_sig[i].seh == code || ctx->caught == ex_sig[i].seh) {
             ctx->state = ex_throw_st;
             ctx->ex = ex_sig[i].ex;
             ctx->file = "unknown";
@@ -352,11 +355,32 @@ void ex_handler(int sig) {
     for (i = 0; i < max_ex_sig; i++) {
         if (ex_sig[i].sig == sig) {
             ex = ex_sig[i].ex;
+            ex_init()->caught = sig;
             break;
         }
     }
 
     ex_throw(ex, "unknown", 0, NULL, NULL);
+}
+
+void ex_signal_reset(int sig) {
+#if defined(_WIN32) || defined(_WIN64)
+    if (signal(sig, SIG_DFL) == SIG_ERR)
+        fprintf(stderr, "Cannot install handler for signal no %d\n",
+                sig);
+#else
+    /*
+     * Make signal handlers persistent.
+     */
+    ex_sig_sa.sa_handler = SIG_DFL;
+    if (sigemptyset(&ex_sig_sa.sa_mask) != 0)
+        fprintf(stderr, "Cannot setup handler for signal no %d (%s)\n",
+                sig, ex);
+    else if (sigaction(sig, &ex_sig_sa, NULL) != 0)
+        fprintf(stderr, "Cannot restore handler for signal no %d (%s)\n",
+                sig, ex);
+#endif
+    exception_signal_set = false;
 }
 
 void ex_signal(int sig, const char *ex) {
@@ -466,5 +490,62 @@ void ex_signal_setup(void) {
     ex_signal(SIGBUS, EX_NAME(sig_bus));
 #elif SIG_BUS
     ex_signal(SIG_BUS, EX_NAME(sig_bus));
+#endif
+}
+
+void ex_signal_default(void) {
+#ifdef SIGSEGV
+    ex_signal_reset(SIGSEGV);
+#endif
+
+#if defined(SIGABRT)
+    ex_signal_reset(SIGABRT);
+#endif
+
+#ifdef SIGFPE
+    ex_signal_reset(SIGFPE);
+#endif
+
+#ifdef SIGILL
+    ex_signal_reset(SIGILL);
+#endif
+
+#ifdef SIGBREAK
+    ex_signal_reset(SIGBREAK);
+#endif
+
+#ifdef SIGINT
+    ex_signal_reset(SIGINT);
+#endif
+
+#ifdef SIGTERM
+    ex_signal_reset(SIGTERM);
+#endif
+
+#if !defined(_WIN32)
+#ifdef SIGQUIT
+    ex_signal_reset(SIGQUIT);
+#endif
+
+#ifdef SIGHUP
+    ex_signal_reset(SIGHUP);
+#endif
+
+#ifdef SIGWINCH
+    ex_signal_reset(SIGWINCH);
+#endif
+#ifdef SIGTRAP
+    ex_signal_reset(SIGTRAP);
+#endif
+#endif
+
+#ifdef SIGALRM
+    ex_signal_reset(SIGALRM);
+#endif
+
+#ifdef SIGBUS
+    ex_signal_reset(SIGBUS);
+#elif SIG_BUS
+    ex_signal_reset(SIG_BUS);
 #endif
 }

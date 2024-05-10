@@ -162,6 +162,9 @@ C_API void ex_signal(int sig, const char *ex);
 /* Convert signals into exceptions */
 C_API void ex_signal_setup(void);
 
+/* Reset signal handler to default */
+C_API void ex_signal_default(void);
+
 #ifdef _WIN32
 #define EXCEPTION_PANIC 0xE0000001
 C_API void ex_signal_seh(DWORD sig, const char *ex);
@@ -215,10 +218,6 @@ enum {
 #define ex_longjmp(buf,st) longjmp(buf,st)
 #endif
 
-
-#define rethrow() \
-    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic)
-
 #define ex_throw_loc(E, F, L, C)           \
     do                                  \
     {                                   \
@@ -237,13 +236,20 @@ throws an exception of given message. */
 
 #ifdef _WIN32
 #define throw(E) raii_panic(EX_STR(E))
-#define ex_signal_block(ctrl)                  \
-    CRITICAL_SECTION ctrl##__FUNCTION__; \
+
+#define rethrow()                   \
+    if (ex_err.caught > -1)         \
+        ex_err.state = ex_throw_st; \
+    else                            \
+        ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic)
+
+#define ex_signal_block(ctrl)               \
+    CRITICAL_SECTION ctrl##__FUNCTION__;    \
     InitializeCriticalSection(&ctrl##__FUNCTION__); \
     EnterCriticalSection(&ctrl##__FUNCTION__);
 
-#define ex_signal_unblock(ctrl)                  \
-    LeaveCriticalSection(&ctrl##__FUNCTION__); \
+#define ex_signal_unblock(ctrl)                 \
+    LeaveCriticalSection(&ctrl##__FUNCTION__);  \
     DeleteCriticalSection(&ctrl##__FUNCTION__);
 
 #define ex_try                              \
@@ -306,6 +312,7 @@ throws an exception of given message. */
     if (ex_context == &ex_err)              \
         /* global context updated */        \
         ex_context = ex_err.next;           \
+    ex_err.caught = -1;                     \
     if ((ex_err.state & ex_throw_st) != 0)  \
         rethrow();                          \
     }
@@ -320,6 +327,9 @@ throws an exception of given message. */
 
 #define ex_signal_unblock(ctrl)                  \
     pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
+
+#define rethrow()  \
+    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic)
 
 #define throw(E) \
     ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
@@ -400,6 +410,7 @@ struct ex_context_s {
     void *data;
     void *prev;
     bool is_unwind;
+    int volatile caught;
 
     /* The handler in the stack (which is a FILO container). */
     ex_context_t *next;
