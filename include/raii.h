@@ -27,6 +27,11 @@
 #include "exception.h"
 #include <stdio.h>
 #include <time.h>
+
+#ifndef HAS_C11_THREADS
+    #include "cthread.h"
+#endif
+
 #ifdef __cplusplus
     extern "C" {
 #endif
@@ -265,7 +270,7 @@ execution begins when current `guard` scope exits or panic/throw. */
 #define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _recover(err)   raii_catch_by(raii_init()->arena, err)
+#define _recover(err)   raii_is_caught(raii_init()->arena, err)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
 #define _is_caught(err)   raii_is_caught(raii_init()->arena, err)

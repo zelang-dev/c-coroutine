@@ -272,7 +272,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     int i;
 
     for (i = 0; i < max_ex_sig; i++) {
-        if (ex_sig[i].ex == exception) {
+        if (ex_sig[i].ex == exception || is_str_eq(ctx->panic, exception)) {
             ctx->state = ex_throw_st;
             ctx->ex = ex_sig[i].ex;
             ctx->file = "unknown";

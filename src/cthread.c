@@ -24,6 +24,7 @@ freely, subject to the following restrictions:
 SPDX-License-Identifier: Zlib
 */
 
+#ifndef HAS_C11_THREADS
 #include "cthread.h"
 #include <stdlib.h>
 
@@ -1071,3 +1072,4 @@ void call_once(once_flag *flag, void (*func)(void))
 #ifdef __cplusplus
 }
 #endif
+#endif /* HAS_C11_THREADS */

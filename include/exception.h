@@ -114,6 +114,8 @@
       #elif __APPLE__ && __MACH__
         #define thread_local __thread
       #else /* C11 and newer define thread_local in threads.h */
+        #undef HAS_C11_THREADS
+        #define HAS_C11_THREADS 1
         #include <threads.h>
       #endif
     #elif defined(__cplusplus) /* Compiling as C++ Language */
@@ -127,6 +129,8 @@
         #endif
       #else /* In C++ >= 11, thread_local in a builtin keyword */
         /* Don't do anything */
+        #undef HAS_C11_THREADS
+        #define HAS_C11_THREADS 1
       #endif
     #endif
 #endif
@@ -215,7 +219,24 @@ enum {
 #define rethrow() \
     ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic)
 
+#define ex_throw_loc(E, F, L, C)           \
+    do                                  \
+    {                                   \
+        C_API const char EX_NAME(E)[]; \
+        ex_throw(EX_NAME(E), F, L, C, NULL);     \
+    } while (0)
+
+/* An macro that stops the ordinary flow of control and begins panicking,
+throws an exception of given message. */
+#define raii_panic(message)                                                     \
+    do                                                                          \
+    {                                                                           \
+        C_API const char EX_NAME(panic)[];                                      \
+        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message));  \
+    } while (0)
+
 #ifdef _WIN32
+#define throw(E) raii_panic(EX_STR(E))
 #define ex_signal_block(ctrl)                  \
     CRITICAL_SECTION ctrl##__FUNCTION__; \
     InitializeCriticalSection(&ctrl##__FUNCTION__); \
@@ -225,29 +246,31 @@ enum {
     LeaveCriticalSection(&ctrl##__FUNCTION__); \
     DeleteCriticalSection(&ctrl##__FUNCTION__);
 
-#define ex_try                                \
-{                                             \
-        /* local context */                   \
-        ex_context_t ex_err;                  \
-        if (!ex_context)                      \
-            ex_init();                        \
-        ex_err.next = ex_context;             \
-        ex_err.stack = 0;                     \
-        ex_err.ex = 0;                        \
-        ex_err.unstack = 0;                   \
-        /* global context updated */          \
-        ex_context = &ex_err;                 \
-        /* save jump location */              \
-        ex_err.state = ex_setjmp(ex_err.buf); \
-    __try                                     \
-    {                                         \
+#define ex_try                              \
+{                                           \
+    if (!exception_signal_set)              \
+        ex_signal_setup();                  \
+    /* local context */                     \
+    ex_context_t ex_err;                    \
+    if (!ex_context)                        \
+        ex_init();                          \
+    ex_err.next = ex_context;               \
+    ex_err.stack = 0;                       \
+    ex_err.ex = 0;                          \
+    ex_err.unstack = 0;                     \
+    /* global context updated */            \
+    ex_context = &ex_err;                   \
+    /* save jump location */                \
+    ex_err.state = ex_setjmp(ex_err.buf);   \
+    __try                                   \
+    {                                       \
         if (ex_err.state == ex_try_st)  {
 
-#define ex_catch(E)                     \
-        }                               \
-    } __except(catch_seh(E, GetExceptionCode(), GetExceptionInformation())) {   \
+#define ex_catch(E)                         \
+        }                                   \
+    } __except(catch_seh(EX_STR(E), GetExceptionCode(), GetExceptionInformation())) {   \
         if (ex_err.state == ex_throw_st) {  \
-            EX_MAKE();                  \
+            EX_MAKE();                      \
             ex_err.state = ex_catch_st;
 
 #define ex_catch_any                    \
@@ -298,23 +321,27 @@ enum {
 #define ex_signal_unblock(ctrl)                  \
     pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
 
-#define ex_try                               \
-    {                                         \
-        /* local context */                   \
-        ex_context_t ex_err;                  \
-        if (!ex_context)                      \
-            ex_init();                        \
-        ex_err.next = ex_context;             \
-        ex_err.stack = 0;                     \
-        ex_err.ex = 0;                        \
-        ex_err.unstack = 0;                   \
-        /* global context updated */          \
-        ex_context = &ex_err;                 \
-        /* save jump location */              \
-        ex_err.state = ex_setjmp(ex_err.buf); \
-        if (ex_err.state == ex_try_st)        \
-        {                                     \
-            {
+#define throw(E) \
+    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
+#define ex_try                              \
+{                                           \
+    if (!exception_signal_set)              \
+        ex_signal_setup();                  \
+    /* local context */                     \
+    ex_context_t ex_err;                    \
+    if (!ex_context)                        \
+        ex_init();                          \
+    ex_err.next = ex_context;               \
+    ex_err.stack = 0;                       \
+    ex_err.ex = 0;                          \
+    ex_err.unstack = 0;                     \
+    /* global context updated */            \
+    ex_context = &ex_err;                   \
+    /* save jump location */                \
+    ex_err.state = ex_setjmp(ex_err.buf);   \
+    if (ex_err.state == ex_try_st)          \
+        {                                   \
+        {
 
 #define ex_catch_any                    \
     }                                \
@@ -357,31 +384,12 @@ enum {
     }                                   \
     if (ex_err.state == ex_throw_st)    \
     {                                   \
-        C_API const char EX_NAME(E)[]; \
+        C_API const char EX_NAME(E)[];  \
         if (ex_err.ex == EX_NAME(E))    \
         {                               \
             EX_MAKE();                  \
             ex_err.state = ex_catch_st;
 #endif
-
-#define ex_throw_loc(E, F, L, C)           \
-    do                                  \
-    {                                   \
-        C_API const char EX_NAME(E)[]; \
-        ex_throw(EX_NAME(E), F, L, C, NULL);     \
-    } while (0)
-
-#define throw(E) \
-    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
-
- /* An macro that stops the ordinary flow of control and begins panicking,
- throws an exception of given message. */
-#define raii_panic(message)                                                     \
-    do                                                                          \
-    {                                                                           \
-        C_API const char EX_NAME(panic)[];                                      \
-        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message));  \
-    } while (0)
 
 /* types
 */
