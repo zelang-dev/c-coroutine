@@ -417,12 +417,18 @@ RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void *data) {
 bool raii_caught(const char *err) {
     memory_t *scope = raii_init();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    return scope->is_recovered = is_str_eq(err, exception);
+    if (scope->is_recovered = is_str_eq(err, exception))
+        ex_init()->state = ex_catch_st;
+
+    return scope->is_recovered;
 }
 
 bool raii_is_caught(unique_t *scope, const char *err) {
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    return scope->is_recovered = is_str_eq(err, exception);
+    if (scope->is_recovered = is_str_eq(err, exception))
+        ex_init()->state = ex_catch_st;
+
+    return scope->is_recovered;
 }
 
 const char *raii_message(void) {
@@ -446,6 +452,7 @@ void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
     memory_t *scope = raii_init()->arena;
     scope->err = (void *)ex;
     scope->panic = message;
+    ctx->is_guarded = true;
     ex_swap_set(ctx, (void *)scope);
     ex_unwind_set(ctx, scope->is_protected);
 }
@@ -453,6 +460,7 @@ void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
 void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind) {
     raii_init()->arena = scope;
     ex_swap_reset(ex_init());
+    ex_init()->is_guarded = false;
     exception_setup_func = set;
     exception_unwind_func = unwind;
 }
@@ -470,7 +478,21 @@ values_type *raii_value(void *data) {
         return ((raii_values_t *)data)->value;
 
     RAII_LOG("attempt to get value on null");
-    return ((raii_values_t *)0)->value;
+    return;
+}
+
+static void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
+    memory_t *scope = raii_init();
+    scope->err = (void *)ex;
+    scope->panic = message;
+    ex_swap_set(ctx, (void *)scope);
+    ex_unwind_set(ctx, scope->is_protected);
+}
+
+void raii_setup(void) {
+    exception_unwind_func = (ex_unwind_func)raii_deferred_free;
+    exception_setup_func = raii_unwind_set;
+    ex_signal_setup();
 }
 
 int strpos(const char *text, char *pattern) {

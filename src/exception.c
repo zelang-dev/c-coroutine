@@ -162,7 +162,7 @@ static void ex_print(ex_context_t *exception, const char *message) {
     fprintf(stderr, "\n%s: %s\n", message, (exception->panic != NULL ? exception->panic : exception->ex));
     if (exception->file != NULL) {
         if (exception->function != NULL) {
-            fprintf(stderr, "    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
+            fprintf(stderr, "    thrown in %s at (%s:%d)\n\n", exception->function, exception->file, exception->line);
         } else {
             fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
         }
@@ -204,6 +204,8 @@ ex_context_t *ex_init(void) {
     ex_signal_block(all);
     ex_context = &ex_context_buffer;
     ex_context->is_unwind = false;
+    ex_context->is_rethrown = false;
+    ex_context->is_guarded = false;
     ex_context->caught = -1;
     ex_context->type = ex_context_st;
     ex_signal_unblock(all);
@@ -260,7 +262,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
         ex_terminate();
 
 #ifdef _WIN32
-    RaiseException(EXCEPTION_PANIC, 0, 0, 0);
+    RaiseException(EXCEPTION_PANIC, 0, 0, NULL);
 #endif
     ex_longjmp(ctx->buf, ctx->state | ex_throw_st);
 }
@@ -271,19 +273,25 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     const char *ex = 0;
     int i;
 
+    if (!is_str_eq(ctx->panic, exception))
+        return EXCEPTION_EXECUTE_HANDLER;
+
     for (i = 0; i < max_ex_sig; i++) {
-        if (is_str_eq(ex_sig[i].ex, exception)
+        if (ex_sig[i].seh == code
+            || ctx->caught == ex_sig[i].seh
             || is_str_eq(ctx->panic, exception)
-            || ex_sig[i].seh == code
-            || ctx->caught == ex_sig[i].seh) {
+            ) {
             ctx->state = ex_throw_st;
-            ctx->ex = ex_sig[i].ex;
-            ctx->file = "unknown";
-            ctx->line = 0;
-            ctx->function = NULL;
+            ctx->is_rethrown = true;
+            if (got_signal) {
+                ctx->ex = ex_sig[i].ex;
+                ctx->file = "unknown";
+                ctx->line = 0;
+                ctx->function = NULL;
+            }
 
             if (exception_setup_func)
-                exception_setup_func(ctx, ctx->ex, NULL);
+                exception_setup_func(ctx, ctx->ex, ctx->panic);
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }
@@ -304,13 +312,18 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     for (i = 0; i < max_ex_sig; i++) {
         if (ex_sig[i].seh == code || ctx->caught == ex_sig[i].seh) {
             ctx->state = ex_throw_st;
+            ctx->is_rethrown = true;
             ctx->ex = ex_sig[i].ex;
+            ctx->panic = NULL;
             ctx->file = "unknown";
             ctx->line = 0;
             ctx->function = NULL;
 
             if (exception_setup_func)
-                exception_setup_func(ctx, ctx->ex, NULL);
+                exception_setup_func(ctx, ctx->ex, ctx->panic);
+
+            if (!ctx->is_guarded)
+                ex_unwind_stack(ctx);
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }

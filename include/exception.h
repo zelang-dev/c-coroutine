@@ -201,6 +201,11 @@ enum {
     const char *const err_file = ((void)err_file, ex_err.file); \
     const int err_line = ((void)err_line, ex_err.line)
 
+#define EX_MAKE_IF()                                              \
+    const char *const err = ((void)err, !is_empty((void *)ex_err.panic) ? ex_err.panic : ex_err.ex);             \
+    const char *const err_file = ((void)err_file, ex_err.file); \
+    const int err_line = ((void)err_line, ex_err.line)
+
 /* macros
  */
 #define EX_EXCEPTION(E) \
@@ -236,12 +241,13 @@ throws an exception of given message. */
 
 #ifdef _WIN32
 #define throw(E) raii_panic(EX_STR(E))
-
-#define rethrow()                   \
-    if (ex_err.caught > -1)         \
-        ex_err.state = ex_throw_st; \
-    else                            \
-        ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic)
+#define rethrow()                                       \
+        if (ex_err.caught > -1 || ex_err.is_rethrown) { \
+            ex_err.is_rethrown = false;                         \
+            ex_longjmp(ex_err.buf, ex_err.state | ex_throw_st); \
+        } else {                                                \
+            ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic); \
+        }
 
 #define ex_signal_block(ctrl)               \
     CRITICAL_SECTION ctrl##__FUNCTION__;    \
@@ -264,60 +270,58 @@ throws an exception of given message. */
     ex_err.stack = 0;                       \
     ex_err.ex = 0;                          \
     ex_err.unstack = 0;                     \
+    ex_err.is_rethrown = false;             \
     /* global context updated */            \
     ex_context = &ex_err;                   \
     /* save jump location */                \
     ex_err.state = ex_setjmp(ex_err.buf);   \
-    __try                                   \
-    {                                       \
-        if (ex_err.state == ex_try_st)  {
+    if (ex_err.state == ex_try_st) {		\
+		__try {
 
-#define ex_catch(E)                         \
-        }                                   \
-    } __except(catch_seh(EX_STR(E), GetExceptionCode(), GetExceptionInformation())) {   \
-        if (ex_err.state == ex_throw_st) {  \
-            EX_MAKE();                      \
-            ex_err.state = ex_catch_st;
+#define ex_catch(E)                             \
+		} __except(catch_seh(EX_STR(E), GetExceptionCode(), GetExceptionInformation())) {   \
+			if (ex_err.state == ex_throw_st) {  \
+				EX_MAKE_IF();                   \
+				ex_err.state = ex_catch_st;
 
-#define ex_catch_any                    \
-        }                               \
-    } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
-        if (ex_err.state == ex_throw_st) {  \
-            EX_MAKE();                  \
-            ex_err.state = ex_catch_st;
-
-#define ex_catch_if                     \
-        }                               \
-    } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
-        if (ex_err.state == ex_throw_st) {  \
-            EX_MAKE();
-
-#define ex_finally                      \
-    }                                   \
+#define ex_finally						\
+			}							\
+		}                               \
     }                                   \
         {                               \
-            EX_MAKE();                  \
+            EX_MAKE_IF();               \
             /* global context updated */\
             ex_context = ex_err.next;
 
-#define ex_finality                      \
-        }                               \
-    } __finally  {                      \
-        EX_MAKE();                      \
-        /* global context updated */    \
-        ex_context = ex_err.next;
-
 #define ex_end_try                          \
-        }                                   \
+    }										\
     if (ex_context == &ex_err)              \
         /* global context updated */        \
         ex_context = ex_err.next;           \
     ex_err.caught = -1;                     \
+    ex_err.is_rethrown = false;             \
     if ((ex_err.state & ex_throw_st) != 0)  \
         rethrow();                          \
-    }
+}
 
-#define ex_end_trying   ex_end_try }
+#define ex_catch_any                    	    \
+        } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
+            if (ex_err.state == ex_throw_st) {  \
+                EX_MAKE_IF();                   \
+                ex_err.state = ex_catch_st;
+
+#define ex_catch_if                             \
+        } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
+            if (ex_err.state == ex_throw_st) {  \
+                EX_MAKE_IF();
+
+#define ex_finality							\
+        } __finally {						\
+			EX_MAKE_IF();					\
+			/* global context updated */	\
+			ex_context = ex_err.next;
+
+#define ex_end_trying	 ex_finally ex_end_try
 
 #else
 #define ex_signal_block(ctrl)                  \
@@ -410,6 +414,8 @@ struct ex_context_s {
     void *data;
     void *prev;
     bool is_unwind;
+    bool is_rethrown;
+    bool is_guarded;
     int volatile caught;
 
     /* The handler in the stack (which is a FILO container). */

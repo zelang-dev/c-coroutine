@@ -235,6 +235,7 @@ C_API void *malloc_arena(size_t size);
 C_API void *calloc_arena(int count, size_t size);
 
 C_API values_type *raii_value(void *);
+C_API void raii_setup(void);
 C_API raii_type type_of(void *);
 C_API bool is_type(void *, raii_type);
 C_API bool is_instance_of(void *, void *);
@@ -273,9 +274,9 @@ execution begins when current `guard` scope exits or panic/throw. */
 #define _recover(err)   raii_is_caught(raii_init()->arena, err)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _is_caught(err)   raii_is_caught(raii_init()->arena, err)
+#define _is_caught(err)   raii_is_caught(raii_init()->arena, EX_STR(err))
 
-/* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
+/* Get scoped error condition string. */
 #define _get_message()  raii_message_by(raii_init()->arena)
 #define _panic          raii_panic
 
@@ -323,8 +324,6 @@ return given `result` when done, use `NONE` for no return. */
     } ex_catch_if {                                                 \
         if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
             raii_deferred_free(_$##__FUNCTION__);                   \
-        if ((_$##__FUNCTION__)->is_recovered)                      \
-            ex_err.state = ex_catch_st;                             \
     } ex_finally {                                                  \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
@@ -342,8 +341,6 @@ On exit will begin executing deferred functions.
     } ex_catch_if {                                                \
         if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
             raii_deferred_free(_$##__FUNCTION__);                   \
-        if ((_$##__FUNCTION__)->is_recovered)                      \
-            ex_err.state = ex_catch_st;                             \
     } ex_finally {                                                  \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
@@ -367,6 +364,7 @@ On exit will begin executing deferred functions.
 #define catch(e) ex_catch(e)
 #define end_try ex_end_try
 #define finally ex_finally
+#define caught(err) raii_caught(EX_STR(err))
 
 #ifdef _WIN32
     #define finality ex_finality
