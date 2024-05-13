@@ -268,12 +268,14 @@ DO NOT FREE, will `throw/panic` if memory request fails. */
 
 /* Defer execution `LIFO` of given function with argument,
 execution begins when current `guard` scope exits or panic/throw. */
-#define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, func, ptr)
+#define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, (func_t)func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
 #define _recover(err)   raii_is_caught(raii_init()->arena, err)
 
-/* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
+/* Compare `err` to scoped error condition,
+will mark exception handled, if `true`.
+DO NOT PUT `err` in quote's like "err". */
 #define _is_caught(err)   raii_is_caught(raii_init()->arena, EX_STR(err))
 
 /* Get scoped error condition string. */
@@ -370,7 +372,7 @@ On exit will begin executing deferred functions.
     #define finality ex_finality
     #define end_trying ex_end_trying
 #else
-    #define finality ex_finally
+    #define finality catch_any ex_finally
     #define end_trying ex_end_try
 #endif
 

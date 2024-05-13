@@ -24,10 +24,8 @@ freely, subject to the following restrictions:
 SPDX-License-Identifier: Zlib
 */
 
+#include "raii.h"
 #ifndef HAS_C11_THREADS
-#include "cthread.h"
-#include <stdlib.h>
-
 /* Platform specific includes */
 #if defined(_TTHREAD_POSIX_)
   #include <signal.h>
@@ -581,7 +579,7 @@ static void * _thrd_wrapper_function(void * aArg)
   arg = ti->mArg;
 
   /* The thread is responsible for freeing the startup information */
-  free((void *)ti);
+  RAII_FREE((void *)ti);
 
   /* Call the actual client thread function */
   res = fun(arg);
@@ -671,7 +669,7 @@ static void _remove_thread_data(DWORD thread_id)
     if (node->thread_id == thread_id)
     {
       _cthread_thread_head = node->next;
-      free(node);
+      RAII_FREE(node);
       ReleaseSRWLockExclusive(&_cthread_thread_head_srwlock);
       return;
     }
@@ -681,7 +679,7 @@ static void _remove_thread_data(DWORD thread_id)
       {
         struct CThreadThrdData* needle = node->next;
         node->next = needle->next;
-        free(needle);
+        RAII_FREE(needle);
         ReleaseSRWLockExclusive(&_cthread_thread_head_srwlock);
         return;
       }
@@ -696,7 +694,7 @@ int thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
 {
   /* Fill out the thread startup information (passed to the thread wrapper,
      which will eventually free it) */
-  _thread_start_info* ti = (_thread_start_info*)malloc(sizeof(_thread_start_info));
+  _thread_start_info* ti = (_thread_start_info*)RAII_MALLOC(sizeof(_thread_start_info));
   if (ti == NULL)
   {
     return thrd_nomem;
@@ -707,17 +705,17 @@ int thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
   /* Create the thread */
 #if defined(_TTHREAD_WIN32_)
   struct CThreadThrdData* data;
-  data = (struct CThreadThrdData*)malloc(sizeof(struct CThreadThrdData));
+  data = (struct CThreadThrdData*)RAII_MALLOC(sizeof(struct CThreadThrdData));
   if (data == NULL)
   {
-    free(ti);
+    RAII_FREE(ti);
     return thrd_nomem;
   }
   HANDLE handle = CreateThread(NULL, 0, _thrd_wrapper_function, (LPVOID)ti, 0, NULL);
   if (handle == NULL)
   {
-    free(ti);
-    free(data);
+    RAII_FREE(ti);
+    RAII_FREE(data);
     return thrd_error;
   }
   data->handle = handle;
@@ -728,7 +726,7 @@ int thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
 #elif defined(_TTHREAD_POSIX_)
   if(pthread_create(thr, NULL, _thrd_wrapper_function, (void *)ti) != 0)
   {
-      free(ti);
+      RAII_FREE(ti);
       return thrd_error;
   }
 #endif
@@ -965,7 +963,7 @@ int tss_set(tss_t key, void *val)
   struct CThreadTSSData* data = (struct CThreadTSSData*)TlsGetValue(key);
   if (data == NULL)
   {
-    data = (struct CThreadTSSData*)malloc(sizeof(struct CThreadTSSData));
+    data = (struct CThreadTSSData*)RAII_MALLOC(sizeof(struct CThreadTSSData));
     if (data == NULL)
     {
       return thrd_error;

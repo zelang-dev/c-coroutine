@@ -2,43 +2,12 @@
 #undef _FORTIFY_SOURCE
 #endif
 #include "raii.h"
-/*
- o---------------------------------------------------------------------o
- |
- | Exception in C
- |
- | Copyright (c) 2001+ Laurent Deniau, laurent.deniau@cern.ch
- |
- | For more information, see:
- | http://cern.ch/laurent.deniau/oopc.html
- |
- o---------------------------------------------------------------------o
- |
- | Exception in C is free software; you can redistribute it and/or
- | modify it under the terms of the GNU Lesser General Public License
- | as published by the Free Software Foundation; either version 2.1 of
- | the License, or (at your option) any later version.
- |
- | The C Object System is distributed in the hope that it will be
- | useful, but WITHOUT ANY WARRANTY; without even the implied warranty
- | of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- | Lesser General Public License for more details.
- |
- | You should have received a copy of the GNU Lesser General Public
- | License along with this library; if not, write to the Free
- | Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- | Boston, MA 02110-1301 USA
- |
- o---------------------------------------------------------------------o
- |
- | $Id$
- |
-*/
 
 /* Some common exception */
 EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(divide_by_zero);
+EX_EXCEPTION(division_by_zero);
 EX_EXCEPTION(out_of_memory);
 EX_EXCEPTION(panic);
 
@@ -387,11 +356,9 @@ void ex_signal_reset(int sig) {
      */
     ex_sig_sa.sa_handler = SIG_DFL;
     if (sigemptyset(&ex_sig_sa.sa_mask) != 0)
-        fprintf(stderr, "Cannot setup handler for signal no %d (%s)\n",
-                sig, ex);
+        fprintf(stderr, "Cannot setup handler for signal no %d\n", sig);
     else if (sigaction(sig, &ex_sig_sa, NULL) != 0)
-        fprintf(stderr, "Cannot restore handler for signal no %d (%s)\n",
-                sig, ex);
+        fprintf(stderr, "Cannot restore handler for signal no %d\n", sig);
 #endif
     exception_signal_set = false;
 }
