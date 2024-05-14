@@ -223,7 +223,7 @@ typedef struct values_s
 C_API value_t co_value(void_t);
 ```
 
-The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/symplely/c-coroutine/blob/main/include/coroutine.h) for additional.
+The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/zelang-dev/c-coroutine/blob/main/include/coroutine.h) for additional.
 
 > Note: None of the functions above require passing/handling the underlying `routine_t` object/structure.
 
@@ -1014,7 +1014,7 @@ Coroutine scheduler exited
 </pre>
 </details>
 
-### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
+### See [examples](https://github.com/zelang-dev/c-coroutine/tree/main/examples) folder for more
 
 ## Installation
 
@@ -1025,7 +1025,7 @@ The build system uses **cmake**, that produces _single_ **static** library store
 ```shell
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON/OFF # use to build files examples folder
+cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON/OFF # use to build files in examples folder
 cmake --build .
 ```
 
@@ -1034,13 +1034,13 @@ cmake --build .
 ```shell
 mkdir build
 cd build
-cmake .. -D BUILD_TESTING=ON/OFF # use to build files examples folder
+cmake .. -D BUILD_TESTING=ON/OFF # use to build files in examples folder
 cmake --build . --config Debug/Release
 ```
 
 ## Contributing
 
-Contributions are encouraged and welcome; I am always happy to get feedback or pull requests on Github :) Create [Github Issues](https://github.com/symplely/c-coroutine/issues) for bugs and new features and comment on the ones you are interested in.
+Contributions are encouraged and welcome; I am always happy to get feedback or pull requests on Github :) Create [Github Issues](https://github.com/zelang-dev/c-coroutine/issues) for bugs and new features and comment on the ones you are interested in.
 
 ## License
 

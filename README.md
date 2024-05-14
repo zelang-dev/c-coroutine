@@ -1,6 +1,6 @@
 # c-coroutine
 
-[![windows & linux & macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci.yml)[![macOS](https://github.com/symplely/c-coroutine/actions/workflows/ci_macos.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_macos.yml)[![armv7, aarch64, ppc64le](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_others.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu_others.yml)[![riscv64 & s390x by ucontext  .](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg)](https://github.com/symplely/c-coroutine/actions/workflows/ci_qemu.yml)
+[![windows & linux & macOS](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci.yml)[![macOS](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_macos.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_macos.yml)[![armv7, aarch64, ppc64le](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu_others.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu_others.yml)[![riscv64 & s390x by ucontext  .](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu.yml)
 
 **c-coroutine** is a cooperative multithreading library written in C89. Designed to be simple as possible in usage, but powerfully enough in execution, easily modifiable to any need. It incorporates most asynchronous patterns from various languages. They all the same behaviorally, just syntax layout differences.
 
@@ -223,7 +223,7 @@ typedef struct values_s
 C_API value_t co_value(void_t);
 ```
 
-The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/symplely/c-coroutine/blob/main/include/coroutine.h) for additional.
+The above is the **main** and most likely functions to be used, see [coroutine.h](https://github.com/zelang-dev/c-coroutine/blob/main/include/coroutine.h) for additional.
 
 > Note: None of the functions above require passing/handling the underlying `routine_t` object/structure.
 
@@ -731,7 +731,7 @@ int co_main(int argc, char **argv)
 </tr>
 </table>
 
-### See [examples](https://github.com/symplely/c-coroutine/tree/main/examples) folder for more
+### See [examples](https://github.com/zelang-dev/c-coroutine/tree/main/examples) folder for more
 
 ## Installation
 
@@ -757,7 +757,7 @@ cmake --build . --config Debug/Release
 
 ## Contributing
 
-Contributions are encouraged and welcome; I am always happy to get feedback or pull requests on Github :) Create [Github Issues](https://github.com/symplely/c-coroutine/issues) for bugs and new features and comment on the ones you are interested in.
+Contributions are encouraged and welcome; I am always happy to get feedback or pull requests on Github :) Create [Github Issues](https://github.com/zelang-dev/c-coroutine/issues) for bugs and new features and comment on the ones you are interested in.
 
 ## License
 
