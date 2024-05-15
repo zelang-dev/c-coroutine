@@ -735,14 +735,14 @@ int co_main(int argc, char **argv)
 
 ## Installation
 
-The build system uses **cmake**, that produces _single_ **static** library stored under `coroutine-built`, and the complete `include` folder is needed.
+The build system uses **cmake**, that produces _single_ **static** library stored under `built`, and the complete `include` folder is needed.
 
 **Linux**
 
 ```shell
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON/OFF # use to build files examples folder
+cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON # use to build files in examples folder
 cmake --build .
 ```
 
@@ -751,7 +751,7 @@ cmake --build .
 ```shell
 mkdir build
 cd build
-cmake .. -D BUILD_TESTING=ON/OFF # use to build files examples folder
+cmake .. -D BUILD_TESTING=ON # use to build files in examples folder
 cmake --build . --config Debug/Release
 ```
 

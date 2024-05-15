@@ -24,7 +24,6 @@
 
 #include "uv_routine.h"
 #include "raii.h"
-#include "cthread.h"
 
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1

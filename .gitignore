@@ -54,7 +54,7 @@ dkms.conf
 build/
 .frontmatter/
 frontmatter.json
-coroutine-built/
+built/
 *.crt
 *.pem
 *.key

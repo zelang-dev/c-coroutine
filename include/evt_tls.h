@@ -19,7 +19,7 @@ extern "C" {
 #include <openssl/ssl.h>
 #include <openssl/conf.h>
 #include <openssl/engine.h>
-#include "queue.h"
+#include "uv/queue.h"
 
 
 typedef struct evt_tls_s evt_tls_t;

@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 static thread_local int channel_id_generate = 0;
 static thread_local gc_channel_t *channel_list = NULL;

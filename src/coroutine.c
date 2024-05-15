@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 static thread_local gc_coroutine_t *coroutine_list = NULL;
 
@@ -385,16 +385,12 @@ CO_FORCE_INLINE void co_recover(func_t func, void_t data) {
     raii_recover_by(co_active()->scope, func, data);
 }
 
-bool co_catch(string_t err) {
-    routine_t *co = co_active();
-    string_t exception = (string_t)(!is_empty((void_t)co->scope->panic) ? co->scope->panic : co->scope->err);
-    co->scope->is_recovered = is_str_eq(err, exception);
-    return co->scope->is_recovered;
+CO_FORCE_INLINE bool co_catch(string_t err) {
+    return raii_is_caught(co_active()->scope, err);
 }
 
-string_t co_message(void) {
-    routine_t *co = co_active();
-    return !is_empty((void_t)co->scope->panic) ? co->scope->panic : co->scope->err;
+CO_FORCE_INLINE string_t co_message(void) {
+    return  raii_message_by(co_active()->scope);
 }
 
 CO_FORCE_INLINE size_t co_deferred(routine_t *coro, func_t func, void_t data) {

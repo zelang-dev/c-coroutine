@@ -135,12 +135,10 @@ static void co_awaitable() {
             co_result_set(co, co->func(co->args));
             co_deferred_free(co);
         }
-    } catch_any {
+    } catch_if {
         co_deferred_free(co);
-        if (!co->scope->is_recovered)
-            rethrow();
-        else
-            ex_flags_reset();
+        if (co->scope->is_recovered)
+           ex_flags_reset();
     } finally {
         if (co->loop_erred) {
             co->halt = true;

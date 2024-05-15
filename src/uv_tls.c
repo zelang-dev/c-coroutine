@@ -8,7 +8,7 @@
 //
 //%///////////////////////////////////////////////////////////////////////////
 
-#include "../include/uv_routine.h"
+#include "uv_routine.h"
 #ifndef CO_ASSERT
   #if defined(NDEBUG)
     #include <assert.h>

@@ -21,7 +21,7 @@ int raii_array_reset(raii_array_t *a) {
     RAII_FREE(a->base);
     a->base = NULL;
     a->elements = 0;
-    memset(a, 0, sizeof(a));
+    memset(a, 0, sizeof(raii_array_t));
 
     return 0;
 }
@@ -89,6 +89,14 @@ RAII_INLINE int raii_deferred_init(defer_t *array) {
     return raii_array_init((raii_array_t *)array);
 }
 
+void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
+    memory_t *scope = raii_init();
+    scope->err = (void *)ex;
+    scope->panic = message;
+    ex_swap_set(ctx, (void *)scope);
+    ex_unwind_set(ctx, scope->is_protected);
+}
+
 memory_t *raii_init(void) {
     if (raii_context == NULL) {
         raii_context = &raii_context_buffer;
@@ -101,6 +109,13 @@ memory_t *raii_init(void) {
         raii_context->mid = -1;
         if (UNLIKELY(raii_deferred_init(&raii_context->defer) < 0))
             raii_panic("Deferred initialization failed!");
+
+        ex_context_t *ctx = ex_init();
+        ctx->data = (void *)raii_context;
+        ctx->prev = (void *)raii_context;
+        ctx->is_raii = true;
+        if (!exception_signal_set)
+            ex_signal_setup();
     }
 
     return raii_context;
@@ -173,15 +188,11 @@ void *malloc_full(memory_t *scope, size_t size, func_t func) {
     return arena;
 }
 
-RAII_INLINE void *malloc_arena(size_t size) {
+RAII_INLINE void *malloc_default(size_t size) {
     return malloc_full(raii_init(), size, RAII_FREE);
 }
 
-RAII_INLINE memory_t *raii_new(size_t size) {
-    return raii_malloc_full(size, RAII_FREE);
-}
-
-RAII_INLINE void *new_arena(memory_t *scope, size_t size) {
+RAII_INLINE void *malloc_by(memory_t *scope, size_t size) {
     return malloc_full(scope, size, RAII_FREE);
 }
 
@@ -212,12 +223,8 @@ void *calloc_full(memory_t *scope, int count, size_t size, func_t func) {
     return arena;
 }
 
-RAII_INLINE void *calloc_arena(int count, size_t size) {
+RAII_INLINE void *calloc_default(int count, size_t size) {
     return calloc_full(raii_init(), count, size, RAII_FREE);
-}
-
-RAII_INLINE memory_t *raii_calloc(int count, size_t size) {
-    return raii_calloc_full(count, size, RAII_FREE);
 }
 
 RAII_INLINE void *calloc_by(memory_t *scope, int count, size_t size) {
@@ -230,7 +237,7 @@ void raii_delete(memory_t *ptr) {
 
     raii_deferred_free(ptr);
     if (ptr != &raii_context_buffer) {
-        memset(ptr, -1, sizeof(ptr));
+        memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }
 
@@ -245,7 +252,7 @@ static void raii_array_free(void *data) {
     raii_array_t *array = data;
 
     raii_array_reset(array);
-    memset(array, 0, sizeof(array));
+    memset(array, 0, sizeof(raii_array_t));
     data = NULL;
 }
 
@@ -417,15 +424,21 @@ RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void *data) {
 bool raii_caught(const char *err) {
     memory_t *scope = raii_init();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    if (scope->is_recovered = is_str_eq(err, exception))
+
+    if (exception == NULL && is_str_eq(err, ex_init()->ex)) {
+        ex_init()->state = ex_catch_st;
+        return true;
+    }
+
+    if ((scope->is_recovered = is_str_eq(err, exception)))
         ex_init()->state = ex_catch_st;
 
     return scope->is_recovered;
 }
 
-bool raii_is_caught(unique_t *scope, const char *err) {
+bool raii_is_caught(memory_t *scope, const char *err) {
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    if (scope->is_recovered = is_str_eq(err, exception))
+    if ((scope->is_recovered = is_str_eq(err, exception)))
         ex_init()->state = ex_catch_st;
 
     return scope->is_recovered;
@@ -433,7 +446,8 @@ bool raii_is_caught(unique_t *scope, const char *err) {
 
 const char *raii_message(void) {
     memory_t *scope = raii_init();
-    return !is_empty((void *)scope->panic) ? scope->panic : scope->err;
+    const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
+    return exception == NULL ? ex_init()->ex : exception;
 }
 
 RAII_INLINE const char *raii_message_by(memory_t *scope) {
@@ -479,20 +493,6 @@ values_type *raii_value(void *data) {
 
     RAII_LOG("attempt to get value on null");
     return;
-}
-
-static void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
-    memory_t *scope = raii_init();
-    scope->err = (void *)ex;
-    scope->panic = message;
-    ex_swap_set(ctx, (void *)scope);
-    ex_unwind_set(ctx, scope->is_protected);
-}
-
-void raii_setup(void) {
-    exception_unwind_func = (ex_unwind_func)raii_deferred_free;
-    exception_setup_func = raii_unwind_set;
-    ex_signal_setup();
 }
 
 int strpos(const char *text, char *pattern) {

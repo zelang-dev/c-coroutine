@@ -103,9 +103,11 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 
     if (ctx->is_unwind && exception_unwind_func) {
         exception_unwind_func(ctx->data);
+    } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_context) {
+        raii_deferred_clean();
     } else {
         while (p && p->type == ex_protected_st) {
-            if (got_uncaught_exception = (temp == *p->ptr))
+            if ((got_uncaught_exception = (temp == *p->ptr)))
                 break;
 
             if (*p->ptr) {
@@ -175,6 +177,7 @@ ex_context_t *ex_init(void) {
     ex_context->is_unwind = false;
     ex_context->is_rethrown = false;
     ex_context->is_guarded = false;
+    ex_context->is_raii = false;
     ex_context->caught = -1;
     ex_context->type = ex_context_st;
     ex_signal_unblock(all);
@@ -187,6 +190,9 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
+    if (ex_init()->is_raii)
+        raii_destroy();
+
     if (ex_uncaught_exception() || got_uncaught_exception)
         ex_print(ex_context, "\nException during stack unwinding leading to an undefined behavior");
     else
@@ -223,6 +229,8 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
 
     if (exception_setup_func)
         exception_setup_func(ctx, ctx->ex, ctx->panic);
+    else if (ctx->is_raii)
+        raii_unwind_set(ctx, ctx->ex, ctx->panic);
 
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
@@ -242,13 +250,13 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     const char *ex = 0;
     int i;
 
-    if (!is_str_eq(ctx->panic, exception))
+    if (!is_str_eq(ctx->ex, exception))
         return EXCEPTION_EXECUTE_HANDLER;
 
     for (i = 0; i < max_ex_sig; i++) {
         if (ex_sig[i].seh == code
             || ctx->caught == ex_sig[i].seh
-            || is_str_eq(ctx->panic, exception)
+            || is_str_eq(ctx->ex, exception)
             ) {
             ctx->state = ex_throw_st;
             ctx->is_rethrown = true;
@@ -261,6 +269,8 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
 
             if (exception_setup_func)
                 exception_setup_func(ctx, ctx->ex, ctx->panic);
+            else if (ctx->is_raii)
+                raii_unwind_set(ctx, ctx->ex, ctx->panic);
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }
@@ -290,6 +300,8 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
 
             if (exception_setup_func)
                 exception_setup_func(ctx, ctx->ex, ctx->panic);
+            else if (ctx->is_raii)
+                raii_unwind_set(ctx, ctx->ex, ctx->panic);
 
             if (!ctx->is_guarded)
                 ex_unwind_stack(ctx);

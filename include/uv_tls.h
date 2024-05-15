@@ -14,7 +14,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "uv/evt_tls.h"
+#include "evt_tls.h"
 #include "uv.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/unistd.h"

@@ -6,22 +6,23 @@ set(C_STANDARD 89)
 
 include(CMakeDependentOption)
 include(GNUInstallDirs)
-cmake_dependent_option(CO_BUILD_TESTS
-  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" ON
+cmake_dependent_option(BUILD_TESTING
+  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
   "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
 
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
-set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
+set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/coroutine-built")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
 
 option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
+
 add_subdirectory(deps/libuv)
 
 file(GLOB lib_files
-    ${CMAKE_SOURCE_DIR}/src/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 )
 
 add_definitions(-DCO_SCRAPE_SIZE=64)
@@ -48,7 +49,7 @@ else()
 endif()
 
 target_include_directories(coroutine
-    AFTER PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D NDEBUG -D CO_USE_VALGRIND ")
@@ -61,10 +62,10 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
 
-find_package(Threads REQUIRED)
-target_link_libraries(coroutine ${CMAKE_THREAD_LIBS_INIT})
+add_subdirectory(deps/raii)
+target_link_libraries(coroutine PUBLIC raii)
 
-if(CO_BUILD_TESTS)
+if(BUILD_TESTING)
     add_subdirectory(examples)
 endif()
 
