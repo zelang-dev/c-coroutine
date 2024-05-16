@@ -26,3 +26,6 @@ jobs:
             ./go_select
             ./go_panic
             ./co_cpp_future_wait
+            ./co_uv_fs
+            ./co_uv_spawn
+            ./co_uv_stream

@@ -37,8 +37,10 @@ jobs:
             ./go_select
             ./go_wait_group
             ./go_panic
-            ./co_call_uv
             ./co_cpp_future_wait
+            ./co_uv_fs
+            ./co_uv_spawn
+            ./co_uv_stream
             ./test_delay 2 5
             ./chan_3
             ./primes
@@ -65,13 +67,15 @@ jobs:
         shell: cmd
         run: |
             cd build\Debug
+            .\go_channel.exe
+            .\go_sleep.exe
+            .\go_select.exe
+            .\go_wait_group.exe
+            .\go_panic.exe
+            .\co_cpp_future_wait.exe
+            .\co_uv_fs.exe
+            .\co_uv_spawn.exe
+            .\co_uv_stream.exe
             .\test_delay.exe 2 5
             .\chan_3.exe
             .\primes.exe
-            .\go_channel.exe
-            .\go_select.exe
-            .\go_sleep.exe
-            .\go_wait_group.exe
-            .\go_panic.exe
-            .\co_call_uv.exe
-            .\co_cpp_future_wait.exe

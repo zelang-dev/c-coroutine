@@ -47,5 +47,7 @@ jobs:
                 ./go_wait_group
                 ./go_panic
             fi
-            ./co_call_uv
+            ./co_uv_fs
+            ./co_uv_spawn
+            ./co_uv_stream
             ./co_cpp_future_wait
