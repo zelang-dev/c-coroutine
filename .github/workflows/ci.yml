@@ -27,7 +27,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run test examples
         run: |
@@ -62,11 +62,11 @@ jobs:
             mkdir build
             cd build
             cmake .. -D BUILD_TESTING=ON -A ${{ matrix.arch }}
-            cmake --build . --config Debug
+            cmake --build . --config Release
       - name: Run test examples
         shell: cmd
         run: |
-            cd build\Debug
+            cd build\Release
             .\go_channel.exe
             .\go_sleep.exe
             .\go_select.exe
