@@ -256,7 +256,7 @@ static int channel_proc(channel_co_t *a) {
         c = a[ i ].c;
 
         CO_INFO(" %c:", "esrnb"[ a[ i ].op ]);
-#ifdef NDEBUG
+#ifdef USE_DEBUG
         if (c->name)
             printf("%s", c->name);
         else
@@ -275,7 +275,7 @@ static int channel_proc(channel_co_t *a) {
                 if (j-- == 0) {
                     c = a[ i ].c;
                     CO_INFO(" => %c:", "esrnb"[ a[ i ].op ]);
-#ifdef NDEBUG
+#ifdef USE_DEBUG
                     if (c->name)
                         printf("%s", c->name);
                     else

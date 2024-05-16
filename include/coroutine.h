@@ -44,10 +44,10 @@
     #endif
 #endif
 
-#ifdef NDEBUG
-    #define CO_LOG(s) puts(s)
-    #define CO_INFO(s, ...) printf(s, __VA_ARGS__ )
-    #define CO_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
+#ifdef USE_DEBUG
+    #define CO_LOG(s) RAII_LOG(s)
+    #define CO_INFO(s, ...) RAII_INFO(s, __VA_ARGS__ )
+    #define CO_HERE() RAII_HERE()
 #else
     #define CO_LOG(s) (void)s
     #define CO_INFO(s, ...)  (void)s
@@ -79,7 +79,7 @@
 #endif
 
 #ifndef CO_ASSERT
-  #if defined(NDEBUG)
+  #if defined(USE_DEBUG)
     #include <assert.h>
     #define CO_ASSERT(c) assert(c)
   #else

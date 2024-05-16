@@ -77,7 +77,7 @@
 #endif
 
 #ifndef RAII_ASSERT
-  #if defined(NDEBUG)
+  #if defined(USE_DEBUG)
     #include <assert.h>
     #define RAII_ASSERT(c) assert(c)
   #else
@@ -85,7 +85,7 @@
   #endif
 #endif
 
-#ifdef NDEBUG
+#ifdef USE_DEBUG
     #define RAII_LOG(s) puts(s)
     #define RAII_INFO(s, ...) printf(s, __VA_ARGS__ )
     #define RAII_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
