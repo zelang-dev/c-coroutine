@@ -39,7 +39,6 @@ jobs:
             ./go_panic
             ./co_uv_fs
             ./co_uv_spawn
-            ./co_uv_stream
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -70,4 +69,3 @@ jobs:
             .\go_panic.exe
             .\co_uv_fs.exe
             .\co_uv_spawn.exe
-            .\co_uv_stream.exe
