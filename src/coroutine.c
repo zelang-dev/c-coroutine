@@ -284,8 +284,12 @@ wait_result_t *co_wait(wait_group_t *wg) {
 
                             coroutine_yield();
                         } else {
-                            if (!is_empty(co->results) && !co->loop_erred) {
-                                hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
+                            if ((!is_empty(co->results) && !co->loop_erred) || co->is_plain) {
+                                if (co->is_plain)
+                                    hash_put(wgr, co_itoa(co->cid), &co->plain_results);
+                                else
+                                    hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
+
                                 if (!co->event_active && !co->is_plain && !co->is_address) {
                                     CO_FREE(co->results);
                                     co->results = NULL;
@@ -337,6 +341,11 @@ void co_result_set(routine_t *co, void_t data) {
             memcpy(co->results, data, sizeof(data));
         }
     }
+}
+
+void co_plain_set(routine_t *co, size_t data) {
+    co->is_plain = true;
+    co->plain_results = data;
 }
 
 #if defined(_WIN32) || defined(_WIN64)

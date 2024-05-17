@@ -8,7 +8,7 @@ void *worker(void *arg) {
     co_sleep(1000);
     printf("Worker %d done\n", wid);
     if (id == 4)
-        return 32;
+        return (values_t*)32;
     else if (id == 3)
         return "hello world";
 

@@ -902,6 +902,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->user_data = NULL;
     co->cycles = 0;
     co->results = NULL;
+    co->plain_results = -1;
     co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CO_MAGIC_NUMBER;

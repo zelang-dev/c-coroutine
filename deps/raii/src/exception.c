@@ -126,7 +126,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 
 static void ex_print(ex_context_t *exception, const char *message) {
     fflush(stdout);
-#ifndef NDEBUG
+#ifndef USE_DEBUG
     fprintf(stderr, "\nFatal Error: %s in function(%s)\n\n",
                   ((void *)exception->panic != NULL ? exception->panic : exception->ex), exception->function);
 #else

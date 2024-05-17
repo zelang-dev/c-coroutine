@@ -10,7 +10,7 @@
 
 #include "uv_routine.h"
 #ifndef CO_ASSERT
-  #if defined(NDEBUG)
+  #if defined(USE_DEBUG)
     #include <assert.h>
     #define CO_ASSERT(c) assert(c)
   #else

@@ -138,8 +138,7 @@ static void connect_cb(uv_connect_t *client, int status) {
 
     co->halt = true;
     if (status < 0) {
-        co->results = &status;
-        co->is_plain = true;
+        co_plain_set(co, (size_t)status);
     } else {
         co_result_set(co, args[0].value.object);
     }
@@ -186,13 +185,12 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
 
     co->halt = true;
     scheduler_info_log = false;
-    co->is_plain = true;
     if (0 == status) {
+        co->is_address = true;
         co_result_set(co, STREAM(ut->tcp_hdl));
     } else {
         co->loop_code = status;
-        co->results = NULL;
-        co->is_plain = true;
+        co_plain_set(co, -1);
     }
 
     co_resuming(co->context);
@@ -250,8 +248,7 @@ static void connection_cb(uv_stream_t *server, int status) {
             CO_FREE(handle);
 
         co->loop_code = r;
-        co->results = &status;
-        co->is_plain = true;
+        co_plain_set(co, (size_t)status);
     }
 
     if (uv->bind_type != UV_TLS)
@@ -268,8 +265,7 @@ static void write_cb(uv_write_t *req, int status) {
     }
 
     co->halt = true;
-    co->is_plain = true;
-    co->results = &status;
+    co_plain_set(co, (size_t)status);
     co_resuming(co->context);
     co_scheduler();
 }
@@ -282,8 +278,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
     }
 
     co->halt = true;
-    co->is_plain = true;
-    co->results = &status;
+    co_plain_set(co, (size_t)status);
     co_resuming(co->context);
     co_scheduler();
 }
@@ -301,19 +296,18 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    co->is_plain = true;
     if (nread < 0) {
         if (nread != UV_EOF)
             fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
 
-        co->results = (nread == UV_EOF ? 0 : &nread);
+        co_plain_set(co, (size_t)nread);
         uv_read_stop(stream);
     } else {
         if (nread > 0) {
             co->is_address = true;
             co_result_set(co, buf->base);
         } else {
-            co->results = NULL;
+            co_plain_set(co, 0);
         }
     }
 
@@ -326,18 +320,17 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    co->is_plain = true;
     if (nread < 0) {
         if (nread != UV_EOF)
             fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
 
-        co->results = (nread == UV_EOF ? 0 : &nread);
+        co_plain_set(co, (size_t)nread);
     } else {
         if (nread > 0) {
             co->is_address = true;
             co_result_set(co, buf->base);
         } else {
-            co->results = NULL;
+            co_plain_set(co, 0);
         }
     }
 
@@ -404,7 +397,7 @@ static void fs_cb(uv_fs_t *req) {
 
     co->halt = true;
     if (!override)
-        co_result_set(co, (values_t *)uv_fs_get_result(req));
+        co_plain_set(co, (size_t)uv_fs_get_result(req));
 
     co_resuming(co->context);
     co_scheduler();

@@ -473,6 +473,8 @@ struct routine_s {
     void_t args;
     /* Coroutine result of function return/exit. */
     void_t results;
+    /* Coroutine plain result of function return/exit. */
+    size_t plain_results;
     memory_t scope[1];
     /* Used to check stack overflow. */
     size_t magic_number;
@@ -912,6 +914,7 @@ C_API wait_result_t *co_wait(wait_group_t *);
 C_API value_t co_group_get_result(wait_result_t *, int);
 
 C_API void co_result_set(routine_t *, void_t);
+C_API void co_plain_set(routine_t *, size_t);
 
 C_API void delete(void_t ptr);
 
