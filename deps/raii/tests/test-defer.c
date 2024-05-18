@@ -4,7 +4,7 @@
 char number[20];
 int g_print(void *args) {
     ASSERT_NOTNULL(args);
-    int arg = raii_value(args)->integer;
+    int arg = raii_value(args).integer;
     ASSERT_EQ(true, arg >= 0);
     printf("Defer in g = %d.\n\n", arg);
 }

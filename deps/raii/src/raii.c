@@ -487,7 +487,7 @@ void guard_delete(memory_t *ptr) {
     }
 }
 
-values_type *raii_value(void *data) {
+values_type raii_value(void *data) {
     if (data)
         return ((raii_values_t *)data)->value;
 
@@ -517,6 +517,86 @@ int strpos(const char *text, char *pattern) {
     }
 
     return -1;
+}
+
+void args_free(args_t *params) {
+    if (is_type(params, RAII_ARGS)) {
+        RAII_FREE(params->args);
+        memset(params, -1, sizeof(args_t));
+        RAII_FREE(params);
+    }
+}
+
+values_type get_args(void *params, int item) {
+    args_t *args = (args_t *)params;
+    if (!args->defer_set) {
+        args->defer_set = true;
+        raii_deferred(args->context, (func_t)args_free, args);
+    }
+
+    return args_in(args, item);
+}
+
+RAII_INLINE values_type args_in(args_t *params, int index) {
+    return (index > -1 && index < (int)params->n_args)
+        ? params->args[index].value
+        : ((raii_values_t *)0)->value;
+}
+
+args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
+    int count = (int)strlen(desc);
+    args_t *params = try_calloc(1, sizeof(args_t));
+    raii_values_t *args = try_calloc(count, sizeof(raii_values_t));
+    va_list argp;
+
+    va_start(argp, desc);
+    for (int i = 0; i < count; i++) {
+        switch (*desc++) {
+            case 'i':
+                // unsigned integer argument
+                args[i].value.max_size = va_arg(argp, size_t);
+                break;
+            case 'd':
+                // signed integer argument
+                args[i].value.long_long = va_arg(argp, int64_t);
+                break;
+            case 'c':
+                // character argument
+                args[i].value.schar = (char)va_arg(argp, int);
+                break;
+            case 's':
+                // string argument
+                args[i].value.char_ptr = va_arg(argp, char *);
+                break;
+            case 'a':
+                // array argument
+                args[i].value.array = va_arg(argp, char **);
+                break;
+            case 'x':
+                // executable argument
+                args[i].value.func = (raii_func_t)va_arg(argp, func_args_t);
+                break;
+            case 'f':
+                // float argument
+                args[i].value.precision = va_arg(argp, double);
+                break;
+            case 'p':
+                // void pointer (any arbitrary pointer) argument
+                args[i].value.object = va_arg(argp, void *);
+                break;
+            default:
+                args[i].value.object = NULL;
+                break;
+        }
+    }
+    va_end(argp);
+
+    params->args = args;
+    params->defer_set = false;
+    params->n_args = (int)count;
+    params->context = scope;
+    params->type = RAII_ARGS;
+    return params;
 }
 
 RAII_INLINE raii_type type_of(void *self) {

@@ -19,83 +19,12 @@ CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
     return coroutine_list;
 }
 
-void args_free(args_t *params) {
-    if (is_type(params, CO_ARGS)) {
-        CO_FREE(params->args);
-        memset(params, 0, sizeof(value_types));
-        CO_FREE(params);
-    }
-}
-
-value_t get_args(void_t *params, int item) {
-    args_t *co_args = (args_t *)params;
-    if (!co_args->defer_set) {
-        defer(args_free, co_args);
-        co_args->defer_set = true;
-    }
-
-    return args_in(co_args, item);
-}
-
-CO_FORCE_INLINE value_t args_in(args_t *params, int index) {
-    return (index > -1 && index < (int)params->n_args)
-        ? params->args[index].value
-        : ((generics_t *)0)->value;
-}
-
 args_t *args_for(string_t desc, ...) {
-    int count = (int)strlen(desc);
-    args_t *params = (args_t *)try_calloc(1, sizeof(args_t));
-    generics_t *args = (generics_t *)try_calloc(count, sizeof(generics_t));
-    va_list argp;
-
-    va_start(argp, desc);
-    for (int i = 0; i < count; i++) {
-        switch (*desc++) {
-            case 'i':
-                // unsigned integer argument
-                args[i].value.max_size = va_arg(argp, size_t);
-                break;
-            case 'd':
-                // signed integer argument
-                args[i].value.long_long = va_arg(argp, int64_t);
-                break;
-            case 'c':
-                // character argument
-                args[i].value.schar = (char)va_arg(argp, int);
-                break;
-            case 's':
-                // string argument
-                args[i].value.char_ptr = va_arg(argp, char *);
-                break;
-            case 'a':
-                // array argument
-                args[i].value.array = va_arg(argp, char **);
-                break;
-            case 'x':
-                // executable argument
-                args[i].value.func = (callable_t)va_arg(argp, any_func_t);
-                break;
-            case 'f':
-                // float argument
-                args[i].value.precision = va_arg(argp, double);
-                break;
-            case 'p':
-                // void pointer (any arbitrary pointer) argument
-                args[i].value.object = va_arg(argp, void_t);
-                break;
-            default:
-                args[i].value.object = NULL;
-                break;
-        }
-    }
-    va_end(argp);
-
-    params->args = args;
-    params->defer_set = false;
-    params->n_args = count;
-    params->type = CO_ARGS;
-    return params;
+    va_list xargs;
+    va_start(xargs, desc);
+    args_t *scope_args = raii_args_for(co_active()->scope, desc, xargs);
+    va_end(xargs);
+    return scope_args;
 }
 
 void delete(void_t ptr) {

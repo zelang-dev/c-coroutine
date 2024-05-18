@@ -236,7 +236,7 @@ extern "C"
 
 typedef enum
 {
-    CO_NULL,
+    CO_NULL = RAII_NULL,
     CO_INT,
     CO_ENUM,
     CO_INTEGER,
@@ -564,19 +564,6 @@ typedef struct uv_args_s
     size_t n_args;
 } uv_args_t;
 
-typedef struct args_s
-{
-    value_types type;
-    /* allocated array of arguments */
-    generics_t *args;
-    routine_t *context;
-    string buffer;
-
-    /* total number of args in set */
-    size_t n_args;
-    bool defer_set;
-} args_t;
-
 /*
  * channel communication
  */
@@ -626,13 +613,6 @@ struct channel_co_s
 C_API uv_loop_t *co_loop(void);
 
 /**
-* `Release/free` allocated memory, must be called if not using `get_args()` function.
-*
-* @param params arbitrary arguments
-*/
-C_API void args_free(args_t *params);
-
-/**
 * Creates an container for arbitrary arguments passing to an `coroutine` or `thread`.
 * Use `get_args()` or `args_in()` for retrieval.
 *
@@ -648,25 +628,6 @@ C_API void args_free(args_t *params);
 * @param arguments indexed by `desc` format order
 */
 C_API args_t *args_for(string_t desc, ...);
-
-/**
-* Returns generic union `value_t` of argument, will auto `release/free`
-* allocated memory when `coroutine` return/exit by `co_defer()`.
-*
-* Must be called at least once to release `allocated` memory.
-*
-* @param params arbitrary arguments
-* @param item index number
-*/
-C_API value_t get_args(void_t *params, int item);
-
-/**
-* Returns generic union `value_t` of argument.
-*
-* @param params arguments instance
-* @param index item number
-*/
-C_API value_t args_in(args_t *params, int index);
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);

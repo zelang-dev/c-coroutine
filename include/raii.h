@@ -41,7 +41,8 @@ all other fields private, this object binds any additional requests to it's life
 typedef struct memory_s memory_t;
 typedef memory_t unique_t;
 typedef void (*func_t)(void *);
-
+typedef void (*func_args_t)(void *, ...);
+typedef void *(*raii_func_t)(void *);
 typedef enum {
     RAII_NULL,
     RAII_INT,
@@ -121,12 +122,12 @@ typedef union {
     char *char_ptr;
     char **array;
     void *object;
-    func_t func;
+    raii_func_t func;
     const char const_char[256];
 } values_type;
 
 typedef struct {
-    values_type value[1];
+    values_type value;
     raii_type type;
 } raii_values_t;
 
@@ -170,6 +171,61 @@ struct memory_s {
     defer_t defer;
     size_t mid;
 };
+
+typedef struct args_s {
+    raii_type type;
+    /* allocated array of arguments */
+    raii_values_t *args;
+    unique_t *context;
+
+    /* total number of args in set */
+    size_t n_args;
+    bool defer_set;
+} args_t;
+
+/**
+* `Release/free` allocated memory, must be called if not using `get_args()` function.
+*
+* @param params arbitrary arguments
+*/
+C_API void args_free(args_t *params);
+
+/**
+* Creates an scoped container for arbitrary arguments passing to an single `args` function.
+* Use `get_args()` or `args_in()` for retrieval.
+*
+* @param scope callers context to bind `allocated` arguments to
+* @param desc format, similar to `printf()`:
+* * `i` unsigned integer,
+* * `d` signed integer,
+* * `c` character,
+* * `s` string,
+* * `a` array,
+* * `x` function,
+* * `f` double/float,
+* * `p` void pointer for any arbitrary object
+* @param arguments indexed by `desc` format order
+*/
+C_API args_t *raii_args_for(memory_t *scope, const char *desc, ...);
+
+/**
+* Returns generic union `values_type` of argument, will auto `release/free`
+* allocated memory when scoped return/exit.
+*
+* Must be called at least once to release `allocated` memory.
+*
+* @param params arbitrary arguments
+* @param item index number
+*/
+C_API values_type get_args(void *params, int item);
+
+/**
+* Returns generic union `values_type` of argument.
+*
+* @param params arguments instance
+* @param index item number
+*/
+C_API values_type args_in(args_t *params, int index);
 
 /* Return current `thread` smart memory pointer. */
 C_API memory_t *raii_init(void);
@@ -269,7 +325,7 @@ DO NOT `free`, will be `RAII_FREE`
 when `raii_deferred_clean` is called. */
 C_API void *calloc_default(int count, size_t size);
 
-C_API values_type *raii_value(void *);
+C_API values_type raii_value(void *);
 C_API raii_type type_of(void *);
 C_API bool is_type(void *, raii_type);
 C_API bool is_instance_of(void *, void *);

@@ -18,7 +18,7 @@ static unsigned int names[max_threads];
 static thrd_t threads[max_threads];
 
 void defer_capture(void *arg) {
-    thrd_t thrd = (thrd_t)raii_value(arg)->max_size;
+    thrd_t thrd = (thrd_t)raii_value(arg).max_size;
     if (thrd_success != thrd_join(thrd, NULL)) {
         puts("main: thrd_join failure");
         thrd_exit(EXIT_FAILURE);
@@ -28,7 +28,7 @@ void defer_capture(void *arg) {
 }
 
 void do_print(void *name) {
-    printf("thread %u deferred mtx_unlock = %.03u\n", raii_value(name)->integer, completed);
+    printf("thread %u deferred mtx_unlock = %.03u\n", raii_value(name).integer, completed);
     if (thrd_success != mtx_unlock(&lock)) {
         snprintf(number, 20, "%d", thrd_error);
         _panic(number);

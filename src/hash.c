@@ -132,7 +132,7 @@ inline static void oa_hash_grow(oa_hash *htable) {
 
     for (size_t i = 0; i < old_capacity; i++) {
         crt_pair = old_buckets[ i ];
-        if (NULL != crt_pair && !oa_hash_is_tombstone(htable, i)) {
+        if (NULL != crt_pair && !(crt_pair->key == NULL && crt_pair->value == NULL && crt_pair->hash == 0)) {
             oa_hash_put(htable, crt_pair->key, crt_pair->value);
             htable->key_ops.free(crt_pair->key, htable->key_ops.arg);
             htable->val_ops.free(crt_pair->value);
@@ -379,7 +379,6 @@ static uint32_t oa_hash_fmix32(uint32_t h) {
 }
 
 uint32_t oa_string_hash(const_t data, void_t arg) {
-
     // djb2
     uint32_t hash = (const uint32_t)5381;
     string_t str = (string_t)data;
