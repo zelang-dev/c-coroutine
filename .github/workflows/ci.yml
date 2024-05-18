@@ -7,15 +7,13 @@ on:
 jobs:
   build:
     name: Linux ${{ matrix.target }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: amd64
             flags: -m64
-          - target: x86
-            flags: -m32
     steps:
       - uses: actions/checkout@v3
       - name: Prepare
