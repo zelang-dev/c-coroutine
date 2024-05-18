@@ -828,6 +828,10 @@ routine_t *co_active(void) {
     return co_active_handle;
 }
 
+memory_t *co_scope(void) {
+    return co_active()->scope;
+}
+
 routine_t *co_current(void) {
     return co_current_handle;
 }

@@ -18,8 +18,8 @@ int fibonacci(channel_t *c, channel_t *quit) {
 }
 
 void *func(void *args) {
-    channel_t *c = get_args(args, 0).object;
-    channel_t *quit = get_args(args, 1).object;
+    channel_t *c = args_get(args, 0).object;
+    channel_t *quit = args_get(args, 1).object;
 
     defer(delete, c);
 

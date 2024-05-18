@@ -613,8 +613,18 @@ struct channel_co_s
 C_API uv_loop_t *co_loop(void);
 
 /**
+* Returns generic union `values_type` of argument, will auto `release/free`
+* allocated memory when current coroutine return/exit.
+*
+* Must be called at least once to release `allocated` memory.
+*
+* @param params arbitrary arguments
+* @param item index number
+*/
+C_API values_type args_get(void_t params, int item);
+/**
 * Creates an container for arbitrary arguments passing to an `coroutine` or `thread`.
-* Use `get_args()` or `args_in()` for retrieval.
+* Use `args_get()` or `args_in()` for retrieval.
 *
 * @param desc format, similar to `printf()`:
 * * `i` unsigned integer,
@@ -627,10 +637,12 @@ C_API uv_loop_t *co_loop(void);
 * * `p` void pointer for any arbitrary object
 * @param arguments indexed by `desc` format order
 */
-C_API args_t *args_for(string_t desc, ...);
+#define args_for(desc, ...) raii_args_for(co_scope(), desc, __VA_ARGS__)
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);
+
+C_API memory_t *co_scope(void);
 
 /* Delete specified coroutine. */
 C_API void co_delete(routine_t *);

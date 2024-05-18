@@ -132,7 +132,7 @@ inline static void oa_hash_grow(oa_hash *htable) {
 
     for (size_t i = 0; i < old_capacity; i++) {
         crt_pair = old_buckets[ i ];
-        if (NULL != crt_pair && !(crt_pair->key == NULL && crt_pair->value == NULL && crt_pair->hash == 0)) {
+        if (NULL != crt_pair && !oa_hash_is_tombstone(htable, i)) {
             oa_hash_put(htable, crt_pair->key, crt_pair->value);
             htable->key_ops.free(crt_pair->key, htable->key_ops.arg);
             htable->val_ops.free(crt_pair->value);
@@ -148,7 +148,6 @@ inline static bool oa_hash_should_grow(oa_hash *htable) {
 }
 
 void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
-
     if (oa_hash_should_grow(htable)) {
         oa_hash_grow(htable);
     }
@@ -189,7 +188,6 @@ void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
 }
 
 void_t oa_hash_replace(oa_hash *htable, const_t key, const_t value) {
-
     if (oa_hash_should_grow(htable)) {
         oa_hash_grow(htable);
     }
@@ -297,7 +295,6 @@ void oa_hash_remove(oa_hash *htable, const_t key) {
 }
 
 void oa_hash_print(oa_hash *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
-
     oa_pair *pair;
 
     printf("Hash Capacity: %zu\n", (size_t)htable->capacity);

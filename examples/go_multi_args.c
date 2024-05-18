@@ -2,8 +2,8 @@
 #include "coroutine.h"
 
 void *worker(void *arg) {
-    int count = get_args(arg, 0).integer;
-    char *text = get_args(arg, 1).char_ptr;
+    int count = args_get(arg, 0).integer;
+    char *text = args_get(arg, 1).char_ptr;
 
     for (int i = 0; i < count; i++) {
         printf("%s\n", text);

@@ -19,12 +19,14 @@ CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
     return coroutine_list;
 }
 
-args_t *args_for(string_t desc, ...) {
-    va_list xargs;
-    va_start(xargs, desc);
-    args_t *scope_args = raii_args_for(co_active()->scope, desc, xargs);
-    va_end(xargs);
-    return scope_args;
+values_type args_get(void_t params, int item) {
+    args_t *args = (args_t *)params;
+    if (!args->defer_set) {
+        args->defer_set = true;
+        defer(args_free, args);
+    }
+
+    return args_in(args, item);
 }
 
 void delete(void_t ptr) {
@@ -316,19 +318,19 @@ CO_FORCE_INLINE void co_deferred_free(routine_t *coro) {
 }
 
 CO_FORCE_INLINE size_t co_defer(func_t func, void_t data) {
-    return raii_deferred(co_active()->scope, func, data);
+    return raii_deferred(co_scope(), func, data);
 }
 
 CO_FORCE_INLINE void co_recover(func_t func, void_t data) {
-    raii_recover_by(co_active()->scope, func, data);
+    raii_recover_by(co_scope(), func, data);
 }
 
 CO_FORCE_INLINE bool co_catch(string_t err) {
-    return raii_is_caught(co_active()->scope, err);
+    return raii_is_caught(co_scope(), err);
 }
 
 CO_FORCE_INLINE string_t co_message(void) {
-    return  raii_message_by(co_active()->scope);
+    return  raii_message_by(co_scope());
 }
 
 CO_FORCE_INLINE size_t co_deferred(routine_t *coro, func_t func, void_t data) {
@@ -336,11 +338,11 @@ CO_FORCE_INLINE size_t co_deferred(routine_t *coro, func_t func, void_t data) {
 }
 
 CO_FORCE_INLINE void co_defer_cancel(size_t index) {
-    raii_deferred_cancel(co_active()->scope, index);
+    raii_deferred_cancel(co_scope(), index);
 }
 
 CO_FORCE_INLINE void co_defer_fire(size_t index) {
-    raii_deferred_fire(co_active()->scope, index);
+    raii_deferred_fire(co_scope(), index);
 }
 
 CO_FORCE_INLINE void_t co_malloc_full(routine_t *coro, size_t size, func_t func) {
