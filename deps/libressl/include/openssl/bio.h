@@ -1,4 +1,4 @@
-/* $OpenBSD: bio.h,v 1.60 2023/08/25 12:37:33 schwarze Exp $ */
+/* $OpenBSD: bio.h,v 1.63 2024/03/02 09:22:41 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -534,7 +534,6 @@ const BIO_METHOD *BIO_s_file(void);
 BIO *BIO_new_file(const char *filename, const char *mode);
 BIO *BIO_new_fp(FILE *stream, int close_flag);
 BIO	*BIO_new(const BIO_METHOD *type);
-int	BIO_set(BIO *a, const BIO_METHOD *type);
 int	BIO_free(BIO *a);
 int	BIO_up_ref(BIO *bio);
 void	*BIO_get_data(BIO *a);
@@ -599,14 +598,10 @@ int BIO_dgram_non_fatal_error(int _error);
 
 int BIO_fd_should_retry(int i);
 int BIO_fd_non_fatal_error(int _error);
-int BIO_dump_cb(int (*cb)(const void *data, size_t len, void *u),
-    void *u, const char *s, int len);
-int BIO_dump_indent_cb(int (*cb)(const void *data, size_t len, void *u),
-    void *u, const char *s, int len, int indent);
+
 int BIO_dump(BIO *b, const char *bytes, int len);
 int BIO_dump_indent(BIO *b, const char *bytes, int len, int indent);
-int BIO_dump_fp(FILE *fp, const char *s, int len);
-int BIO_dump_indent_fp(FILE *fp, const char *s, int len, int indent);
+
 struct hostent *BIO_gethostbyname(const char *name);
 /* We might want a thread-safe interface too:
  * struct hostent *BIO_gethostbyname_r(const char *name,
@@ -648,25 +643,9 @@ void BIO_copy_next_retry(BIO *b);
 #ifndef __MINGW_PRINTF_FORMAT
 int BIO_printf(BIO *bio, const char *format, ...)
 	__attribute__((__format__(__printf__, 2, 3), __nonnull__(2)));
-int BIO_vprintf(BIO *bio, const char *format, va_list args)
-	__attribute__((__format__(__printf__, 2, 0), __nonnull__(2)));
-int BIO_snprintf(char *buf, size_t n, const char *format, ...)
-	__attribute__((__deprecated__, __format__(__printf__, 3, 4),
-	    __nonnull__(3)));
-int BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
-	__attribute__((__deprecated__, __format__(__printf__, 3, 0),
-	    __nonnull__(3)));
 #else
 int BIO_printf(BIO *bio, const char *format, ...)
 	__attribute__((__format__(__MINGW_PRINTF_FORMAT, 2, 3), __nonnull__(2)));
-int BIO_vprintf(BIO *bio, const char *format, va_list args)
-	__attribute__((__format__(__MINGW_PRINTF_FORMAT, 2, 0), __nonnull__(2)));
-int BIO_snprintf(char *buf, size_t n, const char *format, ...)
-	__attribute__((__deprecated__, __format__(__MINGW_PRINTF_FORMAT, 3, 4),
-	    __nonnull__(3)));
-int BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
-	__attribute__((__deprecated__, __format__(__MINGW_PRINTF_FORMAT, 3, 0),
-	    __nonnull__(3)));
 #endif
 
 void ERR_load_BIO_strings(void);

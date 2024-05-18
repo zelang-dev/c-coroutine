@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_local.h,v 1.6 2023/08/09 12:09:06 tb Exp $ */
+/* $OpenBSD: rsa_local.h,v 1.8 2024/01/01 15:43:02 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -60,10 +60,6 @@ __BEGIN_HIDDEN_DECLS
 
 #define RSA_MIN_MODULUS_BITS	512
 
-/* Macros to test if a pkey or ctx is for a PSS key */
-#define pkey_is_pss(pkey) (pkey->ameth->pkey_id == EVP_PKEY_RSA_PSS)
-#define pkey_ctx_is_pss(ctx) (ctx->pmeth->pkey_id == EVP_PKEY_RSA_PSS)
-
 struct rsa_meth_st {
 	char *name;
 	int (*rsa_pub_enc)(int flen, const unsigned char *from,
@@ -108,8 +104,6 @@ struct rsa_st {
 	long version;
 	const RSA_METHOD *meth;
 
-	/* functional reference if 'meth' is ENGINE-provided */
-	ENGINE *engine;
 	BIGNUM *n;
 	BIGNUM *e;
 	BIGNUM *d;

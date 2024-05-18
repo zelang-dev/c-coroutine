@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.314 2023/09/19 01:22:31 tb Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.321 2024/03/02 11:48:55 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -153,10 +153,6 @@
 #include <openssl/ocsp.h>
 #include <openssl/opensslconf.h>
 #include <openssl/x509v3.h>
-
-#ifndef OPENSSL_NO_ENGINE
-#include <openssl/engine.h>
-#endif
 
 #include "bytestring.h"
 #include "dtls_local.h"
@@ -1072,7 +1068,7 @@ SSL_is_server(const SSL *s)
 LSSL_ALIAS(SSL_is_server);
 
 static long
-ssl_get_default_timeout()
+ssl_get_default_timeout(void)
 {
 	/*
 	 * 2 hours, the 24 hours mentioned in the TLSv1 spec
@@ -1519,18 +1515,6 @@ SSL_CTX_callback_ctrl(SSL_CTX *ctx, int cmd, void (*fp)(void))
 	}
 }
 LSSL_ALIAS(SSL_CTX_callback_ctrl);
-
-int
-ssl_cipher_id_cmp(const SSL_CIPHER *a, const SSL_CIPHER *b)
-{
-	long	l;
-
-	l = a->id - b->id;
-	if (l == 0L)
-		return (0);
-	else
-		return ((l > 0) ? 1:-1);
-}
 
 STACK_OF(SSL_CIPHER) *
 SSL_get_ciphers(const SSL *s)
@@ -2164,26 +2148,6 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	ret->tlsext_status_cb = 0;
 	ret->tlsext_status_arg = NULL;
 
-#ifndef OPENSSL_NO_ENGINE
-	ret->client_cert_engine = NULL;
-#ifdef OPENSSL_SSL_CLIENT_ENGINE_AUTO
-#define eng_strx(x)	#x
-#define eng_str(x)	eng_strx(x)
-	/* Use specific client engine automatically... ignore errors */
-	{
-		ENGINE *eng;
-		eng = ENGINE_by_id(eng_str(OPENSSL_SSL_CLIENT_ENGINE_AUTO));
-		if (!eng) {
-			ERR_clear_error();
-			ENGINE_load_builtin_engines();
-			eng = ENGINE_by_id(eng_str(
-			    OPENSSL_SSL_CLIENT_ENGINE_AUTO));
-		}
-		if (!eng || !SSL_CTX_set_client_cert_engine(ret, eng))
-			ERR_clear_error();
-	}
-#endif
-#endif
 	/*
 	 * Default is to connect to non-RI servers. When RI is more widely
 	 * deployed might change this.
@@ -2239,10 +2203,6 @@ SSL_CTX_free(SSL_CTX *ctx)
 #ifndef OPENSSL_NO_SRTP
 	if (ctx->srtp_profiles)
 		sk_SRTP_PROTECTION_PROFILE_free(ctx->srtp_profiles);
-#endif
-
-#ifndef OPENSSL_NO_ENGINE
-	ENGINE_finish(ctx->client_cert_engine);
 #endif
 
 	free(ctx->tlsext_ecpointformatlist);
@@ -2337,12 +2297,6 @@ ssl_set_cert_masks(SSL_CERT *c, const SSL_CIPHER *cipher)
 			mask_a |= SSL_aECDSA;
 	}
 
-	cpk = &(c->pkeys[SSL_PKEY_GOST01]);
-	if (cpk->x509 != NULL && cpk->privatekey != NULL) {
-		mask_k |= SSL_kGOST;
-		mask_a |= SSL_aGOST01;
-	}
-
 	cpk = &(c->pkeys[SSL_PKEY_RSA]);
 	if (cpk->x509 != NULL && cpk->privatekey != NULL) {
 		mask_a |= SSL_aRSA;
@@ -2403,8 +2357,6 @@ ssl_get_server_send_pkey(const SSL *s)
 		i = SSL_PKEY_ECC;
 	} else if (alg_a & SSL_aRSA) {
 		i = SSL_PKEY_RSA;
-	} else if (alg_a & SSL_aGOST01) {
-		i = SSL_PKEY_GOST01;
 	} else { /* if (alg_a & SSL_aNULL) */
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		return (NULL);
@@ -2973,8 +2925,6 @@ SSL_dup(SSL *s)
 
 	SSL_set_info_callback(ret, SSL_get_info_callback(s));
 
-	ret->debug = s->debug;
-
 	/* copy app data, a little dangerous perhaps */
 	if (!CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_SSL,
 	    &ret->ex_data, &s->ex_data))
@@ -3525,13 +3475,6 @@ SSL_set_msg_callback(SSL *ssl, void (*cb)(int write_p, int version,
 }
 LSSL_ALIAS(SSL_set_msg_callback);
 
-void
-SSL_set_debug(SSL *s, int debug)
-{
-	s->debug = debug;
-}
-LSSL_ALIAS(SSL_set_debug);
-
 int
 SSL_cache_hit(SSL *s)
 {
@@ -3678,18 +3621,3 @@ SSL_set_quic_use_legacy_codepoint(SSL *ssl, int use_legacy)
 	/* Not supported. */
 }
 LSSL_ALIAS(SSL_set_quic_use_legacy_codepoint);
-
-static int
-ssl_cipher_id_cmp_BSEARCH_CMP_FN(const void *a_, const void *b_)
-{
-	SSL_CIPHER const *a = a_;
-	SSL_CIPHER const *b = b_;
-	return ssl_cipher_id_cmp(a, b);
-}
-
-SSL_CIPHER *
-OBJ_bsearch_ssl_cipher_id(SSL_CIPHER *key, SSL_CIPHER const *base, int num)
-{
-	return (SSL_CIPHER *)OBJ_bsearch_(key, base, num, sizeof(SSL_CIPHER),
-	    ssl_cipher_id_cmp_BSEARCH_CMP_FN);
-}

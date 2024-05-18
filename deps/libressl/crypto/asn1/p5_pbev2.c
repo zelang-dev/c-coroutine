@@ -1,4 +1,4 @@
-/* $OpenBSD: p5_pbev2.c,v 1.30 2023/07/07 19:37:52 beck Exp $ */
+/* $OpenBSD: p5_pbev2.c,v 1.32 2024/03/02 10:17:37 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999-2004.
  */
@@ -65,6 +65,7 @@
 #include <openssl/x509.h>
 
 #include "evp_local.h"
+#include "x509_local.h"
 
 /* PKCS#5 v2.0 password based encryption structures */
 
@@ -218,7 +219,7 @@ PKCS5_pbe2_set_iv(const EVP_CIPHER *cipher, int iter, unsigned char *salt,
 			arc4random_buf(iv, EVP_CIPHER_iv_length(cipher));
 	}
 
-	EVP_CIPHER_CTX_init(&ctx);
+	EVP_CIPHER_CTX_legacy_clear(&ctx);
 
 	/* Dummy cipherinit to just setup the IV, and PRF */
 	if (!EVP_CipherInit_ex(&ctx, cipher, NULL, NULL, iv, 0))

@@ -1,3 +1,9 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 
@@ -6,7 +12,9 @@
 .globl	_RC4
 
 .p2align	4
-_RC4:	orq	%rsi,%rsi
+_RC4:
+_CET_ENDBR
+	orq	%rsi,%rsi
 	jne	L$entry
 	retq
 L$entry:
@@ -523,6 +531,7 @@ L$epilogue:
 
 .p2align	4
 _RC4_set_key:
+_CET_ENDBR
 	leaq	8(%rdi),%rdi
 	leaq	(%rdx,%rsi,1),%rdx
 	negq	%rsi

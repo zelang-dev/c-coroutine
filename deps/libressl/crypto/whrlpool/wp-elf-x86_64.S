@@ -1,3 +1,9 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 
@@ -5,7 +11,7 @@
 .type	whirlpool_block,@function
 .align	16
 whirlpool_block:
-	endbr64
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12

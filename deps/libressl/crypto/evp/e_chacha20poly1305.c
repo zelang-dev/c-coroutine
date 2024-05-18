@@ -1,4 +1,4 @@
-/* $OpenBSD: e_chacha20poly1305.c,v 1.32 2023/09/28 11:29:10 tb Exp $ */
+/* $OpenBSD: e_chacha20poly1305.c,v 1.34 2023/12/30 18:24:09 tb Exp $ */
 
 /*
  * Copyright (c) 2022 Joel Sing <jsing@openbsd.org>
@@ -345,7 +345,7 @@ static const EVP_AEAD aead_chacha20_poly1305 = {
 };
 
 const EVP_AEAD *
-EVP_aead_chacha20_poly1305()
+EVP_aead_chacha20_poly1305(void)
 {
 	return &aead_chacha20_poly1305;
 }
@@ -363,7 +363,7 @@ static const EVP_AEAD aead_xchacha20_poly1305 = {
 };
 
 const EVP_AEAD *
-EVP_aead_xchacha20_poly1305()
+EVP_aead_xchacha20_poly1305(void)
 {
 	return &aead_xchacha20_poly1305;
 }
@@ -477,7 +477,7 @@ chacha20_poly1305_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
 	if (len > SIZE_MAX - cpx->in_len) {
 		EVPerror(EVP_R_TOO_LARGE);
-		return 0;
+		return -1;
 	}
 
 	/* Disallow authenticated data after plaintext/ciphertext. */

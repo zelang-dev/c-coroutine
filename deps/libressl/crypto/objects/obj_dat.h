@@ -62,12 +62,12 @@
  * [including the GNU Public Licence.]
  */
 
-#define NUM_NID 1053
-#define NUM_SN 1046
-#define NUM_LN 1046
-#define NUM_OBJ 975
+#define NUM_NID 1055
+#define NUM_SN 1048
+#define NUM_LN 1048
+#define NUM_OBJ 977
 
-static const unsigned char lvalues[6949]={
+static const unsigned char lvalues[6968]={
 0x2A,0x86,0x48,0x86,0xF7,0x0D,               /* [  0] OBJ_rsadsi */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,          /* [  6] OBJ_pkcs */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x02,     /* [ 13] OBJ_md2 */
@@ -1037,6 +1037,8 @@ static const unsigned char lvalues[6949]={
 0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x03,0x0E,/* [6921] OBJ_RSA_SHA3_256 */
 0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x03,0x0F,/* [6930] OBJ_RSA_SHA3_384 */
 0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x03,0x10,/* [6939] OBJ_RSA_SHA3_512 */
+0x2B,0x06,0x01,0x05,0x05,0x07,0x01,0x1F,     /* [6948] OBJ_acmeIdentifier */
+0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x33,/* [6956] OBJ_id_ct_rpkiSignedPrefixList */
 };
 
 static const ASN1_OBJECT nid_objs[NUM_NID]={
@@ -2755,6 +2757,10 @@ static const ASN1_OBJECT nid_objs[NUM_NID]={
 	9,&(lvalues[6930]),0},
 {"id-rsassa-pkcs1-v1_5-with-sha3-512","RSA-SHA3-512",NID_RSA_SHA3_512,
 	9,&(lvalues[6939]),0},
+{"acmeIdentifier","ACME Identifier",NID_acmeIdentifier,8,
+	&(lvalues[6948]),0},
+{"id-ct-rpkiSignedPrefixList","id-ct-rpkiSignedPrefixList",
+	NID_id_ct_rpkiSignedPrefixList,11,&(lvalues[6956]),0},
 };
 
 static const unsigned int sn_objs[NUM_SN]={
@@ -2991,6 +2997,7 @@ static const unsigned int sn_objs[NUM_SN]={
 288,	/* "ac-targeting" */
 368,	/* "acceptableResponses" */
 446,	/* "account" */
+1053,	/* "acmeIdentifier" */
 363,	/* "ad_timestamping" */
 376,	/* "algorithm" */
 405,	/* "ansi-X9-62" */
@@ -3260,6 +3267,7 @@ static const unsigned int sn_objs[NUM_SN]={
 1001,	/* "id-ct-routeOriginAuthz" */
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
+1054,	/* "id-ct-rpkiSignedPrefixList" */
 1014,	/* "id-ct-signedChecklist" */
 1024,	/* "id-ct-signedTAL" */
 802,	/* "id-dsa-with-sha224" */
@@ -3807,6 +3815,7 @@ static const unsigned int sn_objs[NUM_SN]={
 };
 
 static const unsigned int ln_objs[NUM_LN]={
+1053,	/* "ACME Identifier" */
 363,	/* "AD Time Stamping" */
 405,	/* "ANSI X9.62" */
 368,	/* "Acceptable OCSP Responses" */
@@ -4320,6 +4329,7 @@ static const unsigned int ln_objs[NUM_LN]={
 1001,	/* "id-ct-routeOriginAuthz" */
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
+1054,	/* "id-ct-rpkiSignedPrefixList" */
 1014,	/* "id-ct-signedChecklist" */
 1024,	/* "id-ct-signedTAL" */
 408,	/* "id-ecPublicKey" */
@@ -5390,6 +5400,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 1016,	/* OBJ_tlsfeature                   1 3 6 1 5 5 7 1 24 */
 1006,	/* OBJ_sbgp_ipAddrBlockv2           1 3 6 1 5 5 7 1 28 */
 1007,	/* OBJ_sbgp_autonomousSysNumv2      1 3 6 1 5 5 7 1 29 */
+1053,	/* OBJ_acmeIdentifier               1 3 6 1 5 5 7 1 31 */
 164,	/* OBJ_id_qt_cps                    1 3 6 1 5 5 7 2 1 */
 165,	/* OBJ_id_qt_unotice                1 3 6 1 5 5 7 2 2 */
 293,	/* OBJ_textNotice                   1 3 6 1 5 5 7 2 3 */
@@ -5773,6 +5784,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 1014,	/* OBJ_id_ct_signedChecklist        1 2 840 113549 1 9 16 1 48 */
 1017,	/* OBJ_id_ct_ASPA                   1 2 840 113549 1 9 16 1 49 */
 1024,	/* OBJ_id_ct_signedTAL              1 2 840 113549 1 9 16 1 50 */
+1054,	/* OBJ_id_ct_rpkiSignedPrefixList   1 2 840 113549 1 9 16 1 51 */
 212,	/* OBJ_id_smime_aa_receiptRequest   1 2 840 113549 1 9 16 2 1 */
 213,	/* OBJ_id_smime_aa_securityLabel    1 2 840 113549 1 9 16 2 2 */
 214,	/* OBJ_id_smime_aa_mlExpandHistory  1 2 840 113549 1 9 16 2 3 */

@@ -1,3 +1,9 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 
@@ -7,7 +13,7 @@
 .type	RC4,@function
 .align	16
 RC4:
-	endbr64
+_CET_ENDBR
 	orq	%rsi,%rsi
 	jne	.Lentry
 	retq
@@ -525,7 +531,7 @@ RC4:
 .type	RC4_set_key,@function
 .align	16
 RC4_set_key:
-	endbr64
+_CET_ENDBR
 	leaq	8(%rdi),%rdi
 	leaq	(%rdx,%rsi,1),%rdx
 	negq	%rsi

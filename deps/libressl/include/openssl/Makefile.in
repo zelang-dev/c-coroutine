@@ -129,13 +129,13 @@ am__opensslinclude_HEADERS_DIST = opensslconf.h aes.h asn1.h asn1t.h \
 	bio.h blowfish.h bn.h buffer.h camellia.h cast.h chacha.h \
 	cmac.h cms.h comp.h conf.h conf_api.h crypto.h ct.h \
 	curve25519.h des.h dh.h dsa.h dtls1.h ec.h ecdh.h ecdsa.h \
-	engine.h err.h evp.h gost.h hkdf.h hmac.h idea.h kdf.h lhash.h \
-	md4.h md5.h modes.h obj_mac.h objects.h ocsp.h \
-	opensslfeatures.h opensslv.h ossl_typ.h pem.h pem2.h pkcs12.h \
-	pkcs7.h poly1305.h rand.h rc2.h rc4.h ripemd.h rsa.h \
-	safestack.h sha.h sm3.h sm4.h srtp.h ssl.h ssl2.h ssl23.h \
-	ssl3.h stack.h tls1.h ts.h txt_db.h ui.h ui_compat.h \
-	whrlpool.h x509.h x509_vfy.h x509v3.h
+	engine.h err.h evp.h hkdf.h hmac.h idea.h kdf.h lhash.h md4.h \
+	md5.h modes.h obj_mac.h objects.h ocsp.h opensslfeatures.h \
+	opensslv.h ossl_typ.h pem.h pem2.h pkcs12.h pkcs7.h poly1305.h \
+	posix_time.h rand.h rc2.h rc4.h ripemd.h rsa.h safestack.h \
+	sha.h sm3.h sm4.h srtp.h ssl.h ssl2.h ssl23.h ssl3.h stack.h \
+	tls1.h ts.h txt_db.h ui.h ui_compat.h whrlpool.h x509.h \
+	x509_vfy.h x509v3.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -325,18 +325,18 @@ AM_CPPFLAGS = -I$(top_srcdir)/include -I$(abs_top_builddir)/include \
 @ENABLE_LIBTLS_ONLY_FALSE@	conf_api.h crypto.h ct.h \
 @ENABLE_LIBTLS_ONLY_FALSE@	curve25519.h des.h dh.h dsa.h \
 @ENABLE_LIBTLS_ONLY_FALSE@	dtls1.h ec.h ecdh.h ecdsa.h engine.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	err.h evp.h gost.h hkdf.h hmac.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	idea.h kdf.h lhash.h md4.h md5.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	modes.h obj_mac.h objects.h ocsp.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	err.h evp.h hkdf.h hmac.h idea.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	kdf.h lhash.h md4.h md5.h modes.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	obj_mac.h objects.h ocsp.h \
 @ENABLE_LIBTLS_ONLY_FALSE@	opensslfeatures.h opensslv.h \
 @ENABLE_LIBTLS_ONLY_FALSE@	ossl_typ.h pem.h pem2.h pkcs12.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	pkcs7.h poly1305.h rand.h rc2.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	rc4.h ripemd.h rsa.h safestack.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	sha.h sm3.h sm4.h srtp.h ssl.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	ssl2.h ssl23.h ssl3.h stack.h tls1.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	ts.h txt_db.h ui.h ui_compat.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	whrlpool.h x509.h x509_vfy.h \
-@ENABLE_LIBTLS_ONLY_FALSE@	x509v3.h
+@ENABLE_LIBTLS_ONLY_FALSE@	pkcs7.h poly1305.h posix_time.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	rand.h rc2.h rc4.h ripemd.h rsa.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	safestack.h sha.h sm3.h sm4.h srtp.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	ssl.h ssl2.h ssl23.h ssl3.h stack.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	tls1.h ts.h txt_db.h ui.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	ui_compat.h whrlpool.h x509.h \
+@ENABLE_LIBTLS_ONLY_FALSE@	x509_vfy.h x509v3.h
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 

@@ -1,9 +1,16 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 .globl	aesni_encrypt
 .def	aesni_encrypt;	.scl 2;	.type 32;	.endef
 .p2align	4
 aesni_encrypt:
+_CET_ENDBR
 	movups	(%rcx),%xmm2
 	movl	240(%r8),%eax
 	movups	(%r8),%xmm0
@@ -25,6 +32,7 @@ aesni_encrypt:
 .def	aesni_decrypt;	.scl 2;	.type 32;	.endef
 .p2align	4
 aesni_decrypt:
+_CET_ENDBR
 	movups	(%rcx),%xmm2
 	movl	240(%r8),%eax
 	movups	(%r8),%xmm0
@@ -44,6 +52,7 @@ aesni_decrypt:
 .def	_aesni_encrypt3;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_encrypt3:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -77,6 +86,7 @@ _aesni_encrypt3:
 .def	_aesni_decrypt3;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_decrypt3:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -110,6 +120,7 @@ _aesni_decrypt3:
 .def	_aesni_encrypt4;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_encrypt4:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -148,6 +159,7 @@ _aesni_encrypt4:
 .def	_aesni_decrypt4;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_decrypt4:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -186,6 +198,7 @@ _aesni_decrypt4:
 .def	_aesni_encrypt6;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_encrypt6:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -243,6 +256,7 @@ _aesni_encrypt6:
 .def	_aesni_decrypt6;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_decrypt6:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -300,6 +314,7 @@ _aesni_decrypt6:
 .def	_aesni_encrypt8;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_encrypt8:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -370,6 +385,7 @@ _aesni_encrypt8:
 .def	_aesni_decrypt8;	.scl 3;	.type 32;	.endef
 .p2align	4
 _aesni_decrypt8:
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -451,6 +467,7 @@ aesni_ecb_encrypt:
 	movq	%r9,%rcx
 	movq	40(%rsp),%r8
 
+_CET_ENDBR
 	andq	$-16,%rdx
 	jz	.Lecb_ret
 
@@ -766,6 +783,7 @@ aesni_ccm64_encrypt_blocks:
 	movq	40(%rsp),%r8
 	movq	48(%rsp),%r9
 
+_CET_ENDBR
 	leaq	-88(%rsp),%rsp
 	movaps	%xmm6,(%rsp)
 	movaps	%xmm7,16(%rsp)
@@ -848,6 +866,7 @@ aesni_ccm64_decrypt_blocks:
 	movq	40(%rsp),%r8
 	movq	48(%rsp),%r9
 
+_CET_ENDBR
 	leaq	-88(%rsp),%rsp
 	movaps	%xmm6,(%rsp)
 	movaps	%xmm7,16(%rsp)
@@ -959,7 +978,7 @@ aesni_ctr32_encrypt_blocks:
 	movq	%r9,%rcx
 	movq	40(%rsp),%r8
 
-	endbr64
+_CET_ENDBR
 	leaq	(%rsp),%rax
 	pushq	%rbp
 	subq	$192,%rsp
@@ -1249,6 +1268,7 @@ aesni_xts_encrypt:
 	movq	40(%rsp),%r8
 	movq	48(%rsp),%r9
 
+_CET_ENDBR
 	leaq	(%rsp),%rax
 	pushq	%rbp
 	subq	$256,%rsp
@@ -1683,6 +1703,7 @@ aesni_xts_decrypt:
 	movq	40(%rsp),%r8
 	movq	48(%rsp),%r9
 
+_CET_ENDBR
 	leaq	(%rsp),%rax
 	pushq	%rbp
 	subq	$256,%rsp
@@ -2161,6 +2182,7 @@ aesni_cbc_encrypt:
 	movq	40(%rsp),%r8
 	movq	48(%rsp),%r9
 
+_CET_ENDBR
 	testq	%rdx,%rdx
 	jz	.Lcbc_ret
 
@@ -2503,6 +2525,7 @@ aesni_cbc_encrypt:
 .def	aesni_set_decrypt_key;	.scl 2;	.type 32;	.endef
 .p2align	4
 aesni_set_decrypt_key:
+_CET_ENDBR
 	subq	$8,%rsp
 	call	__aesni_set_encrypt_key
 	shll	$4,%edx
@@ -2541,6 +2564,7 @@ aesni_set_decrypt_key:
 .def	aesni_set_encrypt_key;	.scl 2;	.type 32;	.endef
 .p2align	4
 aesni_set_encrypt_key:
+_CET_ENDBR
 __aesni_set_encrypt_key:
 	subq	$8,%rsp
 	movq	$-1,%rax
@@ -2729,6 +2753,7 @@ __aesni_set_encrypt_key:
 	retq
 
 
+.section	.rodata
 .p2align	6
 .Lbswap_mask:
 .byte	15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
@@ -2738,13 +2763,13 @@ __aesni_set_encrypt_key:
 .long	1,0,0,0
 .Lxts_magic:
 .long	0x87,0,1,0
-
-.byte	65,69,83,32,102,111,114,32,73,110,116,101,108,32,65,69,83,45,78,73,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
 .p2align	6
+.text	
 
 .def	ecb_se_handler;	.scl 3;	.type 32;	.endef
 .p2align	4
 ecb_se_handler:
+_CET_ENDBR
 	pushq	%rsi
 	pushq	%rdi
 	pushq	%rbx
@@ -2764,6 +2789,7 @@ ecb_se_handler:
 .def	ccm64_se_handler;	.scl 3;	.type 32;	.endef
 .p2align	4
 ccm64_se_handler:
+_CET_ENDBR
 	pushq	%rsi
 	pushq	%rdi
 	pushq	%rbx
@@ -2805,6 +2831,7 @@ ccm64_se_handler:
 .def	ctr32_se_handler;	.scl 3;	.type 32;	.endef
 .p2align	4
 ctr32_se_handler:
+_CET_ENDBR
 	pushq	%rsi
 	pushq	%rdi
 	pushq	%rbx
@@ -2840,6 +2867,7 @@ ctr32_se_handler:
 .def	xts_se_handler;	.scl 3;	.type 32;	.endef
 .p2align	4
 xts_se_handler:
+_CET_ENDBR
 	pushq	%rsi
 	pushq	%rdi
 	pushq	%rbx
@@ -2879,6 +2907,7 @@ xts_se_handler:
 .def	cbc_se_handler;	.scl 3;	.type 32;	.endef
 .p2align	4
 cbc_se_handler:
+_CET_ENDBR
 	pushq	%rsi
 	pushq	%rdi
 	pushq	%rbx

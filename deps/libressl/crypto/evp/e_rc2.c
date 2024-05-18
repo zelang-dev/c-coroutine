@@ -1,4 +1,4 @@
-/* $OpenBSD: e_rc2.c,v 1.22 2023/07/07 19:37:53 beck Exp $ */
+/* $OpenBSD: e_rc2.c,v 1.27 2024/01/07 15:42:57 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -172,7 +172,6 @@ static const EVP_CIPHER rc2_cbc = {
 	.set_asn1_parameters = rc2_set_asn1_type_and_iv,
 	.get_asn1_parameters = rc2_get_asn1_type_and_iv,
 	.ctrl = rc2_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -194,7 +193,6 @@ static const EVP_CIPHER rc2_cfb64 = {
 	.set_asn1_parameters = rc2_set_asn1_type_and_iv,
 	.get_asn1_parameters = rc2_get_asn1_type_and_iv,
 	.ctrl = rc2_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -216,7 +214,6 @@ static const EVP_CIPHER rc2_ofb = {
 	.set_asn1_parameters = rc2_set_asn1_type_and_iv,
 	.get_asn1_parameters = rc2_get_asn1_type_and_iv,
 	.ctrl = rc2_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -238,7 +235,6 @@ static const EVP_CIPHER rc2_ecb = {
 	.set_asn1_parameters = rc2_set_asn1_type_and_iv,
 	.get_asn1_parameters = rc2_get_asn1_type_and_iv,
 	.ctrl = rc2_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -252,31 +248,33 @@ EVP_rc2_ecb(void)
 #define RC2_128_MAGIC	0x3a
 
 static const EVP_CIPHER r2_64_cbc_cipher = {
-	NID_rc2_64_cbc,
-	8, 8 /* 64 bit */, 8,
-	EVP_CIPH_CBC_MODE | EVP_CIPH_VARIABLE_LENGTH | EVP_CIPH_CTRL_INIT,
-	rc2_init_key,
-	rc2_cbc_cipher,
-	NULL,
-	sizeof(EVP_RC2_KEY),
-	rc2_set_asn1_type_and_iv,
-	rc2_get_asn1_type_and_iv,
-	rc2_ctrl,
-	NULL
+	.nid = NID_rc2_64_cbc,
+	.block_size = 8,
+	.key_len = 8,
+	.iv_len = 8,
+	.flags = EVP_CIPH_CBC_MODE | EVP_CIPH_VARIABLE_LENGTH | EVP_CIPH_CTRL_INIT,
+	.init = rc2_init_key,
+	.do_cipher = rc2_cbc_cipher,
+	.cleanup = NULL,
+	.ctx_size = sizeof(EVP_RC2_KEY),
+	.set_asn1_parameters = rc2_set_asn1_type_and_iv,
+	.get_asn1_parameters = rc2_get_asn1_type_and_iv,
+	.ctrl = rc2_ctrl,
 };
 
 static const EVP_CIPHER r2_40_cbc_cipher = {
-	NID_rc2_40_cbc,
-	8, 5 /* 40 bit */, 8,
-	EVP_CIPH_CBC_MODE | EVP_CIPH_VARIABLE_LENGTH | EVP_CIPH_CTRL_INIT,
-	rc2_init_key,
-	rc2_cbc_cipher,
-	NULL,
-	sizeof(EVP_RC2_KEY),
-	rc2_set_asn1_type_and_iv,
-	rc2_get_asn1_type_and_iv,
-	rc2_ctrl,
-	NULL
+	.nid = NID_rc2_40_cbc,
+	.block_size = 8,
+	.key_len = 5,
+	.iv_len = 8,
+	.flags = EVP_CIPH_CBC_MODE | EVP_CIPH_VARIABLE_LENGTH | EVP_CIPH_CTRL_INIT,
+	.init = rc2_init_key,
+	.do_cipher = rc2_cbc_cipher,
+	.cleanup = NULL,
+	.ctx_size = sizeof(EVP_RC2_KEY),
+	.set_asn1_parameters = rc2_set_asn1_type_and_iv,
+	.get_asn1_parameters = rc2_get_asn1_type_and_iv,
+	.ctrl = rc2_ctrl,
 };
 
 const EVP_CIPHER *
@@ -338,17 +336,17 @@ rc2_get_asn1_type_and_iv(EVP_CIPHER_CTX *c, ASN1_TYPE *type)
 	long num = 0;
 	int i = 0;
 	int key_bits;
-	unsigned int l;
+	int l;
 	unsigned char iv[EVP_MAX_IV_LENGTH];
 
 	if (type != NULL) {
 		l = EVP_CIPHER_CTX_iv_length(c);
-		if (l > sizeof(iv)) {
+		if (l < 0 || l > sizeof(iv)) {
 			EVPerror(EVP_R_IV_TOO_LARGE);
 			return -1;
 		}
 		i = ASN1_TYPE_get_int_octetstring(type, &num, iv, l);
-		if (i != (int)l)
+		if (i != l)
 			return (-1);
 		key_bits = rc2_magic_to_meth((int)num);
 		if (!key_bits)
@@ -373,6 +371,8 @@ rc2_set_asn1_type_and_iv(EVP_CIPHER_CTX *c, ASN1_TYPE *type)
 	if (type != NULL) {
 		num = rc2_meth_to_magic(c);
 		j = EVP_CIPHER_CTX_iv_length(c);
+		if (j < 0 || j > sizeof(c->oiv))
+			return 0;
 		i = ASN1_TYPE_set_int_octetstring(type, num, c->oiv, j);
 	}
 	return (i);

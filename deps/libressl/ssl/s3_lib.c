@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.246 2023/07/08 16:40:13 beck Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.251 2024/03/02 11:46:55 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -150,6 +150,7 @@
 
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <openssl/bn.h>
 #include <openssl/curve25519.h>
@@ -574,41 +575,6 @@ const SSL_CIPHER ssl3_ciphers[] = {
 		.algorithm2 = SSL_HANDSHAKE_MAC_SHA256|TLS1_PRF_SHA256,
 		.strength_bits = 256,
 		.alg_bits = 256,
-	},
-
-	/* GOST Ciphersuites */
-
-	/* Cipher 81 */
-	{
-		.valid = 1,
-		.name = "GOST2001-GOST89-GOST89",
-		.id = 0x3000081,
-		.algorithm_mkey = SSL_kGOST,
-		.algorithm_auth = SSL_aGOST01,
-		.algorithm_enc = SSL_eGOST2814789CNT,
-		.algorithm_mac = SSL_GOST89MAC,
-		.algorithm_ssl = SSL_TLSV1,
-		.algo_strength = SSL_HIGH,
-		.algorithm2 = SSL_HANDSHAKE_MAC_GOST94|TLS1_PRF_GOST94|
-		    TLS1_STREAM_MAC,
-		.strength_bits = 256,
-		.alg_bits = 256
-	},
-
-	/* Cipher 83 */
-	{
-		.valid = 1,
-		.name = "GOST2001-NULL-GOST94",
-		.id = 0x3000083,
-		.algorithm_mkey = SSL_kGOST,
-		.algorithm_auth = SSL_aGOST01,
-		.algorithm_enc = SSL_eNULL,
-		.algorithm_mac = SSL_GOST94,
-		.algorithm_ssl = SSL_TLSV1,
-		.algo_strength = SSL_STRONG_NONE,
-		.algorithm2 = SSL_HANDSHAKE_MAC_GOST94|TLS1_PRF_GOST94,
-		.strength_bits = 0,
-		.alg_bits = 0
 	},
 
 #ifndef OPENSSL_NO_CAMELLIA
@@ -1361,40 +1327,6 @@ const SSL_CIPHER ssl3_ciphers[] = {
 		.alg_bits = 256,
 	},
 
-	/* Cipher FF85 FIXME IANA */
-	{
-		.valid = 1,
-		.name = "GOST2012256-GOST89-GOST89",
-		.id = 0x300ff85, /* FIXME IANA */
-		.algorithm_mkey = SSL_kGOST,
-		.algorithm_auth = SSL_aGOST01,
-		.algorithm_enc = SSL_eGOST2814789CNT,
-		.algorithm_mac = SSL_GOST89MAC,
-		.algorithm_ssl = SSL_TLSV1,
-		.algo_strength = SSL_HIGH,
-		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256|
-		    TLS1_STREAM_MAC,
-		.strength_bits = 256,
-		.alg_bits = 256
-	},
-
-	/* Cipher FF87 FIXME IANA */
-	{
-		.valid = 1,
-		.name = "GOST2012256-NULL-STREEBOG256",
-		.id = 0x300ff87, /* FIXME IANA */
-		.algorithm_mkey = SSL_kGOST,
-		.algorithm_auth = SSL_aGOST01,
-		.algorithm_enc = SSL_eNULL,
-		.algorithm_mac = SSL_STREEBOG256,
-		.algorithm_ssl = SSL_TLSV1,
-		.algo_strength = SSL_STRONG_NONE,
-		.algorithm2 = SSL_HANDSHAKE_MAC_STREEBOG256|TLS1_PRF_STREEBOG256,
-		.strength_bits = 0,
-		.alg_bits = 0
-	},
-
-
 	/* end of list */
 };
 
@@ -1413,18 +1345,26 @@ ssl3_get_cipher(unsigned int u)
 		return (NULL);
 }
 
-const SSL_CIPHER *
-ssl3_get_cipher_by_id(unsigned int id)
+static int
+ssl3_cipher_id_cmp(const void *id, const void *cipher)
 {
-	const SSL_CIPHER *cp;
-	SSL_CIPHER c;
+	unsigned long a = *(const unsigned long *)id;
+	unsigned long b = ((const SSL_CIPHER *)cipher)->id;
 
-	c.id = id;
-	cp = OBJ_bsearch_ssl_cipher_id(&c, ssl3_ciphers, SSL3_NUM_CIPHERS);
-	if (cp != NULL && cp->valid == 1)
-		return (cp);
+	return a < b ? -1 : a > b;
+}
 
-	return (NULL);
+const SSL_CIPHER *
+ssl3_get_cipher_by_id(unsigned long id)
+{
+	const SSL_CIPHER *cipher;
+
+	cipher = bsearch(&id, ssl3_ciphers, SSL3_NUM_CIPHERS, sizeof(*cipher),
+	    ssl3_cipher_id_cmp);
+	if (cipher != NULL && cipher->valid == 1)
+		return cipher;
+
+	return NULL;
 }
 
 const SSL_CIPHER *
@@ -2030,6 +1970,7 @@ SSL_get_signature_type_nid(const SSL *s, int *nid)
 
 	return 1;
 }
+LSSL_ALIAS(SSL_get_signature_type_nid);
 
 int
 SSL_get_peer_signature_type_nid(const SSL *s, int *nid)
@@ -2046,6 +1987,7 @@ SSL_get_peer_signature_type_nid(const SSL *s, int *nid)
 
 	return 1;
 }
+LSSL_ALIAS(SSL_get_peer_signature_type_nid);
 
 long
 ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
@@ -2652,27 +2594,16 @@ ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
 	return (ret);
 }
 
+#define SSL3_CT_RSA_SIGN	1
+#define SSL3_CT_RSA_FIXED_DH	3
+#define SSL3_CT_ECDSA_SIGN	64
+
 int
 ssl3_get_req_cert_types(SSL *s, CBB *cbb)
 {
 	unsigned long alg_k;
 
 	alg_k = s->s3->hs.cipher->algorithm_mkey;
-
-#ifndef OPENSSL_NO_GOST
-	if ((alg_k & SSL_kGOST) != 0) {
-		if (!CBB_add_u8(cbb, TLS_CT_GOST01_SIGN))
-			return 0;
-		if (!CBB_add_u8(cbb, TLS_CT_GOST12_256_SIGN))
-			return 0;
-		if (!CBB_add_u8(cbb, TLS_CT_GOST12_512_SIGN))
-			return 0;
-		if (!CBB_add_u8(cbb, TLS_CT_GOST12_256_SIGN_COMPAT))
-			return 0;
-		if (!CBB_add_u8(cbb, TLS_CT_GOST12_512_SIGN_COMPAT))
-			return 0;
-	}
-#endif
 
 	if ((alg_k & SSL_kDHE) != 0) {
 		if (!CBB_add_u8(cbb, SSL3_CT_RSA_FIXED_DH))
@@ -2686,7 +2617,7 @@ ssl3_get_req_cert_types(SSL *s, CBB *cbb)
 	 * ECDSA certs can be used with RSA cipher suites as well
 	 * so we don't need to check for SSL_kECDH or SSL_kECDHE.
 	 */
-	if (!CBB_add_u8(cbb, TLS_CT_ECDSA_SIGN))
+	if (!CBB_add_u8(cbb, SSL3_CT_ECDSA_SIGN))
 		return 0;
 
 	return 1;

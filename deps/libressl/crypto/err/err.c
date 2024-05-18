@@ -1,4 +1,4 @@
-/* $OpenBSD: err.c,v 1.56 2023/07/28 10:23:19 tb Exp $ */
+/* $OpenBSD: err.c,v 1.60 2024/03/02 11:37:13 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -122,14 +122,29 @@
 #include <openssl/err.h>
 #include <openssl/lhash.h>
 
+#include "crypto_local.h"
+
 DECLARE_LHASH_OF(ERR_STRING_DATA);
 DECLARE_LHASH_OF(ERR_STATE);
 
 typedef struct st_ERR_FNS ERR_FNS;
 
+typedef struct err_state_st {
+	CRYPTO_THREADID tid;
+	int err_flags[ERR_NUM_ERRORS];
+	unsigned long err_buffer[ERR_NUM_ERRORS];
+	char *err_data[ERR_NUM_ERRORS];
+	int err_data_flags[ERR_NUM_ERRORS];
+	const char *err_file[ERR_NUM_ERRORS];
+	int err_line[ERR_NUM_ERRORS];
+	int top, bottom;
+} ERR_STATE;
+
 static void err_load_strings(int lib, ERR_STRING_DATA *str);
 
+static ERR_STATE *ERR_get_state(void);
 static void ERR_STATE_free(ERR_STATE *s);
+
 #ifndef OPENSSL_NO_ERR
 static ERR_STRING_DATA ERR_str_libraries[] = {
 	{ERR_PACK(ERR_LIB_NONE,0,0),		"unknown library"},
@@ -328,17 +343,14 @@ err_string_data_cmp(const ERR_STRING_DATA *a, const ERR_STRING_DATA *b)
 }
 static IMPLEMENT_LHASH_COMP_FN(err_string_data, ERR_STRING_DATA)
 
-static
-LHASH_OF(ERR_STRING_DATA) *int_err_get(int create)
+static LHASH_OF(ERR_STRING_DATA) *
+int_err_get(int create)
 {
 	LHASH_OF(ERR_STRING_DATA) *ret = NULL;
 
 	CRYPTO_w_lock(CRYPTO_LOCK_ERR);
-	if (!int_error_hash && create) {
-		CRYPTO_push_info("int_err_get (err.c)");
+	if (!int_error_hash && create)
 		int_error_hash = lh_ERR_STRING_DATA_new();
-		CRYPTO_pop_info();
-	}
 	if (int_error_hash)
 		ret = int_error_hash;
 	CRYPTO_w_unlock(CRYPTO_LOCK_ERR);
@@ -425,17 +437,14 @@ err_state_cmp(const ERR_STATE *a, const ERR_STATE *b)
 }
 static IMPLEMENT_LHASH_COMP_FN(err_state, ERR_STATE)
 
-static
-LHASH_OF(ERR_STATE) *int_thread_get(int create)
+static LHASH_OF(ERR_STATE) *
+int_thread_get(int create)
 {
 	LHASH_OF(ERR_STATE) *ret = NULL;
 
 	CRYPTO_w_lock(CRYPTO_LOCK_ERR);
-	if (!int_thread_hash && create) {
-		CRYPTO_push_info("int_thread_get (err.c)");
+	if (!int_thread_hash && create)
 		int_thread_hash = lh_ERR_STATE_new();
-		CRYPTO_pop_info();
-	}
 	if (int_thread_hash) {
 		int_thread_hash_references++;
 		ret = int_thread_hash;
@@ -1026,7 +1035,7 @@ ERR_remove_state(unsigned long pid)
 }
 LCRYPTO_ALIAS(ERR_remove_state);
 
-ERR_STATE *
+static ERR_STATE *
 ERR_get_state(void)
 {
 	static ERR_STATE fallback;
@@ -1064,7 +1073,6 @@ ERR_get_state(void)
 	}
 	return ret;
 }
-LCRYPTO_ALIAS(ERR_get_state);
 
 int
 ERR_get_next_error_library(void)

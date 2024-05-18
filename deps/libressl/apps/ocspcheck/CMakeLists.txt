@@ -11,11 +11,7 @@ else()
 	set(OCSPCHECK_SRC ${OCSPCHECK_SRC} compat/memmem.c)
 endif()
 
-if(NOT "${OPENSSLDIR}" STREQUAL "")
-	add_definitions(-DDEFAULT_CA_FILE=\"${OPENSSLDIR}/cert.pem\")
-else()
-	add_definitions(-DDEFAULT_CA_FILE=\"${CMAKE_INSTALL_PREFIX}/etc/ssl/cert.pem\")
-endif()
+add_definitions(-DDEFAULT_CA_FILE=\"${OPENSSLDIR}/cert.pem\")
 
 add_executable(ocspcheck ${OCSPCHECK_SRC})
 target_include_directories(ocspcheck
@@ -24,7 +20,7 @@ target_include_directories(ocspcheck
 	PUBLIC
 		../../include
 		${CMAKE_BINARY_DIR}/include)
-target_link_libraries(ocspcheck tls ${OPENSSL_LIBS})
+target_link_libraries(ocspcheck tls ${OPENSSL_LIBS} compat_obj tls_compat_obj)
 
 if(ENABLE_LIBRESSL_INSTALL)
 	install(TARGETS ocspcheck DESTINATION ${CMAKE_INSTALL_BINDIR})

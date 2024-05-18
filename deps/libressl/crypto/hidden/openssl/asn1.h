@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1.h,v 1.6 2023/07/28 10:33:13 tb Exp $ */
+/* $OpenBSD: asn1.h,v 1.12 2024/03/02 09:08:41 tb Exp $ */
 /*
  * Copyright (c) 2023 Bob Beck <beck@openbsd.org>
  *
@@ -154,7 +154,6 @@ LCRYPTO_USED(ASN1_TIME_normalize);
 LCRYPTO_USED(ASN1_TIME_set_string_X509);
 LCRYPTO_USED(ASN1_TIME_diff);
 LCRYPTO_USED(ASN1_TIME_set);
-LCRYPTO_USED(ASN1_TIME_set_tm);
 LCRYPTO_USED(ASN1_TIME_adj);
 LCRYPTO_USED(ASN1_TIME_check);
 LCRYPTO_USED(ASN1_TIME_to_generalizedtime);
@@ -222,32 +221,15 @@ LCRYPTO_USED(ASN1_mbstring_copy);
 LCRYPTO_USED(ASN1_mbstring_ncopy);
 LCRYPTO_USED(ASN1_STRING_set_by_NID);
 LCRYPTO_USED(ASN1_STRING_TABLE_get);
-LCRYPTO_USED(ASN1_STRING_TABLE_add);
-LCRYPTO_USED(ASN1_STRING_TABLE_cleanup);
 LCRYPTO_USED(ASN1_item_new);
 LCRYPTO_USED(ASN1_item_free);
 LCRYPTO_USED(ASN1_item_d2i);
 LCRYPTO_USED(ASN1_item_i2d);
-LCRYPTO_USED(ASN1_add_oid_module);
 LCRYPTO_USED(ASN1_generate_nconf);
 LCRYPTO_USED(ASN1_generate_v3);
 LCRYPTO_USED(ASN1_item_print);
-LCRYPTO_USED(ASN1_PCTX_new);
-LCRYPTO_USED(ASN1_PCTX_free);
-LCRYPTO_USED(ASN1_PCTX_get_flags);
-LCRYPTO_USED(ASN1_PCTX_set_flags);
-LCRYPTO_USED(ASN1_PCTX_get_nm_flags);
-LCRYPTO_USED(ASN1_PCTX_set_nm_flags);
-LCRYPTO_USED(ASN1_PCTX_get_cert_flags);
-LCRYPTO_USED(ASN1_PCTX_set_cert_flags);
-LCRYPTO_USED(ASN1_PCTX_get_oid_flags);
-LCRYPTO_USED(ASN1_PCTX_set_oid_flags);
-LCRYPTO_USED(ASN1_PCTX_get_str_flags);
-LCRYPTO_USED(ASN1_PCTX_set_str_flags);
 LCRYPTO_USED(SMIME_crlf_copy);
 LCRYPTO_USED(SMIME_text);
 LCRYPTO_USED(ERR_load_ASN1_strings);
-LCRYPTO_USED(ASN1_time_parse);
-LCRYPTO_USED(ASN1_time_tm_cmp);
 
 #endif /* _LIBCRYPTO_ASN1_H */

@@ -1,4 +1,4 @@
-/* $OpenBSD: err_prn.c,v 1.20 2023/07/07 13:54:45 beck Exp $ */
+/* $OpenBSD: err_prn.c,v 1.23 2024/03/02 11:37:13 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,6 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -65,6 +66,7 @@
 #include <openssl/lhash.h>
 
 #include "bio_local.h"
+#include "crypto_local.h"
 
 void
 ERR_print_errors_cb(int (*cb)(const char *str, size_t len, void *u), void *u)
@@ -93,12 +95,9 @@ LCRYPTO_ALIAS(ERR_print_errors_cb);
 static int
 print_fp(const char *str, size_t len, void *fp)
 {
-	BIO bio;
-
-	BIO_set(&bio, BIO_s_file());
-	BIO_set_fp(&bio, fp, BIO_NOCLOSE);
-
-	return BIO_printf(&bio, "%s", str);
+	if (len > INT_MAX)
+		return -1;
+	return fprintf(fp, "%.*s", (int)len, str);
 }
 
 void
@@ -111,7 +110,7 @@ LCRYPTO_ALIAS(ERR_print_errors_fp);
 static int
 print_bio(const char *str, size_t len, void *bp)
 {
-	return BIO_write((BIO *)bp, str, len);
+	return BIO_write(bp, str, len);
 }
 
 void

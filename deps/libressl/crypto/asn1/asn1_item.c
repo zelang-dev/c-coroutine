@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_item.c,v 1.17 2023/07/13 20:59:10 tb Exp $ */
+/* $OpenBSD: asn1_item.c,v 1.20 2024/01/28 14:43:48 joshua Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -118,6 +118,7 @@
 
 #include "asn1_local.h"
 #include "evp_local.h"
+#include "x509_local.h"
 
 int
 ASN1_item_digest(const ASN1_ITEM *it, const EVP_MD *type, void *asn,
@@ -221,13 +222,20 @@ int
 ASN1_item_sign(const ASN1_ITEM *it, X509_ALGOR *algor1, X509_ALGOR *algor2,
     ASN1_BIT_STRING *signature, void *asn, EVP_PKEY *pkey, const EVP_MD *type)
 {
-	EVP_MD_CTX ctx;
-	EVP_MD_CTX_init(&ctx);
-	if (!EVP_DigestSignInit(&ctx, NULL, type, NULL, pkey)) {
-		EVP_MD_CTX_cleanup(&ctx);
-		return 0;
-	}
-	return ASN1_item_sign_ctx(it, algor1, algor2, signature, asn, &ctx);
+	EVP_MD_CTX *md_ctx = NULL;
+	int ret = 0;
+
+	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+		goto err;
+	if (!EVP_DigestSignInit(md_ctx, NULL, type, NULL, pkey))
+		goto err;
+
+	ret = ASN1_item_sign_ctx(it, algor1, algor2, signature, asn, md_ctx);
+
+ err:
+	EVP_MD_CTX_free(md_ctx);
+
+	return ret;
 }
 
 static int
@@ -235,7 +243,6 @@ asn1_item_set_algorithm_identifiers(EVP_MD_CTX *ctx, X509_ALGOR *algor1,
     X509_ALGOR *algor2)
 {
 	EVP_PKEY *pkey;
-	ASN1_OBJECT *aobj;
 	const EVP_MD *md;
 	int sign_id, sign_param;
 
@@ -254,21 +261,17 @@ asn1_item_set_algorithm_identifiers(EVP_MD_CTX *ctx, X509_ALGOR *algor1,
 		ASN1error(ASN1_R_DIGEST_AND_KEY_TYPE_NOT_SUPPORTED);
 		return 0;
 	}
-	if ((aobj = OBJ_nid2obj(sign_id)) == NULL) {
-		ASN1error(ASN1_R_UNKNOWN_OBJECT_TYPE);
-		return 0;
-	}
 
 	sign_param = V_ASN1_UNDEF;
 	if (pkey->ameth->pkey_flags & ASN1_PKEY_SIGPARAM_NULL)
 		sign_param = V_ASN1_NULL;
 
 	if (algor1 != NULL) {
-		if (!X509_ALGOR_set0(algor1, aobj, sign_param, NULL))
+		if (!X509_ALGOR_set0_by_nid(algor1, sign_id, sign_param, NULL))
 			return 0;
 	}
 	if (algor2 != NULL) {
-		if (!X509_ALGOR_set0(algor2, aobj, sign_param, NULL))
+		if (!X509_ALGOR_set0_by_nid(algor2, sign_id, sign_param, NULL))
 			return 0;
 	}
 
@@ -378,7 +381,7 @@ int
 ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
     ASN1_BIT_STRING *signature, void *asn, EVP_PKEY *pkey)
 {
-	EVP_MD_CTX ctx;
+	EVP_MD_CTX *md_ctx = NULL;
 	unsigned char *in = NULL;
 	int mdnid, pknid;
 	int in_len = 0;
@@ -386,15 +389,16 @@ ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
 
 	if (pkey == NULL) {
 		ASN1error(ERR_R_PASSED_NULL_PARAMETER);
-		return -1;
+		goto err;
 	}
 
 	if (signature->type == V_ASN1_BIT_STRING && signature->flags & 0x7) {
 		ASN1error(ASN1_R_INVALID_BIT_STRING_BITS_LEFT);
-		return -1;
+		goto err;
 	}
 
-	EVP_MD_CTX_init(&ctx);
+	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+		goto err;
 
 	/* Convert signature OID into digest and public key OIDs */
 	if (!OBJ_find_sigid_algs(OBJ_obj2nid(a->algorithm), &mdnid, &pknid)) {
@@ -406,7 +410,7 @@ ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
 			ASN1error(ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM);
 			goto err;
 		}
-		ret = pkey->ameth->item_verify(&ctx, it, asn, a,
+		ret = pkey->ameth->item_verify(md_ctx, it, asn, a,
 		    signature, pkey);
 		/* Return value of 2 means carry on, anything else means we
 		 * exit straight away: either a fatal error of the underlying
@@ -429,7 +433,7 @@ ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
 			goto err;
 		}
 
-		if (!EVP_DigestVerifyInit(&ctx, NULL, type, NULL, pkey)) {
+		if (!EVP_DigestVerifyInit(md_ctx, NULL, type, NULL, pkey)) {
 			ASN1error(ERR_R_EVP_LIB);
 			ret = 0;
 			goto err;
@@ -443,7 +447,7 @@ ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
 		goto err;
 	}
 
-	if (EVP_DigestVerify(&ctx, signature->data, signature->length,
+	if (EVP_DigestVerify(md_ctx, signature->data, signature->length,
 	    in, in_len) <= 0) {
 		ASN1error(ERR_R_EVP_LIB);
 		ret = 0;
@@ -453,7 +457,7 @@ ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
 	ret = 1;
 
  err:
-	EVP_MD_CTX_cleanup(&ctx);
+	EVP_MD_CTX_free(md_ctx);
 	freezero(in, in_len);
 
 	return ret;

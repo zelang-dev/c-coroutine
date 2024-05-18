@@ -1,4 +1,4 @@
-/* $OpenBSD: set_key.c,v 1.23 2023/07/08 07:34:34 jsing Exp $ */
+/* $OpenBSD: set_key.c,v 1.26 2023/12/20 06:30:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,14 +56,10 @@
  * [including the GNU Public Licence.]
  */
 
-/* set_key.c v 1.4 eay 24/9/91
- * 1.4 Speed up by 400% :-)
- * 1.3 added register declarations.
- * 1.2 unrolled make_key_sched a bit more
- * 1.1 added norm_expand_bits
- * 1.0 First working version
- */
+#include <stdlib.h>
+
 #include <openssl/crypto.h>
+
 #include "des_local.h"
 
 int DES_check_key = 0;	/* defaults to false */
@@ -398,10 +394,13 @@ DES_key_sched(const_DES_cblock *key, DES_key_schedule *schedule)
 {
 	return (DES_set_key(key, schedule));
 }
-/*
-#undef des_fixup_key_parity
-void des_fixup_key_parity(des_cblock *key)
-	{
-	des_set_odd_parity(key);
-	}
-*/
+
+int
+DES_random_key(DES_cblock *ret)
+{
+	do {
+		arc4random_buf(ret, sizeof(DES_cblock));
+		DES_set_odd_parity(ret);
+	} while (DES_is_weak_key(ret));
+	return (1);
+}

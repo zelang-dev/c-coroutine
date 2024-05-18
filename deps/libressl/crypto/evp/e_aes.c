@@ -1,4 +1,4 @@
-/* $OpenBSD: e_aes.c,v 1.54 2023/09/28 11:29:10 tb Exp $ */
+/* $OpenBSD: e_aes.c,v 1.56 2024/01/04 17:38:36 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 2001-2011 The OpenSSL Project.  All rights reserved.
  *
@@ -2460,7 +2460,11 @@ aes_wrap_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	}
 
 	if (iv != NULL) {
-		memcpy(ctx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
+		int iv_len = EVP_CIPHER_CTX_iv_length(ctx);
+
+		if (iv_len < 0 || iv_len > sizeof(ctx->iv))
+			return 0;
+		memcpy(ctx->iv, iv, iv_len);
 		wctx->iv = ctx->iv;
 	}
 
@@ -2546,7 +2550,6 @@ static const EVP_CIPHER aes_128_wrap = {
 	.set_asn1_parameters = NULL,
 	.get_asn1_parameters = NULL,
 	.ctrl = aes_wrap_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -2568,7 +2571,6 @@ static const EVP_CIPHER aes_192_wrap = {
 	.set_asn1_parameters = NULL,
 	.get_asn1_parameters = NULL,
 	.ctrl = aes_wrap_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -2590,7 +2592,6 @@ static const EVP_CIPHER aes_256_wrap = {
 	.set_asn1_parameters = NULL,
 	.get_asn1_parameters = NULL,
 	.ctrl = aes_wrap_ctrl,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *

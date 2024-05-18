@@ -1,4 +1,4 @@
-/* $OpenBSD: obj_dat.c,v 1.61 2023/09/05 14:59:00 tb Exp $ */
+/* $OpenBSD: obj_dat.c,v 1.89 2024/03/02 11:11:11 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -59,6 +59,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <openssl/opensslconf.h>
@@ -70,19 +71,10 @@
 #include <openssl/objects.h>
 
 #include "asn1_local.h"
+#include "lhash_local.h"
 
 /* obj_dat.h is generated from objects.h by obj_dat.pl */
 #include "obj_dat.h"
-
-static int sn_cmp_BSEARCH_CMP_FN(const void *, const void *);
-static int sn_cmp(const ASN1_OBJECT * const *, unsigned int const *);
-static unsigned int *OBJ_bsearch_sn(const ASN1_OBJECT * *key, unsigned int const *base, int num);
-static int ln_cmp_BSEARCH_CMP_FN(const void *, const void *);
-static int ln_cmp(const ASN1_OBJECT * const *, unsigned int const *);
-static unsigned int *OBJ_bsearch_ln(const ASN1_OBJECT * *key, unsigned int const *base, int num);
-static int obj_cmp_BSEARCH_CMP_FN(const void *, const void *);
-static int obj_cmp(const ASN1_OBJECT * const *, unsigned int const *);
-static unsigned int *OBJ_bsearch_obj(const ASN1_OBJECT * *key, unsigned int const *base, int num);
 
 #define ADDED_DATA	0
 #define ADDED_SNAME	1
@@ -97,48 +89,6 @@ DECLARE_LHASH_OF(ADDED_OBJ);
 
 static int new_nid = NUM_NID;
 static LHASH_OF(ADDED_OBJ) *added = NULL;
-
-static int sn_cmp(const ASN1_OBJECT * const *a, const unsigned int *b)
-{
-	return (strcmp((*a)->sn, nid_objs[*b].sn));
-}
-
-
-static int
-sn_cmp_BSEARCH_CMP_FN(const void *a_, const void *b_)
-{
-	const ASN1_OBJECT * const *a = a_;
-	unsigned int const *b = b_;
-	return sn_cmp(a, b);
-}
-
-static unsigned int *
-OBJ_bsearch_sn(const ASN1_OBJECT * *key, unsigned int const *base, int num)
-{
-	return (unsigned int *)OBJ_bsearch_(key, base, num, sizeof(unsigned int),
-	    sn_cmp_BSEARCH_CMP_FN);
-}
-
-static int ln_cmp(const ASN1_OBJECT * const *a, const unsigned int *b)
-{
-	return (strcmp((*a)->ln, nid_objs[*b].ln));
-}
-
-
-static int
-ln_cmp_BSEARCH_CMP_FN(const void *a_, const void *b_)
-{
-	const ASN1_OBJECT * const *a = a_;
-	unsigned int const *b = b_;
-	return ln_cmp(a, b);
-}
-
-static unsigned int *
-OBJ_bsearch_ln(const ASN1_OBJECT * *key, unsigned int const *base, int num)
-{
-	return (unsigned int *)OBJ_bsearch_(key, base, num, sizeof(unsigned int),
-	    ln_cmp_BSEARCH_CMP_FN);
-}
 
 static unsigned long
 added_obj_hash(const ADDED_OBJ *ca)
@@ -234,30 +184,12 @@ static IMPLEMENT_LHASH_DOALL_FN(cleanup1, ADDED_OBJ)
 static IMPLEMENT_LHASH_DOALL_FN(cleanup2, ADDED_OBJ)
 static IMPLEMENT_LHASH_DOALL_FN(cleanup3, ADDED_OBJ)
 
-/* The purpose of obj_cleanup_defer is to avoid EVP_cleanup() attempting
- * to use freed up OIDs. If necessary the actual freeing up of OIDs is
- * delayed.
- */
-
-int obj_cleanup_defer = 0;
-
-void
-check_defer(int nid)
-{
-	if (!obj_cleanup_defer && nid >= NUM_NID)
-		obj_cleanup_defer = 1;
-}
-
 void
 OBJ_cleanup(void)
 {
-	if (obj_cleanup_defer) {
-		obj_cleanup_defer = 2;
-		return;
-	}
 	if (added == NULL)
 		return;
-	lh_ADDED_OBJ_down_load(added) = 0;
+
 	lh_ADDED_OBJ_doall(added, LHASH_DOALL_FN(cleanup1)); /* zero counters */
 	lh_ADDED_OBJ_doall(added, LHASH_DOALL_FN(cleanup2)); /* set counters */
 	lh_ADDED_OBJ_doall(added, LHASH_DOALL_FN(cleanup3)); /* free objects */
@@ -277,7 +209,7 @@ OBJ_new_nid(int num)
 }
 LCRYPTO_ALIAS(OBJ_new_nid);
 
-int
+static int
 OBJ_add_object(const ASN1_OBJECT *obj)
 {
 	ASN1_OBJECT *o = NULL;
@@ -327,143 +259,182 @@ OBJ_add_object(const ASN1_OBJECT *obj)
 	ASN1_OBJECT_free(o);
 	return (NID_undef);
 }
-LCRYPTO_ALIAS(OBJ_add_object);
 
 ASN1_OBJECT *
-OBJ_nid2obj(int n)
+OBJ_nid2obj(int nid)
 {
-	ADDED_OBJ ad, *adp;
-	ASN1_OBJECT ob;
+	if (nid >= 0 && nid < NUM_NID) {
+		if (nid == NID_undef || nid_objs[nid].nid != NID_undef)
+			return (ASN1_OBJECT *)&nid_objs[nid];
 
-	if ((n >= 0) && (n < NUM_NID)) {
-		if ((n != NID_undef) && (nid_objs[n].nid == NID_undef)) {
-			OBJerror(OBJ_R_UNKNOWN_NID);
-			return (NULL);
-		}
-		return ((ASN1_OBJECT *)&(nid_objs[n]));
-	} else if (added == NULL)
-		return (NULL);
-	else {
-		ad.type = ADDED_NID;
-		ad.obj = &ob;
-		ob.nid = n;
-		adp = lh_ADDED_OBJ_retrieve(added, &ad);
-		if (adp != NULL)
-			return (adp->obj);
-		else {
-			OBJerror(OBJ_R_UNKNOWN_NID);
-			return (NULL);
-		}
+		goto unknown;
 	}
+
+	/* XXX - locking. */
+	if (added != NULL) {
+		ASN1_OBJECT aobj = {
+			.nid = nid,
+		};
+		ADDED_OBJ needle = {
+			.type = ADDED_NID,
+			.obj = &aobj,
+		};
+		ADDED_OBJ *found;
+
+		if ((found = lh_ADDED_OBJ_retrieve(added, &needle)) != NULL)
+			return found->obj;
+	}
+
+ unknown:
+	OBJerror(OBJ_R_UNKNOWN_NID);
+
+	return NULL;
 }
 LCRYPTO_ALIAS(OBJ_nid2obj);
 
 const char *
-OBJ_nid2sn(int n)
+OBJ_nid2sn(int nid)
 {
-	ADDED_OBJ ad, *adp;
-	ASN1_OBJECT ob;
+	ASN1_OBJECT *aobj;
 
-	if ((n >= 0) && (n < NUM_NID)) {
-		if ((n != NID_undef) && (nid_objs[n].nid == NID_undef)) {
-			OBJerror(OBJ_R_UNKNOWN_NID);
-			return (NULL);
-		}
-		return (nid_objs[n].sn);
-	} else if (added == NULL)
-		return (NULL);
-	else {
-		ad.type = ADDED_NID;
-		ad.obj = &ob;
-		ob.nid = n;
-		adp = lh_ADDED_OBJ_retrieve(added, &ad);
-		if (adp != NULL)
-			return (adp->obj->sn);
-		else {
-			OBJerror(OBJ_R_UNKNOWN_NID);
-			return (NULL);
-		}
-	}
+	if ((aobj = OBJ_nid2obj(nid)) == NULL)
+		return NULL;
+
+	return aobj->sn;
 }
 LCRYPTO_ALIAS(OBJ_nid2sn);
 
 const char *
-OBJ_nid2ln(int n)
+OBJ_nid2ln(int nid)
 {
-	ADDED_OBJ ad, *adp;
-	ASN1_OBJECT ob;
+	ASN1_OBJECT *aobj;
 
-	if ((n >= 0) && (n < NUM_NID)) {
-		if ((n != NID_undef) && (nid_objs[n].nid == NID_undef)) {
-			OBJerror(OBJ_R_UNKNOWN_NID);
-			return (NULL);
-		}
-		return (nid_objs[n].ln);
-	} else if (added == NULL)
-		return (NULL);
-	else {
-		ad.type = ADDED_NID;
-		ad.obj = &ob;
-		ob.nid = n;
-		adp = lh_ADDED_OBJ_retrieve(added, &ad);
-		if (adp != NULL)
-			return (adp->obj->ln);
-		else {
-			OBJerror(OBJ_R_UNKNOWN_NID);
-			return (NULL);
-		}
-	}
+	if ((aobj = OBJ_nid2obj(nid)) == NULL)
+		return NULL;
+
+	return aobj->ln;
 }
 LCRYPTO_ALIAS(OBJ_nid2ln);
 
 static int
-obj_cmp(const ASN1_OBJECT * const *ap, const unsigned int *bp)
+obj_objs_cmp(const void *aobj, const void *b)
 {
-	const ASN1_OBJECT *a = *ap;
-	const ASN1_OBJECT *b = &nid_objs[*bp];
+	const unsigned int *nid = b;
 
-	return OBJ_cmp(a, b);
-}
+	OPENSSL_assert(*nid < NUM_NID);
 
-static int
-obj_cmp_BSEARCH_CMP_FN(const void *a_, const void *b_)
-{
-	const ASN1_OBJECT * const *a = a_;
-	unsigned int const *b = b_;
-	return obj_cmp(a, b);
-}
-
-static unsigned int *
-OBJ_bsearch_obj(const ASN1_OBJECT * *key, unsigned int const *base, int num)
-{
-	return (unsigned int *)OBJ_bsearch_(key, base, num, sizeof(unsigned int),
-	    obj_cmp_BSEARCH_CMP_FN);
+	return OBJ_cmp(aobj, &nid_objs[*nid]);
 }
 
 int
-OBJ_obj2nid(const ASN1_OBJECT *a)
+OBJ_obj2nid(const ASN1_OBJECT *aobj)
 {
-	const unsigned int *op;
-	ADDED_OBJ ad, *adp;
+	const unsigned int *nid;
 
-	if (a == NULL || a->length == 0)
-		return (NID_undef);
-	if (a->nid != NID_undef)
-		return (a->nid);
+	if (aobj == NULL || aobj->length == 0)
+		return NID_undef;
 
+	if (aobj->nid != NID_undef)
+		return aobj->nid;
+
+	/* XXX - locking. OpenSSL 3 moved this after built-in object lookup. */
 	if (added != NULL) {
-		ad.type = ADDED_DATA;
-		ad.obj=(ASN1_OBJECT *)a; /* XXX: ugly but harmless */
-		adp = lh_ADDED_OBJ_retrieve(added, &ad);
-		if (adp != NULL)
-			return (adp->obj->nid);
+		ADDED_OBJ needle = {
+			.type = ADDED_DATA,
+			.obj = (ASN1_OBJECT *)aobj,
+		};
+		ADDED_OBJ *found;
+
+		if ((found = lh_ADDED_OBJ_retrieve(added, &needle)) != NULL)
+			return found->obj->nid;
 	}
-	op = OBJ_bsearch_obj(&a, obj_objs, NUM_OBJ);
-	if (op == NULL)
-		return (NID_undef);
-	return (nid_objs[*op].nid);
+
+	/* obj_objs holds built-in obj NIDs in ascending OBJ_cmp() order. */
+	nid = bsearch(aobj, obj_objs, NUM_OBJ, sizeof(unsigned int), obj_objs_cmp);
+	if (nid != NULL)
+		return *nid;
+
+	return NID_undef;
 }
 LCRYPTO_ALIAS(OBJ_obj2nid);
+
+static int
+sn_objs_cmp(const void *sn, const void *b)
+{
+	const unsigned int *nid = b;
+
+	OPENSSL_assert(*nid < NUM_NID);
+
+	return strcmp(sn, nid_objs[*nid].sn);
+}
+
+int
+OBJ_sn2nid(const char *sn)
+{
+	const unsigned int *nid;
+
+	/* XXX - locking. OpenSSL 3 moved this after built-in object lookup. */
+	if (added != NULL) {
+		ASN1_OBJECT aobj = {
+			.sn = sn,
+		};
+		ADDED_OBJ needle = {
+			.type = ADDED_SNAME,
+			.obj = &aobj,
+		};
+		ADDED_OBJ *found;
+
+		if ((found = lh_ADDED_OBJ_retrieve(added, &needle)) != NULL)
+			return found->obj->nid;
+	}
+
+	/* sn_objs holds NIDs in ascending alphabetical order of SN. */
+	nid = bsearch(sn, sn_objs, NUM_SN, sizeof(unsigned int), sn_objs_cmp);
+	if (nid != NULL)
+		return *nid;
+
+	return NID_undef;
+}
+LCRYPTO_ALIAS(OBJ_sn2nid);
+
+static int
+ln_objs_cmp(const void *ln, const void *b)
+{
+	const unsigned int *nid = b;
+
+	OPENSSL_assert(*nid < NUM_NID);
+
+	return strcmp(ln, nid_objs[*nid].ln);
+}
+
+int
+OBJ_ln2nid(const char *ln)
+{
+	const unsigned int *nid;
+
+	/* XXX - locking. OpenSSL 3 moved this after built-in object lookup. */
+	if (added != NULL) {
+		ASN1_OBJECT aobj = {
+			.ln = ln,
+		};
+		ADDED_OBJ needle = {
+			.type = ADDED_LNAME,
+			.obj = &aobj,
+		};
+		ADDED_OBJ *found;
+
+		if ((found = lh_ADDED_OBJ_retrieve(added, &needle)) != NULL)
+			return found->obj->nid;
+	}
+
+	/* ln_objs holds NIDs in ascending alphabetical order of LN. */
+	nid = bsearch(ln, ln_objs, NUM_LN, sizeof(unsigned int), ln_objs_cmp);
+	if (nid != NULL)
+		return *nid;
+
+	return NID_undef;
+}
+LCRYPTO_ALIAS(OBJ_ln2nid);
 
 /* Convert an object name into an ASN1_OBJECT
  * if "noname" is not set then search for short and long names first.
@@ -477,8 +448,8 @@ OBJ_txt2obj(const char *s, int no_name)
 	int nid;
 
 	if (!no_name) {
-		if (((nid = OBJ_sn2nid(s)) != NID_undef) ||
-		    ((nid = OBJ_ln2nid(s)) != NID_undef) )
+		if ((nid = OBJ_sn2nid(s)) != NID_undef ||
+		    (nid = OBJ_ln2nid(s)) != NID_undef)
 			return OBJ_nid2obj(nid);
 	}
 
@@ -505,93 +476,6 @@ OBJ_txt2nid(const char *s)
 	return nid;
 }
 LCRYPTO_ALIAS(OBJ_txt2nid);
-
-int
-OBJ_ln2nid(const char *s)
-{
-	ASN1_OBJECT o;
-	const ASN1_OBJECT *oo = &o;
-	ADDED_OBJ ad, *adp;
-	const unsigned int *op;
-
-	o.ln = s;
-	if (added != NULL) {
-		ad.type = ADDED_LNAME;
-		ad.obj = &o;
-		adp = lh_ADDED_OBJ_retrieve(added, &ad);
-		if (adp != NULL)
-			return (adp->obj->nid);
-	}
-	op = OBJ_bsearch_ln(&oo, ln_objs, NUM_LN);
-	if (op == NULL)
-		return (NID_undef);
-	return (nid_objs[*op].nid);
-}
-LCRYPTO_ALIAS(OBJ_ln2nid);
-
-int
-OBJ_sn2nid(const char *s)
-{
-	ASN1_OBJECT o;
-	const ASN1_OBJECT *oo = &o;
-	ADDED_OBJ ad, *adp;
-	const unsigned int *op;
-
-	o.sn = s;
-	if (added != NULL) {
-		ad.type = ADDED_SNAME;
-		ad.obj = &o;
-		adp = lh_ADDED_OBJ_retrieve(added, &ad);
-		if (adp != NULL)
-			return (adp->obj->nid);
-	}
-	op = OBJ_bsearch_sn(&oo, sn_objs, NUM_SN);
-	if (op == NULL)
-		return (NID_undef);
-	return (nid_objs[*op].nid);
-}
-LCRYPTO_ALIAS(OBJ_sn2nid);
-
-const void *
-OBJ_bsearch_(const void *key, const void *base, int num, int size,
-    int (*cmp)(const void *, const void *))
-{
-	return OBJ_bsearch_ex_(key, base, num, size, cmp, 0);
-}
-LCRYPTO_ALIAS(OBJ_bsearch_);
-
-const void *
-OBJ_bsearch_ex_(const void *key, const void *base_, int num, int size,
-    int (*cmp)(const void *, const void *), int flags)
-{
-	const char *base = base_;
-	int l, h, i = 0, c = 0;
-	const char *p = NULL;
-
-	if (num == 0)
-		return (NULL);
-	l = 0;
-	h = num;
-	while (l < h) {
-		i = (l + h) / 2;
-		p = &(base[i * size]);
-		c = (*cmp)(key, p);
-		if (c < 0)
-			h = i;
-		else if (c > 0)
-			l = i + 1;
-		else
-			break;
-	}
-	if (c != 0 && !(flags & OBJ_BSEARCH_VALUE_ON_NOMATCH))
-		p = NULL;
-	else if (c == 0 && (flags & OBJ_BSEARCH_FIRST_VALUE_ON_MATCH)) {
-		while (i > 0 && (*cmp)(key, &(base[(i - 1) * size])) == 0)
-			i--;
-		p = &(base[i * size]);
-	}
-	return (p);
-}
 
 int
 OBJ_create_objects(BIO *in)
@@ -646,31 +530,33 @@ LCRYPTO_ALIAS(OBJ_create_objects);
 int
 OBJ_create(const char *oid, const char *sn, const char *ln)
 {
-	int ok = 0;
-	ASN1_OBJECT *op = NULL;
-	unsigned char *buf;
-	int i;
+	ASN1_OBJECT *aobj = NULL;
+	unsigned char *buf = NULL;
+	int len, nid;
+	int ret = 0;
 
-	i = a2d_ASN1_OBJECT(NULL, 0, oid, -1);
-	if (i <= 0)
-		return (0);
+	if ((len = a2d_ASN1_OBJECT(NULL, 0, oid, -1)) <= 0)
+		goto err;
 
-	if ((buf = malloc(i)) == NULL) {
+	if ((buf = calloc(1, len)) == NULL) {
 		OBJerror(ERR_R_MALLOC_FAILURE);
-		return (0);
+		goto err;
 	}
-	i = a2d_ASN1_OBJECT(buf, i, oid, -1);
-	if (i == 0)
+
+	if ((len = a2d_ASN1_OBJECT(buf, len, oid, -1)) == 0)
 		goto err;
-	op = (ASN1_OBJECT *)ASN1_OBJECT_create(OBJ_new_nid(1), buf, i, sn, ln);
-	if (op == NULL)
+
+	nid = OBJ_new_nid(1);
+	if ((aobj = ASN1_OBJECT_create(nid, buf, len, sn, ln)) == NULL)
 		goto err;
-	ok = OBJ_add_object(op);
+
+	ret = OBJ_add_object(aobj);
 
  err:
-	ASN1_OBJECT_free(op);
+	ASN1_OBJECT_free(aobj);
 	free(buf);
-	return (ok);
+
+	return ret;
 }
 LCRYPTO_ALIAS(OBJ_create);
 

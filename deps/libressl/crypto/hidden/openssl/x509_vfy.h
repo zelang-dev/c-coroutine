@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_vfy.h,v 1.6 2023/07/05 21:14:54 bcook Exp $ */
+/* $OpenBSD: x509_vfy.h,v 1.9 2024/03/02 10:57:03 tb Exp $ */
 /*
  * Copyright (c) 2022 Bob Beck <beck@openbsd.org>
  *
@@ -40,6 +40,7 @@ LCRYPTO_USED(X509_STORE_new);
 LCRYPTO_USED(X509_STORE_free);
 LCRYPTO_USED(X509_STORE_up_ref);
 LCRYPTO_USED(X509_STORE_get0_objects);
+LCRYPTO_USED(X509_STORE_get1_objects);
 LCRYPTO_USED(X509_STORE_get_ex_data);
 LCRYPTO_USED(X509_STORE_set_ex_data);
 LCRYPTO_USED(X509_STORE_set_flags);
@@ -78,14 +79,7 @@ LCRYPTO_USED(X509_LOOKUP_ctrl);
 LCRYPTO_USED(X509_load_cert_file);
 LCRYPTO_USED(X509_load_crl_file);
 LCRYPTO_USED(X509_load_cert_crl_file);
-LCRYPTO_USED(X509_LOOKUP_new);
 LCRYPTO_USED(X509_LOOKUP_free);
-LCRYPTO_USED(X509_LOOKUP_init);
-LCRYPTO_USED(X509_LOOKUP_by_subject);
-LCRYPTO_USED(X509_LOOKUP_by_issuer_serial);
-LCRYPTO_USED(X509_LOOKUP_by_fingerprint);
-LCRYPTO_USED(X509_LOOKUP_by_alias);
-LCRYPTO_USED(X509_LOOKUP_shutdown);
 LCRYPTO_USED(X509_STORE_load_locations);
 LCRYPTO_USED(X509_STORE_load_mem);
 LCRYPTO_USED(X509_STORE_set_default_paths);
@@ -108,7 +102,6 @@ LCRYPTO_USED(X509_STORE_CTX_set_chain);
 LCRYPTO_USED(X509_STORE_CTX_set0_crls);
 LCRYPTO_USED(X509_STORE_CTX_set_purpose);
 LCRYPTO_USED(X509_STORE_CTX_set_trust);
-LCRYPTO_USED(X509_STORE_CTX_purpose_inherit);
 LCRYPTO_USED(X509_STORE_CTX_set_flags);
 LCRYPTO_USED(X509_STORE_CTX_set_time);
 LCRYPTO_USED(X509_STORE_CTX_set0_verified_chain);

@@ -1,4 +1,4 @@
-/* $OpenBSD: pmeth_gn.c,v 1.13 2023/07/07 19:37:54 beck Exp $ */
+/* $OpenBSD: pmeth_gn.c,v 1.15 2024/01/01 18:33:04 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -197,7 +197,7 @@ EVP_PKEY_CTX_get_keygen_info(EVP_PKEY_CTX *ctx, int idx)
 {
 	if (idx == -1)
 		return ctx->keygen_info_count;
-	if (idx < 0 || idx > ctx->keygen_info_count)
+	if (idx < 0 || idx >= ctx->keygen_info_count)
 		return 0;
 	return ctx->keygen_info[idx];
 }
@@ -208,7 +208,7 @@ EVP_PKEY_new_mac_key(int type, ENGINE *e, const unsigned char *key, int keylen)
 	EVP_PKEY_CTX *mac_ctx = NULL;
 	EVP_PKEY *mac_key = NULL;
 
-	mac_ctx = EVP_PKEY_CTX_new_id(type, e);
+	mac_ctx = EVP_PKEY_CTX_new_id(type, NULL);
 	if (!mac_ctx)
 		return NULL;
 	if (EVP_PKEY_keygen_init(mac_ctx) <= 0)

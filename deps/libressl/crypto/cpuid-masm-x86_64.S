@@ -1,26 +1,33 @@
 ; 1 "crypto/cpuid-masm-x86_64.S.tmp"
 ; 1 "<built-in>" 1
 ; 1 "<built-in>" 3
-; 343 "<built-in>" 3
+; 371 "<built-in>" 3
 ; 1 "<command line>" 1
 ; 1 "<built-in>" 2
 ; 1 "crypto/cpuid-masm-x86_64.S.tmp" 2
 OPTION	DOTNAME
 
+
+
+
+
+
+
 ; 1 "./crypto/x86_arch.h" 1
 
 
 ; 16 "./crypto/x86_arch.h"
+   
 
 
 
 
 
-
-
+   
 
 
 ; 40 "./crypto/x86_arch.h"
+   
 
 
 
@@ -65,11 +72,11 @@ OPTION	DOTNAME
 
 
 
-
-; 3 "crypto/cpuid-masm-x86_64.S.tmp" 2
+; 9 "crypto/cpuid-masm-x86_64.S.tmp" 2
 EXTERN	OPENSSL_cpuid_setup:NEAR
 
 .CRT$XCU	SEGMENT READONLY ALIGN(8)
+
 		DQ	OPENSSL_cpuid_setup
 
 EXTERN	OPENSSL_ia32cap_P:NEAR
@@ -82,6 +89,7 @@ PUBLIC	OPENSSL_ia32_cpuid
 
 ALIGN	16
 OPENSSL_ia32_cpuid	PROC PUBLIC
+
 	mov	r8,rbx
 
 	xor	eax,eax

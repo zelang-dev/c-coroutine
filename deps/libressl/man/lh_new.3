@@ -1,4 +1,4 @@
-.\" $OpenBSD: lh_new.3,v 1.9 2022/03/31 17:27:17 naddy Exp $
+.\" $OpenBSD: lh_new.3,v 1.13 2024/03/05 22:15:29 tb Exp $
 .\" full merge up to:
 .\" OpenSSL doc/crypto/lhash.pod 1bc74519 May 20 08:11:46 2016 -0400
 .\" selective merge up to:
@@ -118,7 +118,7 @@
 .\" copied and put under another distribution licence
 .\" [including the GNU Public Licence.]
 .\"
-.Dd $Mdocdate: March 31 2022 $
+.Dd $Mdocdate: March 5 2024 $
 .Dt LH_NEW 3
 .Os
 .Sh NAME
@@ -342,15 +342,8 @@ lh_STUFF_doall(hashtable, LHASH_DOALL_FN(STUFF_cleanup));
 lh_STUFF_free(hashtable);
 .Ed
 .Pp
-When doing this, be careful if you delete entries from the hash table in
-your callbacks: the table may decrease in size, moving the item that you
-are currently on down lower in the hash table \(em this could cause some
-entries to be skipped during the iteration.
-The second best solution to this problem is to set hash->down_load=0
-before you start (which will stop the hash table ever decreasing in
-size).
-The best solution is probably to avoid deleting items from the hash
-table inside a doall callback!
+A callback may delete entries from the hash table, however, it is
+not safe to insert new entries.
 .Pp
 .Fn lh_<type>_doall_arg
 is the same as
@@ -386,8 +379,6 @@ lh_STUFF_doall_arg(hashtable, LHASH_DOALL_ARG_FN(STUFF_print), BIO,
 .Pp
 .Fn lh_<type>_error
 can be used to determine if an error occurred in the last operation.
-.Fn lh_<type>_error
-is a macro.
 .Sh RETURN VALUES
 .Fn lh_<type>_new
 returns
@@ -526,8 +517,7 @@ routine would not normally be passed to
 rather it would be used in the function passed to
 .Fn lh_<type>_new .
 .Sh SEE ALSO
-.Xr crypto 3 ,
-.Xr lh_stats 3
+.Xr crypto 3
 .Sh HISTORY
 .Fn lh_new ,
 .Fn lh_free ,

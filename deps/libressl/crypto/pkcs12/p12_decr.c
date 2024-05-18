@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_decr.c,v 1.24 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: p12_decr.c,v 1.26 2024/03/02 10:15:16 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -77,7 +77,7 @@ PKCS12_pbe_crypt(const X509_ALGOR *algor, const char *pass, int passlen,
 	int outlen, i;
 	EVP_CIPHER_CTX ctx;
 
-	EVP_CIPHER_CTX_init(&ctx);
+	EVP_CIPHER_CTX_legacy_clear(&ctx);
 	/* Decrypt data */
 	if (!EVP_PBE_CipherInit(algor->algorithm, pass, passlen,
 	    algor->parameter, &ctx, en_de)) {
@@ -116,7 +116,6 @@ err:
 	return out;
 
 }
-LCRYPTO_ALIAS(PKCS12_pbe_crypt);
 
 /* Decrypt an OCTET STRING and decode ASN1 structure
  * if zbuf set zero buffer after use.
@@ -145,7 +144,6 @@ PKCS12_item_decrypt_d2i(const X509_ALGOR *algor, const ASN1_ITEM *it,
 	free(out);
 	return ret;
 }
-LCRYPTO_ALIAS(PKCS12_item_decrypt_d2i);
 
 /* Encode ASN1 structure and encrypt, return OCTET STRING
  * if zbuf set zero encoding.
@@ -184,6 +182,3 @@ err:
 	ASN1_OCTET_STRING_free(oct);
 	return NULL;
 }
-LCRYPTO_ALIAS(PKCS12_item_i2d_encrypt);
-
-IMPLEMENT_PKCS12_STACK_OF(PKCS7)

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl.h,v 1.4 2023/07/28 09:53:55 tb Exp $ */
+/* $OpenBSD: ssl.h,v 1.6 2024/03/02 11:48:55 tb Exp $ */
 /*
  * Copyright (c) 2023 Bob Beck <beck@openbsd.org>
  *
@@ -111,8 +111,6 @@ LSSL_USED(SSL_want);
 LSSL_USED(SSL_clear);
 LSSL_USED(SSL_CTX_flush_sessions);
 LSSL_USED(SSL_get_current_cipher);
-LSSL_USED(SSL_CIPHER_get_by_id);
-LSSL_USED(SSL_CIPHER_get_by_value);
 LSSL_USED(SSL_CIPHER_get_bits);
 LSSL_USED(SSL_CIPHER_get_version);
 LSSL_USED(SSL_CIPHER_get_name);
@@ -360,7 +358,6 @@ LSSL_USED(SSL_COMP_add_compression_method);
 LSSL_USED(SSL_set_session_ticket_ext);
 LSSL_USED(SSL_set_session_ticket_ext_cb);
 LSSL_USED(SSL_set_session_secret_cb);
-LSSL_USED(SSL_set_debug);
 LSSL_USED(SSL_cache_hit);
 LSSL_USED(SSL_set_security_level);
 LSSL_USED(SSL_get_security_level);

@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_vfy.h,v 1.64 2023/05/28 05:25:24 tb Exp $ */
+/* $OpenBSD: x509_vfy.h,v 1.68 2024/03/02 10:57:03 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -293,6 +293,7 @@ int X509_STORE_up_ref(X509_STORE *x);
 STACK_OF(X509) *X509_STORE_CTX_get1_certs(X509_STORE_CTX *st, X509_NAME *nm);
 STACK_OF(X509_CRL) *X509_STORE_CTX_get1_crls(X509_STORE_CTX *st, X509_NAME *nm);
 STACK_OF(X509_OBJECT) *X509_STORE_get0_objects(X509_STORE *xs);
+STACK_OF(X509_OBJECT) *X509_STORE_get1_objects(X509_STORE *xs);
 void *X509_STORE_get_ex_data(X509_STORE *xs, int idx);
 int X509_STORE_set_ex_data(X509_STORE *xs, int idx, void *data);
 
@@ -362,19 +363,7 @@ int X509_load_cert_file(X509_LOOKUP *ctx, const char *file, int type);
 int X509_load_crl_file(X509_LOOKUP *ctx, const char *file, int type);
 int X509_load_cert_crl_file(X509_LOOKUP *ctx, const char *file, int type);
 
-
-X509_LOOKUP *X509_LOOKUP_new(X509_LOOKUP_METHOD *method);
 void X509_LOOKUP_free(X509_LOOKUP *ctx);
-int X509_LOOKUP_init(X509_LOOKUP *ctx);
-int X509_LOOKUP_by_subject(X509_LOOKUP *ctx, X509_LOOKUP_TYPE type,
-    X509_NAME *name, X509_OBJECT *ret);
-int X509_LOOKUP_by_issuer_serial(X509_LOOKUP *ctx, X509_LOOKUP_TYPE type,
-    X509_NAME *name, ASN1_INTEGER *serial, X509_OBJECT *ret);
-int X509_LOOKUP_by_fingerprint(X509_LOOKUP *ctx, X509_LOOKUP_TYPE type,
-    const unsigned char *bytes, int len, X509_OBJECT *ret);
-int X509_LOOKUP_by_alias(X509_LOOKUP *ctx, X509_LOOKUP_TYPE type,
-    const char *str, int len, X509_OBJECT *ret);
-int X509_LOOKUP_shutdown(X509_LOOKUP *ctx);
 
 int	X509_STORE_load_locations(X509_STORE *ctx,
 		const char *file, const char *dir);
@@ -401,8 +390,6 @@ void	X509_STORE_CTX_set_chain(X509_STORE_CTX *c,STACK_OF(X509) *sk);
 void	X509_STORE_CTX_set0_crls(X509_STORE_CTX *c,STACK_OF(X509_CRL) *sk);
 int X509_STORE_CTX_set_purpose(X509_STORE_CTX *ctx, int purpose);
 int X509_STORE_CTX_set_trust(X509_STORE_CTX *ctx, int trust);
-int X509_STORE_CTX_purpose_inherit(X509_STORE_CTX *ctx, int def_purpose,
-				int purpose, int trust);
 void X509_STORE_CTX_set_flags(X509_STORE_CTX *ctx, unsigned long flags);
 void X509_STORE_CTX_set_time(X509_STORE_CTX *ctx, unsigned long flags,
 								time_t t);

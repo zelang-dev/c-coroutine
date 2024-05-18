@@ -1,10 +1,16 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 .globl	aesni_encrypt
 .type	aesni_encrypt,@function
 .align	16
 aesni_encrypt:
-	endbr64
+_CET_ENDBR
 	movups	(%rdi),%xmm2
 	movl	240(%rdx),%eax
 	movups	(%rdx),%xmm0
@@ -26,7 +32,7 @@ aesni_encrypt:
 .type	aesni_decrypt,@function
 .align	16
 aesni_decrypt:
-	endbr64
+_CET_ENDBR
 	movups	(%rdi),%xmm2
 	movl	240(%rdx),%eax
 	movups	(%rdx),%xmm0
@@ -46,7 +52,7 @@ aesni_decrypt:
 .type	_aesni_encrypt3,@function
 .align	16
 _aesni_encrypt3:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -80,7 +86,7 @@ _aesni_encrypt3:
 .type	_aesni_decrypt3,@function
 .align	16
 _aesni_decrypt3:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -114,7 +120,7 @@ _aesni_decrypt3:
 .type	_aesni_encrypt4,@function
 .align	16
 _aesni_encrypt4:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -153,7 +159,7 @@ _aesni_encrypt4:
 .type	_aesni_decrypt4,@function
 .align	16
 _aesni_decrypt4:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -192,7 +198,7 @@ _aesni_decrypt4:
 .type	_aesni_encrypt6,@function
 .align	16
 _aesni_encrypt6:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -250,7 +256,7 @@ _aesni_encrypt6:
 .type	_aesni_decrypt6,@function
 .align	16
 _aesni_decrypt6:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -308,7 +314,7 @@ _aesni_decrypt6:
 .type	_aesni_encrypt8,@function
 .align	16
 _aesni_encrypt8:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -379,7 +385,7 @@ _aesni_encrypt8:
 .type	_aesni_decrypt8,@function
 .align	16
 _aesni_decrypt8:
-	endbr64
+_CET_ENDBR
 	movups	(%rcx),%xmm0
 	shrl	$1,%eax
 	movups	16(%rcx),%xmm1
@@ -451,7 +457,7 @@ _aesni_decrypt8:
 .type	aesni_ecb_encrypt,@function
 .align	16
 aesni_ecb_encrypt:
-	endbr64
+_CET_ENDBR
 	andq	$-16,%rdx
 	jz	.Lecb_ret
 
@@ -754,7 +760,7 @@ aesni_ecb_encrypt:
 .type	aesni_ccm64_encrypt_blocks,@function
 .align	16
 aesni_ccm64_encrypt_blocks:
-	endbr64
+_CET_ENDBR
 	movl	240(%rcx),%eax
 	movdqu	(%r8),%xmm9
 	movdqa	.Lincrement64(%rip),%xmm6
@@ -812,6 +818,7 @@ aesni_ccm64_encrypt_blocks:
 .type	aesni_ccm64_decrypt_blocks,@function
 .align	16
 aesni_ccm64_decrypt_blocks:
+_CET_ENDBR
 	movl	240(%rcx),%eax
 	movups	(%r8),%xmm9
 	movdqu	(%r9),%xmm3
@@ -899,7 +906,7 @@ aesni_ccm64_decrypt_blocks:
 .type	aesni_ctr32_encrypt_blocks,@function
 .align	16
 aesni_ctr32_encrypt_blocks:
-	endbr64
+_CET_ENDBR
 	leaq	(%rsp),%rax
 	pushq	%rbp
 	subq	$32,%rsp
@@ -1155,6 +1162,7 @@ aesni_ctr32_encrypt_blocks:
 .type	aesni_xts_encrypt,@function
 .align	16
 aesni_xts_encrypt:
+_CET_ENDBR
 	leaq	(%rsp),%rax
 	pushq	%rbp
 	subq	$96,%rsp
@@ -1555,6 +1563,7 @@ aesni_xts_encrypt:
 .type	aesni_xts_decrypt,@function
 .align	16
 aesni_xts_decrypt:
+_CET_ENDBR
 	leaq	(%rsp),%rax
 	pushq	%rbp
 	subq	$96,%rsp
@@ -1999,6 +2008,7 @@ aesni_xts_decrypt:
 .type	aesni_cbc_encrypt,@function
 .align	16
 aesni_cbc_encrypt:
+_CET_ENDBR
 	testq	%rdx,%rdx
 	jz	.Lcbc_ret
 
@@ -2330,7 +2340,7 @@ aesni_cbc_encrypt:
 .type	aesni_set_decrypt_key,@function
 .align	16
 aesni_set_decrypt_key:
-	endbr64
+_CET_ENDBR
 	subq	$8,%rsp
 	call	__aesni_set_encrypt_key
 	shll	$4,%esi
@@ -2369,7 +2379,7 @@ aesni_set_decrypt_key:
 .type	aesni_set_encrypt_key,@function
 .align	16
 aesni_set_encrypt_key:
-	endbr64
+_CET_ENDBR
 __aesni_set_encrypt_key:
 	subq	$8,%rsp
 	movq	$-1,%rax

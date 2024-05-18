@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_purp.c,v 1.29 2023/08/18 08:42:41 tb Exp $ */
+/* $OpenBSD: x509_purp.c,v 1.39 2024/03/02 10:43:52 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2001.
  */
@@ -68,6 +68,16 @@
 #include "x509_internal.h"
 #include "x509_local.h"
 
+struct x509_purpose_st {
+	int purpose;
+	int trust;		/* Default trust ID */
+	int flags;
+	int (*check_purpose)(const struct x509_purpose_st *, const X509 *, int);
+	char *name;
+	char *sname;
+	void *usr_data;
+} /* X509_PURPOSE */;
+
 #define V1_ROOT (EXFLAG_V1|EXFLAG_SS)
 #define ku_reject(x, usage) \
 	(((x)->ex_flags & EXFLAG_KUSAGE) && !((x)->ex_kusage & (usage)))
@@ -95,10 +105,7 @@ static int check_purpose_timestamp_sign(const X509_PURPOSE *xp, const X509 *x,
 static int no_check(const X509_PURPOSE *xp, const X509 *x, int ca);
 static int ocsp_helper(const X509_PURPOSE *xp, const X509 *x, int ca);
 
-static int xp_cmp(const X509_PURPOSE * const *a, const X509_PURPOSE * const *b);
-static void xptable_free(X509_PURPOSE *p);
-
-static X509_PURPOSE xstandard[] = {
+static const X509_PURPOSE xstandard[] = {
 	{
 		.purpose = X509_PURPOSE_SSL_CLIENT,
 		.trust = X509_TRUST_SSL_CLIENT,
@@ -166,14 +173,6 @@ static X509_PURPOSE xstandard[] = {
 
 #define X509_PURPOSE_COUNT (sizeof(xstandard) / sizeof(xstandard[0]))
 
-static STACK_OF(X509_PURPOSE) *xptable = NULL;
-
-static int
-xp_cmp(const X509_PURPOSE * const *a, const X509_PURPOSE * const *b)
-{
-	return (*a)->purpose - (*b)->purpose;
-}
-
 /* As much as I'd like to make X509_check_purpose use a "const" X509*
  * I really can't because it does recalculate hashes and do other non-const
  * things. */
@@ -188,43 +187,30 @@ X509_check_purpose(X509 *x, int id, int ca)
 
 	if (id == -1)
 		return 1;
-	idx = X509_PURPOSE_get_by_id(id);
-	if (idx == -1)
+
+	if ((idx = X509_PURPOSE_get_by_id(id)) == -1)
 		return -1;
-	pt = X509_PURPOSE_get0(idx);
+	if ((pt = X509_PURPOSE_get0(idx)) == NULL)
+		return -1;
+
 	return pt->check_purpose(pt, x, ca);
 }
 LCRYPTO_ALIAS(X509_check_purpose);
 
 int
-X509_PURPOSE_set(int *p, int purpose)
-{
-	if (X509_PURPOSE_get_by_id(purpose) == -1) {
-		X509V3error(X509V3_R_INVALID_PURPOSE);
-		return 0;
-	}
-	*p = purpose;
-	return 1;
-}
-LCRYPTO_ALIAS(X509_PURPOSE_set);
-
-int
 X509_PURPOSE_get_count(void)
 {
-	if (!xptable)
-		return X509_PURPOSE_COUNT;
-	return sk_X509_PURPOSE_num(xptable) + X509_PURPOSE_COUNT;
+	return X509_PURPOSE_COUNT;
 }
 LCRYPTO_ALIAS(X509_PURPOSE_get_count);
 
-X509_PURPOSE *
+const X509_PURPOSE *
 X509_PURPOSE_get0(int idx)
 {
-	if (idx < 0)
+	if (idx < 0 || (size_t)idx >= X509_PURPOSE_COUNT)
 		return NULL;
-	if (idx < (int)X509_PURPOSE_COUNT)
-		return xstandard + idx;
-	return sk_X509_PURPOSE_value(xptable, idx - X509_PURPOSE_COUNT);
+
+	return &xstandard[idx];
 }
 LCRYPTO_ALIAS(X509_PURPOSE_get0);
 
@@ -232,7 +218,7 @@ int
 X509_PURPOSE_get_by_sname(const char *sname)
 {
 	int i;
-	X509_PURPOSE *xptmp;
+	const X509_PURPOSE *xptmp;
 
 	for (i = 0; i < X509_PURPOSE_get_count(); i++) {
 		xptmp = X509_PURPOSE_get0(i);
@@ -246,117 +232,15 @@ LCRYPTO_ALIAS(X509_PURPOSE_get_by_sname);
 int
 X509_PURPOSE_get_by_id(int purpose)
 {
-	X509_PURPOSE tmp;
-	int idx;
-
-	if ((purpose >= X509_PURPOSE_MIN) && (purpose <= X509_PURPOSE_MAX))
-		return purpose - X509_PURPOSE_MIN;
-	tmp.purpose = purpose;
-	if (!xptable)
+	/*
+	 * Ensure the purpose identifier is between MIN and MAX inclusive.
+	 * If so, translate it to an index into the xstandard[] table.
+	 */
+	if (purpose < X509_PURPOSE_MIN || purpose > X509_PURPOSE_MAX)
 		return -1;
-	idx = sk_X509_PURPOSE_find(xptable, &tmp);
-	if (idx == -1)
-		return -1;
-	return idx + X509_PURPOSE_COUNT;
+
+	return purpose - X509_PURPOSE_MIN;
 }
-LCRYPTO_ALIAS(X509_PURPOSE_get_by_id);
-
-int
-X509_PURPOSE_add(int id, int trust, int flags,
-    int (*ck)(const X509_PURPOSE *, const X509 *, int), const char *name,
-    const char *sname, void *arg)
-{
-	int idx;
-	X509_PURPOSE *ptmp;
-	char *name_dup, *sname_dup;
-
-	name_dup = sname_dup = NULL;
-
-	if (name == NULL || sname == NULL) {
-		X509V3error(X509V3_R_INVALID_NULL_ARGUMENT);
-		return 0;
-	}
-
-	/* This is set according to what we change: application can't set it */
-	flags &= ~X509_PURPOSE_DYNAMIC;
-	/* This will always be set for application modified trust entries */
-	flags |= X509_PURPOSE_DYNAMIC_NAME;
-	/* Get existing entry if any */
-	idx = X509_PURPOSE_get_by_id(id);
-	/* Need a new entry */
-	if (idx == -1) {
-		if ((ptmp = malloc(sizeof(X509_PURPOSE))) == NULL) {
-			X509V3error(ERR_R_MALLOC_FAILURE);
-			return 0;
-		}
-		ptmp->flags = X509_PURPOSE_DYNAMIC;
-	} else
-		ptmp = X509_PURPOSE_get0(idx);
-
-	if ((name_dup = strdup(name)) == NULL)
-		goto err;
-	if ((sname_dup = strdup(sname)) == NULL)
-		goto err;
-
-	/* free existing name if dynamic */
-	if (ptmp->flags & X509_PURPOSE_DYNAMIC_NAME) {
-		free(ptmp->name);
-		free(ptmp->sname);
-	}
-	/* dup supplied name */
-	ptmp->name = name_dup;
-	ptmp->sname = sname_dup;
-	/* Keep the dynamic flag of existing entry */
-	ptmp->flags &= X509_PURPOSE_DYNAMIC;
-	/* Set all other flags */
-	ptmp->flags |= flags;
-
-	ptmp->purpose = id;
-	ptmp->trust = trust;
-	ptmp->check_purpose = ck;
-	ptmp->usr_data = arg;
-
-	/* If its a new entry manage the dynamic table */
-	if (idx == -1) {
-		if (xptable == NULL &&
-		    (xptable = sk_X509_PURPOSE_new(xp_cmp)) == NULL)
-			goto err;
-		if (sk_X509_PURPOSE_push(xptable, ptmp) == 0)
-			goto err;
-	}
-	return 1;
-
-err:
-	free(name_dup);
-	free(sname_dup);
-	if (idx == -1)
-		free(ptmp);
-	X509V3error(ERR_R_MALLOC_FAILURE);
-	return 0;
-}
-LCRYPTO_ALIAS(X509_PURPOSE_add);
-
-static void
-xptable_free(X509_PURPOSE *p)
-{
-	if (!p)
-		return;
-	if (p->flags & X509_PURPOSE_DYNAMIC) {
-		if (p->flags & X509_PURPOSE_DYNAMIC_NAME) {
-			free(p->name);
-			free(p->sname);
-		}
-		free(p);
-	}
-}
-
-void
-X509_PURPOSE_cleanup(void)
-{
-	sk_X509_PURPOSE_pop_free(xptable, xptable_free);
-	xptable = NULL;
-}
-LCRYPTO_ALIAS(X509_PURPOSE_cleanup);
 
 int
 X509_PURPOSE_get_id(const X509_PURPOSE *xp)
@@ -365,14 +249,14 @@ X509_PURPOSE_get_id(const X509_PURPOSE *xp)
 }
 LCRYPTO_ALIAS(X509_PURPOSE_get_id);
 
-char *
+const char *
 X509_PURPOSE_get0_name(const X509_PURPOSE *xp)
 {
 	return xp->name;
 }
 LCRYPTO_ALIAS(X509_PURPOSE_get0_name);
 
-char *
+const char *
 X509_PURPOSE_get0_sname(const X509_PURPOSE *xp)
 {
 	return xp->sname;
@@ -384,70 +268,34 @@ X509_PURPOSE_get_trust(const X509_PURPOSE *xp)
 {
 	return xp->trust;
 }
-LCRYPTO_ALIAS(X509_PURPOSE_get_trust);
 
-static int
-nid_cmp(const int *a, const int *b)
-{
-	return *a - *b;
-}
-
-static int nid_cmp_BSEARCH_CMP_FN(const void *, const void *);
-static int nid_cmp(int const *, int const *);
-static int *OBJ_bsearch_nid(int *key, int const *base, int num);
-
-static int
-nid_cmp_BSEARCH_CMP_FN(const void *a_, const void *b_)
-{
-	int const *a = a_;
-	int const *b = b_;
-	return nid_cmp(a, b);
-}
-
-static int *
-OBJ_bsearch_nid(int *key, int const *base, int num)
-{
-	return (int *)OBJ_bsearch_(key, base, num, sizeof(int),
-	    nid_cmp_BSEARCH_CMP_FN);
-}
-
+/*
+ * List of NIDs of extensions supported by the verifier. If an extension
+ * is critical and doesn't appear in this list, then the certificate will
+ * normally be rejected.
+ */
 int
-X509_supported_extension(X509_EXTENSION *ex)
+X509_supported_extension(X509_EXTENSION *ext)
 {
-	/* This table is a list of the NIDs of supported extensions:
-	 * that is those which are used by the verify process. If
-	 * an extension is critical and doesn't appear in this list
-	 * then the verify process will normally reject the certificate.
-	 * The list must be kept in numerical order because it will be
-	 * searched using bsearch.
-	 */
-
-	static const int supported_nids[] = {
-		NID_netscape_cert_type, /* 71 */
-		NID_key_usage,		/* 83 */
-		NID_subject_alt_name,	/* 85 */
-		NID_basic_constraints,	/* 87 */
-		NID_certificate_policies, /* 89 */
-		NID_ext_key_usage,	/* 126 */
+	switch (OBJ_obj2nid(X509_EXTENSION_get_object(ext))) {
+	case NID_basic_constraints:
+	case NID_certificate_policies:
+	case NID_ext_key_usage:
+	case NID_inhibit_any_policy:
+	case NID_key_usage:
+	case NID_name_constraints:
+	case NID_netscape_cert_type:
+	case NID_policy_constraints:
+	case NID_policy_mappings:
 #ifndef OPENSSL_NO_RFC3779
-		NID_sbgp_ipAddrBlock,   /* 290 */
-		NID_sbgp_autonomousSysNum, /* 291 */
+	case NID_sbgp_ipAddrBlock:
+	case NID_sbgp_autonomousSysNum:
 #endif
-		NID_policy_constraints,	/* 401 */
-		NID_name_constraints,	/* 666 */
-		NID_policy_mappings,	/* 747 */
-		NID_inhibit_any_policy	/* 748 */
-	};
-
-	int ex_nid = OBJ_obj2nid(X509_EXTENSION_get_object(ex));
-
-	if (ex_nid == NID_undef)
-		return 0;
-
-	if (OBJ_bsearch_nid(&ex_nid, supported_nids,
-	    sizeof(supported_nids) / sizeof(int)))
+	case NID_subject_alt_name:
 		return 1;
-	return 0;
+	default:
+		return 0;
+	}
 }
 LCRYPTO_ALIAS(X509_supported_extension);
 
@@ -711,7 +559,8 @@ x509v3_cache_extensions_internal(X509 *x)
 	if (!x509_extension_oids_are_unique(x))
 		x->ex_flags |= EXFLAG_INVALID;
 
-	x509_verify_cert_info_populate(x);
+	if (!x509_verify_cert_info_populate(x))
+		x->ex_flags |= EXFLAG_INVALID;
 
 	x->ex_flags |= EXFLAG_SET;
 }

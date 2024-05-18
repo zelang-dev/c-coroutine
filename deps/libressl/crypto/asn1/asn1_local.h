@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_local.h,v 1.4 2023/07/28 10:00:10 tb Exp $ */
+/* $OpenBSD: asn1_local.h,v 1.10 2024/03/02 09:10:42 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -89,88 +89,6 @@ struct asn1_pctx_st {
 	unsigned long str_flags;
 } /* ASN1_PCTX */;
 
-/* ASN1 public key method structure */
-
-struct evp_pkey_asn1_method_st {
-	int pkey_id;
-	int pkey_base_id;
-	unsigned long pkey_flags;
-
-	char *pem_str;
-	char *info;
-
-	int (*pub_decode)(EVP_PKEY *pk, X509_PUBKEY *pub);
-	int (*pub_encode)(X509_PUBKEY *pub, const EVP_PKEY *pk);
-	int (*pub_cmp)(const EVP_PKEY *a, const EVP_PKEY *b);
-	int (*pub_print)(BIO *out, const EVP_PKEY *pkey, int indent,
-	    ASN1_PCTX *pctx);
-
-	int (*priv_decode)(EVP_PKEY *pk, const PKCS8_PRIV_KEY_INFO *p8inf);
-	int (*priv_encode)(PKCS8_PRIV_KEY_INFO *p8, const EVP_PKEY *pk);
-	int (*priv_print)(BIO *out, const EVP_PKEY *pkey, int indent,
-	    ASN1_PCTX *pctx);
-
-	int (*pkey_size)(const EVP_PKEY *pk);
-	int (*pkey_bits)(const EVP_PKEY *pk);
-	int (*pkey_security_bits)(const EVP_PKEY *pk);
-
-	int (*param_decode)(EVP_PKEY *pkey, const unsigned char **pder,
-	    int derlen);
-	int (*param_encode)(const EVP_PKEY *pkey, unsigned char **pder);
-	int (*param_missing)(const EVP_PKEY *pk);
-	int (*param_copy)(EVP_PKEY *to, const EVP_PKEY *from);
-	int (*param_cmp)(const EVP_PKEY *a, const EVP_PKEY *b);
-	int (*param_print)(BIO *out, const EVP_PKEY *pkey, int indent,
-	    ASN1_PCTX *pctx);
-	int (*sig_print)(BIO *out, const X509_ALGOR *sigalg,
-	    const ASN1_STRING *sig, int indent, ASN1_PCTX *pctx);
-
-	void (*pkey_free)(EVP_PKEY *pkey);
-	int (*pkey_ctrl)(EVP_PKEY *pkey, int op, long arg1, void *arg2);
-
-	/* Legacy functions for old PEM */
-
-	int (*old_priv_decode)(EVP_PKEY *pkey, const unsigned char **pder,
-	    int derlen);
-	int (*old_priv_encode)(const EVP_PKEY *pkey, unsigned char **pder);
-	/* Custom ASN1 signature verification */
-	int (*item_verify)(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
-	    X509_ALGOR *a, ASN1_BIT_STRING *sig, EVP_PKEY *pkey);
-	int (*item_sign)(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
-	    X509_ALGOR *alg1, X509_ALGOR *alg2, ASN1_BIT_STRING *sig);
-
-	int (*pkey_check)(const EVP_PKEY *pk);
-	int (*pkey_public_check)(const EVP_PKEY *pk);
-	int (*pkey_param_check)(const EVP_PKEY *pk);
-
-	int (*set_priv_key)(EVP_PKEY *pk, const unsigned char *private_key,
-	    size_t len);
-	int (*set_pub_key)(EVP_PKEY *pk, const unsigned char *public_key,
-	    size_t len);
-	int (*get_priv_key)(const EVP_PKEY *pk, unsigned char *out_private_key,
-	    size_t *out_len);
-	int (*get_pub_key)(const EVP_PKEY *pk, unsigned char *out_public_key,
-	    size_t *out_len);
-} /* EVP_PKEY_ASN1_METHOD */;
-
-/* Method to handle CRL access.
- * In general a CRL could be very large (several Mb) and can consume large
- * amounts of resources if stored in memory by multiple processes.
- * This method allows general CRL operations to be redirected to more
- * efficient callbacks: for example a CRL entry database.
- */
-
-#define X509_CRL_METHOD_DYNAMIC		1
-
-struct x509_crl_method_st {
-	int flags;
-	int (*crl_init)(X509_CRL *crl);
-	int (*crl_free)(X509_CRL *crl);
-	int (*crl_lookup)(X509_CRL *crl, X509_REVOKED **ret,
-	    ASN1_INTEGER *ser, X509_NAME *issuer);
-	int (*crl_verify)(X509_CRL *crl, EVP_PKEY *pk);
-};
-
 int asn1_get_choice_selector(ASN1_VALUE **pval, const ASN1_ITEM *it);
 int asn1_set_choice_selector(ASN1_VALUE **pval, int value, const ASN1_ITEM *it);
 
@@ -242,7 +160,7 @@ ASN1_BIT_STRING *c2i_ASN1_BIT_STRING(ASN1_BIT_STRING **a,
 int i2c_ASN1_INTEGER(ASN1_INTEGER *a, unsigned char **pp);
 ASN1_INTEGER *c2i_ASN1_INTEGER(ASN1_INTEGER **a, const unsigned char **pp,
     long length);
-int OPENSSL_gmtime_adj(struct tm *tm, int offset_day, long offset_sec);
+int OPENSSL_gmtime_adj(struct tm *tm, int offset_day, int64_t offset_sec);
 int OPENSSL_gmtime_diff(int *pday, int *psec, const struct tm *from,
     const struct tm *to);
 int asn1_time_time_t_to_tm(const time_t *time, struct tm *out_tm);
@@ -268,5 +186,8 @@ void ASN1_primitive_free(ASN1_VALUE **pval, const ASN1_ITEM *it);
 
 int ASN1_template_new(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt);
 void ASN1_template_free(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt);
+
+int ASN1_time_parse(const char *_bytes, size_t _len, struct tm *_tm, int _mode);
+int ASN1_time_tm_cmp(struct tm *_tm1, struct tm *_tm2);
 
 __END_HIDDEN_DECLS

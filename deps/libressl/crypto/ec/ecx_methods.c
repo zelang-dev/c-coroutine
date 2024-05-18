@@ -1,4 +1,4 @@
-/*	$OpenBSD: ecx_methods.c,v 1.9 2023/07/22 19:33:25 tb Exp $ */
+/*	$OpenBSD: ecx_methods.c,v 1.11 2024/01/04 17:01:26 tb Exp $ */
 /*
  * Copyright (c) 2022 Joel Sing <jsing@openbsd.org>
  *
@@ -27,6 +27,7 @@
 #include "bytestring.h"
 #include "curve25519_internal.h"
 #include "evp_local.h"
+#include "x509_local.h"
 
 /*
  * EVP PKEY and PKEY ASN.1 methods Ed25519 and X25519.
@@ -729,16 +730,12 @@ static int
 ecx_item_sign(EVP_MD_CTX *md_ctx, const ASN1_ITEM *it, void *asn,
     X509_ALGOR *algor1, X509_ALGOR *algor2, ASN1_BIT_STRING *abs)
 {
-	ASN1_OBJECT *aobj;
-
-	if ((aobj = OBJ_nid2obj(NID_ED25519)) == NULL)
-		return 0;
-
-	if (!X509_ALGOR_set0(algor1, aobj, V_ASN1_UNDEF, NULL))
+	if (!X509_ALGOR_set0_by_nid(algor1, NID_ED25519, V_ASN1_UNDEF, NULL))
 		return 0;
 
 	if (algor2 != NULL) {
-		if (!X509_ALGOR_set0(algor2, aobj, V_ASN1_UNDEF, NULL))
+		if (!X509_ALGOR_set0_by_nid(algor2, NID_ED25519, V_ASN1_UNDEF,
+		    NULL))
 			return 0;
 	}
 
@@ -816,8 +813,8 @@ pkey_ecx_ed_ctrl(EVP_PKEY_CTX *pkey_ctx, int op, int arg1, void *arg2)
 }
 
 const EVP_PKEY_ASN1_METHOD x25519_asn1_meth = {
+	.base_method = &x25519_asn1_meth,
 	.pkey_id = EVP_PKEY_X25519,
-	.pkey_base_id = EVP_PKEY_X25519,
 	.pkey_flags = 0,
 	.pem_str = "X25519",
 	.info = "OpenSSL X25519 algorithm",
@@ -854,8 +851,8 @@ const EVP_PKEY_METHOD x25519_pkey_meth = {
 };
 
 const EVP_PKEY_ASN1_METHOD ed25519_asn1_meth = {
+	.base_method = &ed25519_asn1_meth,
 	.pkey_id = EVP_PKEY_ED25519,
-	.pkey_base_id = EVP_PKEY_ED25519,
 	.pkey_flags = 0,
 	.pem_str = "ED25519",
 	.info = "OpenSSL ED25519 algorithm",

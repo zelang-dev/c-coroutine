@@ -1,4 +1,4 @@
-/* $OpenBSD: err.h,v 1.31 2023/07/28 10:23:19 tb Exp $ */
+/* $OpenBSD: err.h,v 1.33 2024/03/02 10:32:26 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -143,16 +143,6 @@ extern "C" {
 #define ERR_FLAG_MARK		0x01
 
 #define ERR_NUM_ERRORS	16
-typedef struct err_state_st {
-	CRYPTO_THREADID tid;
-	int err_flags[ERR_NUM_ERRORS];
-	unsigned long err_buffer[ERR_NUM_ERRORS];
-	char *err_data[ERR_NUM_ERRORS];
-	int err_data_flags[ERR_NUM_ERRORS];
-	const char *err_file[ERR_NUM_ERRORS];
-	int err_line[ERR_NUM_ERRORS];
-	int top, bottom;
-} ERR_STATE;
 
 /* library */
 #define ERR_LIB_NONE		1
@@ -388,8 +378,8 @@ void ERR_asprintf_error_data(char * format, ...);
 void ERR_add_error_data(int num, ...);
 void ERR_add_error_vdata(int num, va_list args);
 #endif
-void ERR_load_strings(int lib, ERR_STRING_DATA str[]);
-void ERR_unload_strings(int lib, ERR_STRING_DATA str[]);
+void ERR_load_strings(int lib, ERR_STRING_DATA *str);
+void ERR_unload_strings(int lib, ERR_STRING_DATA *str);
 void ERR_load_ERR_strings(void);
 void ERR_load_crypto_strings(void);
 void ERR_free_strings(void);
@@ -397,7 +387,6 @@ void ERR_free_strings(void);
 void ERR_remove_thread_state(const CRYPTO_THREADID *tid);
 /* Wrapped in OPENSSL_NO_DEPRECATED in 0.9.8. Still used in 2023. */
 void ERR_remove_state(unsigned long pid);
-ERR_STATE *ERR_get_state(void);
 
 int ERR_get_next_error_library(void);
 

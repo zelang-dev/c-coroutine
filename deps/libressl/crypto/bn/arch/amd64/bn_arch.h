@@ -21,7 +21,9 @@
 #define HEADER_BN_ARCH_H
 
 #ifdef _WIN32
+#ifndef OPENSSL_NO_ASM
 #define OPENSSL_NO_ASM
+#endif
 #else
 
 #ifndef OPENSSL_NO_ASM

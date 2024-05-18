@@ -1,3 +1,9 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 
@@ -5,7 +11,7 @@
 .type	bn_mul_mont,@function
 .align	16
 bn_mul_mont:
-	endbr64
+_CET_ENDBR
 	testl	$3,%r9d
 	jnz	.Lmul_enter
 	cmpl	$8,%r9d
@@ -213,7 +219,7 @@ bn_mul_mont:
 .align	16
 bn_mul4x_mont:
 .Lmul4x_enter:
-	endbr64
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12
@@ -612,7 +618,7 @@ bn_mul4x_mont:
 .align	16
 bn_sqr4x_mont:
 .Lsqr4x_enter:
-	endbr64
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12

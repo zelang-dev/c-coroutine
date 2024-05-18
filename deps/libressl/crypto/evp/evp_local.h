@@ -1,4 +1,4 @@
-/* $OpenBSD: evp_local.h,v 1.5 2023/09/28 11:29:10 tb Exp $ */
+/* $OpenBSD: evp_local.h,v 1.19 2024/03/02 10:20:27 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -89,15 +89,75 @@ struct ecx_key_st {
 	size_t pub_key_len;
 };
 
+struct evp_pkey_asn1_method_st {
+	const EVP_PKEY_ASN1_METHOD *base_method;
+	int pkey_id;
+	unsigned long pkey_flags;
+
+	char *pem_str;
+	char *info;
+
+	int (*pub_decode)(EVP_PKEY *pk, X509_PUBKEY *pub);
+	int (*pub_encode)(X509_PUBKEY *pub, const EVP_PKEY *pk);
+	int (*pub_cmp)(const EVP_PKEY *a, const EVP_PKEY *b);
+	int (*pub_print)(BIO *out, const EVP_PKEY *pkey, int indent,
+	    ASN1_PCTX *pctx);
+
+	int (*priv_decode)(EVP_PKEY *pk, const PKCS8_PRIV_KEY_INFO *p8inf);
+	int (*priv_encode)(PKCS8_PRIV_KEY_INFO *p8, const EVP_PKEY *pk);
+	int (*priv_print)(BIO *out, const EVP_PKEY *pkey, int indent,
+	    ASN1_PCTX *pctx);
+
+	int (*pkey_size)(const EVP_PKEY *pk);
+	int (*pkey_bits)(const EVP_PKEY *pk);
+	int (*pkey_security_bits)(const EVP_PKEY *pk);
+
+	int (*param_decode)(EVP_PKEY *pkey, const unsigned char **pder,
+	    int derlen);
+	int (*param_encode)(const EVP_PKEY *pkey, unsigned char **pder);
+	int (*param_missing)(const EVP_PKEY *pk);
+	int (*param_copy)(EVP_PKEY *to, const EVP_PKEY *from);
+	int (*param_cmp)(const EVP_PKEY *a, const EVP_PKEY *b);
+	int (*param_print)(BIO *out, const EVP_PKEY *pkey, int indent,
+	    ASN1_PCTX *pctx);
+	int (*sig_print)(BIO *out, const X509_ALGOR *sigalg,
+	    const ASN1_STRING *sig, int indent, ASN1_PCTX *pctx);
+
+	void (*pkey_free)(EVP_PKEY *pkey);
+	int (*pkey_ctrl)(EVP_PKEY *pkey, int op, long arg1, void *arg2);
+
+	/* Legacy functions for old PEM */
+
+	int (*old_priv_decode)(EVP_PKEY *pkey, const unsigned char **pder,
+	    int derlen);
+	int (*old_priv_encode)(const EVP_PKEY *pkey, unsigned char **pder);
+	/* Custom ASN1 signature verification */
+	int (*item_verify)(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
+	    X509_ALGOR *a, ASN1_BIT_STRING *sig, EVP_PKEY *pkey);
+	int (*item_sign)(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
+	    X509_ALGOR *alg1, X509_ALGOR *alg2, ASN1_BIT_STRING *sig);
+
+	int (*pkey_check)(const EVP_PKEY *pk);
+	int (*pkey_public_check)(const EVP_PKEY *pk);
+	int (*pkey_param_check)(const EVP_PKEY *pk);
+
+	int (*set_priv_key)(EVP_PKEY *pk, const unsigned char *private_key,
+	    size_t len);
+	int (*set_pub_key)(EVP_PKEY *pk, const unsigned char *public_key,
+	    size_t len);
+	int (*get_priv_key)(const EVP_PKEY *pk, unsigned char *out_private_key,
+	    size_t *out_len);
+	int (*get_pub_key)(const EVP_PKEY *pk, unsigned char *out_public_key,
+	    size_t *out_len);
+} /* EVP_PKEY_ASN1_METHOD */;
+
 /* Type needs to be a bit field
  * Sub-type needs to be for variations on the method, as in, can it do
  * arbitrary encryption.... */
 struct evp_pkey_st {
 	int type;
-	int save_type;
 	int references;
 	const EVP_PKEY_ASN1_METHOD *ameth;
-	ENGINE *engine;
 	union	{
 		void *ptr;
 #ifndef OPENSSL_NO_RSA
@@ -140,7 +200,6 @@ struct evp_md_st {
 
 struct evp_md_ctx_st {
 	const EVP_MD *digest;
-	ENGINE *engine; /* functional reference if 'digest' is ENGINE-provided */
 	unsigned long flags;
 	void *md_data;
 	/* Public key context for sign/verify */
@@ -164,17 +223,15 @@ struct evp_cipher_st {
 	int (*set_asn1_parameters)(EVP_CIPHER_CTX *, ASN1_TYPE *); /* Populate a ASN1_TYPE with parameters */
 	int (*get_asn1_parameters)(EVP_CIPHER_CTX *, ASN1_TYPE *); /* Get parameters from a ASN1_TYPE */
 	int (*ctrl)(EVP_CIPHER_CTX *, int type, int arg, void *ptr); /* Miscellaneous operations */
-	void *app_data;		/* Application data */
 } /* EVP_CIPHER */;
 
 struct evp_cipher_ctx_st {
 	const EVP_CIPHER *cipher;
-	ENGINE *engine;	/* functional reference if 'cipher' is ENGINE-provided */
 	int encrypt;		/* encrypt or decrypt */
-	int buf_len;		/* number we have left */
+	int partial_len;	/* number of bytes written to buf */
 
-	unsigned char  oiv[EVP_MAX_IV_LENGTH];	/* original iv */
-	unsigned char  iv[EVP_MAX_IV_LENGTH];	/* working iv */
+	unsigned char oiv[EVP_MAX_IV_LENGTH];	/* original iv */
+	unsigned char iv[EVP_MAX_IV_LENGTH];	/* working iv */
 	unsigned char buf[EVP_MAX_BLOCK_LENGTH];/* saved partial block */
 	int num;				/* used by cfb/ofb/ctr mode */
 
@@ -183,7 +240,6 @@ struct evp_cipher_ctx_st {
 	unsigned long flags;	/* Various flags */
 	void *cipher_data; /* per EVP data */
 	int final_used;
-	int block_mask;
 	unsigned char final[EVP_MAX_BLOCK_LENGTH];/* possible final block */
 } /* EVP_CIPHER_CTX */;
 
@@ -205,8 +261,6 @@ struct evp_Encode_Ctx_st {
 struct evp_pkey_ctx_st {
 	/* Method associated with this operation */
 	const EVP_PKEY_METHOD *pmeth;
-	/* Engine that implements this method or NULL if builtin */
-	ENGINE *engine;
 	/* Key: may be NULL */
 	EVP_PKEY *pkey;
 	/* Peer key for key agreement, may be NULL */
@@ -223,8 +277,6 @@ struct evp_pkey_ctx_st {
 	int *keygen_info;
 	int keygen_info_count;
 } /* EVP_PKEY_CTX */;
-
-#define EVP_PKEY_FLAG_DYNAMIC	1
 
 struct evp_pkey_method_st {
 	int pkey_id;
@@ -288,9 +340,6 @@ struct evp_pkey_method_st {
 
 void evp_pkey_set_cb_translate(BN_GENCB *cb, EVP_PKEY_CTX *ctx);
 
-int PKCS5_v2_PBKDF2_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass, int passlen,
-    ASN1_TYPE *param, const EVP_CIPHER *c, const EVP_MD *md, int en_de);
-
 /* EVP_AEAD represents a specific AEAD algorithm. */
 struct evp_aead_st {
 	unsigned char key_len;
@@ -321,9 +370,21 @@ struct evp_aead_ctx_st {
 	void *aead_state;
 };
 
+/* Legacy EVP_CIPHER methods used by CMS and its predecessors. */
+int EVP_CIPHER_set_asn1_iv(EVP_CIPHER_CTX *cipher, ASN1_TYPE *type);
+int EVP_CIPHER_asn1_to_param(EVP_CIPHER_CTX *cipher, ASN1_TYPE *type);
+int EVP_CIPHER_get_asn1_iv(EVP_CIPHER_CTX *cipher, ASN1_TYPE *type);
+int EVP_CIPHER_param_to_asn1(EVP_CIPHER_CTX *cipher, ASN1_TYPE *type);
+
+int EVP_PBE_CipherInit(ASN1_OBJECT *pbe_obj, const char *pass, int passlen,
+    ASN1_TYPE *param, EVP_CIPHER_CTX *ctx, int en_de);
+
 int EVP_PKEY_CTX_str2ctrl(EVP_PKEY_CTX *ctx, int cmd, const char *str);
 int EVP_PKEY_CTX_hex2ctrl(EVP_PKEY_CTX *ctx, int cmd, const char *hex);
 int EVP_PKEY_CTX_md(EVP_PKEY_CTX *ctx, int optype, int cmd, const char *md_name);
+
+void EVP_CIPHER_CTX_legacy_clear(EVP_CIPHER_CTX *ctx);
+void EVP_MD_CTX_legacy_clear(EVP_MD_CTX *ctx);
 
 __END_HIDDEN_DECLS
 

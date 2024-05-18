@@ -91,7 +91,6 @@ typedef struct asn1_pctx_st ASN1_PCTX;
 #endif
 #endif
 #undef X509_NAME
-#undef X509_CERT_PAIR
 #undef X509_EXTENSIONS
 #undef OCSP_REQUEST
 #undef OCSP_RESPONSE

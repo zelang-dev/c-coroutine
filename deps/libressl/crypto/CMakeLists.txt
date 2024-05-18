@@ -111,6 +111,8 @@ if(HOST_ASM_MACOSX_X86_64)
 		bn/arch/amd64/word_clz.S
 		bn/arch/amd64/bn_arch.c
 	)
+	add_definitions(-Dendbr64=)
+	add_definitions(-Dendbr32=)
 	add_definitions(-DAES_ASM)
 	add_definitions(-DBSAES_ASM)
 	add_definitions(-DVPAES_ASM)
@@ -152,7 +154,6 @@ if(HOST_ASM_MASM_X86_64)
 		whrlpool/wp-masm-x86_64.S
 		cpuid-masm-x86_64.S
 	)
-	add_definitions(-Dendbr64=)
 	add_definitions(-DAES_ASM)
 	add_definitions(-DBSAES_ASM)
 	add_definitions(-DVPAES_ASM)
@@ -194,6 +195,7 @@ if(HOST_ASM_MINGW64_X86_64)
 		cpuid-mingw64-x86_64.S
 	)
 	add_definitions(-Dendbr64=)
+	add_definitions(-Dendbr32=)
 	add_definitions(-DAES_ASM)
 	add_definitions(-DBSAES_ASM)
 	add_definitions(-DVPAES_ASM)
@@ -277,7 +279,6 @@ set(
 	asn1/a_time_tm.c
 	asn1/a_type.c
 	asn1/a_utf8.c
-	asn1/ameth_lib.c
 	asn1/asn1_err.c
 	asn1/asn1_gen.c
 	asn1/asn1_item.c
@@ -439,7 +440,6 @@ set(
 	des/ofb_enc.c
 	des/pcbc_enc.c
 	des/qud_cksm.c
-	des/rand_key.c
 	des/set_key.c
 	des/str2key.c
 	des/xcbc_enc.c
@@ -488,11 +488,7 @@ set(
 	evp/bio_b64.c
 	evp/bio_enc.c
 	evp/bio_md.c
-	evp/c_all.c
-	evp/cipher_method_lib.c
-	evp/digest.c
 	evp/e_aes.c
-	evp/e_aes_cbc_hmac_sha1.c
 	evp/e_bf.c
 	evp/e_camellia.c
 	evp/e_cast.c
@@ -500,24 +496,21 @@ set(
 	evp/e_chacha20poly1305.c
 	evp/e_des.c
 	evp/e_des3.c
-	evp/e_gost2814789.c
 	evp/e_idea.c
 	evp/e_null.c
 	evp/e_rc2.c
 	evp/e_rc4.c
-	evp/e_rc4_hmac_md5.c
 	evp/e_sm4.c
 	evp/e_xcbc_d.c
-	evp/encode.c
 	evp/evp_aead.c
-	evp/evp_enc.c
+	evp/evp_cipher.c
+	evp/evp_digest.c
+	evp/evp_encode.c
 	evp/evp_err.c
 	evp/evp_key.c
-	evp/evp_lib.c
+	evp/evp_names.c
 	evp/evp_pbe.c
 	evp/evp_pkey.c
-	evp/m_gost2814789.c
-	evp/m_gostr341194.c
 	evp/m_md4.c
 	evp/m_md5.c
 	evp/m_md5_sha1.c
@@ -526,36 +519,15 @@ set(
 	evp/m_sha1.c
 	evp/m_sha3.c
 	evp/m_sigver.c
-	evp/m_streebog.c
 	evp/m_sm3.c
 	evp/m_wp.c
-	evp/names.c
-	evp/p5_crpt.c
-	evp/p5_crpt2.c
-	evp/p_dec.c
-	evp/p_enc.c
+	evp/p_legacy.c
 	evp/p_lib.c
-	evp/p_open.c
-	evp/p_seal.c
 	evp/p_sign.c
 	evp/p_verify.c
 	evp/pmeth_fn.c
 	evp/pmeth_gn.c
 	evp/pmeth_lib.c
-	gost/gost2814789.c
-	gost/gost89_keywrap.c
-	gost/gost89_params.c
-	gost/gost89imit_ameth.c
-	gost/gost89imit_pmeth.c
-	gost/gost_asn1.c
-	gost/gost_err.c
-	gost/gostr341001.c
-	gost/gostr341001_ameth.c
-	gost/gostr341001_key.c
-	gost/gostr341001_params.c
-	gost/gostr341001_pmeth.c
-	gost/gostr341194.c
-	gost/streebog.c
 	hkdf/hkdf.c
 	hmac/hm_ameth.c
 	hmac/hm_pmeth.c
@@ -567,7 +539,6 @@ set(
 	idea/i_skey.c
 	kdf/hkdf_evp.c
 	kdf/kdf_err.c
-	lhash/lh_stats.c
 	lhash/lhash.c
 	md4/md4.c
 	md5/md5.c
@@ -578,7 +549,6 @@ set(
 	modes/gcm128.c
 	modes/ofb128.c
 	modes/xts128.c
-	objects/o_names.c
 	objects/obj_dat.c
 	objects/obj_err.c
 	objects/obj_lib.c
@@ -606,7 +576,6 @@ set(
 	pkcs12/p12_add.c
 	pkcs12/p12_asn.c
 	pkcs12/p12_attr.c
-	pkcs12/p12_crpt.c
 	pkcs12/p12_crt.c
 	pkcs12/p12_decr.c
 	pkcs12/p12_init.c
@@ -734,6 +703,8 @@ set(
 	x509/x_all.c
 )
 
+set(COMPAT_SRC empty.c)
+
 if(UNIX)
 	set(CRYPTO_SRC ${CRYPTO_SRC} crypto_lock.c)
 	set(CRYPTO_SRC ${CRYPTO_SRC} bio/b_posix.c)
@@ -749,154 +720,119 @@ if(WIN32)
 endif()
 
 if(WIN32)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/posix_win.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} gettimeofday)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} getuid)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_perror)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_fopen)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_fgets)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_open)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_rename)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_connect)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_close)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_read)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_write)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_getsockopt)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} posix_setsockopt)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/posix_win.c)
 endif()
 
 if(NOT HAVE_ASPRINTF)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/bsd-asprintf.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} asprintf)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} vasprintf)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/bsd-asprintf.c)
 endif()
 
 if(NOT HAVE_FREEZERO)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/freezero.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} freezero)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/freezero.c)
 endif()
 
 if(NOT HAVE_GETOPT)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/getopt_long.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} getopt)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} optarg)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} optind)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/getopt_long.c)
 endif()
 
 if(NOT HAVE_GETPAGESIZE)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/getpagesize.c)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/getpagesize.c)
 endif()
 
 if(NOT HAVE_GETPROGNAME)
 	if(WIN32)
-		set(CRYPTO_SRC ${CRYPTO_SRC} compat/getprogname_windows.c)
+		set(COMPAT_SRC ${COMPAT_SRC} compat/getprogname_windows.c)
 	elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
-		set(CRYPTO_SRC ${CRYPTO_SRC} compat/getprogname_linux.c)
+		set(COMPAT_SRC ${COMPAT_SRC} compat/getprogname_linux.c)
 	else()
-		set(CRYPTO_SRC ${CRYPTO_SRC} compat/getprogname_unimpl.c)
+		set(COMPAT_SRC ${COMPAT_SRC} compat/getprogname_unimpl.c)
 	endif()
 endif()
 
 if(NOT HAVE_REALLOCARRAY)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/reallocarray.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} reallocarray)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/reallocarray.c)
 endif()
 
 if(NOT HAVE_RECALLOCARRAY)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/recallocarray.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} recallocarray)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/recallocarray.c)
 endif()
 
 if(NOT HAVE_STRCASECMP)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strcasecmp.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} strcasecmp)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/strcasecmp.c)
 endif()
 
 if(NOT HAVE_STRLCAT)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strlcat.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} strlcat)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/strlcat.c)
 endif()
 
 if(NOT HAVE_STRLCPY)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strlcpy.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} strlcpy)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/strlcpy.c)
 endif()
 
 if(NOT HAVE_STRNDUP)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strndup.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} strndup)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/strndup.c)
 	if(NOT HAVE_STRNLEN)
-		set(CRYPTO_SRC ${CRYPTO_SRC} compat/strnlen.c)
-		set(EXTRA_EXPORT ${EXTRA_EXPORT} strnlen)
+		set(COMPAT_SRC ${COMPAT_SRC} compat/strnlen.c)
 	endif()
 endif()
 
 if(NOT HAVE_STRSEP)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strsep.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} strsep)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/strsep.c)
 endif()
 
 if(NOT HAVE_STRTONUM)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strtonum.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} strtonum)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/strtonum.c)
 endif()
 
 if(NOT HAVE_SYSLOG_R)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/syslog_r.c)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/syslog_r.c)
 endif()
 
 if(NOT HAVE_TIMEGM)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/timegm.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} timegm)
+        # XXX - Remove after next bump once libtls, ocspcheck, and asn1time are fixed.
+	set(COMPAT_SRC ${COMPAT_SRC} compat/timegm.c)
 endif()
 
 if(NOT HAVE_EXPLICIT_BZERO)
 	if(WIN32)
-		set(CRYPTO_SRC ${CRYPTO_SRC} compat/explicit_bzero_win.c)
+		set(COMPAT_SRC ${COMPAT_SRC} compat/explicit_bzero_win.c)
 	else()
-		set(CRYPTO_SRC ${CRYPTO_SRC} compat/explicit_bzero.c)
+		set(COMPAT_SRC ${COMPAT_SRC} compat/explicit_bzero.c)
 		set_source_files_properties(compat/explicit_bzero.c PROPERTIES COMPILE_FLAGS -O0)
 	endif()
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} explicit_bzero)
 endif()
 
 if(NOT HAVE_ARC4RANDOM_BUF)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/arc4random.c)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/arc4random_uniform.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} arc4random)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} arc4random_buf)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} arc4random_uniform)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/arc4random.c)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/arc4random_uniform.c)
 
 	if(NOT HAVE_GETENTROPY)
 		if(WIN32)
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_win.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_win.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "AIX")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_aix.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_aix.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_freebsd.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_freebsd.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "HP-UX")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_hpux.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_hpux.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_linux.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_linux.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "NetBSD")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_netbsd.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_netbsd.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_osx.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_osx.c)
 		elseif(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-			set(CRYPTO_SRC ${CRYPTO_SRC} compat/getentropy_solaris.c)
+			set(COMPAT_SRC ${COMPAT_SRC} compat/getentropy_solaris.c)
 		endif()
-		set(EXTRA_EXPORT ${EXTRA_EXPORT} getentropy)
 	endif()
 endif()
 
 if(NOT HAVE_TIMINGSAFE_BCMP)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/timingsafe_bcmp.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} timingsafe_bcmp)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/timingsafe_bcmp.c)
 endif()
 
 if(NOT HAVE_TIMINGSAFE_MEMCMP)
-	set(CRYPTO_SRC ${CRYPTO_SRC} compat/timingsafe_memcmp.c)
-	set(EXTRA_EXPORT ${EXTRA_EXPORT} timingsafe_memcmp)
+	set(COMPAT_SRC ${COMPAT_SRC} compat/timingsafe_memcmp.c)
 endif()
 
 if(NOT ENABLE_ASM)
@@ -912,29 +848,21 @@ else()
 	endif()
 endif()
 
-if(NOT "${OPENSSLDIR}" STREQUAL "")
-	add_definitions(-DOPENSSLDIR=\"${OPENSSLDIR}\")
-else()
-	if(WIN32)
-		add_definitions(-DOPENSSLDIR=\"C:/Windows/libressl/ssl\")
-	else()
-		add_definitions(-DOPENSSLDIR=\"${CMAKE_INSTALL_PREFIX}/etc/ssl\")
-	endif()
-endif()
+add_definitions(-DOPENSSLDIR=\"${OPENSSLDIR}\")
 
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/crypto.sym SYMS)
 foreach(SYM IN LISTS CRYPTO_UNEXPORT)
 	string(REPLACE "${SYM}\n" "" SYMS ${SYMS})
 endforeach()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym ${SYMS})
-if(EXTRA_EXPORT)
-	list(SORT EXTRA_EXPORT)
-	foreach(SYM IN LISTS EXTRA_EXPORT)
-		file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym "${SYM}\n")
-	endforeach()
-endif()
 
-set(LIBTLS_EXTRA_EXPORT ${EXTRA_EXPORT} PARENT_SCOPE)
+add_library(compat_obj OBJECT ${COMPAT_SRC})
+target_include_directories(compat_obj
+	PRIVATE
+		../include/compat
+	PUBLIC
+		../include
+		${CMAKE_BINARY_DIR}/include)
 
 add_library(crypto_obj OBJECT ${CRYPTO_SRC})
 target_include_directories(crypto_obj
@@ -953,11 +881,13 @@ target_include_directories(crypto_obj
 		evp
 		hidden
 		hmac
+		lhash
 		modes
 		ocsp
 		pkcs12
 		rsa
 		sha
+		stack
 		x509
 		../include/compat
 	PUBLIC
@@ -972,6 +902,8 @@ elseif(HOST_I386)
 	target_include_directories(crypto_obj PRIVATE bn/arch/i386/)
 elseif(HOST_MIPS64)
 	target_include_directories(crypto_obj PRIVATE bn/arch/mips64)
+elseif(HOST_MIPS)
+	target_include_directories(crypto_obj PRIVATE bn/arch/mips)
 elseif(HOST_POWERPC)
 	target_include_directories(crypto_obj PRIVATE bn/arch/powerpc)
 elseif(HOST_POWERPC64)
@@ -984,7 +916,7 @@ elseif(HOST_X86_64)
 	target_include_directories(crypto_obj PRIVATE bn/arch/amd64)
 endif()
 
-add_library(crypto $<TARGET_OBJECTS:crypto_obj> empty.c)
+add_library(crypto $<TARGET_OBJECTS:crypto_obj> $<TARGET_OBJECTS:compat_obj> empty.c)
 
 export_symbol(crypto ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym)
 target_link_libraries(crypto ${PLATFORM_LIBS})

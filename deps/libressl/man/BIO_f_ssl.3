@@ -1,4 +1,4 @@
-.\" $OpenBSD: BIO_f_ssl.3,v 1.14 2023/04/11 16:58:43 schwarze Exp $
+.\" $OpenBSD: BIO_f_ssl.3,v 1.16 2024/01/13 18:37:51 tb Exp $
 .\" full merge up to: OpenSSL f672aee4 Feb 9 11:52:40 2016 -0500
 .\" selective merge up to: OpenSSL 61f805c1 Jan 16 01:01:46 2018 +0800
 .\"
@@ -50,7 +50,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: April 11 2023 $
+.Dd $Mdocdate: January 13 2024 $
 .Dt BIO_F_SSL 3
 .Os
 .Sh NAME
@@ -491,12 +491,6 @@ char tmpbuf[1024];
 SSL_CTX *ctx;
 SSL *ssl;
 
-ERR_load_crypto_strings();
-ERR_load_SSL_strings();
-OpenSSL_add_all_algorithms();
-
-/* Might seed PRNG here */
-
 ctx = SSL_CTX_new(SSLv23_server_method());
 
 if (!SSL_CTX_use_certificate_file(ctx,"server.pem",SSL_FILETYPE_PEM)
@@ -613,20 +607,3 @@ and
 first appeared in SSLeay 0.9.0.
 All these functions have been available since
 .Ox 2.4 .
-.Pp
-In OpenSSL versions before 1.0.0 the
-.Xr BIO_pop 3
-call was handled incorrectly:
-the I/O BIO reference count was incorrectly incremented (instead of
-decremented) and dissociated with the
-.Vt SSL
-.Vt BIO
-even if the
-.Vt SSL
-.Vt BIO
-was not
-explicitly being popped (e.g., a pop higher up the chain).
-Applications which included workarounds for this bug (e.g., freeing BIOs more
-than once) should be modified to handle this fix or they may free up an already
-freed
-.Vt BIO .

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.122 2023/07/08 16:40:13 beck Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.124 2024/01/24 14:05:10 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -137,10 +137,6 @@
 
 #include <openssl/lhash.h>
 #include <openssl/opensslconf.h>
-
-#ifndef OPENSSL_NO_ENGINE
-#include <openssl/engine.h>
-#endif
 
 #include "ssl_local.h"
 
@@ -1163,7 +1159,6 @@ timeout_LHASH_DOALL_ARG(void *arg1, void *arg2)
 void
 SSL_CTX_flush_sessions(SSL_CTX *s, long t)
 {
-	unsigned long i;
 	TIMEOUT_PARAM tp;
 
 	tp.ctx = s;
@@ -1171,12 +1166,10 @@ SSL_CTX_flush_sessions(SSL_CTX *s, long t)
 	if (tp.cache == NULL)
 		return;
 	tp.time = t;
+
 	CRYPTO_w_lock(CRYPTO_LOCK_SSL_CTX);
-	i = CHECKED_LHASH_OF(SSL_SESSION, tp.cache)->down_load;
-	CHECKED_LHASH_OF(SSL_SESSION, tp.cache)->down_load = 0;
 	lh_SSL_SESSION_doall_arg(tp.cache, timeout_LHASH_DOALL_ARG,
-	TIMEOUT_PARAM, &tp);
-	CHECKED_LHASH_OF(SSL_SESSION, tp.cache)->down_load = i;
+	    TIMEOUT_PARAM, &tp);
 	CRYPTO_w_unlock(CRYPTO_LOCK_SSL_CTX);
 }
 LSSL_ALIAS(SSL_CTX_flush_sessions);
@@ -1319,25 +1312,6 @@ int
 	return ctx->client_cert_cb;
 }
 LSSL_ALIAS(SSL_CTX_get_client_cert_cb);
-
-#ifndef OPENSSL_NO_ENGINE
-int
-SSL_CTX_set_client_cert_engine(SSL_CTX *ctx, ENGINE *e)
-{
-	if (!ENGINE_init(e)) {
-		SSLerrorx(ERR_R_ENGINE_LIB);
-		return 0;
-	}
-	if (!ENGINE_get_ssl_client_cert_function(e)) {
-		SSLerrorx(SSL_R_NO_CLIENT_CERT_METHOD);
-		ENGINE_finish(e);
-		return 0;
-	}
-	ctx->client_cert_engine = e;
-	return 1;
-}
-LSSL_ALIAS(SSL_CTX_set_client_cert_engine);
-#endif
 
 void
 SSL_CTX_set_cookie_generate_cb(SSL_CTX *ctx,
