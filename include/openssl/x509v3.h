@@ -1,4 +1,4 @@
-/* $OpenBSD: x509v3.h,v 1.25 2023/06/25 18:15:21 tb Exp $ */
+/* $OpenBSD: x509v3.h,v 1.29 2024/03/02 10:43:52 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -422,15 +422,7 @@ struct ISSUING_DIST_POINT_st {
 #define X509_PURPOSE_DYNAMIC	0x1
 #define X509_PURPOSE_DYNAMIC_NAME	0x2
 
-typedef struct x509_purpose_st {
-	int purpose;
-	int trust;		/* Default trust ID */
-	int flags;
-	int (*check_purpose)(const struct x509_purpose_st *, const X509 *, int);
-	char *name;
-	char *sname;
-	void *usr_data;
-} X509_PURPOSE;
+typedef struct x509_purpose_st X509_PURPOSE;
 
 #define X509_PURPOSE_SSL_CLIENT		1
 #define X509_PURPOSE_SSL_SERVER		2
@@ -692,10 +684,6 @@ ASN1_INTEGER *s2i_ASN1_INTEGER(X509V3_EXT_METHOD *meth, const char *value);
 char *i2s_ASN1_ENUMERATED(X509V3_EXT_METHOD *meth, const ASN1_ENUMERATED *aint);
 char *i2s_ASN1_ENUMERATED_TABLE(X509V3_EXT_METHOD *meth,
     const ASN1_ENUMERATED *aint);
-int X509V3_EXT_add(X509V3_EXT_METHOD *ext);
-int X509V3_EXT_add_list(X509V3_EXT_METHOD *extlist);
-int X509V3_EXT_add_alias(int nid_to, int nid_from);
-void X509V3_EXT_cleanup(void);
 
 const X509V3_EXT_METHOD *X509V3_EXT_get(X509_EXTENSION *ext);
 const X509V3_EXT_METHOD *X509V3_EXT_get_nid(int nid);
@@ -723,20 +711,14 @@ int X509V3_extensions_print(BIO *out, const char *title,
 int X509_check_ca(X509 *x);
 int X509_check_purpose(X509 *x, int id, int ca);
 int X509_supported_extension(X509_EXTENSION *ex);
-int X509_PURPOSE_set(int *p, int purpose);
 int X509_check_issued(X509 *issuer, X509 *subject);
 int X509_check_akid(X509 *issuer, AUTHORITY_KEYID *akid);
+
 int X509_PURPOSE_get_count(void);
-X509_PURPOSE * X509_PURPOSE_get0(int idx);
+const X509_PURPOSE *X509_PURPOSE_get0(int idx);
 int X509_PURPOSE_get_by_sname(const char *sname);
-int X509_PURPOSE_get_by_id(int id);
-int X509_PURPOSE_add(int id, int trust, int flags,
-			int (*ck)(const X509_PURPOSE *, const X509 *, int),
-			const char *name, const char *sname, void *arg);
-char *X509_PURPOSE_get0_name(const X509_PURPOSE *xp);
-char *X509_PURPOSE_get0_sname(const X509_PURPOSE *xp);
-int X509_PURPOSE_get_trust(const X509_PURPOSE *xp);
-void X509_PURPOSE_cleanup(void);
+const char *X509_PURPOSE_get0_name(const X509_PURPOSE *xp);
+const char *X509_PURPOSE_get0_sname(const X509_PURPOSE *xp);
 int X509_PURPOSE_get_id(const X509_PURPOSE *);
 uint32_t X509_get_extension_flags(X509 *x);
 uint32_t X509_get_key_usage(X509 *x);

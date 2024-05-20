@@ -933,8 +933,8 @@ C_API bool promise_done(promise *);
 C_API void promise_close(promise *);
 
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
-for the execution of fn to complete. The value returned by fn can be accessed through
- the future object returned (by calling `co_async_get()`). */
+for the execution of fn to complete. The value `future` returned by fn can be accessed
+by calling `co_async_get()`. */
 C_API future *co_async(callable_t, void_t);
 
 /* Returns the value of a promise, a future thread's shared object, If not ready this
