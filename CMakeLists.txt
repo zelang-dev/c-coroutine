@@ -6,6 +6,12 @@ set(C_STANDARD 89)
 
 include(CMakeDependentOption)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(CheckCCompilerFlag)
+include(GenerateExportHeader)
+include(FetchContent)
+include(CTest)
+
 cmake_dependent_option(BUILD_TESTING
   "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
   "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
@@ -19,7 +25,20 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
 
 option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
 
-add_subdirectory(deps/libuv)
+find_package(raii)
+if(NOT raii_FOUND)
+    FetchContent_Declare(raii
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.2.zip
+        URL_MD5 fe693fcb241747a0e7b5074bcd1f7cbf
+    )
+    FetchContent_MakeAvailable(raii)
+endif()
+
+FetchContent_Declare(libuv
+    URL https://github.com/libuv/libuv/archive/refs/tags/v1.48.0.zip
+    URL_MD5 67d0e50ac6e95de12b09b17ff8baed0f
+)
+FetchContent_MakeAvailable(libuv)
 
 file(GLOB lib_files
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
@@ -43,7 +62,11 @@ else()
     add_definitions(-DLIBRESSL_APPS=OFF)
     add_definitions(-DLIBRESSL_TESTS=OFF)
     add_definitions(-DLIBRESSL_DISABLE_OVERRIDE_WINCRYPT_DEFINES_WARNING)
-    add_subdirectory(deps/libressl)
+    FetchContent_Declare(libressl
+        URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
+        URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
+    )
+    FetchContent_MakeAvailable(libressl)
     target_link_libraries(coroutine PUBLIC crypto)
     target_link_libraries(coroutine PUBLIC ssl)
 endif()
@@ -62,9 +85,7 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
 
-add_subdirectory(deps/raii)
 target_link_libraries(coroutine PUBLIC raii)
-
 if(BUILD_TESTING)
     add_subdirectory(examples)
 endif()
@@ -85,7 +106,7 @@ set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
 
 set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/c-coroutine")
-set(CPACK_PACKAGE_VERSION 0.0.0)
+set(CPACK_PACKAGE_VERSION 1.0.0)
 include(CPack)
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
