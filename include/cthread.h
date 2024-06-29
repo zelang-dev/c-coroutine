@@ -1,169 +1,106 @@
-/* -*- mode: c; tab-width: 2; indent-tabs-mode: nil; -*-
-Copyright (c) 2012 Marcus Geelnard
-Copyright (c) 2013-2016 Evan Nemerson
-
-This software is provided 'as-is', without any express or implied
-warranty. In no event will the authors be held liable for any damages
-arising from the use of this software.
-
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
-
-    1. The origin of this software must not be misrepresented; you must not
-    claim that you wrote the original software. If you use this software
-    in a product, an acknowledgment in the product documentation would be
-    appreciated but is not required.
-
-    2. Altered source versions must be plainly marked as such, and must not be
-    misrepresented as being the original software.
-
-    3. This notice may not be removed or altered from any source
-    distribution.
-
-SPDX-License-Identifier: Zlib
-*/
-
 #ifndef _CTHREAD_H_
 #define _CTHREAD_H_
 
+#if defined(_WIN32) || defined(_WIN64)
+    #if !defined(__cplusplus)
+        #define __STDC__ 1
+    #endif
+#endif
+
+#if defined(__TINYC__) || defined(USE_EMULATED_TLS)
+    #undef emulate_tls
+    #define emulate_tls 1
+#elif !defined(thread_local) /* User can override thread_local for obscure compilers */
+     /* Running in multi-threaded environment */
+    #if defined(__STDC__) /* Compiling as C Language */
+      #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
+        #define thread_local __declspec(thread)
+      #elif __STDC_VERSION__ < 201112L /* If we are on C90/99 */
+        #if defined(__clang__) || defined(__GNUC__) /* Clang and GCC */
+          #define thread_local __thread
+        #else /* Otherwise, we ignore the directive (unless user provides their own) */
+          #define thread_local
+          #define emulate_tls 1
+        #endif
+      #elif __APPLE__ && __MACH__
+        #define thread_local __thread
+      #else /* C11 and newer define thread_local in threads.h */
+        #define HAS_C11_THREADS 1
+        #include <threads.h>
+      #endif
+    #elif defined(__cplusplus) /* Compiling as C++ Language */
+      #if __cplusplus < 201103L /* thread_local is a C++11 feature */
+        #if defined(_MSC_VER)
+          #define thread_local __declspec(thread)
+        #elif defined(__clang__) || defined(__GNUC__)
+          #define thread_local __thread
+        #else /* Otherwise, we ignore the directive (unless user provides their own) */
+          #define thread_local
+          #define emulate_tls 1
+        #endif
+      #else /* In C++ >= 11, thread_local in a builtin keyword */
+        /* Don't do anything */
+      #endif
+      #define HAS_C11_THREADS 1
+    #endif
+#endif
+
+#ifndef HAS_C11_THREADS
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
-* @file
-* @mainpage CThread API Reference
-*
-* @section intro_sec Introduction
-* CThread is a minimal, portable implementation of basic threading
-* classes for C.
-*
-* They closely mimic the functionality and naming of the C11 standard, and
-* should be easily replaceable with the corresponding standard variants.
-*
-* @section port_sec Portability
-* The Win32 variant uses the native Win32 API for implementing the thread
-* classes, while for other systems, the POSIX threads API (pthread) is used.
-*
-* @section misc_sec Miscellaneous
-* The following special keywords are available: #_Thread_local.
-*
-* For more detailed information, browse the different sections of this
-* documentation. A good place to start is:
-* cthread.h.
-*/
-
 /* Which platform are we on? */
-#if !defined(_TTHREAD_PLATFORM_DEFINED_)
-  #if defined(_WIN32) || defined(__WIN32__) || defined(__WINDOWS__)
-    #define _TTHREAD_WIN32_
-  #else
-    #define _TTHREAD_POSIX_
-  #endif
-  #define _TTHREAD_PLATFORM_DEFINED_
+#if !defined(_CTHREAD_PLATFORM_DEFINED_)
+#if defined(_WIN32) || defined(__WIN32__) || defined(__WINDOWS__)
+    #define _CTHREAD_WIN32_
+#else
+    #define _CTHREAD_POSIX_
+#endif
+    #define _CTHREAD_PLATFORM_DEFINED_
 #endif
 
 /* Activate some POSIX functionality (e.g. clock_gettime and recursive mutexes) */
-#if defined(_TTHREAD_POSIX_)
-  #undef _FEATURES_H
-  #if !defined(_GNU_SOURCE)
-    #define _GNU_SOURCE
-  #endif
-  #if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 199309L)
-    #undef _POSIX_C_SOURCE
-    #define _POSIX_C_SOURCE 199309L
-  #endif
-  #if !defined(_XOPEN_SOURCE) || ((_XOPEN_SOURCE - 0) < 500)
-    #undef _XOPEN_SOURCE
-    #define _XOPEN_SOURCE 500
-  #endif
-  #define _XPG6
+#if defined(_CTHREAD_POSIX_)
+#undef _FEATURES_H
+    #if !defined(_GNU_SOURCE)
+        #define _GNU_SOURCE
+    #endif
+    #if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 199309L)
+        #undef _POSIX_C_SOURCE
+        #define _POSIX_C_SOURCE 199309L
+    #endif
+    #if !defined(_XOPEN_SOURCE) || ((_XOPEN_SOURCE - 0) < 500)
+        #undef _XOPEN_SOURCE
+        #define _XOPEN_SOURCE 500
+    #endif
+#define _XPG6
 #endif
 
 /* Generic includes */
-#include <time.h>
+#include <pthread.h>
 
 /* Platform specific includes */
-#if defined(_TTHREAD_POSIX_)
-  #include <pthread.h>
-#elif defined(_TTHREAD_WIN32_)
-  #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN
-    #define __UNDEF_LEAN_AND_MEAN
-  #endif
-  #include <windows.h>
-  #ifdef __UNDEF_LEAN_AND_MEAN
-    #undef WIN32_LEAN_AND_MEAN
-    #undef __UNDEF_LEAN_AND_MEAN
-  #endif
-  #if defined (__MINGW32__) && !defined(__MINGW64__)
-    /* Older versions of MinGW have no _ftime_s symbol */
-    #define _ftime_s _ftime
-  #endif
+#if defined(_CTHREAD_POSIX_)
+    #include <signal.h>
+    #include <sched.h>
+    #include <unistd.h>
+    #include <sys/time.h>
+    #include <errno.h>
+    #include <limits.h>
+#elif defined(_CTHREAD_WIN32_)
+    #include <windows.h>
+    #include <sys/timeb.h>
 #endif
+#include <time.h>
 
 /* Compiler-specific information */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-  #define TTHREAD_NORETURN _Noreturn
+    #define CTHREAD_NORETURN _Noreturn
 #elif defined(__GNUC__)
-  #define TTHREAD_NORETURN __attribute__((__noreturn__))
+    #define CTHREAD_NORETURN __attribute__((__noreturn__))
 #else
-  #define TTHREAD_NORETURN
-#endif
-
-/* If TIME_UTC is missing, provide it and provide a wrapper for
-   timespec_get. */
-#ifndef TIME_UTC
-#define TIME_UTC 1
-#define _TTHREAD_EMULATE_TIMESPEC_GET_
-
-#if defined(_TTHREAD_WIN32_)
-struct _tthread_timespec {
-  time_t tv_sec;
-  long   tv_nsec;
-};
-#define timespec _tthread_timespec
-#endif
-
-int _tthread_timespec_get(struct timespec *ts, int base);
-#define timespec_get _tthread_timespec_get
-#endif
-
-/**
-* @def _Thread_local
-* Thread local storage keyword.
-* A variable that is declared with the @c _Thread_local keyword makes the
-* value of the variable local to each thread (known as thread-local storage,
-* or TLS). Example usage:
-* @code
-* // This variable is local to each thread.
-* _Thread_local int variable;
-* @endcode
-* @note The @c _Thread_local keyword is a macro that maps to the corresponding
-* compiler directive (e.g. @c __declspec(thread)).
-* @note This directive is currently not supported on Mac OS X (it will give
-* a compiler error), since compile-time TLS is not supported in the Mac OS X
-* executable format. Also, some older versions of MinGW (before GCC 4.x) do
-* not support this directive, nor does the Tiny C Compiler.
-* @hideinitializer
-*/
-
-#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)) && !defined(_Thread_local)
- #if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__SUNPRO_CC) || defined(__IBMCPP__)
-  #define _Thread_local __thread
- #else
-  #define _Thread_local __declspec(thread)
- #endif
-#elif defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) < ((4 << 8) | 9))
- #define _Thread_local __thread
-#endif
-
-/* Macros */
-#if defined(_TTHREAD_WIN32_)
-#define TSS_DTOR_ITERATIONS (4)
-#else
-#define TSS_DTOR_ITERATIONS PTHREAD_DESTRUCTOR_ITERATIONS
+    #define CTHREAD_NORETURN
 #endif
 
 /* Function return values */
@@ -185,19 +122,7 @@ enum
 };
 
 /* Mutex */
-#if defined(_TTHREAD_WIN32_)
-typedef struct {
-  union {
-    CRITICAL_SECTION cs;      /* Critical section handle (used for non-timed mutexes) */
-    HANDLE mut;               /* Mutex handle (used for timed mutex) */
-  } mHandle;                  /* Mutex handle */
-  int mAlreadyLocked;         /* TRUE if the mutex is already locked */
-  int mRecursive;             /* TRUE if the mutex is recursive */
-  int mTimed;                 /* TRUE if the mutex is timed */
-} mtx_t;
-#else
 typedef pthread_mutex_t mtx_t;
-#endif
 
 /** Create a mutex object.
 * @param mtx A mutex object.
@@ -255,15 +180,7 @@ int mtx_trylock(mtx_t *mtx);
 int mtx_unlock(mtx_t *mtx);
 
 /* Condition variable */
-#if defined(_TTHREAD_WIN32_)
-typedef struct {
-  HANDLE mEvents[2];                  /* Signal and broadcast event HANDLEs. */
-  unsigned int mWaitersCount;         /* Count of the number of waiters. */
-  CRITICAL_SECTION mWaitersCountLock; /* Serialize access to mWaitersCount. */
-} cnd_t;
-#else
 typedef pthread_cond_t cnd_t;
-#endif
 
 /** Create a condition variable object.
 * @param cond A condition variable object.
@@ -316,7 +233,7 @@ int cnd_wait(cnd_t *cond, mtx_t *mtx);
 * becomes unblocked it locks the mutex before it returns.
 * @param cond A condition variable object.
 * @param mtx A mutex object.
-* @param xt A point in time at which the request will time out (absolute time).
+* @param ts A point in time at which the request will time out (absolute time).
 * @return @ref thrd_success upon success, or @ref thrd_timeout if the time
 * specified in the call was reached without acquiring the requested resource, or
 * @ref thrd_error if the request could not be honored.
@@ -324,11 +241,7 @@ int cnd_wait(cnd_t *cond, mtx_t *mtx);
 int cnd_timedwait(cnd_t *cond, mtx_t *mtx, const struct timespec *ts);
 
 /* Thread */
-#if defined(_TTHREAD_WIN32_)
-typedef DWORD thrd_t;
-#else
 typedef pthread_t thrd_t;
-#endif
 
 /** Thread start function.
 * Any thread that is started with the @ref thrd_create() function must be
@@ -375,7 +288,7 @@ int thrd_equal(thrd_t thr0, thrd_t thr1);
 /** Terminate execution of the calling thread.
 * @param res Result code of the calling thread.
 */
-TTHREAD_NORETURN void thrd_exit(int res);
+CTHREAD_NORETURN void thrd_exit(int res);
 
 /** Wait for a thread to terminate.
 * The function joins the given thread with the current thread by blocking
@@ -408,11 +321,7 @@ int thrd_sleep(const struct timespec *duration, struct timespec *remaining);
 void thrd_yield(void);
 
 /* Thread local storage */
-#if defined(_TTHREAD_WIN32_)
-typedef DWORD tss_t;
-#else
 typedef pthread_key_t tss_t;
-#endif
 
 /** Destructor function for a thread-specific storage.
 * @param val The value of the destructed thread-specific storage.
@@ -456,30 +365,182 @@ void *tss_get(tss_t key);
 */
 int tss_set(tss_t key, void *val);
 
-#if defined(_TTHREAD_WIN32_)
-  typedef struct {
-    LONG volatile status;
-    CRITICAL_SECTION lock;
-  } once_flag;
-  #define ONCE_FLAG_INIT {0,}
-#else
-  #define once_flag pthread_once_t
-  #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
-#endif
+#define once_flag pthread_once_t
+#define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
 
 /** Invoke a callback exactly once
  * @param flag Flag used to ensure the callback is invoked exactly
  *        once.
  * @param func Callback to invoke.
  */
-#if defined(_TTHREAD_WIN32_)
-  void call_once(once_flag *flag, void (*func)(void));
-#else
-  #define call_once(flag,func) pthread_once(flag,func)
-#endif
+#define call_once(flag,func) pthread_once(flag,func)
 
 #ifdef __cplusplus
 }
 #endif
-
+#endif /* HAS_C11_THREADS */
 #endif /* _CTHREAD_H_ */
+
+#if defined(__APPLE__) || defined(__MACH__)
+#include <mach/clock.h>
+#include <mach/mach.h>
+int timespec_get(struct timespec *ts, int base);
+#endif
+
+#ifndef _CTHREAD_EXTRA_H_
+#define _CTHREAD_EXTRA_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "rpmalloc.h"
+#if !defined(C11_MALLOC) || !defined(C11_FREE) || !defined(C11_REALLOC)|| !defined(C11_CALLOC)
+    #define C11_MALLOC malloc
+    #define C11_FREE free
+    #define C11_REALLOC realloc
+    #define C11_CALLOC calloc
+#endif
+
+#ifndef TIME_UTC
+#define TIME_UTC 1
+#endif
+
+/* Public API qualifier. */
+#ifndef C_API
+    #define C_API extern
+#endif
+
+#ifndef thrd_local
+#ifdef emulate_tls
+#   define thrd_local_get(type, var)        \
+        type* var(void) {                   \
+            if (thrd_##var##_tls == 0) {	\
+                thrd_##var##_tls = sizeof(type);    \
+                if (tss_create(&thrd_##var##_tss, C11_FREE) == thrd_success)	\
+                    atexit(var##_delete);   \
+                else                        \
+                      goto err;			    \
+            }								\
+            void *ptr = tss_get(thrd_##var##_tss);  \
+            if (ptr == NULL) {                      \
+                ptr = C11_MALLOC(thrd_##var##_tls); \
+                if (ptr == NULL)		    \
+                    goto err;			    \
+                if ((tss_set(thrd_##var##_tss, ptr)) != thrd_success)	\
+                    goto err;			    \
+            }                               \
+            return (type *)ptr;             \
+        err:                                \
+            return NULL;                    \
+        }
+
+#   define thrd_local_delete(type, var)         \
+        void var##_delete(void) {               \
+            if (thrd_##var##_tls == 0) {        \
+                void *ptr = tss_get(thrd_##var##_tss);  \
+                if (ptr != NULL)                \
+                    C11_FREE(ptr);              \
+                tss_delete(thrd_##var##_tss);   \
+                thrd_##var##_tss = 0;           \
+                thrd_##var##_tls = 0;           \
+            }                                   \
+        }
+
+    /* Initialize and setup thread local storage `var name` as functions. */
+#   define thrd_local(type, var)            \
+        static type thrd_##var##_buffer;    \
+        int thrd_##var##_tls = 0;           \
+        tss_t thrd_##var##_tss = 0;         \
+        thrd_local_delete(type, var)        \
+        thrd_local_get(type, var)
+
+#   define thrd_local_proto(type, var, prefix) \
+        prefix int thrd_##var##_tls;        \
+        prefix tss_t thrd_##var##_tss;      \
+        prefix type* var(void);             \
+        prefix void var##_delete(void);
+
+#   define thrd_local_return(type, var)    return (type *)tss_get(thrd_##var##_tss);
+
+    /* Creates a compile time thread local storage variable */
+#   define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#else
+#   define thrd_local_return(type, var)    return (type *)thrd_##var##_tls;
+#   define thrd_local_get(type, var)        \
+        type* var(void) {                   \
+            if (thrd_##var##_tls == NULL)   \
+                thrd_##var##_tls = &thrd_##var##_buffer;    \
+            thrd_local_return(type, var)    \
+        }
+
+#   define thrd_local(type, var)                        \
+        static thread_local type thrd_##var##_buffer;   \
+        thread_local type* thrd_##var##_tls = NULL;     \
+        thrd_local_get(type, var)
+
+#   define thrd_local_proto(type, var, prefix)      \
+        prefix thread_local type* thrd_##var##_tls; \
+        prefix type* var(void);
+
+#   define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#endif
+#endif /* thrd_local */
+
+#ifndef MAX_THREADS
+    #define MAX_THREADS 64
+    #define MAX_QUEUE 256
+#endif
+
+typedef struct pool_s thrd_pool_t;
+typedef enum {
+    pool_invalid        = -1,
+    pool_lock_failure   = -2,
+    pool_queue_full     = -3,
+    pool_shutdown       = -4,
+    pool_thread_failure = -5
+} pool_error_t;
+
+typedef enum {
+    pool_graceful       = 1
+} thrd_destroy_flags_t;
+
+/**
+ * @brief Creates a thrd_pool_t object.
+ * @param thread_count Number of worker threads.
+ * @param queue_size   Size of the queue.
+ * @return a newly created thread pool or NULL
+ */
+thrd_pool_t *thrd_pool(int thread_count, int queue_size);
+
+/**
+ * @brief add a new task in the queue of a thread pool
+ * @param pool     Thread pool to which add the task.
+ * @param function Pointer to the function that will perform the task.
+ * @param argument Argument to be passed to the function.
+ * @return 0 if all goes well, negative values in case of error (@see
+ * pool_error_t for codes).
+ */
+int thrd_add(thrd_pool_t *pool, void (*routine)(void *), void *arg);
+
+/**
+ * @brief Stops and destroys a thread pool.
+ * @param pool  Thread pool to destroy.
+ * @param flags Flags for shutdown
+ *
+ * Known values for flags are 0 (default) and `pool_graceful` in
+ * which case the thread pool doesn't accept any new tasks but
+ * processes all pending tasks before shutdown.
+ */
+int thrd_destroy(thrd_pool_t *pool, int flags);
+
+/**
+ * @brief Wait until all the tasks are finished in the thread pool.
+ * @param pool Thread pool.
+ */
+void thrd_wait(thrd_pool_t *pool);
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* _CTHREAD_EXTRA_H_ */

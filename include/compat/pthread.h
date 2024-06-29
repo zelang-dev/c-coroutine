@@ -14,17 +14,17 @@
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
  *      http://sources.redhat.com/pthreads-win32/contributors.html
- * 
+ *
  *      This library is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU Lesser General Public
  *      License as published by the Free Software Foundation; either
  *      version 2 of the License, or (at your option) any later version.
- * 
+ *
  *      This library is distributed in the hope that it will be useful,
  *      but WITHOUT ANY WARRANTY; without even the implied warranty of
  *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *      Lesser General Public License for more details.
- * 
+ *
  *      You should have received a copy of the GNU Lesser General Public
  *      License along with this library in the file COPYING.LIB;
  *      if not, write to the Free Software Foundation, Inc.,
@@ -35,6 +35,8 @@
 #pragma once
 #if !defined( PTHREAD_H )
 #define PTHREAD_H
+
+#define  usleep(n) Sleep(n)
 
 /* There are three implementations of cancel cleanup.
  * Note that pthread.h is included in both application
@@ -196,7 +198,7 @@
  * Boolean values to make us independent of system includes.
  */
 enum
-{ 
+{
   PTW32_FALSE = 0,
   PTW32_TRUE = (! PTW32_FALSE)
 };
@@ -429,7 +431,7 @@ enum
  * new/different thread. I.e. the thread is valid iff
  * x == p->ptHandle.x
  */
-typedef struct 
+typedef struct
 {
   void * p;                   /* Pointer to actual object */
   size_t x;                   /* Extra information - reuse count etc */
@@ -459,7 +461,7 @@ typedef struct pthread_barrierattr_t_ * pthread_barrierattr_t;
  * ====================
  */
 
-enum 
+enum
 {
   /*
    * pthread_attr_{get,set}detachstate
@@ -1087,7 +1089,7 @@ PTW32_DLLPORT struct timespec * PTW32_CDECL pthread_win32_getabstime_np(
  * Features that are auto-detected at load/run time.
  */
 PTW32_DLLPORT int PTW32_CDECL pthread_win32_test_features_np(int);
-enum ptw32_features 
+enum ptw32_features
 {
   PTW32_SYSTEM_INTERLOCKED_COMPARE_EXCHANGE = 0x0001,	/* System provides it. */
   PTW32_ALERTABLE_ASYNC_CANCEL              = 0x0002	/* Can cancel blocked threads. */

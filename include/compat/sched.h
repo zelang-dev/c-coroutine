@@ -21,17 +21,17 @@
  *      code distribution. The list can also be seen at the
  *      following World Wide Web location:
  *      http://sources.redhat.com/pthreads-win32/contributors.html
- *
+ * 
  *      This library is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU Lesser General Public
  *      License as published by the Free Software Foundation; either
  *      version 2 of the License, or (at your option) any later version.
- *
+ * 
  *      This library is distributed in the hope that it will be useful,
  *      but WITHOUT ANY WARRANTY; without even the implied warranty of
  *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *      Lesser General Public License for more details.
- *
+ * 
  *      You should have received a copy of the GNU Lesser General Public
  *      License along with this library in the file COPYING.LIB;
  *      if not, write to the Free Software Foundation, Inc.,
@@ -44,7 +44,7 @@
 #define _SCHED_H
 #define __SCHED_H_SOURCED__
 
-#include "_ptw32.h"
+#include "./_ptw32.h"
 
 /* We need a typedef for pid_t, (and POSIX requires <sched.h> to
  * define it, as it is defined in <sys/types.h>, but it does NOT
@@ -118,7 +118,7 @@ typedef ULONG_PTR DWORD_PTR;
 /* Thread scheduling policies */
 
 enum
-{
+{ 
   SCHED_OTHER = 0,
   SCHED_FIFO,
   SCHED_RR,
@@ -127,7 +127,7 @@ enum
 };
 
 struct sched_param
-{
+{ 
   int  sched_priority;
 };
 
@@ -165,7 +165,7 @@ struct sched_param
 #define CPU_EQUAL(set1ptr, set2ptr) (_sched_affinitycpuequal((set1ptr),(set2ptr)))
 
 typedef union
-{
+{ 
   char     cpuset[CPU_SETSIZE/8];
   size_t  _align;
 } cpu_set_t;

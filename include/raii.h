@@ -1,6 +1,7 @@
 #ifndef RAII_H
 #define RAII_H
 
+#include "defines.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/sys/time.h"
     #include <excpt.h>
@@ -25,12 +26,9 @@
 #endif
 
 #include "exception.h"
+#include "cthread.h"
 #include <stdio.h>
 #include <time.h>
-
-#ifndef HAS_C11_THREADS
-    #include "cthread.h"
-#endif
 
 #ifdef __cplusplus
     extern "C" {
@@ -95,7 +93,10 @@ typedef enum {
     RAII_UNION,
     RAII_VALUE,
     RAII_NO_INSTANCE,
-    RAII_GUARDED_STATUS
+    RAII_ARENA,
+    RAII_THREAD,
+    RAII_GUARDED_STATUS,
+    RAII_COUNT
 } raii_type;
 
 enum {
@@ -111,6 +112,7 @@ typedef union {
     unsigned long u_long;
     long long long_long;
     size_t max_size;
+    thrd_t thread;
     float point;
     double precision;
     bool boolean;
@@ -123,7 +125,7 @@ typedef union {
     char **array;
     void *object;
     raii_func_t func;
-    const char const_char[256];
+    const char const_char[128];
 } values_type;
 
 typedef struct {
@@ -167,6 +169,8 @@ struct memory_s {
     void *volatile err;
     const char *volatile panic;
     bool is_protected;
+    bool is_arena;
+    bool is_emulated;
     ex_ptr_t *protector;
     defer_t defer;
     size_t mid;
@@ -227,6 +231,7 @@ C_API values_type get_args(void *params, int item);
 */
 C_API values_type args_in(args_t *params, int index);
 
+C_API memory_t *raii_local(void);
 /* Return current `thread` smart memory pointer. */
 C_API memory_t *raii_init(void);
 C_API void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message);
@@ -270,11 +275,6 @@ to the given `scoped smart pointer` lifetime/destruction. */
 C_API size_t raii_deferred(memory_t *, func_t, void *);
 C_API size_t raii_deferred_count(memory_t *);
 
-/* Smart memory pointer, the allocated `size` memory requested in **->arena** field,
-all other fields private, this object binds any additional requests to it's lifetime.
-Will be freed with given `func`. */
-C_API memory_t *raii_malloc_full(size_t size, func_t func);
-
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
 C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
@@ -282,11 +282,7 @@ C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
 C_API void *malloc_by(memory_t *scope, size_t size);
-
-/* Smart memory pointer, the allocated `size` memory requested in **->arena** field,
-all other fields private, this object binds any additional requests to it's lifetime.
-Will be freed with given `func`. */
-C_API memory_t *raii_calloc_full(int count, size_t size, func_t func);
+C_API void *malloc_arena(memory_t *scope, size_t size);
 
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
@@ -295,9 +291,11 @@ C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
 C_API void *calloc_by(memory_t *scope, int count, size_t size);
+C_API void *calloc_arena(memory_t *scope, int count, size_t size);
 
 /* Same as `raii_deferred_free`, but also destroy smart pointer. */
 C_API void raii_delete(memory_t *ptr);
+C_API void raii_delete_arena(memory_t *ptr);
 
 /* Same as `raii_deferred_clean`, but also
 reset/clear current `thread` smart pointer. */
@@ -312,6 +310,7 @@ C_API void raii_deferred_clean(void);
 /* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
 for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
+C_API unique_t *unique_init_arena(void);
 
 /* Request/return raw memory of given `size`,
 uses current `thread` smart pointer,
@@ -334,17 +333,31 @@ C_API bool is_instance(void *);
 C_API bool is_valid(void *);
 C_API bool is_zero(size_t);
 C_API bool is_empty(void *);
+C_API bool is_true(bool);
+C_API bool is_false(bool);
 C_API bool is_str_in(const char *text, char *pattern);
 C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void *self);
+C_API bool is_exception_emulated(ex_context_t *);
+C_API bool is_protection_emulated(ex_ptr_t *);
+C_API bool is_scope_emulated(memory_t *);
 
 C_API void *try_calloc(int, size_t);
 C_API void *try_malloc(size_t);
+C_API void *try_realloc(void *, size_t);
 
 C_API void guard_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind);
 C_API void guard_delete(memory_t *ptr);
+
+#ifndef MAX
+# define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MIN
+# define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 #define NONE
 
@@ -383,9 +396,9 @@ return given `value` when done, use `NONE` for no return. */
 #define _return(value)              \
     raii_delete(_$##__FUNCTION__);  \
     guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
-    ex_context = ex_err.next;       \
-    if (ex_context == &ex_err)      \
-        ex_context = ex_err.next;   \
+    ex_update(ex_err.next);         \
+    if (ex_local() == &ex_err)      \
+        ex_update(ex_err.next);     \
     return value;
 
 /* Creates an scoped guard section, it replaces `{`.
@@ -408,12 +421,12 @@ are only valid between these sections.
     ex_try {                                            \
         do {
 
-/* This ends an scoped guard section, it replaces `}`.
-On exit will begin executing deferred functions,
-return given `result` when done, use `NONE` for no return. */
-#define unguarded(result)                                           \
-        } while (false);                                            \
-        raii_deferred_free(_$##__FUNCTION__);                       \
+    /* This ends an scoped guard section, it replaces `}`.
+    On exit will begin executing deferred functions,
+    return given `result` when done, use `NONE` for no return. */
+    #define unguarded(result)                                           \
+            } while (false);                                            \
+            raii_deferred_free(_$##__FUNCTION__);                       \
     } ex_catch_if {                                                 \
         if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
             raii_deferred_free(_$##__FUNCTION__);                   \
@@ -424,8 +437,8 @@ return given `result` when done, use `NONE` for no return. */
     return result;                                                  \
 }
 
-/* This ends an scoped guard section, it replaces `}`.
-On exit will begin executing deferred functions. */
+    /* This ends an scoped guard section, it replaces `}`.
+    On exit will begin executing deferred functions. */
 #define guarded                                                     \
         } while (false);                                            \
         raii_deferred_free(_$##__FUNCTION__);                       \
@@ -465,7 +478,58 @@ On exit will begin executing deferred functions. */
     #define end_trying ex_end_try
 #endif
 
-C_API thread_local memory_t *raii_context;
+#define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }
+
+thrd_local_create(memory_t, raii)
+thrd_local_create(ex_context_t, except)
+thread_storage_create(ex_context_t, local_except)
+
+typedef struct arena_s *arena_t;
+struct arena_s {
+    raii_type type;
+    arena_t prev;
+    char *avail;
+    char *limit;
+    void *base;
+    bool is_global;
+    size_t threshold;
+    size_t bytes;
+    size_t total;
+};
+
+/* Allocates, initializes, a new arena, `size` is allocation threshold.
+Default `0` = `10` = `10kb` additional added onto `arena_alloc` requests. */
+C_API arena_t arena_init(size_t);
+
+/* Deallocates all of the space in arena, deallocates the arena itself, and
+clears arena. */
+C_API void arena_free(arena_t arena);
+
+/* Allocates nbytes bytes in arena and returns a pointer to the first byte.
+The bytes are uninitialized. Will `Panic` if allocation fails. */
+C_API void *arena_alloc(arena_t arena, long nbytes);
+
+/* Allocates space in arena for an array of count elements, each occupying nbytes,
+and returns a pointer to the first element.
+The bytes are initialized to zero. Will `Panic` if allocation fails. */
+C_API void *arena_calloc(arena_t arena, long count, long nbytes);
+
+/* Deallocates all of the space in arena — all of the space allocated since
+the last call to `arena_clear`. */
+C_API void arena_clear(arena_t arena);
+
+C_API size_t arena_capacity(const arena_t arena);
+C_API size_t arena_total(const arena_t arena);
+C_API void arena_print(const arena_t arena);
+
+C_API tss_t thrd_arena_tss;
+C_API void thrd_init(void);
+C_API void thrd_defer(func_t, void *);
+C_API void *thrd_unique(size_t);
+C_API void *thrd_get(void);
+C_API void *thrd_alloc(size_t);
+C_API void *thrd_malloc(size_t);
+C_API unique_t *thrd_scope(void);
 
 #ifdef __cplusplus
     }
