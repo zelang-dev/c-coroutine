@@ -1,23 +1,6 @@
 #ifndef C_COROUTINE_H
 #define C_COROUTINE_H
 
-#if defined(__GNUC__) && (!defined(_WIN32) || !defined(_WIN64))
-    #define _GNU_SOURCE
-#endif
-
-#include <errno.h>
-#include <stddef.h>
-#include <string.h>
-#include <stdint.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <inttypes.h>
-#if !defined(_WIN32)
-    #include <sys/time.h>
-    #include <sys/resource.h> /* setrlimit() */
-#endif
-
 #ifndef CERTIFICATE
     #define CERTIFICATE "localhost"
 #endif
@@ -44,15 +27,10 @@
     #endif
 #endif
 
-#ifdef USE_DEBUG
-    #define CO_LOG(s) RAII_LOG(s)
-    #define CO_INFO(s, ...) RAII_INFO(s, __VA_ARGS__ )
-    #define CO_HERE() RAII_HERE()
-#else
-    #define CO_LOG(s) (void)s
-    #define CO_INFO(s, ...)  (void)s
-    #define CO_HERE()  (void)0
-#endif
+#define CO_LOG(s) RAII_LOG(s)
+#define CO_INFO(s, ...) RAII_INFO(s, __VA_ARGS__ )
+#define CO_HERE() RAII_HERE()
+#define CO_ASSERT RAII_ASSERT
 
 /* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
@@ -62,6 +40,8 @@
 #ifndef CO_MAIN_STACK
     #define CO_MAIN_STACK (64 * 1024)
 #endif
+
+#define ERROR_SCRAPE_SIZE 256
 
 #ifndef CO_SCRAPE_SIZE
     #define CO_SCRAPE_SIZE (2 * 64)
@@ -76,15 +56,6 @@
 /* Public API qualifier. */
 #ifndef C_API
     #define C_API extern
-#endif
-
-#ifndef CO_ASSERT
-  #if defined(USE_DEBUG)
-    #include <assert.h>
-    #define CO_ASSERT(c) assert(c)
-  #else
-    #define CO_ASSERT(c)
-  #endif
 #endif
 
 /*[amd64, arm, ppc, x86]:
@@ -202,7 +173,7 @@
   #define fastcall
 #endif
 
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
 #include <valgrind/valgrind.h>
 #endif
 
@@ -467,7 +438,7 @@ struct routine_s {
     bool is_plain;
     signed int loop_code;
     void_t user_data;
-#if defined(CO_USE_VALGRIND)
+#if defined(USE_VALGRIND)
     unsigned int vg_stack_id;
 #endif
     void_t args;

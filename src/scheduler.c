@@ -15,6 +15,7 @@ static void(fastcall *co_swap)(routine_t *, routine_t *) = 0;
 
 static thread_local uv_loop_t co_interrupt_buffer[1];
 static thread_local uv_loop_t *co_interrupt_handle = NULL;
+static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
 static int main_argc;
 static char **main_argv;
@@ -234,7 +235,7 @@ routine_t *co_derive(void_t memory, size_t size) {
         *--p = (long)co_awaitable;     /* start of function */
         *(long *)handle = (long)p;     /* stack pointer */
 
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)handle + sizeof(routine_t), 16);
         handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
@@ -365,7 +366,7 @@ routine_t *co_derive(void_t memory, size_t size) {
         ((int64_t *)handle)[ 31 ] = (int64_t)handle;        /* stack limit */
 #endif
 
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)handle + sizeof(routine_t), 16);
         handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
@@ -411,7 +412,7 @@ routine_t *co_derive(void_t memory, size_t size) {
         handle[ 9 ] = (size_t)co_func;
 
         co = (routine_t *)handle;
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)co + sizeof(routine_t), 16);
         co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
@@ -501,7 +502,7 @@ routine_t *co_derive(void_t memory, size_t size) {
 #endif
 
         co = (routine_t *)handle;
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
         size_t stack_addr = _co_align_forward((size_t)co + sizeof(routine_t), 16);
         co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
@@ -727,7 +728,7 @@ routine_t *co_derive(void_t memory, size_t size) {
     context->gprs[ 12 ] = (uint64_t)co_func;
     context->lr = (uint64_t)co_func;
 
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
     size_t stack_addr = _co_align_forward((size_t)context + sizeof(routine_t), 16);
     context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
@@ -849,8 +850,8 @@ void co_stack_check(int n) {
 
     t = co_running;
     if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER) {
-        snprintf(ex_message, 256, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
-        co_panic(ex_message);
+        snprintf(error_message, ERROR_SCRAPE_SIZE, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
+        co_panic(error_message);
     }
 }
 

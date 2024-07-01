@@ -22,23 +22,26 @@ set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
-option(LIBUV_BUILD_SHARED "Build shared lib" OFF)
-
-find_package(raii)
+# if CMake versions earlier than 3.14 need to be supported see https://cmake.org/cmake/help/v3.14/module/FetchContent.html
+find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.2.zip
-        URL_MD5 fe693fcb241747a0e7b5074bcd1f7cbf
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.3.zip
+        URL_MD5 7ec8141323696b85c7ec032cad898cc1
     )
     FetchContent_MakeAvailable(raii)
 endif()
 
-FetchContent_Declare(libuv
-    URL https://github.com/libuv/libuv/archive/refs/tags/v1.48.0.zip
-    URL_MD5 67d0e50ac6e95de12b09b17ff8baed0f
-)
-FetchContent_MakeAvailable(libuv)
+find_package(libuv QUIET)
+if(NOT libuv_FOUND)
+    FetchContent_Declare(libuv
+        URL https://github.com/libuv/libuv/archive/refs/tags/v1.48.0.zip
+        URL_MD5 67d0e50ac6e95de12b09b17ff8baed0f
+    )
+    FetchContent_MakeAvailable(libuv)
+endif()
 
 file(GLOB lib_files
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
@@ -59,14 +62,17 @@ if(OPENSSL_FOUND)
     target_link_libraries(coroutine PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
     target_link_libraries(coroutine PUBLIC ${OPENSSL_SSL_LIBRARY})
 else()
-    add_definitions(-DLIBRESSL_APPS=OFF)
-    add_definitions(-DLIBRESSL_TESTS=OFF)
-    add_definitions(-DLIBRESSL_DISABLE_OVERRIDE_WINCRYPT_DEFINES_WARNING)
-    FetchContent_Declare(libressl
-        URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
-        URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
-    )
-    FetchContent_MakeAvailable(libressl)
+    find_package(LibreSSL QUIET)
+    if(NOT LibreSSL_FOUND)
+        FetchContent_Declare(libressl
+            URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
+            URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
+        )
+        FetchContent_MakeAvailable(libressl)
+    endif()
+    target_compile_definitions(crypto PRIVATE LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+    target_compile_definitions(ssl PRIVATE LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+    target_compile_definitions(tls PRIVATE LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
     target_link_libraries(coroutine PUBLIC crypto)
     target_link_libraries(coroutine PUBLIC ssl)
 endif()
@@ -75,7 +81,7 @@ target_include_directories(coroutine
     PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG -D CO_USE_VALGRIND ")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG -D USE_VALGRIND ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
 endif()
 
@@ -85,6 +91,8 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
 
+target_include_directories(raii AFTER PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(coroutine PUBLIC raii)
 if(BUILD_TESTING)
     add_subdirectory(examples)

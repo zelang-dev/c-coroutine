@@ -6,7 +6,11 @@ Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
 */
 
 static unsigned long thread_id(thrd_t thread) {
+#ifdef _WIN32
+    return (unsigned long)thread.p;
+#else
     return (unsigned long)thread;
+#endif
 }
 
 future *future_create(callable_t start_routine) {
@@ -71,7 +75,11 @@ value_t co_async_get(future *f) {
 }
 
 CO_FORCE_INLINE unsigned long co_async_self() {
+#ifdef _WIN32
+    return (unsigned long)thrd_current().p;
+#else
     return (unsigned long)thrd_current();
+#endif
 }
 
 void co_async_wait(future *f) {

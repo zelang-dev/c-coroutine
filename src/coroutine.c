@@ -60,7 +60,7 @@ void co_delete(routine_t *co) {
                ) {
         CO_INFO("attempt to delete a coroutine named: %s,\nthat is not dead or suspended, status is: %d\n", co->name, co->status);
     } else {
-#ifdef CO_USE_VALGRIND
+#ifdef USE_VALGRIND
         if (co->vg_stack_id != 0) {
             VALGRIND_STACK_DEREGISTER(co->vg_stack_id);
             co->vg_stack_id = 0;

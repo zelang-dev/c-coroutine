@@ -66,19 +66,20 @@ void tls_close_free(void_t handle) {
 
 void coroutine_event_cleanup(void_t t) {
     routine_t *co = (routine_t *)t;
+    uv_loop_t *uvLoop = NULL;
     if (co->context->wait_group)
         hash_free(co->context->wait_group);
 
-    if (uv_loop_alive(co_loop())) {
+    if (uv_loop_alive(uvLoop = co_loop())) {
         if (uv_server_args && uv_server_args->bind_type == UV_TLS)
-            uv_walk(co_loop(), (uv_walk_cb)tls_close_free, NULL);
+            uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
         else
-            uv_walk(co_loop(), (uv_walk_cb)uv_close_free, NULL);
+            uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
 
-        uv_run(co_loop(), UV_RUN_DEFAULT);
+        uv_run(uvLoop, UV_RUN_DEFAULT);
 
-        uv_stop(co_loop());
-        uv_run(co_loop(), UV_RUN_DEFAULT);
+        uv_stop(uvLoop);
+        uv_run(uvLoop, UV_RUN_DEFAULT);
     }
 }
 

@@ -487,7 +487,7 @@ thread_storage_create(ex_context_t, local_except)
 typedef struct arena_s *arena_t;
 struct arena_s {
     raii_type type;
-    arena_t prev;
+    arena_t next;
     char *avail;
     char *limit;
     void *base;

@@ -2,6 +2,7 @@
 
 static thread_local int channel_id_generate = 0;
 static thread_local gc_channel_t *channel_list = NULL;
+static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
 void gc_channel(channel_t *ch) {
     if (!channel_list)
@@ -130,8 +131,8 @@ static void channel_co_dequeue(channel_co_t *a) {
 
     ar = channel_msg(a->c, a->op);
     if (is_empty(ar)) {
-        snprintf(ex_message, 256, "bad use of channel_co_dequeue op=%d\n", a->op);
-        co_panic(ex_message);
+        snprintf(error_message, ERROR_SCRAPE_SIZE, "bad use of channel_co_dequeue op=%d\n", a->op);
+        co_panic(error_message);
     }
 
     for (i = 0; i < ar->n; i++)
