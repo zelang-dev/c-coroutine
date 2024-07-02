@@ -12,11 +12,11 @@ void gc_channel(channel_t *ch) {
         hash_put(channel_list, co_itoa(ch->id), ch);
 }
 
-CO_FORCE_INLINE gc_channel_t *gc_channel_list() {
+CO_FORCE_INLINE gc_channel_t *gc_channel_list(void) {
     return channel_list;
 }
 
-void gc_channel_free() {
+void gc_channel_free(void) {
     if (channel_list)
         hash_free(channel_list);
 }
@@ -38,7 +38,7 @@ channel_t *channel_create(int elem_size, int bufsize) {
     return c;
 }
 
-CO_FORCE_INLINE channel_t *channel() {
+CO_FORCE_INLINE channel_t *channel(void) {
     return channel_create(sizeof(values_t), 0);
 }
 

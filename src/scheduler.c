@@ -18,15 +18,26 @@ typedef struct {
 static thread_local coroutine_task_t task_data = {0};
 
 typedef struct {
+    bool info_log;
+
     /* coroutine unique id generator */
     int id_generate;
 
+    /* number of coroutines waiting in sleep mode. */
     int sleeping_counted;
+
+    /* has the coroutine sleep/wait system started. */
     int started_wait;
+
+    /* indicator for thread termination. */
     int exiting;
+
+    /* track the number of coroutines used */
+    int used_count;
+
     /* number of other coroutine that ran while the current coroutine was waiting.*/
     int num_others_ran;
-
+    /* record which coroutine sleeping in scheduler */
     co_scheduler_t sleeping;
 
     /* record which coroutine is executing for scheduler */
@@ -34,6 +45,8 @@ typedef struct {
 
     /* coroutines's FIFO scheduler queue */
     co_scheduler_t run_queue;
+
+    uv_args_t *uv_args;
 } thread_processor_t;
 thread_local thread_processor_t thread_data = {0};
 
@@ -50,9 +63,6 @@ routine_t **all_coroutine;
 
 int n_all_coroutine;
 
-/* track the number of coroutines used */
-thread_local int coroutine_count;
-thread_local bool scheduler_info_log = true;
 
 int coroutine_loop(int);
 void coroutine_interrupt(void);
@@ -124,7 +134,7 @@ C_API string co_system_uname(void) {
 }
 
 /* called only if routine_t func returns */
-static void co_done() {
+static void co_done(void) {
     if (!co_active()->loop_active) {
         co_active()->halt = true;
         co_active()->status = CO_DEAD;
@@ -133,7 +143,7 @@ static void co_done() {
     co_scheduler();
 }
 
-static void co_awaitable() {
+static void co_awaitable(void) {
     routine_t *co = co_active();
     try {
         if (co->loop_active) {
@@ -161,7 +171,7 @@ static void co_awaitable() {
     } end_try;
 }
 
-static void co_func() {
+static void co_func(void) {
     co_awaitable();
     co_done(); /* called only if coroutine function returns */
 }
@@ -171,7 +181,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align) {
     return (addr + (align - 1)) & ~(align - 1);
 }
 
-uv_loop_t *co_loop() {
+uv_loop_t *co_loop(void) {
     if (!is_empty(task_data.interrupt_handle))
         return task_data.interrupt_handle;
 
@@ -464,7 +474,7 @@ static const uint32_t co_swap_function[ 1024 ] = {
 #ifdef _WIN32
 #include <windows.h>
 
-static void co_init() {
+static void co_init(void) {
 #ifdef CO_MPROTECT
     DWORD old_privileges;
     VirtualProtect((void_t)co_swap_function, sizeof co_swap_function, PAGE_EXECUTE_READ, &old_privileges);
@@ -847,7 +857,7 @@ routine_t *co_coroutine(void) {
     return thread_data.running;
 }
 
-CO_FORCE_INLINE void co_scheduler() {
+CO_FORCE_INLINE void co_scheduler(void) {
     co_switch(task_data.main_handle);
 }
 
@@ -972,7 +982,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
 
     t = co_create(stack, fn, arg);
     t->cid = ++thread_data.id_generate;
-    coroutine_count++;
+    thread_data.used_count++;
     id = t->cid;
     if (n_all_coroutine % 64 == 0) {
         all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[ 0 ]));
@@ -1010,7 +1020,7 @@ CO_FORCE_INLINE int co_go(callable_t fn, void_t arg) {
     return coroutine_create(fn, arg, CO_STACK_SIZE);
 }
 
-void co_yield() {
+void co_yield(void) {
     coroutine_schedule(thread_data.running);
     co_suspend();
 }
@@ -1067,7 +1077,7 @@ static void_t coroutine_wait(void_t v) {
         while ((t = thread_data.sleeping.head) && now >= t->alarm_time) {
             coroutine_remove(&thread_data.sleeping, t);
             if (!t->system && --thread_data.sleeping_counted == 0)
-                coroutine_count--;
+                thread_data.used_count--;
 
             coroutine_schedule(t);
         }
@@ -1109,7 +1119,7 @@ unsigned int co_sleep(unsigned int ms) {
         thread_data.sleeping.tail = t;
 
     if (!t->system && thread_data.sleeping_counted++ == 0)
-        coroutine_count++;
+        thread_data.used_count++;
 
     co_switch(co_current());
 
@@ -1121,7 +1131,7 @@ void coroutine_schedule(routine_t *t) {
     coroutine_add(&thread_data.run_queue, t);
 }
 
-int coroutine_yield() {
+int coroutine_yield(void) {
     int n;
     n = thread_data.num_others_ran;
     coroutine_schedule(thread_data.running);
@@ -1130,7 +1140,7 @@ int coroutine_yield() {
     return thread_data.num_others_ran - n - 1;
 }
 
-bool coroutine_active() {
+bool coroutine_active(void) {
     return !is_empty(thread_data.run_queue.head);
 }
 
@@ -1154,14 +1164,26 @@ void coroutine_name(char *fmt, ...) {
     va_end(args);
 }
 
-char *coroutine_get_state() {
+CO_FORCE_INLINE char *coroutine_get_state(void) {
     return co_active()->state;
+}
+
+CO_FORCE_INLINE void coroutine_dec_count(void) {
+    --thread_data.used_count;
+}
+
+CO_FORCE_INLINE void coroutine_log_reset(void) {
+    thread_data.info_log = false;
+}
+
+CO_FORCE_INLINE uv_args_t *coroutine_event_args(void) {
+    thread_data.uv_args;
 }
 
 void coroutine_system(void) {
     if (!thread_data.running->system) {
         thread_data.running->system = 1;
-        --coroutine_count;
+        --thread_data.used_count;
     }
 }
 
@@ -1172,7 +1194,7 @@ void coroutine_exit(int val) {
     co_scheduler();
 }
 
-void coroutine_info() {
+void coroutine_info(void) {
     int i;
     routine_t *t;
     char *extra;
@@ -1198,7 +1220,7 @@ void coroutine_update(routine_t *t) {
     all_coroutine[i]->all_coroutine_slot = i;
 }
 
-void coroutine_cleanup() {
+void coroutine_cleanup(void) {
     routine_t *t;
     if (!can_cleanup)
         return;
@@ -1207,10 +1229,10 @@ void coroutine_cleanup() {
     gc_channel_free();
     gc_coroutine_free();
     if (n_all_coroutine) {
-        if (coroutine_count)
+        if (thread_data.used_count)
             n_all_coroutine--;
 
-        for (int i = 0; i < (n_all_coroutine + (coroutine_count != 0)); i++) {
+        for (int i = 0; i < (n_all_coroutine + (thread_data.used_count != 0)); i++) {
             t = all_coroutine[n_all_coroutine - i];
             if (t && t->magic_number == CO_MAGIC_NUMBER) {
                 t->magic_number = -1;
@@ -1240,10 +1262,10 @@ static void coroutine_scheduler(void) {
     routine_t *t;
 
     for (;;) {
-        if (coroutine_count == 0 || !coroutine_active()) {
+        if (thread_data.used_count == 0 || !coroutine_active()) {
             coroutine_cleanup();
-            if (coroutine_count > 0) {
-                CO_INFO("No runnable coroutines! %d stalled\n", coroutine_count);
+            if (thread_data.used_count > 0) {
+                CO_INFO("No runnable coroutines! %d stalled\n", thread_data.used_count);
                 exit(1);
             } else {
                 CO_LOG("Coroutine scheduler exited");
@@ -1257,7 +1279,7 @@ static void coroutine_scheduler(void) {
         thread_data.running = t;
         thread_data.num_others_ran++;
         t->cycles++;
-        if (scheduler_info_log)
+        if (thread_data.info_log)
             CO_INFO("Thread #%lx running coroutine id: %d (%s) status: %d cycles: %zu\n", co_async_self(), t->cid,
                     ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status, t->cycles);
 
@@ -1266,20 +1288,20 @@ static void coroutine_scheduler(void) {
             co_switch(t);
         }
 
-        if (scheduler_info_log)
+        if (thread_data.info_log)
             CO_LOG("Back at coroutine scheduling");
 
         thread_data.running = NULL;
         if (t->halt || t->exiting) {
             if (!t->system)
-                --coroutine_count;
+                --thread_data.used_count;
 
             coroutine_update(t);
             if (!t->synced && !t->channeled && !t->loop_erred) {
                 co_delete(t);
             } else if (t->channeled) {
                 gc_coroutine(t);
-            } else if (t->loop_erred && coroutine_count == 0) {
+            } else if (t->loop_erred && thread_data.used_count == 0) {
                 coroutine_event_cleanup(t);
             }
         }
@@ -1295,12 +1317,22 @@ static void_t coroutine_main(void_t v) {
 int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
+
+    thread_data.info_log = true;
+    thread_data.uv_args = NULL;
+    thread_data.exiting = 0;
+    thread_data.id_generate = 0;
+
+    task_data.active_handle = NULL;
+    task_data.main_handle = NULL;
+    task_data.current_handle = NULL;
+
     exception_setup_func = coroutine_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
     exception_ctrl_c_func = (ex_terminate_func)coroutine_info;
     exception_terminate_func = (ex_terminate_func)coroutine_cleanup;
 #ifdef UV_H
-    CO_INFO("System starting up: %s\n\n", co_system_uname());
+    CO_INFO("Starting up: %s\n\n", co_system_uname());
 #endif
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);

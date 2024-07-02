@@ -246,7 +246,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
         }
         c->wait_active = false;
         c->wait_group = NULL;
-        --coroutine_count;
+        coroutine_dec_count();
     }
 
     hash_free(wg);

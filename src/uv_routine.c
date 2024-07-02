@@ -3,8 +3,6 @@
 static void_t fs_init(void_t);
 static void_t uv_init(void_t);
 
-thread_local uv_args_t *uv_server_args = NULL;
-
 static void uv_arguments_free(uv_args_t *uv_args) {
     if (is_type(uv_args, CO_EVENT_ARG)) {
         CO_FREE(uv_args->args);
@@ -71,7 +69,7 @@ void coroutine_event_cleanup(void_t t) {
         hash_free(co->context->wait_group);
 
     if (uv_loop_alive(uvLoop = co_loop())) {
-        if (uv_server_args && uv_server_args->bind_type == UV_TLS)
+        if (coroutine_event_args() && coroutine_event_args()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
         else
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
@@ -117,13 +115,13 @@ static void error_catch(void_t uv) {
 
     if (!is_empty((void_t)co_message())) {
         co->scope->is_recovered = true;
-        if (uv_loop_alive(co_loop()) && uv_server_args) {
+        if (uv_loop_alive(co_loop()) && coroutine_event_args()) {
             co->halt = true;
             co->loop_erred = true;
             co->status = CO_ERRED;
-            scheduler_info_log = false;
+            coroutine_log_reset();
             coroutine_event_cleanup(co);
-            uv_server_args = NULL;
+            memset(coroutine_event_args(), 0, sizeof(uv_args_t));
         }
     }
 }
@@ -185,7 +183,7 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    scheduler_info_log = false;
+    coroutine_log_reset();
     if (0 == status) {
         co->is_address = true;
         co_result_set(co, STREAM(ut->tcp_hdl));
@@ -647,8 +645,8 @@ static void_t uv_init(void_t uv_args) {
                         uv_ip4_name((const struct sockaddr_in *)&name, (char *)ip, sizeof ip);
                     }
 
-                    if (is_empty(uv_server_args)) {
-                        uv_server_args = uv;
+                    if (is_empty(coroutine_event_args())) {
+                        *coroutine_event_args() = *uv;
                     }
 
                     printf("Listening to %s:%d for%s connections, %s.\n",
@@ -657,7 +655,7 @@ static void_t uv_init(void_t uv_args) {
                            (uv->bind_type == UV_TLS ? " secure" : ""),
                            http_std_date(0));
 
-                    scheduler_info_log = false;
+                    coroutine_log_reset();
                 }
                 break;
             case UV_PROCESS:
@@ -1011,7 +1009,7 @@ void coro_uv_close(uv_handle_t *handle) {
     uv_start(uv_args, UV_HANDLE, 1, false);
 }
 
-uv_udp_t *udp_create() {
+uv_udp_t *udp_create(void) {
     uv_udp_t *udp = (uv_udp_t *)co_calloc_full(co_active(), 1, sizeof(uv_udp_t), uv_close_free);
     int r = uv_udp_init(co_loop(), udp);
     if (r) {
@@ -1031,7 +1029,7 @@ uv_pipe_t *pipe_create(bool is_ipc) {
     return pipe;
 }
 
-uv_tcp_t *tcp_create() {
+uv_tcp_t *tcp_create(void) {
     uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(co_active(), 1, sizeof(uv_tcp_t), uv_close_free);
     int r = uv_tcp_init(co_loop(), tcp);
     if (r) {
@@ -1237,7 +1235,7 @@ int spawn_detach(spawn_t *child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref((uv_handle_t *)&child->process);
         child->is_detach = true;
-        --coroutine_count;
+        coroutine_dec_count();
         co_yield();
     }
 

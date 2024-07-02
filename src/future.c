@@ -74,7 +74,7 @@ value_t co_async_get(future *f) {
     return r;
 }
 
-CO_FORCE_INLINE unsigned long co_async_self() {
+CO_FORCE_INLINE unsigned long co_async_self(void) {
 #ifdef _WIN32
     return (unsigned long)thrd_current().p;
 #else
@@ -107,7 +107,7 @@ void future_close(future *f) {
     }
 }
 
-promise *promise_create() {
+promise *promise_create(void) {
     promise *p = try_calloc(1, sizeof(promise));
     p->result = try_calloc(1, sizeof(values_t));
     mtx_init(&p->mutex, mtx_plain);

@@ -5,6 +5,8 @@
     #define CERTIFICATE "localhost"
 #endif
 
+#define time_Second 1000
+
 #include "uv_routine.h"
 #include "raii.h"
 
@@ -734,6 +736,9 @@ C_API void coroutine_update(routine_t *);
 C_API void coroutine_schedule(routine_t *);
 C_API bool coroutine_active(void);
 C_API void coroutine_info(void);
+C_API void coroutine_dec_count(void);
+C_API void coroutine_log_reset(void);
+C_API uv_args_t *coroutine_event_args(void);
 
 C_API void channel_print(channel_t *);
 C_API channel_t *channel_create(int, int);
@@ -822,10 +827,6 @@ C_API void co_result_set(routine_t *, void_t);
 C_API void co_plain_set(routine_t *, size_t);
 
 C_API void delete(void_t ptr);
-
-C_API thread_local int coroutine_count;
-C_API thread_local bool scheduler_info_log;
-C_API thread_local uv_args_t *uv_server_args;
 
 typedef struct _promise
 {

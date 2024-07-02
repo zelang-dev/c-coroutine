@@ -432,19 +432,19 @@ oa_val_ops oa_val_ops_string = { oa_string_cp, CO_FREE, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
 oa_val_ops oa_val_ops_channel = {oa_channel_cp, FUNC_VOID(channel_free), oa_value_eq, NULL};
 
-CO_FORCE_INLINE wait_group_t *ht_group_init() {
+CO_FORCE_INLINE wait_group_t *ht_group_init(void) {
     return (wait_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE ht_string_t *ht_string_init() {
+CO_FORCE_INLINE ht_string_t *ht_string_init(void) {
     return (ht_string_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE wait_result_t *ht_result_init() {
+CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
     return (wait_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE gc_channel_t *ht_channel_init() {
+CO_FORCE_INLINE gc_channel_t *ht_channel_init(void) {
     return (gc_channel_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
 }
 
