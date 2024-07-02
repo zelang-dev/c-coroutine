@@ -1,30 +1,7 @@
 #ifndef RAII_H
 #define RAII_H
 
-#include "defines.h"
-#if defined(_WIN32) || defined(_WIN64)
-    #include "compat/sys/time.h"
-    #include <excpt.h>
-    #ifndef SYS_CONSOLE
-        /* O.S. physical ~input/output~ console `DEVICE`. */
-        #define SYS_CONSOLE "\\\\?\\CON"
-        /* O.S. physical ~null~ `DEVICE`. */
-        #define SYS_NULL "\\\\?\\NUL"
-        /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
-        #define SYS_PIPE "\\\\.\\pipe\\"
-    #endif
-#else
-    #ifndef SYS_CONSOLE
-        /* O.S. physical ~input/output~ console `DEVICE`. */
-        #define SYS_CONSOLE "/dev/tty"
-        /* O.S. physical ~null~ `DEVICE`. */
-        #define SYS_NULL "/dev/null"
-        /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
-        #define SYS_PIPE "./"
-    #endif
-    #include <libgen.h>
-#endif
-
+#include "rtypes.h"
 #include "exception.h"
 #include "cthread.h"
 #include <stdio.h>
