@@ -42,7 +42,7 @@ void *func(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    int numRoutines = 100, i;
+    int numRoutines = 100000, i;
     if (argc > 1)
         numRoutines = atoi(argv[1]);
 
