@@ -6,6 +6,8 @@
 #endif
 
 #define time_Second 1000
+#define time_Minute 60000
+#define time_Hour   3600000
 
 #include "uv_routine.h"
 #include "raii.h"
@@ -740,6 +742,17 @@ C_API void coroutine_dec_count(void);
 C_API void coroutine_log_reset(void);
 C_API uv_args_t *coroutine_event_args(void);
 
+/* Collect coroutines with references preventing immediate cleanup. */
+C_API void gc_coroutine(routine_t *);
+
+/* Collect channels with references preventing immediate cleanup. */
+C_API void gc_channel(channel_t *);
+
+C_API gc_channel_t *gc_channel_list(void);
+C_API gc_coroutine_t *gc_coroutine_list(void);
+C_API void gc_coroutine_free(void);
+C_API void gc_channel_free(void);
+
 C_API void channel_print(channel_t *);
 C_API channel_t *channel_create(int, int);
 C_API void channel_free(channel_t *);
@@ -888,13 +901,6 @@ C_API string_t co_itoa(int64_t number);
 
 C_API int co_strpos(string_t text, string pattern);
 C_API void co_strcpy(string dest, string_t src, size_t len);
-
-C_API void gc_coroutine(routine_t *);
-C_API void gc_channel(channel_t *);
-C_API gc_channel_t *gc_channel_list(void);
-C_API gc_coroutine_t *gc_coroutine_list(void);
-C_API void gc_coroutine_free(void);
-C_API void gc_channel_free(void);
 
 /* Check if validated by json type */
 C_API bool is_json(json_t *);

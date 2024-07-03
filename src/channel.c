@@ -1,24 +1,24 @@
 #include "coroutine.h"
 
 static thread_local int channel_id_generate = 0;
-static thread_local gc_channel_t *channel_list = NULL;
+thrd_local_static(gc_channel_t *, channel_list, NULL)
 static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
 void gc_channel(channel_t *ch) {
-    if (!channel_list)
-        channel_list = ht_channel_init();
+    if (is_channel_list_empty())
+        channel_list_update(ht_channel_init());
 
     if (is_type(ch, CO_CHANNEL))
-        hash_put(channel_list, co_itoa(ch->id), ch);
-}
-
-CO_FORCE_INLINE gc_channel_t *gc_channel_list(void) {
-    return channel_list;
+        hash_put(channel_list(), co_itoa(ch->id), ch);
 }
 
 void gc_channel_free(void) {
-    if (channel_list)
-        hash_free(channel_list);
+    if (!is_channel_list_empty())
+        hash_free(channel_list());
+}
+
+CO_FORCE_INLINE gc_channel_t *gc_channel_list(void) {
+    return channel_list();
 }
 
 channel_t *channel_create(int elem_size, int bufsize) {

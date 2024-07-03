@@ -14,8 +14,6 @@ To be clear, this is a programming paradigm on structuring your code. Which can 
 
 You can read [Fibers, Oh My!](https://graphitemaster.github.io/fibers/) for a breakdown on how the actual context switch here is achieved by assembly. This library incorporates [libuv](http://docs.libuv.org) in a way that make providing callbacks unnecessary, same as in [Using C++ Resumable Functions with Libuv](https://devblogs.microsoft.com/cppblog/using-ibuv-with-c-resumable-functions/). **Libuv** is handling any hardware or multi-threading CPU access. This not necessary for library usage, the setup can be replaced with some other Event Loop library, or just disabled. There is a unmaintained [libasync](https://github.com/btrask/libasync) package tried combining **libco**, with **libuv** too, Linux only.
 
-Two videos covering things to keep in mind about concurrency, [Building Scalable Deployments with Multiple Goroutines](https://www.youtube.com/watch?v=LNNaxHYFhw8) and [Detecting and Fixing Unbound Concurrency Problems](https://www.youtube.com/watch?v=gggi4GIvgrg).
-
 ## Table of Contents
 
 * [Introduction](#introduction)
@@ -55,9 +53,13 @@ All internal functions that needs memory allocation is using these routines.
 There will be at least one coroutine always present, the initial, required `co_main()`.
 When a coroutine finish execution either by returning or exceptions, memory is released/freed.
 
+> Note: This _resources management system_ outlined above has been _decoupled_ to _external libraries_ and now brought in as _dependencies_. Where the above is just wrapper calls to: [c-raii](https://github.com/zelang-dev/c-raii) for complete **Defer**, plus **C++ RAII** behavior, with an custom **malloc** replacement [rpmalloc](https://github.com/zelang-dev/rpmalloc), and emulated **C11 Threads and thread Pool** [cthread](https://github.com/zelang-dev/cthread).
+
+- As such, the listed external libraries allow _smart auto memory management_ behaviors in any application, or any other **coroutine** library for that matter.
+
 The other problem with **C** is the low level usage view. I initially started out with the concept of creating ***Yet Another Programming language***.
-But after discovering [Cello High Level C](https://libcello.org/), and the general issues and need to still integrate with exiting C libraries.
-This repo is now staging area the missing **C** runtime, [ZeLang](https://docs.zelang.dev). The documentation **WIP**.
+
+But after discovering [Cello High Level C](https://libcello.org/), realizing the general issues and need to still integrate with exiting C libraries. This repo is now the staging area for the missing **C** runtime, [ZeLang](https://docs.zelang.dev). The documentation **WIP**, and source code hasn't been updated to recent changes in this library.
 
 This **page**, `coroutine.h` and _examples folder_ files is the only current docs, but basic usage should be apparent.
 The _coroutine execution_ part here is _completed_, but how it operates/behaves with other system resources is what still being developed and tested.

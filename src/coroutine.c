@@ -1,22 +1,22 @@
 #include "coroutine.h"
 
-static thread_local gc_coroutine_t *coroutine_list = NULL;
+thrd_local_static(gc_coroutine_t *, coroutine_list, NULL)
 
 void gc_coroutine(routine_t *co) {
-    if (!coroutine_list)
-        coroutine_list = (gc_coroutine_t *)ht_group_init();
+    if (is_coroutine_list_empty())
+        coroutine_list_update(ht_group_init());
 
     if (co->magic_number == CO_MAGIC_NUMBER)
-        hash_put(coroutine_list, co_itoa(co->cid), co);
+        hash_put(coroutine_list(), co_itoa(co->cid), co);
 }
 
 void gc_coroutine_free() {
-    if (coroutine_list)
-        hash_free(coroutine_list);
+    if (!is_coroutine_list_empty())
+        hash_free(coroutine_list());
 }
 
 CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
-    return coroutine_list;
+    return coroutine_list();
 }
 
 values_type args_get(void_t params, int item) {
