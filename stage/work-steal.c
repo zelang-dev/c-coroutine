@@ -34,7 +34,7 @@ typedef struct work_internal *(*task_t)(struct work_internal *);
 
 typedef struct work_internal {
     task_t code;
-    atomic_int join_count;
+    atomic_size_t join_count;
     void *args[];
 } work_t;
 
@@ -66,17 +66,17 @@ void init(deque_t *q, int size_hint) {
 }
 
 void resize(deque_t *q) {
-    array_t *a = atomic_load_explicit(64, &q->array, memory_order_relaxed);
+    array_t *a = atomic_load_explicit(&q->array, memory_order_relaxed);
     size_t old_size = a->size;
     size_t new_size = old_size * 2;
     array_t *new = malloc(sizeof(array_t) + sizeof(work_t *) * new_size);
     atomic_init(&new->size, new_size);
-    size_t i, t = atomic_load_explicit(64, &q->top, memory_order_relaxed);
-    size_t b = atomic_load_explicit(64, &q->bottom, memory_order_relaxed);
+    size_t i, t = atomic_load_explicit(&q->top, memory_order_relaxed);
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed);
     for (i = t; i < b; i++)
         new->buffer[i % new_size] = a->buffer[i % old_size];
 
-    atomic_store_explicit(64, &q->array, new, memory_order_relaxed);
+    atomic_store_explicit(&q->array, new, memory_order_relaxed);
     /* The question arises as to the appropriate timing for releasing memory
      * associated with the previous array denoted by *a. In the original Chase
      * and Lev paper, this task was undertaken by the garbage collector, which
@@ -94,55 +94,54 @@ void resize(deque_t *q) {
 }
 
 work_t *take(deque_t *q) {
-    size_t b = atomic_load_explicit(64, &q->bottom, memory_order_relaxed) - 1;
-    array_t *a = atomic_load_explicit(64, &q->array, memory_order_relaxed);
-    atomic_store_explicit(64, &q->bottom, b, memory_order_relaxed);
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed) - 1;
+    array_t *a = atomic_load_explicit(&q->array, memory_order_relaxed);
+    atomic_store_explicit(&q->bottom, b, memory_order_relaxed);
     atomic_thread_fence(memory_order_seq_cst);
-    size_t t = atomic_load_explicit(64, &q->top, memory_order_relaxed);
+    size_t t = atomic_load_explicit(&q->top, memory_order_relaxed);
     work_t *x;
     if (t <= b) {
         /* Non-empty queue */
-        x = (work_t *)atomic_load_explicit(64, &a->buffer[b % a->size], memory_order_relaxed);
+        x = (work_t *)atomic_load_explicit(&a->buffer[b % a->size], memory_order_relaxed);
         if (t == b) {
             /* Single last element in queue */
-            if (!atomic_compare_exchange_strong_explicit(64, &q->top, &t, t + 1,
+            if (!atomic_compare_exchange_strong_explicit(&q->top, &t, t + 1,
                                                          memory_order_seq_cst,
                                                          memory_order_relaxed))
                 /* Failed race */
                 x = EMPTY;
-            atomic_store_explicit(64, &q->bottom, b + 1, memory_order_relaxed);
+            atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
         }
     } else { /* Empty queue */
         x = EMPTY;
-        atomic_store_explicit(64, &q->bottom, b + 1, memory_order_relaxed);
+        atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
     }
     return x;
 }
 
 void push(deque_t *q, work_t *w) {
-    size_t b = atomic_load_explicit(64, &q->bottom, memory_order_relaxed);
-    size_t t = atomic_load_explicit(64, &q->top, memory_order_acquire);
-    array_t *a = atomic_load_explicit(64, &q->array, memory_order_relaxed);
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed);
+    size_t t = atomic_load_explicit(&q->top, memory_order_acquire);
+    array_t *a = atomic_load_explicit(&q->array, memory_order_relaxed);
     if (b - t > a->size - 1) { /* Full queue */
         resize(q);
-        a = atomic_load_explicit(64, &q->array, memory_order_relaxed);
+        a = atomic_load_explicit(&q->array, memory_order_relaxed);
     }
-    atomic_store_explicit(64, &a->buffer[b % a->size], w, memory_order_relaxed);
+    atomic_store_explicit(&a->buffer[b % a->size], w, memory_order_relaxed);
     atomic_thread_fence(memory_order_release);
-    atomic_store_explicit(64, &q->bottom, b + 1, memory_order_relaxed);
+    atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
 }
 
 work_t *steal(deque_t *q) {
-    size_t t = atomic_load_explicit(64, &q->top, memory_order_acquire);
+    size_t t = atomic_load_explicit(&q->top, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
-    size_t b = atomic_load_explicit(64, &q->bottom, memory_order_acquire);
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_acquire);
     work_t *x = EMPTY;
     if (t < b) {
         /* Non-empty queue */
-        array_t *a = (array_t *)atomic_load_explicit(64, &q->array, memory_order_consume);
-        x = (work_t *)atomic_load_explicit(64, &a->buffer[t % a->size], memory_order_relaxed);
-        if (!atomic_compare_exchange_strong_explicit(64,
-            &q->top, &t, t + 1, memory_order_seq_cst, memory_order_relaxed))
+        array_t *a = (array_t *)atomic_load_explicit(&q->array, memory_order_consume);
+        x = (work_t *)atomic_load_explicit(&a->buffer[t % a->size], memory_order_relaxed);
+        if (!atomic_compare_exchange_strong_explicit(&q->top, &t, t + 1, memory_order_seq_cst, memory_order_relaxed))
             /* Failed race */
             return ABORT;
     }
@@ -171,7 +170,7 @@ void do_work(int id, work_t *work) {
  * items.
  */
 work_t *join_work(work_t *work) {
-    int old_join_count = atomic_fetch_sub(i32, &work->join_count, 1);
+    int old_join_count = atomic_fetch_sub(&work->join_count, 1);
     if (old_join_count == 1)
         return work;
     return NULL;
@@ -209,7 +208,7 @@ void *thread(void *payload) {
                  * until the global "done" flag becomes set, indicative of
                  * potential new work additions.
                  */
-                if (atomic_load(64, &done))
+                if (atomic_load(&done))
                     break;
                 continue;
             } else {
@@ -233,7 +232,7 @@ work_t *print_task(work_t *w) {
 
 work_t *done_task(work_t *w) {
     free(w);
-    atomic_store(64, &done, true);
+    atomic_store(&done, true);
     return NULL;
 }
 
@@ -247,7 +246,7 @@ int main(int argc, char **argv) {
     thread_queues = malloc(N_THREADS * sizeof(deque_t));
     int nprints = 10;
 
-    atomic_store(64, &done, false);
+    atomic_store(&done, false);
     work_t *done_work = malloc(sizeof(work_t));
     done_work->code = &done_task;
     done_work->join_count = N_THREADS * nprints;
