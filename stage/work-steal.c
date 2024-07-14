@@ -105,9 +105,7 @@ work_t *take(deque_t *q) {
         x = (work_t *)atomic_load_explicit(&a->buffer[b % a->size], memory_order_relaxed);
         if (t == b) {
             /* Single last element in queue */
-            if (!atomic_compare_exchange_strong_explicit(&q->top, &t, t + 1,
-                                                         memory_order_seq_cst,
-                                                         memory_order_relaxed))
+            if (!atomic_cas(&q->top, &t, t + 1))
                 /* Failed race */
                 x = EMPTY;
             atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
@@ -141,7 +139,7 @@ work_t *steal(deque_t *q) {
         /* Non-empty queue */
         array_t *a = (array_t *)atomic_load_explicit(&q->array, memory_order_consume);
         x = (work_t *)atomic_load_explicit(&a->buffer[t % a->size], memory_order_relaxed);
-        if (!atomic_compare_exchange_strong_explicit(&q->top, &t, t + 1, memory_order_seq_cst, memory_order_relaxed))
+        if (!atomic_cas(&q->top, &t, t + 1))
             /* Failed race */
             return ABORT;
     }
