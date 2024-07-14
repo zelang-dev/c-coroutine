@@ -111,6 +111,7 @@ unset(_LIBUV_H)
 
 #-----------------------------------------------------------------------------
 # Set Find Package Arguments
+include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args(libuv
     FOUND_VAR libuv_FOUND
     REQUIRED_VARS LIBUV_LIBRARY LIBUV_INCLUDE_DIR

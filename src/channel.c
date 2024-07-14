@@ -1,7 +1,7 @@
 #include "coroutine.h"
 
 static thread_local int channel_id_generate = 0;
-thrd_local_static(gc_channel_t *, channel_list, NULL)
+thrd_static(gc_channel_t, channel_list, NULL)
 static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
 void gc_channel(channel_t *ch) {

@@ -1,6 +1,6 @@
 #include "coroutine.h"
 
-thrd_local_static(gc_coroutine_t *, coroutine_list, NULL)
+thrd_static(gc_coroutine_t, coroutine_list, NULL)
 
 void gc_coroutine(routine_t *co) {
     if (is_coroutine_list_empty())
