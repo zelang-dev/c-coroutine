@@ -98,7 +98,6 @@ C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API ex_context_t *ex_init(void);
 C_API ex_context_t *ex_local(void);
-C_API ex_context_t *ex_local_emulated(void);
 C_API void ex_update(ex_context_t *);
 C_API void ex_unwind_set(ex_context_t *ctx, bool flag);
 C_API void ex_data_set(ex_context_t *ctx, void *data);
