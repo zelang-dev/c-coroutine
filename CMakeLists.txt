@@ -12,10 +12,6 @@ include(GenerateExportHeader)
 include(FetchContent)
 include(CTest)
 
-cmake_dependent_option(BUILD_TESTING
-  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
-  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
-
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
@@ -94,8 +90,14 @@ endif()
 target_include_directories(raii AFTER PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(coroutine PUBLIC raii)
-if(BUILD_TESTING)
-    add_subdirectory(examples)
+
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    option(BUILD_EXAMPLES   "whether or not examples should be built" ON)
+
+    if(BUILD_EXAMPLES)
+        enable_testing()
+        add_subdirectory(examples)
+    endif()
 endif()
 
 set(_fmt TGZ)

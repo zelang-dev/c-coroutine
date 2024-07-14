@@ -744,7 +744,7 @@ The build system uses **cmake**, that produces _single_ **static** library store
 ```shell
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON # use to build files in examples folder
+cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_EXAMPLES=ON # use to build files in examples folder
 cmake --build .
 ```
 
@@ -753,7 +753,7 @@ cmake --build .
 ```shell
 mkdir build
 cd build
-cmake .. -D BUILD_TESTING=ON # use to build files in examples folder
+cmake .. -D BUILD_EXAMPLES=ON # use to build files in examples folder
 cmake --build . --config Debug/Release
 ```
 
