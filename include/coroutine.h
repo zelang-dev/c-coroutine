@@ -178,8 +178,7 @@ extern "C"
 {
 #endif
 
-typedef enum
-{
+typedef enum {
     CO_NULL = RAII_NULL,
     CO_INT,
     CO_ENUM,
@@ -238,8 +237,7 @@ typedef int (*thrd_func_t)(void *);
 typedef void (*any_func_t)(void_t, ...);
 
 /* Coroutine states. */
-typedef enum co_state
-{
+typedef enum co_state {
     CO_EVENT_DEAD = -1, /* The coroutine has ended it's Event Loop routine, is uninitialized or deleted. */
     CO_DEAD, /* The coroutine is uninitialized or deleted. */
     CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
@@ -417,16 +415,14 @@ struct routine_s {
 };
 
 /* scheduler queue struct */
-typedef struct co_scheduler_s
-{
+typedef struct co_scheduler_s {
     value_types type;
     routine_t *head;
     routine_t *tail;
 } co_scheduler_t;
 
 /* Generic simple union storage types. */
-typedef union
-{
+typedef union {
     int integer;
     unsigned int u_int;
     signed long s_long;
@@ -448,14 +444,12 @@ typedef union
     const char const_char[512];
 } value_t;
 
-typedef struct values_s
-{
+typedef struct values_s {
     value_t value;
     value_types type;
 } values_t;
 
-typedef struct
-{
+typedef struct {
     value_types type;
     value_t value;
 } generics_t;
@@ -470,8 +464,7 @@ typedef struct {
     value_t *value;
 } result_t;
 
-typedef struct uv_args_s
-{
+typedef struct uv_args_s {
     value_types type;
     /* allocated array of arguments */
     values_t *args;
@@ -505,15 +498,13 @@ typedef struct uv_args_s
  */
 struct channel_co_s;
 typedef struct channel_co_s channel_co_t;
-typedef struct msg_queue_s
-{
+typedef struct msg_queue_s {
     channel_co_t **a;
     unsigned int n;
     unsigned int m;
 } msg_queue_t;
 
-typedef struct channel_s
-{
+typedef struct channel_s {
     value_types type;
     unsigned int bufsize;
     unsigned int elem_size;
@@ -528,8 +519,7 @@ typedef struct channel_s
     bool select_ready;
 } channel_t;
 
-enum
-{
+enum {
     CHANNEL_END,
     CHANNEL_SEND,
     CHANNEL_RECV,
@@ -537,8 +527,7 @@ enum
     CHANNEL_BLK,
 };
 
-struct channel_co_s
-{
+struct channel_co_s {
     channel_t *c;
     void_t v;
     unsigned int op;
@@ -841,8 +830,7 @@ C_API void co_plain_set(routine_t *, size_t);
 
 C_API void delete(void_t ptr);
 
-typedef struct _promise
-{
+typedef struct _promise {
     value_types type;
     values_t *result;
     mtx_t mutex;
@@ -851,8 +839,7 @@ typedef struct _promise
     int id;
 } promise;
 
-typedef struct _future
-{
+typedef struct _future {
     value_types type;
     thrd_t thread;
     thrd_func_t func;
@@ -860,8 +847,7 @@ typedef struct _future
     promise *value;
 } future;
 
-typedef struct _future_arg
-{
+typedef struct _future_arg {
     value_types type;
     thrd_func_t func;
     void_t arg;
