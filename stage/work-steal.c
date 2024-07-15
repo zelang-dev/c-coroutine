@@ -32,6 +32,7 @@ struct work_internal;
  */
 typedef struct work_internal *(*task_t)(struct work_internal *);
 
+/* the coroutine aka routine_t */
 typedef struct work_internal {
     task_t code;
     atomic_size_t join_count;
@@ -43,14 +44,15 @@ typedef struct work_internal {
  */
 static work_t *EMPTY = (work_t *)0x100, *ABORT = (work_t *)0x200;
 
-/* work_t-stealing deque */
 make_atomic(work_t *, atomic_work_t)
+/* queue/list `all_coroutine`'s of work_t */
 typedef struct {
     atomic_size_t size;
     atomic_work_t buffer[];
 } array_t;
 
 make_atomic(array_t *, atomic_array_t)
+/* `all_coroutine` stealing deque, `run_queue` aka `co_scheduler_t` */
 typedef struct {
     /* Assume that they never overflow */
     atomic_size_t top, bottom;
@@ -66,7 +68,7 @@ void init(deque_t *q, int size_hint) {
 }
 
 void resize(deque_t *q) {
-    array_t *a = atomic_load_explicit(&q->array, memory_order_relaxed);
+    array_t *a = (array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
     size_t old_size = a->size;
     size_t new_size = old_size * 2;
     array_t *new = malloc(sizeof(array_t) + sizeof(work_t *) * new_size);
@@ -95,7 +97,7 @@ void resize(deque_t *q) {
 
 work_t *take(deque_t *q) {
     size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed) - 1;
-    array_t *a = atomic_load_explicit(&q->array, memory_order_relaxed);
+    array_t *a = (array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
     atomic_store_explicit(&q->bottom, b, memory_order_relaxed);
     atomic_thread_fence(memory_order_seq_cst);
     size_t t = atomic_load_explicit(&q->top, memory_order_relaxed);
@@ -120,10 +122,10 @@ work_t *take(deque_t *q) {
 void push(deque_t *q, work_t *w) {
     size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed);
     size_t t = atomic_load_explicit(&q->top, memory_order_acquire);
-    array_t *a = atomic_load_explicit(&q->array, memory_order_relaxed);
+    array_t *a = (array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
     if (b - t > a->size - 1) { /* Full queue */
         resize(q);
-        a = atomic_load_explicit(&q->array, memory_order_relaxed);
+        a = (array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
     }
     atomic_store_explicit(&a->buffer[b % a->size], w, memory_order_relaxed);
     atomic_thread_fence(memory_order_release);
@@ -197,6 +199,7 @@ void *thread(void *payload) {
                 /* Found some work to do */
                 break;
             }
+
             if (stolen == EMPTY) {
                 /* Despite the previous observation of all queues being devoid
                  * of tasks during the last examination, there exists
