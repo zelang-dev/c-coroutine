@@ -18,6 +18,8 @@ typedef struct {
 thrd_static(coroutine_task_t, task, NULL)
 
 typedef struct {
+    bool is_main;
+
     bool info_log;
 
     /* coroutine unique id generator */
@@ -38,13 +40,13 @@ typedef struct {
     /* number of other coroutine that ran while the current coroutine was waiting.*/
     int num_others_ran;
     /* record which coroutine sleeping in scheduler */
-    co_scheduler_t sleeping;
+    scheduler_t sleeping;
 
     /* record which coroutine is executing for scheduler */
     routine_t *running;
 
     /* coroutines's FIFO scheduler queue */
-    co_scheduler_t run_queue;
+    scheduler_t run_queue;
 
     uv_args_t *uv_args;
 } thread_processor_t;
@@ -63,7 +65,7 @@ routine_t **all_coroutine;
 
 int n_all_coroutine;
 
-
+int thrd_main(void_t args);
 int coroutine_loop(int);
 void coroutine_interrupt(void);
 
@@ -74,7 +76,7 @@ routine_t *co_derive(void_t, size_t);
 routine_t *co_create(size_t, callable_t, void_t);
 
 /* Create a new coroutine running func(arg) with stack size. */
-int coroutine_create(callable_t, void_t, unsigned int);
+int create_routine(callable_t, void_t, unsigned int);
 
 /* Sets the current coroutine's name.*/
 void coroutine_name(char *, ...);
@@ -89,7 +91,7 @@ void coroutine_state(char *, ...);
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
 
-void coroutine_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
+void sched_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
     routine_t *co = co_active();
     co->scope->err = (void_t)ex;
     co->scope->panic = message;
@@ -949,7 +951,7 @@ void co_switch(routine_t *handle) {
 }
 
 /* Add coroutine to scheduler queue, appending. */
-static void coroutine_add(co_scheduler_t *l, routine_t *t) {
+static void sched_add(scheduler_t *l, routine_t *t) {
     if (l->tail) {
         l->tail->next = t;
         t->prev = l->tail;
@@ -963,7 +965,7 @@ static void coroutine_add(co_scheduler_t *l, routine_t *t) {
 }
 
 /* Remove coroutine from scheduler queue. */
-static void coroutine_remove(co_scheduler_t *l, routine_t *t) {
+static void sched_remove(scheduler_t *l, routine_t *t) {
     if (t->prev)
         t->prev->next = t->next;
     else
@@ -975,12 +977,30 @@ static void coroutine_remove(co_scheduler_t *l, routine_t *t) {
         l->tail = t->prev;
 }
 
-int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
+static void sched_adjust(atomic_deque_t *q, routine_t *t) {
+    scheduler_t *list = (scheduler_t *)atomic_load(&q->run_queue);
+    size_t coroutines_num_all = atomic_load_explicit(&q->n_all_coroutine, memory_order_relaxed);
+    routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&q->all_coroutine, memory_order_acquire);
+    if (coroutines_num_all % 64 == 0) {
+        coroutines_all = CO_REALLOC(coroutines_all, (coroutines_num_all + 64) * sizeof(coroutines_all[0]));
+        if (is_empty(coroutines_all))
+            co_panic("realloc() failed");
+    }
+
+    t->all_coroutine_slot = coroutines_num_all;
+    coroutines_all[coroutines_num_all++] = t;
+    coroutines_all[coroutines_num_all] = NULL;
+    atomic_store_explicit(&q->all_coroutine, coroutines_all, memory_order_release);
+    atomic_store_explicit(&q->n_all_coroutine, coroutines_num_all, memory_order_relaxed);
+    sched_add(list, t);
+    atomic_store(&q->run_queue, list);
+}
+
+int create_routine(callable_t fn, void_t arg, unsigned int stack) {
     int id;
-    routine_t *t;
+    routine_t *t = co_create(stack, fn, arg);
     routine_t *c = co_active();
 
-    t = co_create(stack, fn, arg);
     t->cid = ++thread()->id_generate;
     thread()->used_count++;
     id = t->cid;
@@ -993,7 +1013,7 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
     t->all_coroutine_slot = n_all_coroutine;
     all_coroutine[ n_all_coroutine++ ] = t;
     all_coroutine[ n_all_coroutine ] = NULL;
-    coroutine_schedule(t);
+    sched_enqueue(t);
 
     if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
@@ -1017,16 +1037,16 @@ int coroutine_create(callable_t fn, void_t arg, unsigned int stack) {
 }
 
 CO_FORCE_INLINE int co_go(callable_t fn, void_t arg) {
-    return coroutine_create(fn, arg, CO_STACK_SIZE);
+    return create_routine(fn, arg, CO_STACK_SIZE);
 }
 
 void co_yield(void) {
-    coroutine_schedule(thread()->running);
+    sched_enqueue(thread()->running);
     co_suspend();
 }
 
 CO_FORCE_INLINE void co_execute(func_t fn, void_t arg) {
-    coroutine_create((callable_t)fn, arg, CO_STACK_SIZE);
+    create_routine((callable_t)fn, arg, CO_STACK_SIZE);
     co_yield();
 }
 
@@ -1056,7 +1076,7 @@ static void_t coroutine_wait(void_t v) {
     coroutine_name("coroutine_wait");
     for (;;) {
         /* let everyone else run */
-        while (coroutine_yield() > 0)
+        while (sched_yielding() > 0)
             ;
         /* we're the only one runnable - check for i/o, the event loop */
         coroutine_state("event loop");
@@ -1075,11 +1095,11 @@ static void_t coroutine_wait(void_t v) {
 
         now = nsec();
         while ((t = thread()->sleeping.head) && now >= t->alarm_time) {
-            coroutine_remove(&thread()->sleeping, t);
+            sched_remove(&thread()->sleeping, t);
             if (!t->system && --thread()->sleeping_counted == 0)
                 thread()->used_count--;
 
-            coroutine_schedule(t);
+            sched_enqueue(t);
         }
     }
 }
@@ -1090,7 +1110,7 @@ unsigned int co_sleep(unsigned int ms) {
 
     if (!thread()->started_wait) {
         thread()->started_wait = 1;
-        coroutine_create(coroutine_wait, 0, CO_STACK_SIZE);
+        create_routine(coroutine_wait, 0, CO_STACK_SIZE);
     }
 
     now = nsec();
@@ -1126,21 +1146,21 @@ unsigned int co_sleep(unsigned int ms) {
     return (unsigned int)(nsec() - now) / 1000000;
 }
 
-void coroutine_schedule(routine_t *t) {
+void sched_enqueue(routine_t *t) {
     t->ready = 1;
-    coroutine_add(&thread()->run_queue, t);
+    sched_add(&thread()->run_queue, t);
 }
 
-int coroutine_yield(void) {
+int sched_yielding(void) {
     int n;
     n = thread()->num_others_ran;
-    coroutine_schedule(thread()->running);
+    sched_enqueue(thread()->running);
     coroutine_state("yield");
     co_suspend();
     return thread()->num_others_ran - n - 1;
 }
 
-bool coroutine_active(void) {
+bool sched_active(void) {
     return !is_empty(thread()->run_queue.head);
 }
 
@@ -1168,15 +1188,15 @@ CO_FORCE_INLINE char *coroutine_get_state(void) {
     return co_active()->state;
 }
 
-CO_FORCE_INLINE void coroutine_dec_count(void) {
+CO_FORCE_INLINE void sched_dec(void) {
     --thread()->used_count;
 }
 
-CO_FORCE_INLINE void coroutine_log_reset(void) {
+CO_FORCE_INLINE void sched_log_reset(void) {
     thread()->info_log = false;
 }
 
-CO_FORCE_INLINE uv_args_t *coroutine_event_args(void) {
+CO_FORCE_INLINE uv_args_t *sched_event_args(void) {
     return thread()->uv_args;
 }
 
@@ -1187,14 +1207,14 @@ void coroutine_system(void) {
     }
 }
 
-void coroutine_exit(int val) {
+void sched_exit(int val) {
     thread()->exiting = val;
     thread()->running->exiting = true;
     co_deferred_free(thread()->running);
     co_scheduler();
 }
 
-void coroutine_info(void) {
+void sched_info(void) {
     int i;
     routine_t *t;
     char *extra;
@@ -1214,13 +1234,13 @@ void coroutine_info(void) {
     fprintf(stderr, "\n\n");
 }
 
-void coroutine_update(routine_t *t) {
+void sched_update(routine_t *t) {
     int i = t->all_coroutine_slot;
     all_coroutine[i] = all_coroutine[--n_all_coroutine];
     all_coroutine[i]->all_coroutine_slot = i;
 }
 
-void coroutine_cleanup(void) {
+void sched_cleanup(void) {
     routine_t *t;
     if (!can_cleanup)
         return;
@@ -1258,23 +1278,28 @@ void coroutine_cleanup(void) {
 #endif
 }
 
-static void coroutine_scheduler(void) {
+static void thrd_scheduler(void) {
     routine_t *t;
 
     for (;;) {
-        if (thread()->used_count == 0 || !coroutine_active()) {
-            coroutine_cleanup();
-            if (thread()->used_count > 0) {
-                CO_INFO("No runnable coroutines! %d stalled\n", thread()->used_count);
-                exit(1);
+        // Todo: Add additional check for active separate running threads.
+        if (thread()->used_count == 0 || !sched_active()) {
+            if (thread()->is_main) {
+                sched_cleanup();
+                if (thread()->used_count > 0) {
+                    CO_INFO("No runnable coroutines! %d stalled\n", thread()->used_count);
+                    exit(1);
+                } else {
+                    CO_LOG("Coroutine scheduler exited");
+                    exit(thread()->exiting);
+                }
             } else {
-                CO_LOG("Coroutine scheduler exited");
-                exit(thread()->exiting);
+                // Todo: In separate running thread, so steal work or exit thread.
             }
         }
 
         t = thread()->run_queue.head;
-        coroutine_remove(&thread()->run_queue, t);
+        sched_remove(&thread()->run_queue, t);
         t->ready = 0;
         thread()->running = t;
         thread()->num_others_ran++;
@@ -1296,7 +1321,7 @@ static void coroutine_scheduler(void) {
             if (!t->system)
                 --thread()->used_count;
 
-            coroutine_update(t);
+            sched_update(t);
             if (!t->synced && !t->channeled && !t->loop_erred) {
                 co_delete(t);
             } else if (t->channeled) {
@@ -1314,10 +1339,15 @@ static void_t coroutine_main(void_t v) {
     return 0;
 }
 
+int thrd_main(void_t args) {
+    return 0;
+}
+
 int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
 
+    thread()->is_main = true;
     thread()->info_log = true;
     thread()->uv_args = NULL;
     thread()->exiting = 0;
@@ -1327,17 +1357,17 @@ int main(int argc, char **argv) {
     task()->main_handle = NULL;
     task()->current_handle = NULL;
 
-    exception_setup_func = coroutine_unwind_setup;
+    exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
-    exception_ctrl_c_func = (ex_terminate_func)coroutine_info;
-    exception_terminate_func = (ex_terminate_func)coroutine_cleanup;
+    exception_ctrl_c_func = (ex_terminate_func)sched_info;
+    exception_terminate_func = (ex_terminate_func)sched_cleanup;
 #ifdef UV_H
     CO_INFO("Starting up: %s\n\n", co_system_uname());
 #endif
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);
-    coroutine_create(coroutine_main, NULL, CO_MAIN_STACK);
-    coroutine_scheduler();
+    create_routine(coroutine_main, NULL, CO_MAIN_STACK);
+    thrd_scheduler();
     fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
     return thread()->exiting;
 }

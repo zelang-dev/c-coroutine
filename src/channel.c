@@ -227,7 +227,7 @@ static void channel_co_exec(channel_co_t *a) {
         channel_co_copy(a, other);
         channel_co_all_dequeue(other->x_msg);
         other->x_msg[ 0 ].x_msg = other;
-        coroutine_schedule(other->co);
+        sched_enqueue(other->co);
     } else {
         channel_co_copy(a, NULL);
     }

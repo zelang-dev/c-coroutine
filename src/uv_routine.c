@@ -69,7 +69,7 @@ void coroutine_event_cleanup(void_t t) {
         hash_free(co->context->wait_group);
 
     if (uv_loop_alive(uvLoop = co_loop())) {
-        if (coroutine_event_args() && coroutine_event_args()->bind_type == UV_TLS)
+        if (sched_event_args() && sched_event_args()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
         else
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
@@ -115,13 +115,13 @@ static void error_catch(void_t uv) {
 
     if (!is_empty((void_t)co_message())) {
         co->scope->is_recovered = true;
-        if (uv_loop_alive(co_loop()) && coroutine_event_args()) {
+        if (uv_loop_alive(co_loop()) && sched_event_args()) {
             co->halt = true;
             co->loop_erred = true;
             co->status = CO_ERRED;
-            coroutine_log_reset();
+            sched_log_reset();
             coroutine_event_cleanup(co);
-            memset(coroutine_event_args(), 0, sizeof(uv_args_t));
+            memset(sched_event_args(), 0, sizeof(uv_args_t));
         }
     }
 }
@@ -183,7 +183,7 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    coroutine_log_reset();
+    sched_log_reset();
     if (0 == status) {
         co->is_address = true;
         co_result_set(co, STREAM(ut->tcp_hdl));
@@ -645,8 +645,8 @@ static void_t uv_init(void_t uv_args) {
                         uv_ip4_name((const struct sockaddr_in *)&name, (char *)ip, sizeof ip);
                     }
 
-                    if (is_empty(coroutine_event_args())) {
-                        *coroutine_event_args() = *uv;
+                    if (is_empty(sched_event_args())) {
+                        *sched_event_args() = *uv;
                     }
 
                     printf("Listening to %s:%d for%s connections, %s.\n",
@@ -655,7 +655,7 @@ static void_t uv_init(void_t uv_args) {
                            (uv->bind_type == UV_TLS ? " secure" : ""),
                            http_std_date(0));
 
-                    coroutine_log_reset();
+                    sched_log_reset();
                 }
                 break;
             case UV_PROCESS:
@@ -1127,7 +1127,7 @@ static void spawning(void_t uv_args) {
     if (!co->loop_code) {
         while (true) {
             if (!co_terminated(co)) {
-                coroutine_yield();
+                sched_yielding();
             } else {
                 if (!is_empty(co->user_data)) {
                     exiting_cb = (spawn_cb)co->user_data;
@@ -1235,7 +1235,7 @@ int spawn_detach(spawn_t *child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref((uv_handle_t *)&child->process);
         child->is_detach = true;
-        coroutine_dec_count();
+        sched_dec();
         co_yield();
     }
 

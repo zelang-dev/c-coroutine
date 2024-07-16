@@ -211,9 +211,9 @@ wait_result_t *co_wait(wait_group_t *wg) {
                         co = (routine_t *)pair->value;
                         if (!co_terminated(co)) {
                             if (!co->loop_active && co->status == CO_NORMAL)
-                                coroutine_schedule(co);
+                                sched_enqueue(co);
 
-                            coroutine_yield();
+                            sched_yielding();
                         } else {
                             if ((!is_empty(co->results) && !co->loop_erred) || co->is_plain) {
                                 if (co->is_plain)
@@ -246,7 +246,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
         }
         c->wait_active = false;
         c->wait_group = NULL;
-        coroutine_dec_count();
+        sched_dec();
     }
 
     hash_free(wg);

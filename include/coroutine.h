@@ -415,11 +415,20 @@ struct routine_s {
 };
 
 /* scheduler queue struct */
-typedef struct co_scheduler_s {
+typedef struct scheduler_s {
     value_types type;
     routine_t *head;
     routine_t *tail;
-} co_scheduler_t;
+} scheduler_t;
+
+make_atomic(routine_t, atomic_routine_t)
+make_atomic(scheduler_t, atomic_scheduler_t)
+typedef struct {
+    atomic_size_t n_all_coroutine;
+    /* scheduler tracking for all coroutines */
+    atomic_routine_t **all_coroutine;
+    atomic_scheduler_t run_queue;
+} atomic_deque_t;
 
 /* Generic simple union storage types. */
 typedef union {
@@ -715,21 +724,23 @@ C_API string co_system_uname(void);
 /* The current coroutine will be scheduled again once all the
 other currently-ready coroutines have a chance to run. Returns
 the number of other tasks that ran while the current task was waiting. */
-C_API int coroutine_yield(void);
-
+C_API int sched_yielding(void);
 
 /* Exit the current coroutine. If this is the last non-system coroutine,
 exit the entire program using the given exit status. */
-C_API void coroutine_exit(int);
-C_API void coroutine_cleanup(void);
-C_API void coroutine_update(routine_t *);
+C_API void sched_exit(int);
+C_API void sched_cleanup(void);
+C_API void sched_update(routine_t *);
 
-C_API void coroutine_schedule(routine_t *);
-C_API bool coroutine_active(void);
-C_API void coroutine_info(void);
-C_API void coroutine_dec_count(void);
-C_API void coroutine_log_reset(void);
-C_API uv_args_t *coroutine_event_args(void);
+/* Add coroutine to current scheduler queue, appending.
+Todo: Refactor to global run queue then to thread run queue .*/
+C_API void sched_enqueue(routine_t *);
+
+C_API bool sched_active(void);
+C_API void sched_info(void);
+C_API void sched_dec(void);
+C_API void sched_log_reset(void);
+C_API uv_args_t *sched_event_args(void);
 
 /* Collect coroutines with references preventing immediate cleanup. */
 C_API void gc_coroutine(routine_t *);
@@ -957,7 +968,7 @@ This behaves same as GoLang `select {}` statement. */
 
 #define select_end              \
   if (___##__FUNCTION__ == false) \
-      coroutine_yield();          \
+      sched_yielding();          \
   }
 
 #define select_case(ch)                                 \
