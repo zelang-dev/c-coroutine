@@ -78,7 +78,7 @@ routine_t *co_derive(void_t, size_t);
 routine_t *co_create(size_t, callable_t, void_t);
 
 /* Create a new coroutine running func(arg) with stack size. */
-int create_routine(callable_t, void_t, unsigned int);
+int create_routine(callable_t, void_t, u32);
 
 /* Sets the current coroutine's name.*/
 void coroutine_name(char *, ...);
@@ -1012,21 +1012,28 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
         l->tail = t->prev;
 }
 
-static void sched_enqueue_atomic(scheduler_t *q, routine_t *t) {
-    t->ready = 1;
-    sched_add(q, t);
+static void sched_enqueue_atomic(routine_t *t) {
+    atomic_thread_fence(memory_order_seq_cst);
+    scheduler_t *list = (scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire);
+    sched_add(list, t);
+    atomic_store_explicit(&atomic_queue.run_queue, list, memory_order_release);
 }
 
-static void sched_take(atomic_deque_t *q, thread_processor_t *r) {
+static void sched_take(atomic_deque_t *q, thread_processor_t *r, bool is_stealing) {
     int count = (int)atomic_load(&q->used_count);
     if (count != 0) {
         r->used_count += count;
         atomic_init(&q->used_count, 0);
     }
-    // scheduler_t *list = (scheduler_t *)atomic_load(&q->run_queue);
-    // memcpy(&r->run_queue, &list, sizeof(list));
-    // memcpy(&r->run_queue.head, &list->head, sizeof(list->head));
-    // memcpy(&r->run_queue.tail, &list->tail, sizeof(list->tail));
+
+    /*
+    if (is_stealing) {
+        scheduler_t *list = (scheduler_t *)atomic_load(&q->run_queue);
+        memcpy(&r->run_queue, &list, sizeof(list));
+        memcpy(&r->run_queue.head, &list->head, sizeof(list->head));
+        memcpy(&r->run_queue.tail, &list->tail, sizeof(list->tail));
+    }
+    */
 }
 
 static void sched_adjust(atomic_deque_t *q, routine_t *t) {
@@ -1047,18 +1054,15 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
     atomic_store(&q->n_all_coroutine, coroutines_num_all);
     sched_enqueue(t);
     atomic_store_explicit(&q->all_coroutine, coroutines_all, memory_order_release);
-    //scheduler_t *list = (scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire);
-    //sched_enqueue_atomic(list, t);
-    //atomic_store_explicit(&q->run_queue, list, memory_order_release);
 }
 
-int create_routine(callable_t fn, void_t arg, unsigned int stack) {
+int create_routine(callable_t fn, void_t arg, u32 stack) {
     int id;
     routine_t *t = co_create(stack, fn, arg);
     routine_t *c = co_active();
 
     atomic_fetch_add(&atomic_queue.used_count, 1);
-    sched_take(&atomic_queue, thread());
+    sched_take(&atomic_queue, thread(), false);
     sched_adjust(&atomic_queue, t);
     id = t->cid;
     if (c->event_active && !is_empty(c->event_group)) {
@@ -1150,7 +1154,7 @@ static void_t coroutine_wait(void_t v) {
     }
 }
 
-unsigned int co_sleep(unsigned int ms) {
+u32 co_sleep(u32 ms) {
     size_t when, now;
     routine_t *t;
 
@@ -1189,12 +1193,15 @@ unsigned int co_sleep(unsigned int ms) {
 
     co_switch(co_current());
 
-    return (unsigned int)(nsec() - now) / 1000000;
+    return (u32)(nsec() - now) / 1000000;
 }
 
-void sched_enqueue(routine_t *t) {
+CO_FORCE_INLINE void sched_enqueue(routine_t *t) {
     t->ready = 1;
-    sched_add(&thread()->run_queue, t);
+    if (!atomic_load(&atomic_queue.is_multi))
+        sched_add(&thread()->run_queue, t);
+    else
+        sched_enqueue_atomic(t);
 }
 
 int sched_yielding(void) {
@@ -1206,11 +1213,11 @@ int sched_yielding(void) {
     return thread()->num_others_ran - n - 1;
 }
 
-bool sched_active(void) {
+CO_FORCE_INLINE bool sched_active(void) {
     return !is_empty(thread()->run_queue.head);
 }
 
-bool sched_thrd_active(void) {
+CO_FORCE_INLINE bool sched_thrd_active(void) {
     return !is_empty(((atomic_scheduler_t*)atomic_load(&atomic_queue.run_queue))->head);
 }
 
@@ -1375,7 +1382,10 @@ static void thrd_scheduler(void) {
             if (!sched_thrd_active())
                 continue;
 
-            thread()->used_count++;
+            if (is_zero(thread()->used_count))
+                thread()->used_count++;
+
+            atomic_thread_fence(memory_order_seq_cst);
             l = ((scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire));
             t = l->head;
             sched_remove(l, t);
@@ -1439,6 +1449,7 @@ int main(int argc, char **argv) {
     atomic_init(&atomic_queue.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
     atomic_init(&atomic_queue.run_queue.head, NULL);
     atomic_init(&atomic_queue.run_queue.tail, NULL);
+    atomic_flag_clear(&atomic_queue.is_multi);
 
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;

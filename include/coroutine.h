@@ -247,6 +247,10 @@ typedef enum co_state {
     CO_ERRED, /* The coroutine has erred. */
 } co_state;
 
+#ifndef CACHELINE_SIZE
+#   define CACHELINE_SIZE 64
+#endif
+typedef char cacheline_pad_t[CACHELINE_SIZE];
 typedef struct routine_s routine_t;
 typedef struct oa_hash_s hash_t;
 typedef struct json_value_t json_t;
@@ -376,7 +380,7 @@ struct routine_s {
     char state[ 64 ];
     char scrape[ CO_SCRAPE_SIZE ];
     /* unique coroutine id */
-    int cid;
+    u32 cid;
     size_t alarm_time;
     size_t cycles;
     routine_t *next;
@@ -402,7 +406,7 @@ struct routine_s {
     signed int loop_code;
     void_t user_data;
 #if defined(USE_VALGRIND)
-    unsigned int vg_stack_id;
+    u32 vg_stack_id;
 #endif
     void_t args;
     /* Coroutine result of function return/exit. */
@@ -424,14 +428,31 @@ typedef struct scheduler_s {
 make_atomic(routine_t, atomic_routine_t)
 make_atomic(scheduler_t, atomic_scheduler_t)
 typedef struct {
+    /* Number of CPU cores this machine has,
+    it determents the number of threads to use. */
     size_t cpu_count;
+
     thrd_t **threads;
+    cacheline_pad_t _pad;
+
+    atomic_flag is_multi;
+    cacheline_pad_t _pad0;
+
     atomic_size_t used_count;
+    cacheline_pad_t _pad1;
+
     atomic_size_t id_generate;
+    cacheline_pad_t _pad2;
+
     atomic_size_t n_all_coroutine;
+    cacheline_pad_t _pad3;
+
     /* scheduler tracking for all coroutines */
     atomic_routine_t **all_coroutine;
+    cacheline_pad_t _pad4;
+
     atomic_scheduler_t run_queue;
+    cacheline_pad_t _pad5;
 } atomic_deque_t;
 C_API atomic_deque_t atomic_queue;
 
@@ -514,18 +535,18 @@ struct channel_co_s;
 typedef struct channel_co_s channel_co_t;
 typedef struct msg_queue_s {
     channel_co_t **a;
-    unsigned int n;
-    unsigned int m;
+    u32 n;
+    u32 m;
 } msg_queue_t;
 
 typedef struct channel_s {
     value_types type;
-    unsigned int bufsize;
-    unsigned int elem_size;
+    u32 bufsize;
+    u32 elem_size;
     unsigned char *buf;
-    unsigned int nbuf;
-    unsigned int off;
-    unsigned int id;
+    u32 nbuf;
+    u32 off;
+    u32 id;
     values_t *tmp;
     msg_queue_t a_send;
     msg_queue_t a_recv;
@@ -544,7 +565,7 @@ enum {
 struct channel_co_s {
     channel_t *c;
     void_t v;
-    unsigned int op;
+    u32 op;
     routine_t *co;
     channel_co_t *x_msg;
 };
@@ -711,10 +732,10 @@ C_API void co_process(func_t fn, void_t args);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
-C_API unsigned int co_sleep(unsigned int ms);
+C_API u32 co_sleep(u32 ms);
 
 /* Return the unique id for the current coroutine. */
-C_API unsigned int co_id(void);
+C_API u32 co_id(void);
 C_API signed int co_err_code(void);
 
 /* Yield execution to another coroutine and reschedule current. */

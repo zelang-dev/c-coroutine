@@ -289,7 +289,7 @@ struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
 }
 #endif
 
-CO_FORCE_INLINE unsigned int co_id() {
+CO_FORCE_INLINE u32 co_id() {
     return co_active()->cid;
 }
 
