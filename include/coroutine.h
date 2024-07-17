@@ -742,6 +742,7 @@ Todo: Refactor to global run queue then to thread run queue .*/
 C_API void sched_enqueue(routine_t *);
 
 C_API bool sched_active(void);
+C_API bool sched_thrd_active(void);
 C_API void sched_info(void);
 C_API void sched_dec(void);
 C_API void sched_log_reset(void);
