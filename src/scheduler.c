@@ -60,10 +60,12 @@ static int main_argc;
 static char **main_argv;
 static string co_powered_by = NULL;
 
-/* scheduler tracking for all coroutines */
-routine_t **all_coroutine;
+/* These are non-NULL pointers that will result in page faults under normal
+ * circumstances, used to verify that nobody uses non-initialized entries.
+ */
+static scheduler_t *EMPTY = (scheduler_t *)0x100, *ABORT = (scheduler_t *)0x200;
 
-int n_all_coroutine;
+atomic_deque_t atomic_queue = {0};
 
 int thrd_main(void_t args);
 int coroutine_loop(int);
@@ -90,6 +92,38 @@ void coroutine_state(char *, ...);
 
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
+
+#ifdef _WIN32
+static size_t sched_count(void) {
+    SYSTEM_INFO system_info;
+    GetSystemInfo(&system_info);
+    return (size_t)system_info.dwNumberOfProcessors;
+}
+#elif (defined(__linux__) || defined(__linux))
+#include <sched.h>
+static size_t sched_count(void) {
+    // return sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_set_t cpuset;
+    sched_getaffinity(0, sizeof(cpuset), &cpuset);
+    return CPU_COUNT(&cpuset);
+}
+#else
+static size_t sched_count(void) {
+    return 1;
+}
+#endif
+
+static void sched_init(bool is_main) {
+    thread()->is_main = is_main;
+    thread()->info_log = true;
+    thread()->uv_args = NULL;
+    thread()->exiting = 0;
+    thread()->id_generate = 0;
+
+    task()->active_handle = NULL;
+    task()->main_handle = NULL;
+    task()->current_handle = NULL;
+}
 
 void sched_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
     routine_t *co = co_active();
@@ -122,14 +156,15 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 }
 #endif
 
-C_API string co_system_uname(void) {
+C_API string sched_uname(void) {
     if (is_empty(co_powered_by)) {
         uv_utsname_t buffer[1];
         uv_os_uname(buffer);
-        co_powered_by = str_concat_by(6, "Coroutine-System Beta, ",
-                                          buffer->sysname, " ",
-                                          buffer->machine, " ",
-                                          buffer->release);
+        co_powered_by = str_concat_by(8, "Beta - Cpu: ",
+                                      co_itoa(sched_count()), " core, ",
+                                      buffer->sysname, " ",
+                                      buffer->machine, " ",
+                                      buffer->release);
     }
 
     return co_powered_by;
@@ -978,7 +1013,7 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
 }
 
 static void sched_adjust(atomic_deque_t *q, routine_t *t) {
-    scheduler_t *list = (scheduler_t *)atomic_load(&q->run_queue);
+    size_t generate_id = atomic_load_explicit(&q->id_generate, memory_order_relaxed);
     size_t coroutines_num_all = atomic_load_explicit(&q->n_all_coroutine, memory_order_relaxed);
     routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&q->all_coroutine, memory_order_acquire);
     if (coroutines_num_all % 64 == 0) {
@@ -987,13 +1022,14 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
             co_panic("realloc() failed");
     }
 
+    t->cid = ++generate_id;
     t->all_coroutine_slot = coroutines_num_all;
     coroutines_all[coroutines_num_all++] = t;
     coroutines_all[coroutines_num_all] = NULL;
+    atomic_store(&q->id_generate, generate_id);
+    atomic_store(&q->n_all_coroutine, coroutines_num_all);
+    sched_enqueue(t);
     atomic_store_explicit(&q->all_coroutine, coroutines_all, memory_order_release);
-    atomic_store_explicit(&q->n_all_coroutine, coroutines_num_all, memory_order_relaxed);
-    sched_add(list, t);
-    atomic_store(&q->run_queue, list);
 }
 
 int create_routine(callable_t fn, void_t arg, unsigned int stack) {
@@ -1001,20 +1037,10 @@ int create_routine(callable_t fn, void_t arg, unsigned int stack) {
     routine_t *t = co_create(stack, fn, arg);
     routine_t *c = co_active();
 
-    t->cid = ++thread()->id_generate;
     thread()->used_count++;
+    atomic_fetch_add(&atomic_queue.used_count, 1);
+    sched_adjust(&atomic_queue, t);
     id = t->cid;
-    if (n_all_coroutine % 64 == 0) {
-        all_coroutine = CO_REALLOC(all_coroutine, (n_all_coroutine + 64) * sizeof(all_coroutine[ 0 ]));
-        if (is_empty(all_coroutine))
-            co_panic("realloc() failed");
-    }
-
-    t->all_coroutine_slot = n_all_coroutine;
-    all_coroutine[ n_all_coroutine++ ] = t;
-    all_coroutine[ n_all_coroutine ] = NULL;
-    sched_enqueue(t);
-
     if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
         t->synced = true;
@@ -1219,9 +1245,11 @@ void sched_info(void) {
     routine_t *t;
     char *extra;
 
+    size_t coroutines_num_all = atomic_load(&atomic_queue.n_all_coroutine);
+    routine_t **coroutines_all = (routine_t **)atomic_load(&atomic_queue.all_coroutine);
     fprintf(stderr, "Coroutine list:\n");
-    for (i = 0; i < n_all_coroutine; i++) {
-        t = all_coroutine[i];
+    for (i = 0; i < coroutines_num_all; i++) {
+        t = coroutines_all[i];
         if (t == thread()->running)
             extra = " (running)";
         else if (t->ready)
@@ -1235,9 +1263,13 @@ void sched_info(void) {
 }
 
 void sched_update(routine_t *t) {
+    size_t coroutines_num_all = atomic_load(&atomic_queue.n_all_coroutine);
+    routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&atomic_queue.all_coroutine, memory_order_acquire);
     int i = t->all_coroutine_slot;
-    all_coroutine[i] = all_coroutine[--n_all_coroutine];
-    all_coroutine[i]->all_coroutine_slot = i;
+    coroutines_all[i] = coroutines_all[--coroutines_num_all];
+    coroutines_all[i]->all_coroutine_slot = i;
+    atomic_store_explicit(&atomic_queue.all_coroutine, coroutines_all, memory_order_release);
+    atomic_store(&atomic_queue.n_all_coroutine, coroutines_num_all);
 }
 
 void sched_cleanup(void) {
@@ -1248,12 +1280,15 @@ void sched_cleanup(void) {
     can_cleanup = false;
     gc_channel_free();
     gc_coroutine_free();
-    if (n_all_coroutine) {
-        if (thread()->used_count)
-            n_all_coroutine--;
+    size_t coroutines_num_all = atomic_load(&atomic_queue.n_all_coroutine);
+    routine_t **coroutines_all = (routine_t **)atomic_load(&atomic_queue.all_coroutine);
 
-        for (int i = 0; i < (n_all_coroutine + (thread()->used_count != 0)); i++) {
-            t = all_coroutine[n_all_coroutine - i];
+    if (coroutines_num_all) {
+        if (thread()->used_count)
+            coroutines_num_all--;
+
+        for (int i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
+            t = coroutines_all[coroutines_num_all - i];
             if (t && t->magic_number == CO_MAGIC_NUMBER) {
                 t->magic_number = -1;
                 CO_FREE(t);
@@ -1261,9 +1296,9 @@ void sched_cleanup(void) {
         }
     }
 
-    if (!is_empty(all_coroutine)) {
-        CO_FREE(all_coroutine);
-        all_coroutine = NULL;
+    if (!is_empty(coroutines_all)) {
+        CO_FREE(coroutines_all);
+        coroutines_all = NULL;
     }
 #ifdef UV_H
     if (!is_empty(task()->interrupt_handle)) {
@@ -1276,6 +1311,10 @@ void sched_cleanup(void) {
         co_powered_by = NULL;
     }
 #endif
+
+    atomic_store(&atomic_queue.all_coroutine, (c89atomic_uint64)NULL);
+    atomic_store(&atomic_queue.n_all_coroutine, 0);
+    free((void *)atomic_load(&atomic_queue.run_queue));
 }
 
 static void thrd_scheduler(void) {
@@ -1347,27 +1386,26 @@ int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
 
-    thread()->is_main = true;
-    thread()->info_log = true;
-    thread()->uv_args = NULL;
-    thread()->exiting = 0;
-    thread()->id_generate = 0;
-
-    task()->active_handle = NULL;
-    task()->main_handle = NULL;
-    task()->current_handle = NULL;
+    sched_init(true);
+    atomic_queue.cpu_count = sched_count();
+    atomic_init(&atomic_queue.id_generate, 0);
+    atomic_init(&atomic_queue.used_count, 0);
+    atomic_init(&atomic_queue.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
+    atomic_init(&atomic_queue.run_queue.head, NULL);
+    atomic_init(&atomic_queue.run_queue.tail, NULL);
 
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
     exception_ctrl_c_func = (ex_terminate_func)sched_info;
     exception_terminate_func = (ex_terminate_func)sched_cleanup;
 #ifdef UV_H
-    CO_INFO("Starting up: %s\n\n", co_system_uname());
+    CO_INFO("%s\n\n", sched_uname());
 #endif
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);
     create_routine(coroutine_main, NULL, CO_MAIN_STACK);
     thrd_scheduler();
-    fprintf(stderr, "Coroutine scheduler returned to main, when it shouldn't have!");
+    unreachable;
+
     return thread()->exiting;
 }

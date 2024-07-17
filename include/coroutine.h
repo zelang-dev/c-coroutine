@@ -424,11 +424,16 @@ typedef struct scheduler_s {
 make_atomic(routine_t, atomic_routine_t)
 make_atomic(scheduler_t, atomic_scheduler_t)
 typedef struct {
+    size_t cpu_count;
+    thrd_t **threads;
+    atomic_size_t used_count;
+    atomic_size_t id_generate;
     atomic_size_t n_all_coroutine;
     /* scheduler tracking for all coroutines */
     atomic_routine_t **all_coroutine;
     atomic_scheduler_t run_queue;
 } atomic_deque_t;
+C_API atomic_deque_t atomic_queue;
 
 /* Generic simple union storage types. */
 typedef union {
@@ -718,8 +723,8 @@ C_API void co_yield(void);
 /* Returns the current coroutine's name. */
 C_API string co_get_name(void);
 
-/* Returns library version and OS system info from `uv_os_uname()`. */
-C_API string co_system_uname(void);
+/* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
+C_API string sched_uname(void);
 
 /* The current coroutine will be scheduled again once all the
 other currently-ready coroutines have a chance to run. Returns
