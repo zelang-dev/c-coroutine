@@ -1013,8 +1013,8 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
 }
 
 static void sched_enqueue_atomic(routine_t *t) {
-    atomic_thread_fence(memory_order_seq_cst);
     scheduler_t *list = (scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire);
+    atomic_thread_fence(memory_order_seq_cst);
     sched_add(list, t);
     atomic_store_explicit(&atomic_queue.run_queue, list, memory_order_release);
 }
@@ -1385,8 +1385,8 @@ static void thrd_scheduler(void) {
             if (is_zero(thread()->used_count))
                 thread()->used_count++;
 
-            atomic_thread_fence(memory_order_seq_cst);
             l = ((scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire));
+            atomic_thread_fence(memory_order_seq_cst);
             t = l->head;
             sched_remove(l, t);
             atomic_store_explicit(&atomic_queue.run_queue, l, memory_order_release);
