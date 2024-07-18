@@ -1346,16 +1346,17 @@ void sched_cleanup(void) {
     atomic_store(&atomic_queue.all_coroutine, (c89atomic_uint64)NULL);
     atomic_store(&atomic_queue.n_all_coroutine, 0);
     free((void *)atomic_load(&atomic_queue.run_queue));
+    free((void *)atomic_queue.threads);
 }
 
 static void thrd_scheduler(void) {
-    routine_t *t;
-    scheduler_t *l;
+    routine_t *t = NULL;
+    scheduler_t *l = NULL;
     bool is_steal = false;
 
     for (;;) {
         // Todo: Add additional check for active separate running threads.
-        if (thread()->used_count == 0 || !sched_active()) {
+        if (thread()->used_count == 0 || !sched_active() || l == EMPTY) {
             if (thread()->is_main && !sched_thrd_active()) {
                 sched_cleanup();
                 if (thread()->used_count > 0) {
@@ -1368,8 +1369,8 @@ static void thrd_scheduler(void) {
                 }
             } else if (sched_thrd_active()) {
                 // Todo: In separate running thread, so steal work or exit thread.
-                fprintf(stderr, "Scheduler has %zu coroutines in other threads,\nneed to implement work steal!\n",
-                        atomic_load(&atomic_queue.used_count));
+                CO_INFO("\nScheduler has %zu coroutines in other threads, and %d stalled.\nTodo: implement work steal!\n\n",
+                        atomic_load(&atomic_queue.used_count), thread()->used_count);
                 is_steal = true;
             } else {
                 // Todo: special thread cleanup
@@ -1379,8 +1380,10 @@ static void thrd_scheduler(void) {
         }
 
         if (is_steal) {
-            if (!sched_thrd_active())
+            if (!sched_thrd_active()) {
+                l = EMPTY;
                 continue;
+            }
 
             if (is_zero(thread()->used_count))
                 thread()->used_count++;
@@ -1444,6 +1447,7 @@ int main(int argc, char **argv) {
 
     sched_init(true);
     atomic_queue.cpu_count = sched_count();
+    atomic_queue.threads = try_calloc(atomic_queue.cpu_count, sizeof(thrd_t));
     atomic_init(&atomic_queue.id_generate, 0);
     atomic_init(&atomic_queue.used_count, 0);
     atomic_init(&atomic_queue.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
