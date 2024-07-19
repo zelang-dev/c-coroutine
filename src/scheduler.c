@@ -1012,6 +1012,19 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
         l->tail = t->prev;
 }
 
+static void sched_copy(atomic_deque_t *q, thread_processor_t *r, int count) {
+    int i;
+    routine_t *t;
+    scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
+    atomic_thread_fence(memory_order_seq_cst);
+    for (i = 0; i < count; i++) {
+        t = l->head;
+        sched_remove(l, t);
+        sched_add(&r->run_queue, t);
+    }
+    atomic_store_explicit(&q->run_queue, l, memory_order_release);
+}
+
 static void sched_enqueue_atomic(routine_t *t) {
     scheduler_t *list = (scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
@@ -1019,21 +1032,17 @@ static void sched_enqueue_atomic(routine_t *t) {
     atomic_store_explicit(&atomic_queue.run_queue, list, memory_order_release);
 }
 
-static void sched_take(atomic_deque_t *q, thread_processor_t *r, bool is_stealing) {
-    int count = (int)atomic_load(&q->used_count);
-    if (count != 0) {
-        r->used_count += count;
-        atomic_init(&q->used_count, 0);
+static void sched_take(atomic_deque_t *q, thread_processor_t *r) {
+    int counter, count = (int)atomic_load(&q->used_count);
+    if (!is_zero(count)) {
+        counter = sched_is_multi() && sched_is_started() && count > q->cpu_count
+            ? (int)(count / q->cpu_count) : count;
+        r->used_count += counter;
+        atomic_init(&q->used_count, count - counter);
+        //if (sched_is_multi() && sched_is_started())
+        if (sched_is_multi())
+            sched_copy(q, r, counter);
     }
-
-    /*
-    if (is_stealing) {
-        scheduler_t *list = (scheduler_t *)atomic_load(&q->run_queue);
-        memcpy(&r->run_queue, &list, sizeof(list));
-        memcpy(&r->run_queue.head, &list->head, sizeof(list->head));
-        memcpy(&r->run_queue.tail, &list->tail, sizeof(list->tail));
-    }
-    */
 }
 
 static void sched_adjust(atomic_deque_t *q, routine_t *t) {
@@ -1062,8 +1071,8 @@ int create_routine(callable_t fn, void_t arg, u32 stack) {
     routine_t *c = co_active();
 
     atomic_fetch_add(&atomic_queue.used_count, 1);
-    sched_take(&atomic_queue, thread(), false);
     sched_adjust(&atomic_queue, t);
+    sched_take(&atomic_queue, thread());
     id = t->cid;
     if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
@@ -1198,7 +1207,7 @@ u32 co_sleep(u32 ms) {
 
 CO_FORCE_INLINE void sched_enqueue(routine_t *t) {
     t->ready = 1;
-    if (!atomic_load(&atomic_queue.is_multi))
+    if (!sched_is_multi())
         sched_add(&thread()->run_queue, t);
     else
         sched_enqueue_atomic(t);
@@ -1215,6 +1224,18 @@ int sched_yielding(void) {
 
 CO_FORCE_INLINE bool sched_active(void) {
     return !is_empty(thread()->run_queue.head);
+}
+
+CO_FORCE_INLINE bool sched_is_multi(void) {
+    return atomic_load(&atomic_queue.is_multi);
+}
+
+CO_FORCE_INLINE bool sched_is_started(void) {
+    return atomic_load(&atomic_queue.is_started);
+}
+
+CO_FORCE_INLINE bool sched_is_empty(void) {
+    return (int)atomic_load(&atomic_queue.used_count) == 0;
 }
 
 CO_FORCE_INLINE bool sched_thrd_active(void) {
@@ -1355,9 +1376,8 @@ static void thrd_scheduler(void) {
     bool is_steal = false;
 
     for (;;) {
-        // Todo: Add additional check for active separate running threads.
         if (thread()->used_count == 0 || !sched_active() || l == EMPTY) {
-            if (thread()->is_main && !sched_thrd_active()) {
+            if (thread()->is_main && ((!sched_thrd_active() && sched_is_empty()) || l == EMPTY)) {
                 sched_cleanup();
                 if (thread()->used_count > 0) {
                     CO_INFO("No runnable coroutines! %d stalled\n", thread()->used_count);
@@ -1368,9 +1388,11 @@ static void thrd_scheduler(void) {
                     exit(thread()->exiting);
                 }
             } else if (sched_thrd_active()) {
-                // Todo: In separate running thread, so steal work or exit thread.
-                CO_INFO("\nScheduler has %zu coroutines in other threads, and %d stalled.\nTodo: implement work steal!\n\n",
-                        atomic_load(&atomic_queue.used_count), thread()->used_count);
+                if (thread()->used_count == 0 && sched_is_empty()) {
+                    l = EMPTY;
+                    continue;
+                }
+
                 is_steal = true;
             } else {
                 // Todo: special thread cleanup
@@ -1385,14 +1407,25 @@ static void thrd_scheduler(void) {
                 continue;
             }
 
-            if (is_zero(thread()->used_count))
-                thread()->used_count++;
-
-            l = ((scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire));
+            l = (scheduler_t *)atomic_load_explicit(&atomic_queue.run_queue, memory_order_acquire);
             atomic_thread_fence(memory_order_seq_cst);
             t = l->head;
             sched_remove(l, t);
             atomic_store_explicit(&atomic_queue.run_queue, l, memory_order_release);
+            if (t->cid == 0) {
+                l = EMPTY;
+                continue;
+            }
+
+            if (is_zero(thread()->used_count))
+                thread()->used_count++;
+
+            if (!sched_is_started())
+                thread()->run_queue = *l;
+            else
+                sched_take(&atomic_queue, thread());
+
+            is_steal = false;
         } else {
             t = thread()->run_queue.head;
             sched_remove(&thread()->run_queue, t);
@@ -1438,6 +1471,15 @@ static void_t coroutine_main(void_t v) {
 }
 
 int thrd_main(void_t args) {
+
+    sched_init(false);
+
+    /* Wait for global start signal */
+    while (!atomic_load(&atomic_queue.is_started))
+        thrd_yield();
+
+    //thrd_scheduler();
+
     return 0;
 }
 
@@ -1454,6 +1496,8 @@ int main(int argc, char **argv) {
     atomic_init(&atomic_queue.run_queue.head, NULL);
     atomic_init(&atomic_queue.run_queue.tail, NULL);
     atomic_flag_clear(&atomic_queue.is_multi);
+    atomic_flag_clear(&atomic_queue.is_started);
+   // atomic_flag_test_and_set(&atomic_queue.is_multi);
 
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
