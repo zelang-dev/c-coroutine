@@ -94,21 +94,21 @@ void coroutine_state(char *, ...);
 char *coroutine_get_state(void);
 
 #ifdef _WIN32
-static size_t sched_count(void) {
+static size_t sched_cpu_count(void) {
     SYSTEM_INFO system_info;
     GetSystemInfo(&system_info);
     return (size_t)system_info.dwNumberOfProcessors;
 }
 #elif (defined(__linux__) || defined(__linux))
 #include <sched.h>
-static size_t sched_count(void) {
+static size_t sched_cpu_count(void) {
     // return sysconf(_SC_NPROCESSORS_ONLN);
     cpu_set_t cpuset;
     sched_getaffinity(0, sizeof(cpuset), &cpuset);
     return CPU_COUNT(&cpuset);
 }
 #else
-static size_t sched_count(void) {
+static size_t sched_cpu_count(void) {
     return 1;
 }
 #endif
@@ -161,7 +161,7 @@ C_API string sched_uname(void) {
         uv_utsname_t buffer[1];
         uv_os_uname(buffer);
         co_powered_by = str_concat_by(8, "Beta - ",
-                                      co_itoa(sched_count()), " cores, ",
+                                      co_itoa(sched_cpu_count()), " cores, ",
                                       buffer->sysname, " ",
                                       buffer->machine, " ",
                                       buffer->release);
@@ -1018,9 +1018,35 @@ static void sched_copy(atomic_deque_t *q, thread_processor_t *r, int count) {
     scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
     atomic_thread_fence(memory_order_seq_cst);
     for (i = 0; i < count; i++) {
+        atomic_fetch_sub(&atomic_queue.count, 1);
         t = l->head;
         sched_remove(l, t);
         sched_add(&r->run_queue, t);
+    }
+    atomic_store_explicit(&q->run_queue, l, memory_order_release);
+}
+
+static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
+    int i;
+    routine_t *t;
+    scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
+    atomic_thread_fence(memory_order_seq_cst);
+    for (i = 0; i < count; i++) {
+        atomic_fetch_sub(&atomic_queue.count, 1);
+        t = l->head;
+        l->head = t->next;
+        l->tail = t->prev;
+
+        if (r->run_queue.tail) {
+            r->run_queue.tail->next = t;
+            t->prev = r->run_queue.tail->prev;
+        } else {
+            r->run_queue.head = t;
+            t->prev = NULL;
+        }
+
+        r->run_queue.tail = t;
+        //r->used_count++;
     }
     atomic_store_explicit(&q->run_queue, l, memory_order_release);
 }
@@ -1030,6 +1056,7 @@ static void sched_enqueue_atomic(routine_t *t) {
     atomic_thread_fence(memory_order_seq_cst);
     sched_add(list, t);
     atomic_store_explicit(&atomic_queue.run_queue, list, memory_order_release);
+    atomic_fetch_add(&atomic_queue.count, 1);
 }
 
 static void sched_take(atomic_deque_t *q, thread_processor_t *r) {
@@ -1207,10 +1234,10 @@ u32 co_sleep(u32 ms) {
 
 CO_FORCE_INLINE void sched_enqueue(routine_t *t) {
     t->ready = 1;
-    if (!sched_is_multi())
-        sched_add(&thread()->run_queue, t);
-    else
+    if (sched_is_multi())
         sched_enqueue_atomic(t);
+    else
+        sched_add(&thread()->run_queue, t);
 }
 
 int sched_yielding(void) {
@@ -1236,6 +1263,10 @@ CO_FORCE_INLINE bool sched_is_started(void) {
 
 CO_FORCE_INLINE bool sched_is_empty(void) {
     return (int)atomic_load(&atomic_queue.used_count) == 0;
+}
+
+CO_FORCE_INLINE size_t sched_count(void) {
+    return atomic_load(&atomic_queue.count);
 }
 
 CO_FORCE_INLINE bool sched_thrd_active(void) {
@@ -1363,9 +1394,6 @@ void sched_cleanup(void) {
         co_powered_by = NULL;
     }
 #endif
-
-    atomic_store(&atomic_queue.all_coroutine, (c89atomic_uint64)NULL);
-    atomic_store(&atomic_queue.n_all_coroutine, 0);
     free((void *)atomic_load(&atomic_queue.run_queue));
     free((void *)atomic_queue.threads);
 }
@@ -1393,7 +1421,8 @@ static void thrd_scheduler(void) {
                     continue;
                 }
 
-                is_steal = true;
+                sched_steal(&atomic_queue, thread(), 1);
+                //is_steal = true;
             } else {
                 // Todo: special thread cleanup
                 // sched_cleanup();
@@ -1402,6 +1431,7 @@ static void thrd_scheduler(void) {
         }
 
         if (is_steal) {
+            is_steal = false;
             if (!sched_thrd_active()) {
                 l = EMPTY;
                 continue;
@@ -1420,12 +1450,8 @@ static void thrd_scheduler(void) {
             if (is_zero(thread()->used_count))
                 thread()->used_count++;
 
-            if (!sched_is_started())
-                thread()->run_queue = *l;
-            else
-                sched_take(&atomic_queue, thread());
-
-            is_steal = false;
+            if (sched_thrd_active())
+                sched_steal(&atomic_queue, thread(), 1);
         } else {
             t = thread()->run_queue.head;
             sched_remove(&thread()->run_queue, t);
@@ -1488,16 +1514,15 @@ int main(int argc, char **argv) {
     main_argv = argv;
 
     sched_init(true);
-    atomic_queue.cpu_count = sched_count();
+    atomic_queue.cpu_count = sched_cpu_count();
     atomic_queue.threads = try_calloc(atomic_queue.cpu_count, sizeof(thrd_t));
     atomic_init(&atomic_queue.id_generate, 0);
     atomic_init(&atomic_queue.used_count, 0);
+    atomic_init(&atomic_queue.count, 0);
     atomic_init(&atomic_queue.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
-    atomic_init(&atomic_queue.run_queue.head, NULL);
-    atomic_init(&atomic_queue.run_queue.tail, NULL);
     atomic_flag_clear(&atomic_queue.is_multi);
     atomic_flag_clear(&atomic_queue.is_started);
-   // atomic_flag_test_and_set(&atomic_queue.is_multi);
+    atomic_flag_test_and_set(&atomic_queue.is_multi);
 
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;

@@ -433,6 +433,9 @@ typedef struct {
     size_t cpu_count;
 
     thrd_t **threads;
+    atomic_size_t count;
+    cacheline_pad_t _pad6;
+
     atomic_flag is_started;
     cacheline_pad_t _pad;
 
