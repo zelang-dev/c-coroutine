@@ -427,12 +427,14 @@ typedef struct scheduler_s {
 
 make_atomic(routine_t, atomic_routine_t)
 make_atomic(scheduler_t, atomic_scheduler_t)
+
+/* Global atomic queue struct */
 typedef struct {
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
 
-    thrd_t **threads;
+    thrd_pool_t *threads;
     atomic_size_t count;
     cacheline_pad_t _pad6;
 
@@ -458,7 +460,8 @@ typedef struct {
     atomic_scheduler_t run_queue;
     cacheline_pad_t _pad5;
 } atomic_deque_t;
-C_API atomic_deque_t atomic_queue;
+
+C_API atomic_deque_t gq_sys;
 
 /* Generic simple union storage types. */
 typedef union {
