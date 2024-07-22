@@ -245,6 +245,7 @@ static int channel_proc(channel_co_t *a) {
 
     t = co_coroutine();
     t->channeled = true;
+    t->taken = true;
     for (i = 0; i < n; i++) {
         a[ i ].co = t;
         a[ i ].x_msg = a;

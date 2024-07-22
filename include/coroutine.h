@@ -386,6 +386,7 @@ struct routine_s {
     routine_t *next;
     routine_t *prev;
     bool channeled;
+    bool taken;
     bool ready;
     bool system;
     bool exiting;
@@ -433,32 +434,33 @@ typedef struct {
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
-
     thrd_pool_t *threads;
-    atomic_size_t count;
-    cacheline_pad_t _pad6;
-
-    atomic_flag is_started;
+    size_t **available;
     cacheline_pad_t _pad;
 
     atomic_flag is_multi;
     cacheline_pad_t _pad0;
 
-    atomic_size_t used_count;
+    atomic_flag is_started;
     cacheline_pad_t _pad1;
 
-    atomic_size_t id_generate;
+    atomic_size_t used_count;
     cacheline_pad_t _pad2;
 
-    atomic_size_t n_all_coroutine;
+    atomic_size_t id_generate;
     cacheline_pad_t _pad3;
+
+    atomic_size_t n_all_coroutine;
+    cacheline_pad_t _pad4;
 
     /* scheduler tracking for all coroutines */
     atomic_routine_t **all_coroutine;
-    cacheline_pad_t _pad4;
+    cacheline_pad_t _pad5;
 
     atomic_scheduler_t run_queue;
-    cacheline_pad_t _pad5;
+    cacheline_pad_t _pad6;
+
+    const char powered_by[CO_SCRAPE_SIZE];
 } atomic_deque_t;
 
 C_API atomic_deque_t gq_sys;
@@ -752,7 +754,7 @@ C_API void co_yield(void);
 C_API string co_get_name(void);
 
 /* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
-C_API string sched_uname(void);
+C_API string_t sched_uname(void);
 
 /* The current coroutine will be scheduled again once all the
 other currently-ready coroutines have a chance to run. Returns
@@ -769,13 +771,10 @@ C_API void sched_update(routine_t *);
 Todo: Refactor to global run queue then to thread run queue .*/
 C_API void sched_enqueue(routine_t *);
 
-C_API bool sched_active(void);
-C_API bool sched_is_multi(void);
-C_API bool sched_is_started(void);
-C_API bool sched_thrd_active(void);
 C_API void sched_info(void);
 C_API void sched_dec(void);
 C_API void sched_log_reset(void);
+C_API void sched_take(int count);
 C_API uv_args_t *sched_event_args(void);
 
 /* Collect coroutines with references preventing immediate cleanup. */
