@@ -1549,7 +1549,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        if (sched_is_multi) {
+        if (sched_is_multi()) {
             atomic_init(&gq_sys.available, try_calloc(gq_sys.cpu_count, sizeof(size_t)));
             for (i = 0; i < gq_sys.cpu_count; i++) {
                 atomic_init(&gq_sys.available[i], 0);
