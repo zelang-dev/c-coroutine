@@ -1049,7 +1049,7 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
 static void sched_set_available(void) {
     size_t available, i, active = atomic_load_explicit(&gq_sys.used_count, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
-    available = active / gq_sys.cpu_count;
+    available = active / (gq_sys.cpu_count + 1);
     for (i = 0; i < gq_sys.cpu_count; i++) {
         atomic_fetch_add(&gq_sys.available[i], available);
         active -= available;
@@ -1400,7 +1400,7 @@ CO_FORCE_INLINE void sched_take(int count) {
     sched_steal(&gq_sys, thread(), count);
 }
 
-static void thrd_take(atomic_deque_t *q) {
+static void sched_steal_thrd(atomic_deque_t *q) {
     routine_t *t;
     scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
     size_t i, available = atomic_load(&q->available[thread()->thrd_id]);
@@ -1411,8 +1411,12 @@ static void thrd_take(atomic_deque_t *q) {
         sched_add(&thread()->run_queue, t);
     }
     thread()->used_count += available;
-    atomic_store_explicit(&q->run_queue, l, memory_order_release);
     atomic_store(&q->available[thread()->thrd_id], 0);
+    atomic_store_explicit(&q->run_queue, l, memory_order_release);
+}
+
+CO_FORCE_INLINE void sched_take_available(void) {
+    sched_steal_thrd(&gq_sys);
 }
 
 static int thrd_scheduler(void) {
@@ -1434,6 +1438,8 @@ static int thrd_scheduler(void) {
                 }
             } else if (sched_thrd_active() && l != EMPTY) {
                 if (thread()->used_count == 0 && sched_is_empty()) {
+                    /* Todo: implement spinning for work, or
+                    possible steal from another thread or exit */
                     l = EMPTY;
                     continue;
                 }

@@ -435,16 +435,22 @@ typedef struct {
     it determents the number of threads to use. */
     size_t cpu_count;
     thrd_pool_t *threads;
-    cacheline_pad_t pad;
+    cacheline_pad_t pad0_;
 
-    atomic_size_t **available;
-    cacheline_pad_t _pad;
+    atomic_flag **idle;
+    cacheline_pad_t pad_;
+
+    atomic_flag **spinning;
+    cacheline_pad_t pad;
 
     atomic_flag is_multi;
     cacheline_pad_t _pad0;
 
     atomic_flag is_started;
     cacheline_pad_t _pad1;
+
+    atomic_size_t **available;
+    cacheline_pad_t _pad;
 
     atomic_size_t used_count;
     cacheline_pad_t _pad2;
@@ -777,6 +783,7 @@ C_API void sched_info(void);
 C_API void sched_dec(void);
 C_API void sched_log_reset(void);
 C_API void sched_take(int count);
+C_API void sched_take_available(void);
 C_API uv_args_t *sched_event_args(void);
 
 /* Collect coroutines with references preventing immediate cleanup. */
