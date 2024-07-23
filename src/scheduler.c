@@ -1403,7 +1403,7 @@ CO_FORCE_INLINE void sched_take(int count) {
 static void thrd_take(atomic_deque_t *q) {
     routine_t *t;
     scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
-    size_t i, available = atomic_load(&gq_sys.available[thread()->thrd_id]);
+    size_t i, available = atomic_load(&q->available[thread()->thrd_id]);
     atomic_thread_fence(memory_order_seq_cst);
     for (i = 0; i < available; i++) {
         t = l->head;
@@ -1412,7 +1412,7 @@ static void thrd_take(atomic_deque_t *q) {
     }
     thread()->used_count += available;
     atomic_store_explicit(&q->run_queue, l, memory_order_release);
-    atomic_store(&gq_sys.available[thread()->thrd_id], 0);
+    atomic_store(&q->available[thread()->thrd_id], 0);
 }
 
 static int thrd_scheduler(void) {
