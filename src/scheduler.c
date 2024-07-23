@@ -1046,13 +1046,15 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
         l->tail = t->prev;
 }
 
-static int sched_set_available(void) {
-    size_t active = atomic_load_explicit(&gq_sys.used_count, memory_order_acquire);
+static void sched_set_available(void) {
+    size_t available, i, active = atomic_load_explicit(&gq_sys.used_count, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
-
+    available = active / gq_sys.cpu_count;
+    for (i = 0; i < gq_sys.cpu_count; i++) {
+        atomic_fetch_add(&gq_sys.available[i], available);
+        active -= available;
+    }
     atomic_store_explicit(&gq_sys.used_count, active, memory_order_release);
-
-    return 0;
 }
 
 static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
@@ -1070,14 +1072,14 @@ static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
         sched_remove(l, t);
         sched_add(&r->run_queue, t);
     }
-    atomic_exchange(&q->run_queue, l);
+    atomic_store_explicit(&q->run_queue, l, memory_order_release);
 }
 
 static void sched_enqueue_atomic(routine_t *t) {
     scheduler_t *list = (scheduler_t *)atomic_load_explicit(&gq_sys.run_queue, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
     sched_add(list, t);
-    atomic_exchange(&gq_sys.run_queue, list);
+    atomic_store_explicit(&gq_sys.run_queue, list, memory_order_release);
 }
 
 static void sched_adjust(atomic_deque_t *q, routine_t *t) {
@@ -1390,12 +1392,27 @@ void sched_cleanup(void) {
     }
 #endif
     CO_FREE((void *)atomic_load(&gq_sys.run_queue));
-    if (gq_sys.available)
-        CO_FREE(gq_sys.available);
+    if (sched_is_multi())
+        CO_FREE((void *)atomic_load(&gq_sys.available));
 }
 
 CO_FORCE_INLINE void sched_take(int count) {
     sched_steal(&gq_sys, thread(), count);
+}
+
+static void thrd_take(atomic_deque_t *q) {
+    routine_t *t;
+    scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
+    size_t i, available = atomic_load(&gq_sys.available[thread()->thrd_id]);
+    atomic_thread_fence(memory_order_seq_cst);
+    for (i = 0; i < available; i++) {
+        t = l->head;
+        sched_remove(l, t);
+        sched_add(&thread()->run_queue, t);
+    }
+    thread()->used_count += available;
+    atomic_store_explicit(&q->run_queue, l, memory_order_release);
+    atomic_store(&gq_sys.available[thread()->thrd_id], 0);
 }
 
 static int thrd_scheduler(void) {
@@ -1532,8 +1549,12 @@ int main(int argc, char **argv) {
             }
         }
 
-        if (sched_is_multi)
-            gq_sys.available = try_calloc(gq_sys.cpu_count, sizeof(size_t));
+        if (sched_is_multi) {
+            atomic_init(&gq_sys.available, try_calloc(gq_sys.cpu_count, sizeof(size_t)));
+            for (i = 0; i < gq_sys.cpu_count; i++) {
+                atomic_init(&gq_sys.available[i], 0);
+            }
+        }
     }
 
     ex_signal_setup();

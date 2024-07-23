@@ -435,7 +435,9 @@ typedef struct {
     it determents the number of threads to use. */
     size_t cpu_count;
     thrd_pool_t *threads;
-    size_t **available;
+    cacheline_pad_t pad;
+
+    atomic_size_t **available;
     cacheline_pad_t _pad;
 
     atomic_flag is_multi;
