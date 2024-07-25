@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "list.h"
 
@@ -173,10 +174,19 @@ static void timer_init(void) {
 }
 
 static void timer_create(unsigned int usecs) {
-    alarm(usecs);
+    struct itimerval timer;
+    //alarm(usecs);
+    /* Configure the timer to expire after 250 msec... */
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = usecs * 1000;
+    /* ... and every 250 msec after that. */
+    //timer.it_interval.tv_sec = 0;
+    //timer.it_interval.tv_usec = usecs * 1000;
+    setitimer(ITIMER_REAL, &timer, NULL);
 }
 static void timer_cancel(void) {
-    alarm(0);
+    //alarm(0);
+    setitimer(ITIMER_REAL, NULL, NULL);
 }
 
 static void timer_wait(void) {
@@ -249,7 +259,7 @@ int main() {
     task_add(sort, "1"), task_add(sort, "2"), task_add(sort, "3"), task_add(sort, "4"), task_add(sort, "5");
 
     preempt_disable();
-    timer_create(1); /* 10 ms */
+    timer_create(10); /* 10 ms */
 
     while (!list_empty(&task_main.list) || !list_empty(&task_reap)) {
         preempt_enable();
