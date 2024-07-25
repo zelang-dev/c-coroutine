@@ -22,25 +22,21 @@
 #include "list.h"
 
 static int preempt_count = 0;
-static void preempt_disable(void)
-{
+static void preempt_disable(void) {
     preempt_count++;
 }
-static void preempt_enable(void)
-{
+static void preempt_enable(void) {
     preempt_count--;
 }
 
-static void local_irq_save(sigset_t *sig_set)
-{
+static void local_irq_save(sigset_t *sig_set) {
     sigset_t block_set;
     sigfillset(&block_set);
     sigdelset(&block_set, SIGINT);
     sigprocmask(SIG_BLOCK, &block_set, sig_set);
 }
 
-static void local_irq_restore(sigset_t *sig_set)
-{
+static void local_irq_restore(sigset_t *sig_set) {
     sigprocmask(SIG_SETMASK, sig_set, NULL);
 }
 
@@ -53,61 +49,56 @@ static void local_irq_restore(sigset_t *sig_set)
 
 typedef void(task_callback_t)(void *arg);
 
-struct task_struct {
-    struct list_head list;
+typedef struct task_struct {
+    list_head_t list;
     ucontext_t context;
     void *stack;
     task_callback_t *callback;
     void *arg;
     bool reap_self;
-};
+} task_struct_t;
 
-static struct task_struct *task_current, task_main;
+static task_struct_t *task_current, task_main;
 static LIST_HEAD(task_reap);
 
-static void task_init(void)
-{
+static void task_init(void) {
     INIT_LIST_HEAD(&task_main.list);
     task_current = &task_main;
 }
 
-static struct task_struct *task_alloc(task_callback_t *func, void *arg)
-{
-    struct task_struct *task = calloc(1, sizeof(*task));
+static task_struct_t *task_alloc(task_callback_t *func, void *arg) {
+    task_struct_t *task = calloc(1, sizeof(*task));
     task->stack = calloc(1, 1 << 20);
     task->callback = func;
     task->arg = arg;
     return task;
 }
 
-static void task_destroy(struct task_struct *task)
-{
+static void task_destroy(task_struct_t *task) {
     list_del(&task->list);
     free(task->stack);
     free(task);
 }
 
-static void task_switch_to(struct task_struct *from, struct task_struct *to)
-{
+static void task_switch_to(task_struct_t *from, task_struct_t *to) {
     task_current = to;
     swapcontext(&from->context, &to->context);
 }
 
-static void schedule(void)
-{
+static void schedule(void) {
     sigset_t set;
     local_irq_save(&set);
 
-    struct task_struct *next_task =
-        list_first_entry(&task_current->list, struct task_struct, list);
+    task_struct_t *next_task =
+        list_first_entry(&task_current->list, task_struct_t, list);
     if (next_task) {
         if (task_current->reap_self)
             list_move(&task_current->list, &task_reap);
         task_switch_to(task_current, next_task);
     }
 
-    struct task_struct *task, *tmp;
-    list_for_each_entry_safe (task, tmp, &task_reap, list) /* clean reaps */
+    task_struct_t *task, *tmp;
+    list_for_each_entry_safe(task_struct_t, task, tmp, &task_reap, list) /* clean reaps */
         task_destroy(task);
 
     local_irq_restore(&set);
@@ -118,16 +109,14 @@ union task_ptr {
     int i[2];
 };
 
-static void local_irq_restore_trampoline(struct task_struct *task)
-{
+static void local_irq_restore_trampoline(task_struct_t *task) {
     sigdelset(&task->context.uc_sigmask, SIGALRM);
     local_irq_restore(&task->context.uc_sigmask);
 }
 
-__attribute__((noreturn)) static void task_trampoline(int i0, int i1)
-{
+__attribute__((noreturn)) static void task_trampoline(int i0, int i1) {
     union task_ptr ptr = {.i = {i0, i1}};
-    struct task_struct *task = ptr.p;
+    task_struct_t *task = ptr.p;
 
     /* We switch to trampoline with blocked timer.  That is safe.
      * So the first thing that we have to do is to unblock timer signal.
@@ -137,13 +126,11 @@ __attribute__((noreturn)) static void task_trampoline(int i0, int i1)
     task->callback(task->arg);
     task->reap_self = true;
     schedule();
-
     __builtin_unreachable(); /* shall not reach here */
 }
 
-static void task_add(task_callback_t *func, void *param)
-{
-    struct task_struct *task = task_alloc(func, param);
+static void task_add(task_callback_t *func, void *param) {
+    task_struct_t *task = task_alloc(func, param);
     if (getcontext(&task->context) == -1)
         abort();
 
@@ -166,8 +153,7 @@ static void task_add(task_callback_t *func, void *param)
     preempt_enable();
 }
 
-static void timer_handler(int signo, siginfo_t *info, ucontext_t *ctx)
-{
+static void timer_handler(int signo, siginfo_t *info, ucontext_t *ctx) {
     if (preempt_count) /* once preemption is disabled */
         return;
 
@@ -177,8 +163,7 @@ static void timer_handler(int signo, siginfo_t *info, ucontext_t *ctx)
     schedule();
 }
 
-static void timer_init(void)
-{
+static void timer_init(void) {
     struct sigaction sa = {
         .sa_handler = (void (*)(int)) timer_handler,
         .sa_flags = SA_SIGINFO,
@@ -187,26 +172,22 @@ static void timer_init(void)
     sigaction(SIGALRM, &sa, NULL);
 }
 
-static void timer_create(unsigned int usecs)
-{
-    ualarm(usecs, usecs);
+static void timer_create(unsigned int usecs) {
+    alarm(usecs);
 }
-static void timer_cancel(void)
-{
-    ualarm(0, 0);
+static void timer_cancel(void) {
+    alarm(0);
 }
 
-static void timer_wait(void)
-{
+static void timer_wait(void) {
     sigset_t mask;
     sigprocmask(0, NULL, &mask);
     sigdelset(&mask, SIGALRM);
     sigsuspend(&mask);
 }
 
-static int cmp_u32(const void *a, const void *b, void *arg)
-{
-    uint32_t x = *(uint32_t *) a, y = *(uint32_t *) b;
+static int cmp_u32(const void *a, const void *b, void *arg) {
+    uint32_t x = *(uint32_t *)a, y = *(uint32_t *)b;
     uint32_t diff = x ^ y;
     if (!diff)
         return 0; /* *a == *b */
@@ -219,8 +200,7 @@ static int cmp_u32(const void *a, const void *b, void *arg)
     return (x & diff) ? 1 : -1;
 }
 
-static inline uint32_t random_shuffle(uint32_t x)
-{
+static inline uint32_t random_shuffle(uint32_t x) {
     /* by Chris Wellons, see: <https://nullprogram.com/blog/2018/07/31/> */
     x ^= x >> 16;
     x *= 0x7feb352dUL;
@@ -231,8 +211,7 @@ static inline uint32_t random_shuffle(uint32_t x)
 }
 
 #define ARR_SIZE 1000000
-static void sort(void *arg)
-{
+static void sort(void *arg) {
     char *name = arg;
 
     preempt_disable();
@@ -263,15 +242,14 @@ static void sort(void *arg)
     preempt_enable();
 }
 
-int main()
-{
+int main() {
     timer_init();
     task_init();
 
-    task_add(sort, "1"), task_add(sort, "2"), task_add(sort, "3");
+    task_add(sort, "1"), task_add(sort, "2"), task_add(sort, "3"), task_add(sort, "4"), task_add(sort, "5");
 
     preempt_disable();
-    timer_create(10000); /* 10 ms */
+    timer_create(1); /* 10 ms */
 
     while (!list_empty(&task_main.list) || !list_empty(&task_reap)) {
         preempt_enable();

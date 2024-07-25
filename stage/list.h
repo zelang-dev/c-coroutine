@@ -1,41 +1,13 @@
-/* Linux-like double-linked list implementation */
+/* Double-linked list implementation */
 
-#ifndef SYSPROG21_LIST_H
-#define SYSPROG21_LIST_H
+#ifndef DOUBLE_LIST_H
+#define DOUBLE_LIST_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <stddef.h>
-
-/* "typeof" is a GNU extension.
- * Reference: https://gcc.gnu.org/onlinedocs/gcc/Typeof.html
- */
-#if defined(__GNUC__)
-#define __LIST_HAVE_TYPEOF 1
-#endif
-
-/**
- * container_of() - Calculate address of object that contains address ptr
- * @ptr: pointer to member variable
- * @type: type of the structure containing ptr
- * @member: name of the member variable in struct @type
- *
- * Return: @type pointer of object containing ptr
- */
-#ifndef container_of
-#ifdef __LIST_HAVE_TYPEOF
-#define container_of(ptr, type, member)                            \
-    __extension__({                                                \
-        const __typeof__(((type *) 0)->member) *__pmember = (ptr); \
-        (type *) ((char *) __pmember - offsetof(type, member));    \
-    })
-#else
-#define container_of(ptr, type, member) \
-    ((type *) ((char *) (ptr) -offsetof(type, member)))
-#endif
-#endif
 
 /**
  * struct list_head - Head and node of a double-linked list
@@ -54,16 +26,18 @@ extern "C" {
  * actual data. Such an container object is called entry. The helper list_entry
  * can be used to calculate the object address from the address of the node.
  */
+typedef struct list_head list_head_t;
+
 struct list_head {
-    struct list_head *prev;
-    struct list_head *next;
+    list_head_t *prev;
+    list_head_t *next;
 };
 
 /**
  * LIST_HEAD - Declare list head and initialize it
  * @head: name of the new object
  */
-#define LIST_HEAD(head) struct list_head head = {&(head), &(head)}
+#define LIST_HEAD(head) list_head_t head = {&(head), &(head)}
 
 /**
  * INIT_LIST_HEAD() - Initialize empty list head
@@ -80,7 +54,7 @@ struct list_head {
  * list_del(_init) on an uninitialized node is undefined (unrelated memory is
  * modified, crashes, ...).
  */
-static inline void INIT_LIST_HEAD(struct list_head *head)
+static inline void INIT_LIST_HEAD(list_head_t *head)
 {
     head->next = head;
     head->prev = head;
@@ -91,9 +65,9 @@ static inline void INIT_LIST_HEAD(struct list_head *head)
  * @node: pointer to the new node
  * @head: pointer to the head of the list
  */
-static inline void list_add(struct list_head *node, struct list_head *head)
+static inline void list_add(list_head_t *node, list_head_t *head)
 {
-    struct list_head *next = head->next;
+    list_head_t *next = head->next;
 
     next->prev = node;
     node->next = next;
@@ -106,9 +80,9 @@ static inline void list_add(struct list_head *node, struct list_head *head)
  * @node: pointer to the new node
  * @head: pointer to the head of the list
  */
-static inline void list_add_tail(struct list_head *node, struct list_head *head)
+static inline void list_add_tail(list_head_t *node, list_head_t *head)
 {
-    struct list_head *prev = head->prev;
+    list_head_t *prev = head->prev;
 
     prev->next = node;
     node->next = head;
@@ -132,17 +106,17 @@ static inline void list_add_tail(struct list_head *node, struct list_head *head)
  * This only works on systems which prohibit access to the predefined memory
  * addresses.
  */
-static inline void list_del(struct list_head *node)
+static inline void list_del(list_head_t *node)
 {
-    struct list_head *next = node->next;
-    struct list_head *prev = node->prev;
+    list_head_t *next = node->next;
+    list_head_t *prev = node->prev;
 
     next->prev = prev;
     prev->next = next;
 
 #ifdef LIST_POISONING
-    node->prev = (struct list_head *) (0x00100100);
-    node->next = (struct list_head *) (0x00200200);
+    node->prev = (list_head_t *) (0x00100100);
+    node->next = (list_head_t *) (0x00200200);
 #endif
 }
 
@@ -153,7 +127,7 @@ static inline void list_del(struct list_head *node)
  * The removed node will not end up in an uninitialized state like when using
  * list_del. Instead the node is initialized again to the unlinked state.
  */
-static inline void list_del_init(struct list_head *node)
+static inline void list_del_init(list_head_t *node)
 {
     list_del(node);
     INIT_LIST_HEAD(node);
@@ -165,7 +139,7 @@ static inline void list_del_init(struct list_head *node)
  *
  * Return: 0 - list is not empty !0 - list is empty
  */
-static inline int list_empty(const struct list_head *head)
+static inline int list_empty(const list_head_t *head)
 {
     return (head->next == head);
 }
@@ -176,7 +150,7 @@ static inline int list_empty(const struct list_head *head)
  *
  * Return: 0 - list is not singular !0 -list has exactly one entry
  */
-static inline int list_is_singular(const struct list_head *head)
+static inline int list_is_singular(const list_head_t *head)
 {
     return (!list_empty(head) && head->prev == head->next);
 }
@@ -191,11 +165,11 @@ static inline int list_is_singular(const struct list_head *head)
  * modified and has to be initialized to be used as a valid list head/node
  * again.
  */
-static inline void list_splice(struct list_head *list, struct list_head *head)
+static inline void list_splice(list_head_t *list, list_head_t *head)
 {
-    struct list_head *head_first = head->next;
-    struct list_head *list_first = list->next;
-    struct list_head *list_last = list->prev;
+    list_head_t *head_first = head->next;
+    list_head_t *list_first = list->next;
+    list_head_t *list_last = list->prev;
 
     if (list_empty(list))
         return;
@@ -217,12 +191,12 @@ static inline void list_splice(struct list_head *list, struct list_head *head)
  * modified and has to be initialized to be used as a valid list head/node
  * again.
  */
-static inline void list_splice_tail(struct list_head *list,
-                                    struct list_head *head)
+static inline void list_splice_tail(list_head_t *list,
+                                    list_head_t *head)
 {
-    struct list_head *head_last = head->prev;
-    struct list_head *list_first = list->next;
-    struct list_head *list_last = list->prev;
+    list_head_t *head_last = head->prev;
+    list_head_t *list_first = list->next;
+    list_head_t *list_last = list->prev;
 
     if (list_empty(list))
         return;
@@ -246,8 +220,8 @@ static inline void list_splice_tail(struct list_head *list,
  * list_splice. Instead the @list is initialized again to the an empty
  * list/unlinked state.
  */
-static inline void list_splice_init(struct list_head *list,
-                                    struct list_head *head)
+static inline void list_splice_init(list_head_t *list,
+                                    list_head_t *head)
 {
     list_splice(list, head);
     INIT_LIST_HEAD(list);
@@ -265,8 +239,8 @@ static inline void list_splice_init(struct list_head *list,
  * list_splice. Instead the @list is initialized again to the an empty
  * list/unlinked state.
  */
-static inline void list_splice_tail_init(struct list_head *list,
-                                         struct list_head *head)
+static inline void list_splice_tail_init(list_head_t *list,
+                                         list_head_t *head)
 {
     list_splice_tail(list, head);
     INIT_LIST_HEAD(list);
@@ -284,11 +258,11 @@ static inline void list_splice_tail_init(struct list_head *list,
  * @head_to is replaced when @head_from is not empty. @node must be a real
  * list node from @head_from or the behavior is undefined.
  */
-static inline void list_cut_position(struct list_head *head_to,
-                                     struct list_head *head_from,
-                                     struct list_head *node)
+static inline void list_cut_position(list_head_t *head_to,
+                                     list_head_t *head_from,
+                                     list_head_t *node)
 {
-    struct list_head *head_from_first = head_from->next;
+    list_head_t *head_from_first = head_from->next;
 
     if (list_empty(head_from))
         return;
@@ -315,7 +289,7 @@ static inline void list_cut_position(struct list_head *head_to,
  * The @node is removed from its old position/node and add to the beginning of
  * @head
  */
-static inline void list_move(struct list_head *node, struct list_head *head)
+static inline void list_move(list_head_t *node, list_head_t *head)
 {
     list_del(node);
     list_add(node, head);
@@ -328,12 +302,20 @@ static inline void list_move(struct list_head *node, struct list_head *head)
  *
  * The @node is removed from its old position/node and add to the end of @head
  */
-static inline void list_move_tail(struct list_head *node,
-                                  struct list_head *head)
+static inline void list_move_tail(list_head_t *node,
+                                  list_head_t *head)
 {
     list_del(node);
     list_add_tail(node, head);
 }
+
+#if defined(__GNUC__)
+#   define __typeof(T,V)   __typeof__(V)
+#else
+#   define __typeof(T,V)   T
+#endif
+
+#define __container_of(ptr, type, member) ((type *) ((uint8_t *) (ptr) -offsetof(type, member)))
 
 /**
  * list_entry() - Calculate address of entry that contains list node
@@ -343,7 +325,7 @@ static inline void list_move_tail(struct list_head *node,
  *
  * Return: @type pointer of entry containing node
  */
-#define list_entry(node, type, member) container_of(node, type, member)
+#define list_entry(node, type, member) __container_of(node, type, member)
 
 /**
  * list_first_entry() - get first entry of the list
@@ -380,25 +362,6 @@ static inline void list_move_tail(struct list_head *node,
     for (node = (head)->next; node != (head); node = node->next)
 
 /**
- * list_for_each_entry - iterate over list entries
- * @entry: pointer used as iterator
- * @head: pointer to the head of the list
- * @member: name of the list_head member variable in struct type of @entry
- *
- * The nodes and the head of the list must must be kept unmodified while
- * iterating through it. Any modifications to the the list will cause undefined
- * behavior.
- *
- * FIXME: remove dependency of __typeof__ extension
- */
-#ifdef __LIST_HAVE_TYPEOF
-#define list_for_each_entry(entry, head, member)                       \
-    for (entry = list_entry((head)->next, __typeof__(*entry), member); \
-         &entry->member != (head);                                     \
-         entry = list_entry(entry->member.next, __typeof__(*entry), member))
-#endif
-
-/**
  * list_for_each_safe - iterate over list nodes and allow deletes
  * @node: list_head pointer used as iterator
  * @safe: list_head pointer used to store info for next entry in list
@@ -420,19 +383,15 @@ static inline void list_move_tail(struct list_head *node,
  *
  * The current node (iterator) is allowed to be removed from the list. Any
  * other modifications to the the list will cause undefined behavior.
- *
- * FIXME: remove dependency of __typeof__ extension
  */
-#define list_for_each_entry_safe(entry, safe, head, member)                \
-    for (entry = list_entry((head)->next, __typeof__(*entry), member),     \
-        safe = list_entry(entry->member.next, __typeof__(*entry), member); \
-         &entry->member != (head); entry = safe,                           \
-        safe = list_entry(safe->member.next, __typeof__(*entry), member))
-
-#undef __LIST_HAVE_TYPEOF
+#define list_for_each_entry_safe(type, entry, safe, head, member)               \
+    for (entry = list_entry((head)->next, __typeof(type, *entry), member),      \
+        safe = list_entry(entry->member.next, __typeof(type, *entry), member);  \
+         &entry->member != (head); entry = safe,                                \
+        safe = list_entry(safe->member.next, __typeof(type, *entry), member))
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* SYSPROG21_LIST_H */
+#endif /* DOUBLE_LIST_H */
