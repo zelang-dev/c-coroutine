@@ -92,8 +92,8 @@ void preempt_init(unsigned int usecs) {
     timer.it_value.tv_sec = 0;
     timer.it_value.tv_usec = usecs * 1000;
     /* ... and every `usecs` msec after that. */
-    //timer.it_interval.tv_sec = 0;
-    //timer.it_interval.tv_usec = usecs * 1000;
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = usecs * 1000;
     setitimer(ITIMER_REAL, &timer, NULL);
 }
 #endif
