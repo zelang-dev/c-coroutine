@@ -786,6 +786,10 @@ C_API void sched_take(int count);
 C_API void sched_take_available(void);
 C_API uv_args_t *sched_event_args(void);
 
+C_API void preempt_init(u32 usecs);
+C_API void preempt_disable(void);
+C_API void preempt_enable(void);
+
 /* Collect coroutines with references preventing immediate cleanup. */
 C_API void gc_coroutine(routine_t *);
 

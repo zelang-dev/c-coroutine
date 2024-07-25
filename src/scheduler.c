@@ -12,8 +12,6 @@ typedef struct {
     /* Variable holding the previous running coroutine per thread. */
     routine_t *current_handle;
 
-    uv_loop_t interrupt_buffer[1];
-    uv_loop_t *interrupt_handle;
 } coroutine_task_t;
 thrd_static(coroutine_task_t, task, NULL)
 
@@ -51,6 +49,8 @@ typedef struct {
     /* coroutines's FIFO scheduler queue */
     scheduler_t run_queue;
 
+    uv_loop_t interrupt_buffer[1];
+    uv_loop_t *interrupt_handle;
     uv_args_t *uv_args;
 } thread_processor_t;
 thrd_static(thread_processor_t, thread, NULL)
@@ -251,8 +251,8 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align) {
 }
 
 uv_loop_t *co_loop(void) {
-    if (!is_empty(task()->interrupt_handle))
-        return task()->interrupt_handle;
+    if (!is_empty(thread()->interrupt_handle))
+        return thread()->interrupt_handle;
 
     return uv_default_loop();
 }
@@ -960,10 +960,12 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
         task()->main_handle = task()->active_handle;
 
 #ifdef UV_H
-    if (!task()->interrupt_handle) {
-        task()->interrupt_handle = task()->interrupt_buffer;
-        if (uv_loop_init(task()->interrupt_handle))
+    if (!thread()->interrupt_handle) {
+        thread()->interrupt_handle = thread()->interrupt_buffer;
+        if (uv_loop_init(thread()->interrupt_handle)) {
             fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+            thread()->interrupt_handle = NULL;
+        }
     }
 #endif
 
@@ -1386,9 +1388,9 @@ void sched_cleanup(void) {
         coroutines_all = NULL;
     }
 #ifdef UV_H
-    if (!is_empty(task()->interrupt_handle)) {
-        uv_loop_close(task()->interrupt_handle);
-        task()->interrupt_handle = NULL;
+    if (!is_empty(thread()->interrupt_handle)) {
+        uv_loop_close(thread()->interrupt_handle);
+        thread()->interrupt_handle = NULL;
     }
 #endif
     CO_FREE((void *)atomic_load(&gq_sys.run_queue));
