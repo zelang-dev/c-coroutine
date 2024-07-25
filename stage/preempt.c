@@ -1,37 +1,61 @@
-#ifdef _WIN32
-#include <windows.h>
-#include <process.h>
-#else
-#include <signal.h>
-#include <ucontext.h>
-#include <unistd.h>
-#include <sys/time.h>
-#endif
-
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-
-int hThreadHandle = 0;
-UINT TimerId;
+#include "exception.h"
 
 #ifdef _WIN32
-static VOID CALLBACK preempt_handler(HWND hWnd, UINT nMsg, UINT nIDEvent, DWORD dwTime) {
-    printf("TimerId this is a test\n");
-    fflush(stdout);
+#   include <process.h>
+static CRITICAL_SECTION signal_ctrl = {0};
+static inline void signal_block() {
+    EnterCriticalSection(&signal_ctrl);
+}
+
+static inline void signal_unblock() {
+    LeaveCriticalSection(&signal_ctrl);
 }
 #else
-static void preempt_handler(int signo, siginfo_t *info, ucontext_t *ctx) {
+#   include <ucontext.h>
+#   include <unistd.h>
+static sigset_t signal_ctrl;
+static inline void signal_block(void) {
+    sigset_t block_set;
+    sigfillset(&block_set);
+    sigdelset(&block_set, SIGINT);
+    sigprocmask(SIG_BLOCK, &block_set, &signal_ctrl);
+}
+
+static inline void signal_unblock(void) {
+    sigprocmask(SIG_SETMASK, &signal_ctrl, NULL);
+}
+#endif
+
+static volatile sig_atomic_t preempt_count = 0;
+static void schedule(void);
+
+static inline void preempt_disable(void) {
+    preempt_count++;
+}
+
+static inline void preempt_enable(void) {
+    preempt_count--;
+}
+
+#ifdef _WIN32
+static UINT TimerId;
+static uintptr_t hThreadId;
+
+static VOID CALLBACK preempt_handler(HWND hWnd, UINT nMsg, UINT nIDEvent, DWORD dwTime)
+#else
+static void preempt_handler(int signo, siginfo_t *info, ucontext_t *ctx)
+#endif
+{
     if (preempt_count) /* once preemption is disabled */
         return;
 
+    signal_block();
     /* We can schedule directly from sighandler because Linux kernel cares only
      * about proper sigreturn frame in the stack.
      */
     schedule();
+    signal_unblock();
 }
-#endif
 
 #ifdef _WIN32
 static int preempt_thread(void *args) {
@@ -40,23 +64,25 @@ static int preempt_thread(void *args) {
     MSG Msg;
 
     TimerId = SetTimer(NULL, 0, ms, (TIMERPROC)&preempt_handler);
-    printf("TimerId: %d\n", TimerId);
     if (!TimerId)
         return 16;
     while (GetMessage(&Msg, NULL, 0, 0))
         DispatchMessage(&Msg);
+
+    DeleteCriticalSection(&signal_ctrl);
 }
 
 void preempt_init(unsigned int usecs) {
     unsigned int *ms = malloc(sizeof(unsigned int));
     *ms = usecs;
-    _beginthread((_beginthread_proc_type)preempt_thread, 0, ms);
+    InitializeCriticalSection(&signal_ctrl);
+    hThreadId = _beginthread((_beginthread_proc_type)preempt_thread, 0, ms);
 }
 #else
 void preempt_init(unsigned int usecs) {
     struct itimerval timer;
     struct sigaction sa = {
-        .sa_handler = (void (*)(int)) timer_handler,
+        .sa_handler = (void (*)(int))preempt_handler,
         .sa_flags = SA_SIGINFO,
     };
     sigfillset(&sa.sa_mask);
@@ -72,9 +98,11 @@ void preempt_init(unsigned int usecs) {
 }
 #endif
 
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char *argv[]) {
     int Counter = 0;
-    preempt_init(1000);
+    preempt_disable();
+    preempt_init(10);
+    preempt_enable();
     usleep(5000);
     return 0;
 }
