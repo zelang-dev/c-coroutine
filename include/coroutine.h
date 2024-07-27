@@ -434,7 +434,12 @@ typedef struct {
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
+    size_t stealable_thread;
+    size_t stealable_amount;
     thrd_pool_t *threads;
+    cacheline_pad_t pad1_;
+
+    atomic_flag any_stealable;
     cacheline_pad_t pad0_;
 
     atomic_flag **idle;
@@ -449,12 +454,15 @@ typedef struct {
     atomic_flag is_started;
     cacheline_pad_t _pad1;
 
+    /* track each thread number of available coroutines */
     atomic_size_t **available;
     cacheline_pad_t _pad;
 
+    /* track the number of global coroutines used/available */
     atomic_size_t used_count;
     cacheline_pad_t _pad2;
 
+    /* coroutine unique id generator */
     atomic_size_t id_generate;
     cacheline_pad_t _pad3;
 
@@ -465,6 +473,7 @@ typedef struct {
     atomic_routine_t **all_coroutine;
     cacheline_pad_t _pad5;
 
+    /* Global coroutines's FIFO run queue */
     atomic_scheduler_t run_queue;
     cacheline_pad_t _pad6;
 
@@ -782,7 +791,8 @@ C_API void sched_enqueue(routine_t *);
 C_API void sched_info(void);
 C_API void sched_dec(void);
 C_API void sched_log_reset(void);
-C_API void sched_take(int count);
+C_API void sched_mark_taken(routine_t *);
+C_API void sched_take(int);
 C_API void sched_take_available(void);
 C_API uv_args_t *sched_event_args(void);
 

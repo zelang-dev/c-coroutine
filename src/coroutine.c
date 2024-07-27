@@ -199,7 +199,6 @@ wait_result_t *co_wait(wait_group_t *wg) {
     routine_t *co;
     bool has_erred = false;
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
-        sched_take((int)atomic_load(&gq_sys.used_count));
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, FUNC_VOID(hash_free), wgr);
@@ -211,7 +210,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
                     if (!is_empty(pair->value)) {
                         co = (routine_t *)pair->value;
                         if (!co_terminated(co)) {
-                            co->taken = true;
+                            sched_mark_taken(co);
                             if (!co->loop_active && co->status == CO_NORMAL)
                                 sched_enqueue(co);
 

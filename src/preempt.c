@@ -60,8 +60,7 @@ static int preempt_thread(void *args) {
     free(args);
     MSG Msg;
 
-    TimerId = SetTimer(NULL, 0, ms, (TIMERPROC)&preempt_handler);
-    if (TimerId)
+    if (TimerId = SetTimer(NULL, 0, ms, (TIMERPROC)&preempt_handler))
         while (GetMessage(&Msg, NULL, 0, 0))
             DispatchMessage(&Msg);
 

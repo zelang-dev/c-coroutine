@@ -2487,13 +2487,6 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_flag_clear_explicit(pSpinlock, c89atomic_memory_order_release);
 }
 
-
-#if defined(__GNUC__)
-#   define atomic_typeof(T,V)   __typeof__(V)
-#else
-#   define atomic_typeof(T,V)   T
-#endif
-
 #ifdef _WIN32
     typedef volatile c89atomic_flag atomic_flag;
     typedef volatile c89atomic_bool atomic_bool;
@@ -2736,7 +2729,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #endif
 
 #define __c89atomic_copy(_d, _s, _sz, _type)            \
-    {                                                  \
+    {                                                   \
         _type val = atomic_load((const _type *) (_s));  \
         _s += sizeof(_type);                            \
         atomic_store((_type *) (_d), val);              \
