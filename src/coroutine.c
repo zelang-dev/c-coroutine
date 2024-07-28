@@ -44,21 +44,21 @@ void delete(void_t ptr) {
                 memset(ptr, 0, sizeof(ptr));
                 CO_FREE(ptr);
             } else
-                CO_LOG("Pointer not freed, possible double free attempt!");
+                RAII_LOG("Pointer not freed, possible double free attempt!");
         }
     }
 }
 
 void co_delete(routine_t *co) {
     if (!co) {
-        CO_LOG("attempt to delete an invalid coroutine");
+        RAII_LOG("attempt to delete an invalid coroutine");
     } else if (!(co->status == CO_NORMAL
                  || co->status == CO_DEAD
                  || co->status == CO_ERRED
                  || co->status == CO_EVENT_DEAD)
                && !co->exiting
                ) {
-        CO_INFO("attempt to delete a coroutine named: %s,\nthat is not dead or suspended, status is: %d\n", co->name, co->status);
+        RAII_INFO("attempt to delete a coroutine named: %s,\nthat is not dead or suspended, status is: %d\n", co->name, co->status);
     } else {
 #ifdef USE_VALGRIND
         if (co->vg_stack_id != 0) {
@@ -81,7 +81,7 @@ void_t co_user_data(routine_t *co) {
     return !is_empty(co) ? co->user_data : NULL;
 }
 
-co_state co_status(routine_t *co) {
+co_states co_status(routine_t *co) {
     return !is_empty(co) ? co->status : CO_DEAD;
 }
 
@@ -89,7 +89,7 @@ values_t *co_var(var_t *data) {
     if (data)
         return ((values_t *)data->value);
 
-    CO_LOG("attempt to get value on null");
+    RAII_LOG("attempt to get value on null");
     return ((values_t *)0);
 }
 
@@ -97,7 +97,7 @@ value_t co_value(void_t data) {
     if (data)
         return ((values_t *)data)->value;
 
-    CO_LOG("attempt to get value on null");
+    RAII_LOG("attempt to get value on null");
     return ((values_t *)0)->value;
 }
 
@@ -156,7 +156,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     co_deferred(c, dtor, handle);
     int r = snprintf(c->name, sizeof(c->name), "handler #%s", key);
     if (r == 0)
-        CO_LOG("Invalid handler");
+        RAII_LOG("Invalid handler");
 
     co->event_group = NULL;
     hash_remove(eg, key);
@@ -177,7 +177,7 @@ void co_process(func_t fn, void_t args) {
 
     int r = snprintf(c->name, sizeof(c->name), "process #%s", key);
     if (r == 0)
-        CO_LOG("Invalid process");
+        RAII_LOG("Invalid process");
 
     co->event_group = NULL;
     hash_remove(eg, key);
@@ -290,13 +290,45 @@ struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
 }
 #endif
 
+static string_t co_state(int status) {
+    switch (status) {
+        case CO_DEAD:
+            return "Dead/Not initialized";
+        case CO_NORMAL:
+            return "Active/Not running";
+        case CO_RUNNING:
+            return "Active/Running";
+        case CO_SUSPENDED:
+            return "Suspended/Not started";
+        case CO_EVENT:
+            return "External/Event callback";
+        case CO_EVENT_DEAD:
+            return "External/Event deleted/uninitialized";
+        case CO_ERRED:
+            return "Erred/Exception generated";
+        default:
+            return "Unknown";
+            break;
+    }
+}
+
 CO_FORCE_INLINE void co_info(routine_t *t) {
 #ifdef USE_DEBUG
-    if (is_empty(t))
+    bool line_end = false;
+    if (is_empty(t)) {
+        line_end = true;
         t = co_active();
+    }
+
+    fprintf(stderr, "\t\t - Thrd #%lx, cid: %d (%s) %s cycles: %zu%s",
+            co_async_self(),
+            t->cid,
+            (!is_empty(t->name) && t->cid > 0 ? t->name : !t->channeled ? "" : "channel"),
+            co_state(t->status),
+            t->cycles,
+            (line_end ? "\n" : "\n\r\033[1A")
+    );
 #endif
-    CO_INFO("Thread #%lx, coroutine id: %d (%s) status: %d cycles: %zu\n", co_async_self(), t->cid,
-            ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status, t->cycles);
 }
 
 CO_FORCE_INLINE u32 co_id() {

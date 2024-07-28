@@ -251,13 +251,13 @@ static int channel_proc(channel_co_t *a) {
         a[ i ].x_msg = a;
     }
 
-    CO_LOG("processed ");
+    RAII_LOG("processed ");
 
     n_can = 0;
     for (i = 0; i < n; i++) {
         c = a[ i ].c;
 
-        CO_INFO(" %c:", "esrnb"[ a[ i ].op ]);
+        RAII_INFO(" %c:", "esrnb"[ a[ i ].op ]);
 #ifdef USE_DEBUG
         if (c->name)
             printf("%s", c->name);
@@ -265,7 +265,7 @@ static int channel_proc(channel_co_t *a) {
             printf("%p", c);
 #endif
         if (channel_co_can_exec(&a[ i ])) {
-            CO_LOG("*");
+            RAII_LOG("*");
             n_can++;
         }
     }
@@ -276,14 +276,14 @@ static int channel_proc(channel_co_t *a) {
             if (channel_co_can_exec(&a[ i ])) {
                 if (j-- == 0) {
                     c = a[ i ].c;
-                    CO_INFO(" => %c:", "esrnb"[ a[ i ].op ]);
+                    RAII_INFO(" => %c:", "esrnb"[ a[ i ].op ]);
 #ifdef USE_DEBUG
                     if (c->name)
                         printf("%s", c->name);
                     else
                         printf("%p", c);
 #endif
-                    CO_LOG(" ");
+                    RAII_LOG(" ");
 
                     channel_co_exec(&a[ i ]);
                     return i;
@@ -292,7 +292,7 @@ static int channel_proc(channel_co_t *a) {
         }
     }
 
-    CO_LOG(" ");
+    RAII_LOG(" ");
     if (!can_block)
         return -1;
 

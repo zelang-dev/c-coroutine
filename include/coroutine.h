@@ -31,9 +31,6 @@
     #endif
 #endif
 
-#define CO_LOG(s) RAII_LOG(s)
-#define CO_INFO(s, ...) RAII_INFO(s, __VA_ARGS__ )
-#define CO_HERE() RAII_HERE()
 #define CO_ASSERT RAII_ASSERT
 
 /* Stack size when creating a coroutine. */
@@ -237,7 +234,7 @@ typedef int (*thrd_func_t)(void *);
 typedef void (*any_func_t)(void_t, ...);
 
 /* Coroutine states. */
-typedef enum co_state {
+typedef enum {
     CO_EVENT_DEAD = -1, /* The coroutine has ended it's Event Loop routine, is uninitialized or deleted. */
     CO_DEAD, /* The coroutine is uninitialized or deleted. */
     CO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
@@ -245,7 +242,14 @@ typedef enum co_state {
     CO_SUSPENDED, /* The coroutine is suspended (in a startup, or it has not started running yet). */
     CO_EVENT, /* The coroutine is in an Event Loop callback. */
     CO_ERRED, /* The coroutine has erred. */
-} co_state;
+} co_states;
+
+typedef enum {
+    RUN_NORMAL,
+    RUN_MAIN,
+    RUN_SYSTEM,
+    RUN_EVENT,
+} run_states;
 
 #ifndef CACHELINE_SIZE
 #   define CACHELINE_SIZE 64
@@ -374,7 +378,7 @@ struct routine_s {
 #endif
     /* Coroutine stack size. */
     size_t stack_size;
-    co_state status;
+    co_states status;
     callable_t func;
     char name[ 64 ];
     char state[ 64 ];
@@ -664,7 +668,7 @@ C_API void co_yielding(routine_t *);
 C_API void co_resuming(routine_t *);
 
 /* Returns the status of the coroutine. */
-C_API co_state co_status(routine_t *);
+C_API co_states co_status(routine_t *);
 
 /* Get coroutine user data. */
 C_API void_t co_user_data(routine_t *);

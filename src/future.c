@@ -56,7 +56,7 @@ void async_start(future *f, promise *value, void_t arg) {
     f_arg->arg = arg;
     f_arg->value = value;
     int r = thrd_create(&f->thread, future_wrapper, f_arg);
-    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
+    RAII_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
 }
 
 future *co_async(callable_t func, void_t args) {
@@ -95,7 +95,7 @@ void future_start(future *f, void_t arg) {
     f_arg->func = f->func;
     f_arg->arg = arg;
     int r = thrd_create(&f->thread, future_func_wrapper, f_arg);
-    CO_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
+    RAII_INFO("thread #%lx created thread #%lx with status(%d) future id(%d) \n", co_async_self(), thread_id(f->thread), r, f->id);
 }
 
 void future_close(future *f) {
@@ -116,29 +116,29 @@ promise *promise_create(void) {
     p->id = rand();
     p->done = false;
     p->type = CO_PROMISE;
-    CO_INFO("promise id(%d) created in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("promise id(%d) created in thread #%lx\n", p->id, co_async_self());
 
     return p;
 }
 
 void promise_set(promise *p, int res) {
-    CO_INFO("promise id(%d) set LOCK in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("promise id(%d) set LOCK in thread #%lx\n", p->id, co_async_self());
     mtx_lock(&p->mutex);
     p->result->value.integer = res;
     p->done = true;
     cnd_signal(&p->cond);
-    CO_INFO("promise id(%d) set UNLOCK in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("promise id(%d) set UNLOCK in thread #%lx\n", p->id, co_async_self());
     mtx_unlock(&p->mutex);
 }
 
 value_t promise_get(promise *p) {
-    CO_INFO("\npromise id(%d) get LOCK in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("\npromise id(%d) get LOCK in thread #%lx\n", p->id, co_async_self());
     mtx_lock(&p->mutex);
     while (!p->done) {
-        CO_INFO("promise id(%d) get WAIT in thread #%lx\n", p->id, co_async_self());
+        RAII_INFO("promise id(%d) get WAIT in thread #%lx\n", p->id, co_async_self());
         cnd_wait(&p->cond, &p->mutex);
     }
-    CO_INFO("promise id(%d) get UNLOCK in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("promise id(%d) get UNLOCK in thread #%lx\n", p->id, co_async_self());
     mtx_unlock(&p->mutex);
     return p->result->value;
 }

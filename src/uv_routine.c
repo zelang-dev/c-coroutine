@@ -869,11 +869,11 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
 
             r = snprintf(crt, sizeof(crt), "%s.crt", name);
             if (r == 0)
-                CO_LOG("Invalid hostname");
+                RAII_LOG("Invalid hostname");
 
             r = snprintf(key, sizeof(key), "%s.key", name);
             if (r == 0)
-                CO_LOG("Invalid hostname");
+                RAII_LOG("Invalid hostname");
 
             evt_ctx_init_ex(&uv_args->ctx, crt, key);
             evt_ctx_set_nio(&uv_args->ctx, NULL, uv_tls_writer);
@@ -961,11 +961,11 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
 
                 r = snprintf(crt, sizeof(crt), "%s.crt", name);
                 if (r == 0)
-                    CO_LOG("Invalid hostname");
+                    RAII_LOG("Invalid hostname");
 
                 r = snprintf(key, sizeof(key), "%s.key", name);
                 if (r == 0)
-                    CO_LOG("Invalid hostname");
+                    RAII_LOG("Invalid hostname");
 
                 evt_ctx_init_ex(&uv_args->ctx, crt, key);
                 evt_ctx_set_nio(&uv_args->ctx, NULL, uv_tls_writer);
@@ -1138,7 +1138,7 @@ static void spawning(void_t uv_args) {
             }
         }
     } else {
-        CO_INFO("Process launch failed with: %s\n", uv_strerror(co->loop_code));
+        RAII_INFO("Process launch failed with: %s\n", uv_strerror(co->loop_code));
     }
 }
 

@@ -37,6 +37,7 @@ typedef struct {
 
     /* number of other coroutine that ran while the current coroutine was waiting.*/
     int num_others_ran;
+
     /* record which coroutine sleeping in scheduler */
     scheduler_t sleeping;
 
@@ -77,8 +78,9 @@ routine_t *co_derive(void_t, size_t);
 /* Create new coroutine. */
 routine_t *co_create(size_t, callable_t, void_t);
 
-/* Create a new coroutine running func(arg) with stack size. */
-int create_routine(callable_t, void_t, u32);
+/* Create a new coroutine running func(arg) with stack size
+and startup type: `RUN_NORMAL`, `RUN_MAIN`, `RUN_SYSTEM`, `RUN_EVENT`. */
+int create_routine(callable_t, void_t, u32, run_states);
 
 /* Sets the current coroutine's name.*/
 void coroutine_name(char *, ...);
@@ -1191,10 +1193,11 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
     atomic_store_explicit(&q->all_coroutine, coroutines_all, memory_order_release);
 }
 
-int create_routine(callable_t fn, void_t arg, u32 stack) {
+int create_routine(callable_t fn, void_t arg, u32 stack, run_states type) {
     int id;
     routine_t *t = co_create(stack, fn, arg);
     routine_t *c = co_active();
+    (void)type;
 
     atomic_fetch_add(&gq_sys.used_count, 1);
     sched_adjust(&gq_sys, t);
@@ -1221,7 +1224,7 @@ int create_routine(callable_t fn, void_t arg, u32 stack) {
 }
 
 CO_FORCE_INLINE int co_go(callable_t fn, void_t arg) {
-    return create_routine(fn, arg, CO_STACK_SIZE);
+    return create_routine(fn, arg, CO_STACK_SIZE, RUN_NORMAL);
 }
 
 void co_yield(void) {
@@ -1241,7 +1244,7 @@ void co_yield(void) {
 }
 
 CO_FORCE_INLINE void co_execute(func_t fn, void_t arg) {
-    create_routine((callable_t)fn, arg, CO_STACK_SIZE);
+    create_routine((callable_t)fn, arg, CO_STACK_SIZE, RUN_NORMAL);
     co_yield();
 }
 
@@ -1274,7 +1277,7 @@ static void_t coroutine_wait(void_t v) {
         while (sched_yielding() > 0)
             ;
         /* we're the only one runnable - check for i/o, the event loop */
-        coroutine_state("event loop");
+        coroutine_state("event_loop");
         if ((t = thread()->sleeping.head) == NULL) {
             ms = -1;
         } else {
@@ -1289,7 +1292,7 @@ static void_t coroutine_wait(void_t v) {
         }
 
         now = nsec();
-        co_info(nullptr);
+        co_info(co_active());
         while ((t = thread()->sleeping.head) && now >= t->alarm_time) {
             sched_remove(&thread()->sleeping, t);
             if (!t->system && --thread()->sleeping_counted == 0)
@@ -1306,7 +1309,7 @@ u32 co_sleep(u32 ms) {
 
     if (!thread()->started_wait) {
         thread()->started_wait = 1;
-        create_routine(coroutine_wait, 0, CO_STACK_SIZE);
+        create_routine(coroutine_wait, 0, CO_STACK_SIZE, RUN_SYSTEM);
     }
 
     now = nsec();
@@ -1495,15 +1498,14 @@ static int thrd_scheduler(void) {
             if (thread()->is_main && ((!sched_is_active() && sched_is_empty()) || l == EMPTY)) {
                 sched_cleanup();
                 if (thread()->used_count > 0) {
-                    CO_INFO("No runnable coroutines! %d stalled\n", thread()->used_count);
+                    RAII_INFO("\nNo runnable coroutines! %d stalled\n", thread()->used_count);
                     exit(1);
                 } else {
-                    CO_LOG("Coroutine scheduler exited");
+                    RAII_LOG("\nCoroutine scheduler exited");
                     exit(thread()->exiting);
                 }
             } else if (sched_is_active() && (!sched_is_empty() || sched_is_available()) && l != EMPTY) {
                 if (sched_is_available()) {
-                    CO_INFO("Thread #%lx <\n", co_async_self());
                     sched_take_available();
                 } else if (!sched_is_empty()) {
                     sched_steal(&gq_sys, thread(), 1);
@@ -1521,10 +1523,10 @@ static int thrd_scheduler(void) {
             } else {
                 if (thread()->is_main) {
                     if (thread()->used_count == 0 && sched_is_empty()) {
-                    trace;
                         l = EMPTY;
                         continue;
                     }
+
                     sched_steal(&gq_sys, thread(), 1);
                 } else {
                     while (atomic_flag_load(&gq_sys.is_started))
@@ -1603,11 +1605,11 @@ int main(int argc, char **argv) {
     exception_ctrl_c_func = (ex_terminate_func)sched_info;
     exception_terminate_func = (ex_terminate_func)sched_cleanup;
 #ifdef UV_H
-    CO_INFO("%s\n", sched_uname());
+    RAII_INFO("%s\n", sched_uname());
 #endif
     if (gq_sys.threads = thrd_pool(gq_sys.cpu_count, gq_sys.cpu_count)) {
         atomic_flag_test_and_set(&gq_sys.is_multi);
-        CO_INFO("\tThread pool started, with %zu threads, each has %d run queue.\n\n", gq_sys.cpu_count, 1);
+        RAII_INFO("\tThread pool started, with %zu threads, each has %d run queue.\n\n", gq_sys.cpu_count, 1);
         for (i = 0; i < gq_sys.cpu_count; i++) {
             int *n = try_malloc(sizeof(int));
             *n = i;
@@ -1634,7 +1636,7 @@ int main(int argc, char **argv) {
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    create_routine(coroutine_main, NULL, CO_MAIN_STACK);
+    create_routine(coroutine_main, NULL, CO_MAIN_STACK, RUN_MAIN);
     thrd_scheduler();
     unreachable;
 
