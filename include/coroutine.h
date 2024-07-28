@@ -760,6 +760,9 @@ C_API void co_process(func_t fn, void_t args);
 Other tasks continue to run during this time. */
 C_API u32 co_sleep(u32 ms);
 
+/* Print coroutine internal data state, only active in `debug` builds. */
+C_API void co_info(routine_t *t);
+
 /* Return the unique id for the current coroutine. */
 C_API u32 co_id(void);
 C_API signed int co_err_code(void);
@@ -791,7 +794,6 @@ C_API void sched_enqueue(routine_t *);
 C_API void sched_info(void);
 C_API void sched_dec(void);
 C_API void sched_log_reset(void);
-C_API void sched_mark_taken(routine_t *);
 C_API void sched_take(int);
 C_API void sched_take_available(void);
 C_API uv_args_t *sched_event_args(void);

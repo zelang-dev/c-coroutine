@@ -3,10 +3,15 @@
 void *worker(void *arg) {
     int wid = args_get(arg, 0).integer;
     int id = co_id();
+
     printf("Worker %d starting\n", wid);
+    co_info(nullptr);
 
     co_sleep(1000);
+
     printf("Worker %d done\n", wid);
+    co_info(nullptr);
+
     if (id == 4)
         return (values_t*)32;
     else if (id == 3)

@@ -210,7 +210,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
                     if (!is_empty(pair->value)) {
                         co = (routine_t *)pair->value;
                         if (!co_terminated(co)) {
-                            sched_mark_taken(co);
+                            //co->taken = true;
                             if (!co->loop_active && co->status == CO_NORMAL)
                                 sched_enqueue(co);
 
@@ -289,6 +289,15 @@ struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
     return buf;
 }
 #endif
+
+CO_FORCE_INLINE void co_info(routine_t *t) {
+#ifdef USE_DEBUG
+    if (is_empty(t))
+        t = co_active();
+#endif
+    CO_INFO("Thread #%lx, coroutine id: %d (%s) status: %d cycles: %zu\n", co_async_self(), t->cid,
+            ((!is_empty(t->name) && t->cid > 0) ? t->name : !t->channeled ? "" : "channel"), t->status, t->cycles);
+}
 
 CO_FORCE_INLINE u32 co_id() {
     return co_active()->cid;
