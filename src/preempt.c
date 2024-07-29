@@ -60,7 +60,8 @@ static int preempt_thread(void *args) {
     free(args);
     MSG Msg;
 
-    if (TimerId = SetTimer(NULL, 0, ms, (TIMERPROC)&preempt_handler))
+    if (SetUserObjectInformationW(GetCurrentProcess(), UOI_TIMERPROC_EXCEPTION_SUPPRESSION, FALSE, 0)
+        && (TimerId = SetTimer(NULL, 0, ms, (TIMERPROC)&preempt_handler)))
         while (GetMessage(&Msg, NULL, 0, 0))
             DispatchMessage(&Msg);
 
@@ -73,6 +74,10 @@ void preempt_init(u32 usecs) {
     *ms = usecs;
     InitializeCriticalSection(&signal_ctrl);
     hThreadId = _beginthread((_beginthread_proc_type)preempt_thread, 0, ms);
+}
+
+void preempt_stop(void) {
+    KillTimer(NULL, TimerId);
 }
 #else
 void preempt_init(u32 usecs) {
@@ -90,6 +95,15 @@ void preempt_init(u32 usecs) {
     /* ... and every `usecs` msec after that. */
     timer.it_interval.tv_sec = 0;
     timer.it_interval.tv_usec = usecs * 1000;
+    setitimer(ITIMER_REAL, &timer, NULL);
+}
+
+void preempt_stop(void) {
+    struct itimerval timer;
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = 0;
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = 0;
     setitimer(ITIMER_REAL, &timer, NULL);
 }
 #endif

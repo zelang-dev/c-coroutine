@@ -378,47 +378,48 @@ struct routine_s {
 #endif
     /* Coroutine stack size. */
     size_t stack_size;
-    co_states status;
-    callable_t func;
-    char name[ 64 ];
-    char state[ 64 ];
-    char scrape[ CO_SCRAPE_SIZE ];
+    size_t alarm_time;
     /* unique coroutine id */
     u32 cid;
-    size_t alarm_time;
     size_t cycles;
-    routine_t *next;
-    routine_t *prev;
-    bool channeled;
+    co_states status;
+    signed int loop_code;
+    int wait_counter;
+    int all_coroutine_slot;
+    run_states run_code;
     bool taken;
+    bool channeled;
     bool ready;
     bool system;
     bool exiting;
     bool halt;
     bool synced;
     bool wait_active;
-    int wait_counter;
-    hash_t *wait_group;
-    hash_t *event_group;
-    int all_coroutine_slot;
-    routine_t *context;
     bool loop_active;
     bool event_active;
     bool process_active;
     bool loop_erred;
     bool is_address;
     bool is_plain;
-    signed int loop_code;
-    void_t user_data;
 #if defined(USE_VALGRIND)
     u32 vg_stack_id;
 #endif
+    void_t user_data;
     void_t args;
     /* Coroutine result of function return/exit. */
     void_t results;
     /* Coroutine plain result of function return/exit. */
     size_t plain_results;
+    callable_t func;
     memory_t scope[1];
+    routine_t *next;
+    routine_t *prev;
+    hash_t *wait_group;
+    hash_t *event_group;
+    routine_t *context;
+    char name[ 64 ];
+    char state[ 64 ];
+    char scrape[ CO_SCRAPE_SIZE ];
     /* Used to check stack overflow. */
     size_t magic_number;
 };
@@ -438,18 +439,19 @@ typedef struct {
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
-    size_t stealable_thread;
-    size_t stealable_amount;
     thrd_pool_t *threads;
+    cacheline_pad_t pad2_;
+
+    atomic_size_t ***count;
     cacheline_pad_t pad1_;
 
-    atomic_flag any_stealable;
+    atomic_flag **any_stealable;
     cacheline_pad_t pad0_;
 
-    atomic_flag **idle;
+    atomic_size_t **stealable_thread;
     cacheline_pad_t pad_;
 
-    atomic_flag **spinning;
+    atomic_size_t **stealable_amount;
     cacheline_pad_t pad;
 
     atomic_flag is_multi;
@@ -794,6 +796,7 @@ C_API void sched_update(routine_t *);
 /* Add coroutine to current scheduler queue, appending.
 Todo: Refactor to global run queue then to thread run queue .*/
 C_API void sched_enqueue(routine_t *);
+C_API routine_t *sched_dequeue(scheduler_t *);
 
 C_API void sched_info(void);
 C_API void sched_dec(void);
@@ -805,6 +808,7 @@ C_API uv_args_t *sched_event_args(void);
 C_API void preempt_init(u32 usecs);
 C_API void preempt_disable(void);
 C_API void preempt_enable(void);
+C_API void preempt_stop(void) ;
 
 /* Collect coroutines with references preventing immediate cleanup. */
 C_API void gc_coroutine(routine_t *);
