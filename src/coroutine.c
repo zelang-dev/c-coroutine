@@ -108,7 +108,7 @@ value_t co_data(values_t *data) {
     return ((values_t *)0)->value;
 }
 
-CO_FORCE_INLINE void co_suspend() {
+CO_FORCE_INLINE void co_suspend(void) {
     co_yielding(co_current());
 }
 
@@ -210,10 +210,10 @@ wait_result_t *co_wait(wait_group_t *wg) {
                     if (!is_empty(pair->value)) {
                         co = (routine_t *)pair->value;
                         if (!co_terminated(co)) {
-                            //co->taken = true;
                             if (!co->loop_active && co->status == CO_NORMAL)
                                 sched_enqueue(co);
 
+                            co_info(c);
                             sched_yielding();
                         } else {
                             if ((!is_empty(co->results) && !co->loop_erred) || co->is_plain) {
@@ -290,7 +290,7 @@ struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
 }
 #endif
 
-static string_t co_state(int status) {
+string_t co_state(int status) {
     switch (status) {
         case CO_DEAD:
             return "Dead/Not initialized";

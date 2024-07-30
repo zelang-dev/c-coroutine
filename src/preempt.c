@@ -57,7 +57,6 @@ static void preempt_handler(int signo, siginfo_t *info)
 #ifdef _WIN32
 static int preempt_thread(void *args) {
     u32 ms = *(u32 *)args;
-    free(args);
     MSG Msg;
 
     if (SetUserObjectInformationW(GetCurrentProcess(), UOI_TIMERPROC_EXCEPTION_SUPPRESSION, FALSE, 0)
@@ -70,14 +69,13 @@ static int preempt_thread(void *args) {
 }
 
 void preempt_init(u32 usecs) {
-    u32 *ms = malloc(sizeof(u32));
-    *ms = usecs;
     InitializeCriticalSection(&signal_ctrl);
-    hThreadId = _beginthread((_beginthread_proc_type)preempt_thread, 0, ms);
+    hThreadId = _beginthread((_beginthread_proc_type)preempt_thread, 0, &usecs);
 }
 
 void preempt_stop(void) {
-    KillTimer(NULL, TimerId);
+    int exit = KillTimer(NULL, TimerId);
+    PostQuitMessage(exit ? 0 : GetLastError());
 }
 #else
 void preempt_init(u32 usecs) {

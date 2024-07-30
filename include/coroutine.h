@@ -436,9 +436,12 @@ make_atomic(scheduler_t, atomic_scheduler_t)
 
 /* Global atomic queue struct */
 typedef struct {
+    volatile bool is_multi;
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
+    size_t thread_count;
+    size_t thread_invalid;
     thrd_pool_t *threads;
     cacheline_pad_t pad2_;
 
@@ -453,9 +456,6 @@ typedef struct {
 
     atomic_size_t **stealable_amount;
     cacheline_pad_t pad;
-
-    atomic_flag is_multi;
-    cacheline_pad_t _pad0;
 
     atomic_flag is_started;
     cacheline_pad_t _pad1;
@@ -793,16 +793,12 @@ C_API void sched_exit(int);
 C_API void sched_cleanup(void);
 C_API void sched_update(routine_t *);
 
-/* Add coroutine to current scheduler queue, appending.
-Todo: Refactor to global run queue then to thread run queue .*/
+/* Add coroutine to current scheduler queue, appending. */
 C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
 C_API void sched_info(void);
 C_API void sched_dec(void);
-C_API void sched_log_reset(void);
-C_API void sched_take(int);
-C_API void sched_take_available(void);
 C_API uv_args_t *sched_event_args(void);
 
 C_API void preempt_init(u32 usecs);
@@ -906,6 +902,9 @@ C_API value_t co_group_get_result(wait_result_t *, int);
 
 C_API void co_result_set(routine_t *, void_t);
 C_API void co_plain_set(routine_t *, size_t);
+
+/* Returns coroutine status state string. */
+C_API string_t co_state(int);
 
 C_API void delete(void_t ptr);
 

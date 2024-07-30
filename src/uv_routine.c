@@ -119,7 +119,6 @@ static void error_catch(void_t uv) {
             co->halt = true;
             co->loop_erred = true;
             co->status = CO_ERRED;
-            sched_log_reset();
             coroutine_event_cleanup(co);
             memset(sched_event_args(), 0, sizeof(uv_args_t));
         }
@@ -183,7 +182,6 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    sched_log_reset();
     if (0 == status) {
         co->is_address = true;
         co_result_set(co, STREAM(ut->tcp_hdl));
@@ -653,9 +651,8 @@ static void_t uv_init(void_t uv_args) {
                            ip,
                            var_int(args[4]),
                            (uv->bind_type == UV_TLS ? " secure" : ""),
-                           http_std_date(0));
-
-                    sched_log_reset();
+                           http_std_date(0)
+                    );
                 }
                 break;
             case UV_PROCESS:

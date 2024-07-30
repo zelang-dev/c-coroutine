@@ -2572,10 +2572,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #endif
 
 /* reads an atomic_flag, `relaxed` */
-#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit(ptr, memory_order_relaxed)
+#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_relaxed)
 
 /* sets an atomic_flag to false */
-#define atomic_flag_clear	c89atomic_flag_clear
+#define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)
 /* sets an atomic_flag to false */
 #define atomic_flag_clear_explicit	c89atomic_flag_clear_explicit
 
@@ -2586,9 +2586,9 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #define atomic_signal_fence(order)	c89atomic_signal_fence(order)
 
 /* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((c89atomic_uint8 *)obj)
+#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((atomic_flag *)obj)
 /* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((c89atomic_uint8 *)obj, order)
+#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((atomic_flag *)obj, order)
 
 #if defined(__i386__) || defined(__ppc__) || defined(__arm__) || defined(_M_ARM) || defined(__i386) || defined(_M_IX86)
 /* sets an atomic_flag to true and returns the old value */
