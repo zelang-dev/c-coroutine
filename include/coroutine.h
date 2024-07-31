@@ -252,8 +252,17 @@ typedef enum {
 } run_states;
 
 #ifndef CACHELINE_SIZE
-#   define CACHELINE_SIZE 64
+/* The estimated size of the CPU's cache line when atomically updating memory.
+ Add this much padding or align to this boundary to avoid atomically-updated
+ memory from forcing cache invalidations on near, but non-atomic, memory.
+
+ https://en.wikipedia.org/wiki/False_sharing
+ https://github.com/golang/go/search?q=CacheLinePadSize
+ https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
+*/
+#   define CACHELINE_SIZE __ATOMIC_CACHE_LINE
 #endif
+
 typedef char cacheline_pad_t[CACHELINE_SIZE];
 typedef struct routine_s routine_t;
 typedef struct oa_hash_s hash_t;

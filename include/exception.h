@@ -13,6 +13,8 @@
 #if !defined(_WIN32)
     #include <sys/time.h>
     #include <sys/resource.h> /* setrlimit() */
+    #include <sys/mman.h>
+    #include <fcntl.h>
 #endif
 
 /* exception config
@@ -23,6 +25,9 @@
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <windows.h>
+    #include "compat/mman.h"
+    #include "compat/unistd.h"
+    #include "compat/fcntl.h"
     #if !defined(__cplusplus)
         #define __STDC__ 1
     #endif

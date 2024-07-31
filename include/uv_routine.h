@@ -318,8 +318,6 @@ C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
 
 #ifdef _WIN32
 #include <sys/utime.h>
-/* mode_t isn't defined on Windows */
-typedef unsigned short mode_t;
 
 #define SLASH '\\'
 #define DIR_SEP	';'

@@ -2753,6 +2753,28 @@ static C89ATOMIC_INLINE void atomic_memcpy(char *dst, const char *src, size_t sz
         __c89atomic_copy(dst, src, sz, uint8_t);
 }
 
+#if defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64) || defined(__mips) || defined(__mips__) || defined(__mips64) || defined(__mips32) || defined(__MIPSEL__) || defined(__MIPSEB__) || defined(__sparc__) || defined(__sparc64__) || defined(__sparc_v9__) || defined(__sparcv9) || defined(__riscv) || defined(__ARM64__)
+#   define __ATOMIC_PAD_LINE 32
+#elif defined(__m68k__)
+#   define __ATOMIC_PAD_LINE 16
+#elif defined(__x86_64) || defined(__x86_64__) || defined(__amd64) || defined(__ppc__) || defined(__ppc) || defined(__powerpc__) || defined(_M_MPPC) || defined(_M_PPC) ||  defined(__aarch64__)  || defined(__ppc64__) || defined(__powerpc64__) || defined(__arc__)
+#   define __ATOMIC_PAD_LINE 128
+#elif defined(__s390__) || defined(__s390x__)
+#   define __ATOMIC_PAD_LINE 256
+#else
+#   define __ATOMIC_PAD_LINE 64
+#endif
+
+/* The estimated size of the CPU's cache line when atomically updating memory.
+ Add this much padding or align to this boundary to avoid atomically-updated
+ memory from forcing cache invalidations on near, but non-atomic, memory.
+
+ https://en.wikipedia.org/wiki/False_sharing
+ https://github.com/golang/go/search?q=CacheLinePadSize
+ https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
+*/
+#define __ATOMIC_CACHE_LINE __ATOMIC_PAD_LINE
+
 #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)))
     #pragma GCC diagnostic pop  /* long long warnings with Clang. */
 #endif

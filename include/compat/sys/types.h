@@ -33,7 +33,7 @@ typedef uint32_t        mode_t;
 typedef uint32_t        uid_t;
 
 #include <basetsd.h>
-typedef SSIZE_T ssize_t;
+//typedef SSIZE_T ssize_t;
 
 #ifndef SSIZE_MAX
 #ifdef _WIN64
