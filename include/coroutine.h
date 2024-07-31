@@ -437,6 +437,7 @@ make_atomic(scheduler_t, atomic_scheduler_t)
 /* Global atomic queue struct */
 typedef struct {
     volatile bool is_multi;
+    volatile bool is_takeable;
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
