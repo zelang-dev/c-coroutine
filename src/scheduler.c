@@ -1590,7 +1590,7 @@ static int thrd_scheduler(void) {
     }
 }
 
-static void_t coroutine_main(void_t v) {
+static void_t main_main(void_t v) {
     coroutine_name("co_main");
     thread()->exiting = co_main(main_argc, main_argv);
     return 0;
@@ -1667,7 +1667,7 @@ int main(int argc, char **argv) {
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    create_routine(coroutine_main, NULL, CO_MAIN_STACK, RUN_MAIN);
+    create_routine(main_main, NULL, CO_MAIN_STACK, RUN_MAIN);
     thrd_scheduler();
     unreachable;
 

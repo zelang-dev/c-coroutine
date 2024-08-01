@@ -25,7 +25,7 @@
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <windows.h>
-    #include "compat/mman.h"
+    #include "compat/sys/mman.h"
     #include "compat/unistd.h"
     #include "compat/fcntl.h"
     #if !defined(__cplusplus)

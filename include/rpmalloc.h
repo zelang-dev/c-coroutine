@@ -375,6 +375,7 @@ C_API void rpmalloc_shutdown(void);
 #endif /* thread_storage */
 
 //! Override standard library malloc/free etc macros
+#undef memalign
 #undef malloc
 #undef calloc
 #undef realloc
@@ -407,11 +408,13 @@ C_API void rpmalloc_shutdown(void);
   #endif
 #endif
 
+C_API void *RPMALLOC_CDECL rp_memalign(size_t alignment, size_t size);
 C_API void *RPMALLOC_CDECL rp_malloc(size_t size);
 C_API void *RPMALLOC_CDECL rp_calloc(size_t count, size_t size);
 C_API void *RPMALLOC_CDECL rp_realloc(void *ptr, size_t size);
 C_API void RPMALLOC_CDECL rp_free(void *ptr);
 
+#define memalign rp_memalign
 #define malloc rp_malloc
 #define calloc rp_calloc
 #define realloc rp_realloc
