@@ -1,10 +1,10 @@
 #include "coroutine.h"
 
 thrd_static(int, chan_id_gen, 0)
-thrd_static(gc_channel_t, chan_list, NULL)
+thrd_static(chan_collector_t, chan_list, NULL)
 static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
-void gc_channel(channel_t *ch) {
+void chan_collector(channel_t *ch) {
     if (is_chan_list_empty())
         chan_list_update(ht_channel_init());
 
@@ -12,12 +12,12 @@ void gc_channel(channel_t *ch) {
         hash_put(chan_list(), co_itoa(ch->id), ch);
 }
 
-void gc_channel_free(void) {
+void chan_collector_free(void) {
     if (!is_chan_list_empty())
         hash_free(chan_list());
 }
 
-CO_FORCE_INLINE gc_channel_t *gc_channel_list(void) {
+CO_FORCE_INLINE chan_collector_t *chan_collector_list(void) {
     return chan_list();
 }
 
@@ -34,7 +34,7 @@ channel_t *channel_create(int elem_size, int bufsize) {
     c->buf = (unsigned char *)(c + 1);
     c->type = CO_CHANNEL;
 
-    gc_channel(c);
+    chan_collector(c);
     return c;
 }
 
@@ -61,8 +61,8 @@ void channel_free(channel_t *c) {
         memset(c, 0, sizeof(value_types));
         CO_FREE(c);
 
-        if (gc_channel_list()->size > 0)
-            hash_remove(gc_channel_list(), co_itoa(id));
+        if (chan_collector_list()->size > 0)
+            hash_remove(chan_collector_list(), co_itoa(id));
     }
 }
 
@@ -245,7 +245,7 @@ static int channel_proc(channel_co_t *a) {
 
     t = co_coroutine();
     t->channeled = true;
-    t->taken = true;;
+    t->taken = true;
     for (i = 0; i < n; i++) {
         a[ i ].co = t;
         a[ i ].x_msg = a;

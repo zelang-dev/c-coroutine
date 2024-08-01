@@ -270,8 +270,8 @@ typedef struct json_value_t json_t;
 typedef hash_t ht_string_t;
 typedef hash_t wait_group_t;
 typedef hash_t wait_result_t;
-typedef hash_t gc_channel_t;
-typedef hash_t gc_coroutine_t;
+typedef hash_t chan_collector_t;
+typedef hash_t co_collector_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
     #define USE_NATIVE 1
@@ -817,15 +817,15 @@ C_API void preempt_enable(void);
 C_API void preempt_stop(void) ;
 
 /* Collect coroutines with references preventing immediate cleanup. */
-C_API void gc_coroutine(routine_t *);
+C_API void co_collector(routine_t *);
 
 /* Collect channels with references preventing immediate cleanup. */
-C_API void gc_channel(channel_t *);
+C_API void chan_collector(channel_t *);
 
-C_API gc_channel_t *gc_channel_list(void);
-C_API gc_coroutine_t *gc_coroutine_list(void);
-C_API void gc_coroutine_free(void);
-C_API void gc_channel_free(void);
+C_API chan_collector_t *chan_collector_list(void);
+C_API co_collector_t *co_collector_list(void);
+C_API void co_collector_free(void);
+C_API void chan_collector_free(void);
 
 C_API void channel_print(channel_t *);
 C_API channel_t *channel_create(int, int);
@@ -892,7 +892,7 @@ C_API wait_group_t *ht_group_init(void);
 /* Creates a new wait group results hash table. */
 C_API wait_result_t *ht_result_init(void);
 
-C_API gc_channel_t *ht_channel_init(void);
+C_API chan_collector_t *ht_channel_init(void);
 
 C_API ht_string_t *ht_string_init(void);
 

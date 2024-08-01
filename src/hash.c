@@ -444,8 +444,8 @@ CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
     return (wait_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
 }
 
-CO_FORCE_INLINE gc_channel_t *ht_channel_init(void) {
-    return (gc_channel_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
+CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {
+    return (chan_collector_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
 }
 
 CO_FORCE_INLINE void hash_free(hash_t *htable) {

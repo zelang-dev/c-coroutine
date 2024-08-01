@@ -1472,8 +1472,8 @@ void sched_cleanup(void) {
             CO_FREE(gq_sys.threads);
     }
 
-    gc_channel_free();
-    gc_coroutine_free();
+    chan_collector_free();
+    co_collector_free();
     size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
     routine_t **coroutines_all = (routine_t **)atomic_load(&gq_sys.all_coroutine);
 
@@ -1582,9 +1582,9 @@ static int thrd_scheduler(void) {
             if (!t->synced && !t->channeled && !t->loop_erred) {
                 co_delete(t);
             } else if (t->channeled) {
-                gc_coroutine(t);
+                co_collector(t);
             } else if (t->loop_erred && thread()->used_count == 0) {
-                coroutine_event_cleanup(t);
+                sched_event_cleanup(t);
             }
         }
     }

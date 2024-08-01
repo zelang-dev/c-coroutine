@@ -62,7 +62,7 @@ void tls_close_free(void_t handle) {
     uv_tls_close((uv_tls_t *)h, (uv_tls_close_cb)CO_FREE);
 }
 
-void coroutine_event_cleanup(void_t t) {
+void sched_event_cleanup(void_t t) {
     routine_t *co = (routine_t *)t;
     uv_loop_t *uvLoop = NULL;
     if (co->context->wait_group)
@@ -119,7 +119,7 @@ static void error_catch(void_t uv) {
             co->halt = true;
             co->loop_erred = true;
             co->status = CO_ERRED;
-            coroutine_event_cleanup(co);
+            sched_event_cleanup(co);
             memset(sched_event_args(), 0, sizeof(uv_args_t));
         }
     }

@@ -183,7 +183,7 @@ C_API uv_stream_t *ipc_err(spawn_t *err);
 
 C_API void coro_uv_close(uv_handle_t *);
 C_API void uv_close_free(void *handle);
-C_API void coroutine_event_cleanup(void *handle);
+C_API void sched_event_cleanup(void *handle);
 
 C_API char *fs_readfile(const char *path);
 C_API int fs_write_file(const char *path, const char *text);

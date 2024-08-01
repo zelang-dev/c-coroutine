@@ -1,8 +1,8 @@
 #include "coroutine.h"
 
-thrd_static(gc_coroutine_t, coroutine_list, NULL)
+thrd_static(co_collector_t, coroutine_list, NULL)
 
-void gc_coroutine(routine_t *co) {
+void co_collector(routine_t *co) {
     if (is_coroutine_list_empty())
         coroutine_list_update(ht_group_init());
 
@@ -10,12 +10,12 @@ void gc_coroutine(routine_t *co) {
         hash_put(coroutine_list(), co_itoa(co->cid), co);
 }
 
-void gc_coroutine_free() {
+void co_collector_free() {
     if (!is_coroutine_list_empty())
         hash_free(coroutine_list());
 }
 
-CO_FORCE_INLINE gc_coroutine_t *gc_coroutine_list() {
+CO_FORCE_INLINE co_collector_t *co_collector_list() {
     return coroutine_list();
 }
 
