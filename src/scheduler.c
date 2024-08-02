@@ -95,10 +95,12 @@ void coroutine_state(char *, ...);
 /* Returns the current coroutine's state name. */
 char *coroutine_get_state(void);
 
+/* Check `local` run queue `head` for not `NULL`. */
 CO_FORCE_INLINE bool sched_active(void) {
     return !is_empty(thread()->run_queue.head);
 }
 
+/* Check `global` run queue `head` for not `NULL`. */
 CO_FORCE_INLINE bool sched_is_active(void) {
     return !is_empty(((atomic_scheduler_t *)atomic_load(&gq_sys.run_queue))->head);
 }
@@ -107,30 +109,40 @@ CO_FORCE_INLINE bool sched_is_started(void) {
     return atomic_flag_load(&gq_sys.is_started);
 }
 
+/* Check `global` run queue count for zero. */
 CO_FORCE_INLINE bool sched_is_empty(void) {
     return atomic_load(&gq_sys.used_count) == 0;
 }
 
+/* Check `global` run queue count for tasks available over threshold for assigning. */
 CO_FORCE_INLINE bool sched_is_takeable(void) {
     return atomic_load(&gq_sys.used_count) >= gq_sys.thread_count && gq_sys.is_takeable;
 }
 
+/* Check for available/assigned tasks for `current` thread. */
 CO_FORCE_INLINE bool sched_is_available(void) {
     return gq_sys.is_multi && atomic_load(&gq_sys.available[thread()->thrd_id]) > 0;
 }
 
+/* Check for thread steal status marking,
+the thread to receive another thread's `run queue`. */
 CO_FORCE_INLINE bool sched_is_stealable(size_t id) {
     return gq_sys.is_multi
         && atomic_flag_load(&gq_sys.any_stealable[id])
         && atomic_load(&gq_sys.stealable_thread[id]) == thread()->thrd_id;
 }
 
+/* Check `current` thread steal status marking,
+the thread giving up tasks to another thread's `run queue`. */
 CO_FORCE_INLINE bool sched_is_stolen(void) {
     return gq_sys.is_multi
         && atomic_flag_load(&gq_sys.any_stealable[thread()->thrd_id])
         && atomic_load(&gq_sys.stealable_thread[thread()->thrd_id]) == gq_sys.thread_invalid;
 }
 
+/* Check all threads run queue count for tasks to steal,
+if so mark the other thread stealable and pause `current` thread,
+until other thread post available tasks to `global` run queue. */
 static bool sched_is_any_available(void) {
     if (!gq_sys.is_multi)
         return false;
@@ -163,6 +175,8 @@ static bool sched_is_any_available(void) {
     return false;
 }
 
+/* Transfer an thread's `marked` local run queue to `global` run queue,
+the amount/count was set by `sched_is_any_available`. */
 void sched_post_stolen(thread_processor_t *r) {
     if (!gq_sys.is_multi)
         return;
@@ -191,6 +205,8 @@ void sched_post_stolen(thread_processor_t *r) {
     atomic_flag_clear(&gq_sys.any_stealable[id]);
 }
 
+/* Calculate the amount each thread can take from `global` run queue,
+the amount/count is over threshold set by `sched_is_takeable`. */
 static void sched_post_available(void) {
     if (!gq_sys.is_multi)
         return;
@@ -1163,6 +1179,7 @@ CO_FORCE_INLINE routine_t *sched_dequeue(scheduler_t *l) {
     return t;
 }
 
+/* Transfer `count` tasks from `global` run queue to `local` run queue. */
 static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
     int i;
     routine_t *t;
@@ -1181,6 +1198,8 @@ static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
     atomic_store_explicit(&q->run_queue, l, memory_order_release);
 }
 
+/* Transfer tasks from `global` run queue to current thread's `local` run queue,
+the amount/count was set by `sched_is_takeable` and `sched_post_available`. */
 static void sched_steal_available(atomic_deque_t *q) {
     routine_t *t;
     size_t i, available = atomic_load_explicit(&q->available[thread()->thrd_id], memory_order_acquire);

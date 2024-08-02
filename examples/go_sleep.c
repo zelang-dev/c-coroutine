@@ -15,6 +15,6 @@ int co_main(int argc, char **argv) {
     co_go(greetings, "John");
     co_go(greetings, "Mary");
     co_sleep(1000);
-    puts("End of main Goroutine");
+    puts("\nEnd of main Goroutine");
     return 0;
 }
