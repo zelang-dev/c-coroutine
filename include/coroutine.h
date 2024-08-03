@@ -807,7 +807,6 @@ C_API void sched_update(routine_t *);
 C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
-C_API void sched_info(void);
 C_API void sched_dec(void);
 C_API uv_args_t *sched_event_args(void);
 

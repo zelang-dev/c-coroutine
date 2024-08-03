@@ -1448,27 +1448,6 @@ void sched_exit(int val) {
     co_scheduler();
 }
 
-void sched_info(void) {
-    int i;
-    routine_t *t;
-
-    size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
-    routine_t **coroutines_all = (routine_t **)atomic_load(&gq_sys.all_coroutine);
-    fprintf(stderr, "Coroutine list:\n");
-    for (i = 0; i < coroutines_num_all; i++) {
-        t = coroutines_all[i];
-        fprintf(stderr, "%6d%c %-20s %s cycles: %zu %s\n",
-                t->cid,
-                t->system ? 's' : ' ',
-                t->name,
-                t->state,
-                t->cycles,
-                co_state(t->status)
-        );
-    }
-    fprintf(stderr, "\n\n");
-}
-
 void sched_update(routine_t *t) {
     size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
     routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&gq_sys.all_coroutine, memory_order_acquire);
@@ -1645,7 +1624,6 @@ int main(int argc, char **argv) {
     atomic_flag_clear(&gq_sys.is_started);
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
-    exception_ctrl_c_func = (ex_terminate_func)sched_info;
     exception_terminate_func = (ex_terminate_func)sched_cleanup;
 #ifdef UV_H
     RAII_INFO("%s\n", sched_uname());
