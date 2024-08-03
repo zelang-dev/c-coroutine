@@ -58,10 +58,10 @@ enum oa_ret_ops {
 };
 
 static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, const_t key, enum oa_ret_ops op);
-static inline void oa_hash_grow(oa_hash *htable);
-static inline bool oa_hash_should_grow(oa_hash *htable);
-static inline bool oa_hash_is_tombstone(oa_hash *htable, size_t idx);
-static inline void oa_hash_put_tombstone(oa_hash *htable, size_t idx);
+static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable);
+static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable);
+static CO_FORCE_INLINE bool oa_hash_is_tombstone(oa_hash *htable, size_t idx);
+static CO_FORCE_INLINE void oa_hash_put_tombstone(oa_hash *htable, size_t idx);
 
 oa_hash *oa_hash_new(
     oa_key_ops key_ops,
@@ -85,7 +85,7 @@ oa_hash *oa_hash_new(
     return htable;
 }
 
-oa_hash *oa_hash_new_lp(oa_key_ops key_ops, oa_val_ops val_ops) {
+CO_FORCE_INLINE oa_hash *oa_hash_new_lp(oa_key_ops key_ops, oa_val_ops val_ops) {
     return oa_hash_new(key_ops, val_ops, oa_hash_lp_idx);
 }
 
@@ -110,7 +110,7 @@ void oa_hash_free(oa_hash *htable) {
     }
 }
 
-inline static void oa_hash_grow(oa_hash *htable) {
+static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     uint32_t old_capacity;
     oa_pair **old_buckets;
     oa_pair *crt_pair;
@@ -143,7 +143,7 @@ inline static void oa_hash_grow(oa_hash *htable) {
     CO_FREE(old_buckets);
 }
 
-inline static bool oa_hash_should_grow(oa_hash *htable) {
+static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable) {
     return (htable->size / htable->capacity) > HASH_LOAD_FACTOR;
 }
 
@@ -395,15 +395,15 @@ void_t oa_string_cp(const_t data, void_t arg) {
     return result;
 }
 
-bool oa_coroutine_eq(const_t data1, const_t data2, void_t arg) {
+CO_FORCE_INLINE bool oa_coroutine_eq(const_t data1, const_t data2, void_t arg) {
     return memcmp(data1, data2, sizeof(co_active())) == 0 ? true : false;
 }
 
-void_t oa_coroutine_cp(const_t data, void_t arg) {
+CO_FORCE_INLINE void_t oa_coroutine_cp(const_t data, void_t arg) {
     return (routine_t *)data;
 }
 
-void_t oa_channel_cp(const_t data, void_t arg) {
+CO_FORCE_INLINE void_t oa_channel_cp(const_t data, void_t arg) {
     return (channel_t *)data;
 }
 
@@ -414,15 +414,15 @@ void_t oa_value_cp(const_t data, void_t arg) {
     return result;
 }
 
-bool oa_value_eq(const_t data1, const_t data2, void_t arg) {
+CO_FORCE_INLINE bool oa_value_eq(const_t data1, const_t data2, void_t arg) {
     return memcmp(data1, data2, sizeof(data2)) == 0 ? true : false;
 }
 
-void oa_string_free(void_t data, void_t arg) {
+CO_FORCE_INLINE void oa_string_free(void_t data, void_t arg) {
     CO_FREE(data);
 }
 
-void oa_string_print(const_t data) {
+CO_FORCE_INLINE void oa_string_print(const_t data) {
     printf("%s", (string_t)data);
 }
 
