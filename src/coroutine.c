@@ -10,7 +10,7 @@ void co_collector(routine_t *co) {
         hash_put(coroutine_list(), co_itoa(co->cid), co);
 }
 
-void co_collector_free() {
+CO_FORCE_INLINE void co_collector_free() {
     if (!is_coroutine_list_empty())
         hash_free(coroutine_list());
 }
@@ -77,11 +77,11 @@ void co_delete(routine_t *co) {
     }
 }
 
-void_t co_user_data(routine_t *co) {
+CO_FORCE_INLINE void_t co_user_data(routine_t *co) {
     return !is_empty(co) ? co->user_data : NULL;
 }
 
-co_states co_status(routine_t *co) {
+CO_FORCE_INLINE co_states co_status(routine_t *co) {
     return !is_empty(co) ? co->status : CO_DEAD;
 }
 
@@ -112,7 +112,7 @@ CO_FORCE_INLINE void co_suspend(void) {
     co_yielding(co_current());
 }
 
-void co_yielding(routine_t *co) {
+CO_FORCE_INLINE void co_yielding(routine_t *co) {
     co_stack_check(0);
     co_switch(co);
 }
@@ -149,7 +149,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
     co->event_group = eg;
     co->event_active = true;
 
-    int cid = co_go((callable_t)fn, handle);
+    u32 cid = co_go((callable_t)fn, handle);
     string_t key = co_itoa(cid);
     routine_t *c = (routine_t *)hash_get(eg, key);
 
@@ -170,7 +170,7 @@ void co_process(func_t fn, void_t args) {
     co->event_group = eg;
     co->event_active = true;
 
-    int cid = co_go((callable_t)fn, args);
+    u32 cid = co_go((callable_t)fn, args);
     string_t key = co_itoa(cid);
     routine_t *c = (routine_t *)hash_get(eg, key);
     c->process_active = true;
