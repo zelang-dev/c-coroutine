@@ -1017,21 +1017,21 @@ routine_t *co_derive(void_t memory, size_t size) {
 }
 #endif
 
-routine_t *co_active(void) {
+CO_FORCE_INLINE routine_t *co_active(void) {
     if (!task()->active_handle)
         task()->active_handle = task()->active_buffer;
     return task()->active_handle;
 }
 
-memory_t *co_scope(void) {
+CO_FORCE_INLINE memory_t *co_scope(void) {
     return co_active()->scope;
 }
 
-routine_t *co_current(void) {
+CO_FORCE_INLINE routine_t *co_current(void) {
     return task()->current_handle;
 }
 
-routine_t *co_coroutine(void) {
+CO_FORCE_INLINE routine_t *co_coroutine(void) {
     return thread()->running;
 }
 

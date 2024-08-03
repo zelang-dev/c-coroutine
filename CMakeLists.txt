@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11...3.14)
 
 project(c-coroutine LANGUAGES C)
 
-set(C_STANDARD 89)
+set(CMAKE_C_STANDARD 90)
 
 include(CMakeDependentOption)
 include(GNUInstallDirs)

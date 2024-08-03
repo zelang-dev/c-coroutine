@@ -58,7 +58,7 @@ void co_delete(routine_t *co) {
                  || co->status == CO_EVENT_DEAD)
                && !co->exiting
                ) {
-        RAII_INFO("attempt to delete a coroutine named: %s,\nthat is not dead or suspended, status is: %d\n", co->name, co->status);
+        co_info(co);
     } else {
 #ifdef USE_VALGRIND
         if (co->vg_stack_id != 0) {

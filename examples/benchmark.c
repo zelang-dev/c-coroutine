@@ -52,6 +52,6 @@ int co_main(int argc, char **argv) {
     }
     co_wait(wg);
 
-    printf("All coroutines finished.\n");
+    printf("\nAll coroutines finished.\n");
     return 0;
 }
