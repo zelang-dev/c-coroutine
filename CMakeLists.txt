@@ -43,8 +43,6 @@ file(GLOB lib_files
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 )
 
-add_definitions(-DCO_SCRAPE_SIZE=64)
-add_definitions(-DHASH_INIT_CAPACITY=512)
 add_library(coroutine STATIC ${lib_files})
 set_property(TARGET coroutine PROPERTY POSITION_INDEPENDENT_CODE True)
 target_link_libraries(coroutine PUBLIC uv_a)

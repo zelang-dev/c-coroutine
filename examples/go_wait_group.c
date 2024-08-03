@@ -5,12 +5,12 @@ void *worker(void *arg) {
     int id = co_id();
 
     printf("Worker %d starting\n", wid);
-    co_info(nullptr);
+    co_info_active();
 
     co_sleep(1000);
 
     printf("Worker %d done\n", wid);
-    co_info(nullptr);
+    co_info_active();
 
     if (id == 4)
         return (values_t*)32;

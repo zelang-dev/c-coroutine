@@ -758,7 +758,7 @@ C_API value_t co_recv(channel_t *);
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
-C_API int co_go(callable_t, void_t);
+C_API u32 co_go(callable_t, void_t);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
 C_API void co_execute(func_t, void_t);
@@ -778,6 +778,9 @@ C_API u32 co_sleep(u32 ms);
 
 /* Print coroutine internal data state, only active in `debug` builds. */
 C_API void co_info(routine_t *t);
+
+/* Print `current` coroutine internal data state, only active in `debug` builds. */
+C_API void co_info_active(void);
 
 /* Return the unique id for the current coroutine. */
 C_API u32 co_id(void);
@@ -838,7 +841,7 @@ C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);
 #define HASH_LOAD_FACTOR (0.75)
 #define HASH_GROWTH_FACTOR (1<<2)
 #ifndef HASH_INIT_CAPACITY
-    #define HASH_INIT_CAPACITY (1<<9)
+    #define HASH_INIT_CAPACITY (1<<10)
 #endif
 
 typedef void_t(*hash_iter_func)(void_t instance, string_t key, const_t value);
@@ -907,7 +910,7 @@ Returns hast table of results, accessible by coroutine id. */
 C_API wait_result_t *co_wait(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
-C_API value_t co_group_get_result(wait_result_t *, int);
+C_API value_t co_group_get_result(wait_result_t *, u32);
 
 C_API void co_result_set(routine_t *, void_t);
 C_API void co_plain_set(routine_t *, size_t);

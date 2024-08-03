@@ -80,7 +80,7 @@ routine_t *co_create(size_t, callable_t, void_t);
 
 /* Create a new coroutine running func(arg) with stack size
 and startup type: `RUN_NORMAL`, `RUN_MAIN`, `RUN_SYSTEM`, `RUN_EVENT`. */
-int create_routine(callable_t, void_t, u32, run_states);
+u32 create_routine(callable_t, void_t, u32, run_states);
 
 /* Sets the current coroutine's name.*/
 void coroutine_name(char *, ...);
@@ -1244,8 +1244,8 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
     atomic_store_explicit(&q->all_coroutine, coroutines_all, memory_order_release);
 }
 
-int create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
-    int id;
+u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
+    u32 id;
     routine_t *t = co_create(stack, fn, arg);
     routine_t *c = co_active();
 
@@ -1273,7 +1273,7 @@ int create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
     return id;
 }
 
-CO_FORCE_INLINE int co_go(callable_t fn, void_t arg) {
+CO_FORCE_INLINE u32 co_go(callable_t fn, void_t arg) {
     return create_routine(fn, arg, CO_STACK_SIZE, RUN_NORMAL);
 }
 
@@ -1448,6 +1448,14 @@ void sched_exit(int val) {
     co_scheduler();
 }
 
+void sched_destroy(void) {
+    if (gq_sys.is_multi) {
+        atomic_flag_clear(&gq_sys.is_started);
+        if (gq_sys.threads && thrd_destroy(gq_sys.threads, 0))
+            CO_FREE(gq_sys.threads);
+    }
+}
+
 void sched_update(routine_t *t) {
     size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
     routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&gq_sys.all_coroutine, memory_order_acquire);
@@ -1464,12 +1472,7 @@ void sched_cleanup(void) {
         return;
 
     can_cleanup = false;
-    if (gq_sys.is_multi) {
-        atomic_flag_clear(&gq_sys.is_started);
-        if (gq_sys.threads && thrd_destroy(gq_sys.threads, 0))
-            CO_FREE(gq_sys.threads);
-    }
-
+    sched_destroy();
     chan_collector_free();
     co_collector_free();
     size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
@@ -1624,6 +1627,7 @@ int main(int argc, char **argv) {
     atomic_flag_clear(&gq_sys.is_started);
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
+    exception_ctrl_c_func = (ex_terminate_func)sched_destroy;
     exception_terminate_func = (ex_terminate_func)sched_cleanup;
 #ifdef UV_H
     RAII_INFO("%s\n", sched_uname());

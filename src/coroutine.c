@@ -128,7 +128,7 @@ CO_FORCE_INLINE bool co_terminated(routine_t *co) {
 
 value_t co_await(callable_t fn, void_t arg) {
     wait_group_t *wg = co_wait_group();
-    int cid = co_go(fn, arg);
+    u32 cid = co_go(fn, arg);
     wait_result_t *wgr = co_wait(wg);
     if (is_empty(wgr))
         return;
@@ -254,7 +254,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
     return has_erred ? NULL : wgr;
 }
 
-value_t co_group_get_result(wait_result_t *wgr, int cid) {
+value_t co_group_get_result(wait_result_t *wgr, u32 cid) {
     if (is_empty(wgr))
         return;
 
@@ -320,7 +320,7 @@ CO_FORCE_INLINE void co_info(routine_t *t) {
         t = co_active();
     }
 
-    fprintf(stderr, "\t\t - Thrd #%lx, cid: %d (%s) %s cycles: %zu%s",
+    fprintf(stderr, "\t\t - Thrd #%lx, cid: %lu (%s) %s cycles: %zu%s",
             co_async_self(),
             t->cid,
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->channeled ? "" : "channel"),
@@ -329,6 +329,10 @@ CO_FORCE_INLINE void co_info(routine_t *t) {
             (line_end ? "\n" : "\n\r\033[1A")
     );
 #endif
+}
+
+CO_FORCE_INLINE void co_info_active() {
+    co_info(nullptr);
 }
 
 CO_FORCE_INLINE u32 co_id() {
