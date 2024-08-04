@@ -86,6 +86,7 @@ void co_async_wait(future *f) {
     bool is_done = false;
     while (!is_done) {
         is_done = promise_done(f->value);
+        co_info(co_active());
         co_yield();
     }
 }
@@ -122,12 +123,12 @@ promise *promise_create(void) {
 }
 
 void promise_set(promise *p, int res) {
-    RAII_INFO("promise id(%d) set LOCK in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("promise id(%d) set LOCK in thread #%lx                                       \n", p->id, co_async_self());
     mtx_lock(&p->mutex);
     p->result->value.integer = res;
     p->done = true;
     cnd_signal(&p->cond);
-    RAII_INFO("promise id(%d) set UNLOCK in thread #%lx\n", p->id, co_async_self());
+    RAII_INFO("promise id(%d) set UNLOCK in thread #%lx                                     \n", p->id, co_async_self());
     mtx_unlock(&p->mutex);
 }
 
