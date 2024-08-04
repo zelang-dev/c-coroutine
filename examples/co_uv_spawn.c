@@ -1,7 +1,7 @@
 #include "../include/coroutine.h"
 
 void _on_process_exit(int64_t exit_status, int term_signal) {
-    fprintf(stderr, "Process exited with status %" PRId64 ", signal %d\n", exit_status, term_signal);
+    fprintf(stderr, "\nProcess exited with status %" PRId64 ", signal %d\n", exit_status, term_signal);
 }
 
 int co_main(int argc, char **argv) {
@@ -12,7 +12,7 @@ int co_main(int argc, char **argv) {
                                      stdio_fd(2, UV_INHERIT_FD)));
 
     if (!spawn_exit(child, _on_process_exit))
-        fprintf(stderr, "\t\t\tLaunched process with ID %d\n", spawn_pid(child));
+        fprintf(stderr, "\nLaunched process with ID %d\n", spawn_pid(child));
 
     return 0;
 }

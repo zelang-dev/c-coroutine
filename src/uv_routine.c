@@ -1124,6 +1124,7 @@ static void spawning(void_t uv_args) {
     if (!co->loop_code) {
         while (true) {
             if (!co_terminated(co)) {
+                co_info(co);
                 sched_yielding();
             } else {
                 if (!is_empty(co->user_data)) {
