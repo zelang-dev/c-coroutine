@@ -10,12 +10,12 @@ void co_collector(routine_t *co) {
         hash_put(coroutine_list(), co_itoa(co->cid), co);
 }
 
-CO_FORCE_INLINE void co_collector_free() {
+CO_FORCE_INLINE void co_collector_free(void) {
     if (!is_coroutine_list_empty())
         hash_free(coroutine_list());
 }
 
-CO_FORCE_INLINE co_collector_t *co_collector_list() {
+CO_FORCE_INLINE co_collector_t *co_collector_list(void) {
     return coroutine_list();
 }
 
@@ -331,19 +331,19 @@ CO_FORCE_INLINE void co_info(routine_t *t) {
 #endif
 }
 
-CO_FORCE_INLINE void co_info_active() {
+CO_FORCE_INLINE void co_info_active(void) {
     co_info(nullptr);
 }
 
-CO_FORCE_INLINE u32 co_id() {
+CO_FORCE_INLINE u32 co_id(void) {
     return co_active()->cid;
 }
 
-CO_FORCE_INLINE signed int co_err_code() {
+CO_FORCE_INLINE signed int co_err_code(void) {
     return co_active()->loop_code;
 }
 
-CO_FORCE_INLINE char *co_get_name() {
+CO_FORCE_INLINE char *co_get_name(void) {
     return co_active()->name;
 }
 
