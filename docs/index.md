@@ -298,62 +298,16 @@ int co_main(int argc, char **argv)
 <summary>DEBUG run output</summary>
 
 <pre>
-Thread #7f11090f11c0 running coroutine id: 1 () status: x cycles: x
 Start of main Goroutine
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 2 () status: x cycles: x
 0 ==> John
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 3 () status: x cycles: x
 0 ==> Mary
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 2 () status: x cycles: x
+1 ==> Mary       - Thrd #c080080, cid: 4 (coroutine_wait) Active/Running cycles: 18
 1 ==> John
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 3 () status: x cycles: x
-1 ==> Mary
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 2 () status: x cycles: x
-2 ==> John
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 3 () status: x cycles: x
+2 ==> John       - Thrd #c080080, cid: 4 (coroutine_wait) Active/Running cycles: 99
 2 ==> Mary
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 2 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 3 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f11090f11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-...
-...
-...
-...
-Thread #7f6ac8aa11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f6ac8aa11c0 running coroutine id: 4 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f6ac8aa11c0 running coroutine id: 1 (co_main) status: x cycles: x
+                 - Thrd #c080080, cid: 4 (coroutine_wait) Active/Running cycles: 8404
 End of main Goroutine
-Back at coroutine scheduling
+
 Coroutine scheduler exited
 </pre>
 </details>
@@ -427,19 +381,14 @@ int co_main(int argc, char **argv) {
 <summary>DEBUG run output</summary>
 
 <pre>
-Thread #7f87171711c0 running coroutine id: 1 () status: x cycles: x
 processed
- r:0x7fffb878dca0
-Back at coroutine scheduling
-Thread #7f87171711c0 running coroutine id: 2 () status: x cycles: x
+ r:000002592E480080
 processed
- s:0x7fffb878dca0*
- => s:0x7fffb878dca0
+ s:000002592E480080*
+ => s:000002592E480080
 No receiver! Send Operation Blocked
-Back at coroutine scheduling
-Thread #7f87171711c0 running coroutine id: 1 (co_main) status: x cycles: x
 Received. Send Operation Successful
-Back at coroutine scheduling
+
 Coroutine scheduler exited
 </pre>
 </details>
@@ -532,129 +481,6 @@ int co_main(int argc, char **argv) {
 </tr>
 </table>
 
-<details>
-<summary>DEBUG run output</summary>
-
-<pre>
-Thread #7f2dadbb11c0 running coroutine id: 1 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-0
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-1
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-1
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-2
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-3
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-5
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-8
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-13
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-21
-processed
- r:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- s:0x7fffc1f35ca0*
- => s:0x7fffc1f35ca0
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-34
-processed
- s:0x7fffc1f35f10
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 1 (co_main) status: x cycles: x
-processed
- r:0x7fffc1f35f10*
- => r:0x7fffc1f35f10
-quit
-Back at coroutine scheduling
-Thread #7f2dadbb11c0 running coroutine id: 2 () status: x cycles: x
-Back at coroutine scheduling
-Coroutine scheduler exited
-
-</pre>
-</details>
-
 Original **Go** example from <https://www.developer.com/languages/go-error-handling-with-panic-recovery-and-defer/>
 
 <table>
@@ -733,15 +559,10 @@ int co_main(int argc, char **argv) {
 <summary>DEBUG run output</summary>
 
 <pre>
-Thread #7fd29c4011c0 running coroutine id: 1 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7fd29c4011c0 running coroutine id: 2 () status: x cycles: x
-panic occurred: sig_ill
-Back at coroutine scheduling
-Thread #7fd29c4011c0 running coroutine id: 1 (co_main) status: x cycles: x
+panic occurred: divide_by_zero
 Although panicked. We recovered. We call mul() func
 mul func result: 50
-Back at coroutine scheduling
+
 Coroutine scheduler exited
 </pre>
 </details>
@@ -836,64 +657,31 @@ int co_main(int argc, char **argv)
 <summary>DEBUG run output</summary>
 
 <pre>
-Thread #7f48f6c211c0 running coroutine id: 1 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 2 () status: x cycles: x
+Worker 1 starting
+                 - Thrd #a38e0080, cid: 2 () Active/Running cycles: 1
 Worker 2 starting
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 3 () status: x cycles: x
+                 - Thrd #a38e0080, cid: 3 () Active/Running cycles: 1
 Worker 3 starting
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 4 () status: x cycles: x
+                 - Thrd #a38e0080, cid: 4 () Active/Running cycles: 1
 Worker 4 starting
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 5 () status: x cycles: x
+                 - Thrd #a38e0080, cid: 5 () Active/Running cycles: 1
 Worker 5 starting
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 6 () status: x cycles: x
-Worker 6 starting
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 7 () status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 6 () status: x cycles: x
-Worker 6 done
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 7 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 5 () status: x cycles: x
-Worker 5 done
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 7 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 4 () status: x cycles: x
-Worker 4 done
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 7 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 3 () status: x cycles: x
-Worker 3 done
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 7 (coroutine_wait) status: x cycles: x
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 2 () status: x cycles: x
-Worker 2 done
-Back at coroutine scheduling
-Thread #7f48f6c211c0 running coroutine id: 1 (co_main) status: x cycles: x
+                 - Thrd #a38e0080, cid: 6 () Active/Running cycles: 1
+Worker 5 done    - Thrd #a38e0080, cid: 1 (co_main) Active/Running cycles: 2
+                 - Thrd #a38e0080, cid: 6 () Active/Running cycles: 2
+Worker 2 done    - Thrd #a38e0080, cid: 1 (co_main) Active/Running cycles: 3
+                 - Thrd #a38e0080, cid: 3 () Active/Running cycles: 2
+Worker 3 done    - Thrd #a38e0080, cid: 1 (co_main) Active/Running cycles: 4
+                 - Thrd #a38e0080, cid: 4 () Active/Running cycles: 2
+Worker 1 done    - Thrd #a38e0080, cid: 1 (co_main) Active/Running cycles: 5
+                 - Thrd #a38e0080, cid: 2 () Active/Running cycles: 2
+Worker 4 done    - Thrd #a38e0080, cid: 1 (co_main) Active/Running cycles: 6
+                 - Thrd #a38e0080, cid: 5 () Active/Running cycles: 2
 
 Worker # 4 returned: 32
 
 Worker # 3 returned: hello world
-Back at coroutine scheduling
+
 Coroutine scheduler exited
 </pre>
 </details>
@@ -981,37 +769,17 @@ int co_main(int argc, char **argv) {
 <summary>DEBUG run output</summary>
 
 <pre>
-Thread #7fc61b3d11c0 running coroutine id: 1 () status: x cycles: x
-promise id(706099430) created in thread #7fc61b3d11c0
-thread #7fc61b3d11c0 created thread #7fc61b2b0700 with status(0) future id(706099430)
+promise id(16038) created in thread #18d80080
+thread #18d80080 created thread #18d80130 with status(0) future id(16038)
 checking...
-Back at coroutine scheduling
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-...
-...
-...
-...
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-promise id(706099430) set LOCK in thread #7fc61b2b0700
-promise id(706099430) set UNLOCK in thread #7fc61b2b0700
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
-Back at coroutine scheduling
-Thread #7fc61b3d11c0 running coroutine id: 1 (co_main) status: x cycles: x
+promise id(16038) set LOCK in thread #18d80130
+promise id(16038) set UNLOCK in thread #18d80130
+                 - Thrd #18d80080, cid: 1 (co_main) Active/Running cycles: 34289
+194232491
+promise id(16038) get LOCK in thread #18d80080
+promise id(16038) get UNLOCK in thread #18d80080
+is prime.
 
-194232491 promise id(706099430) get LOCK in thread #7fc61b3d11c0
-promise id(706099430) get UNLOCK in thread #7fc61b3d11c0
-is prime!
-Back at coroutine scheduling
 Coroutine scheduler exited
 </pre>
 </details>
