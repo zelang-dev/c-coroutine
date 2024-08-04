@@ -11,9 +11,9 @@ int co_main(int argc, char *argv[]) {
 #ifndef _WIN32
     uv_pipe_t *pipe = pipe_create(false);
     status = uv_pipe_open(pipe, STDOUT_FILENO);
-    printf("Created and opened pipe, status: %d\n", status);
+    printf("\nCreated and opened pipe, status: %d\n", status);
     status = stream_write(STREAM(pipe), "ABCDEF\n");
-    printf("Wrote to stream - pipe, status: %d\n", status);
+    printf("\nWrote to stream - pipe, status: %d\n", status);
 #endif
 
     uv_file fdd[2];
@@ -25,7 +25,7 @@ int co_main(int argc, char *argv[]) {
     printf("Opened uv_pipe pair 1 - 1 for writing, status: %d\n", uv_pipe_open(read1, fdd[1]));
     printf("Opened uv_pipe pair 2 - 0 for reading, status: %d\n", uv_pipe_open(read2, fdd[0]));
 
-    printf("Wrote to pair pipe stream, status: %d\n", stream_write(STREAM(read1), "ABC"));
-    printf("Read from stream - pipe: %s\n", stream_read(STREAM(read2)));
+    printf("\nWrote to pair pipe stream, status: %d\n", stream_write(STREAM(read1), "ABC"));
+    printf("\nRead from stream - pipe: %s\n", stream_read(STREAM(read2)));
     return 0;
 }
