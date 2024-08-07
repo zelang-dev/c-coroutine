@@ -145,7 +145,7 @@ static void connect_cb(uv_connect_t *client, int status) {
     co_scheduler();
 }
 
-void on_connect_handshake(uv_tls_t *tls, int status) {
+CO_FORCE_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
     CO_ASSERT(tls->tcp_hdl->data == tls);
     connect_cb((uv_connect_t *)tls->data, status);
 }
@@ -690,7 +690,7 @@ static void_t uv_init(void_t uv_args) {
     return 0;
 }
 
-uv_file fs_open(string_t path, int flags, int mode) {
+CO_FORCE_INLINE uv_file fs_open(string_t path, int flags, int mode) {
     uv_args_t *uv_args = uv_arguments(3, true);
     uv_args->args[0].value.char_ptr = (string)path;
     uv_args->args[1].value.integer = flags;
@@ -699,21 +699,21 @@ uv_file fs_open(string_t path, int flags, int mode) {
     return (uv_file)fs_start(uv_args, UV_FS_OPEN, 3, true).integer;
 }
 
-int fs_unlink(string_t path) {
+CO_FORCE_INLINE int fs_unlink(string_t path) {
     uv_args_t *uv_args = uv_arguments(1, true);
     uv_args->args[0].value.char_ptr = (string)path;
 
     return (uv_file)fs_start(uv_args, UV_FS_UNLINK, 1, true).integer;
 }
 
-uv_stat_t *fs_fstat(uv_file fd) {
+CO_FORCE_INLINE uv_stat_t *fs_fstat(uv_file fd) {
     uv_args_t *uv_args = uv_arguments(1, true);
     uv_args->args[0].value.integer = fd;
 
     return (uv_stat_t *)fs_start(uv_args, UV_FS_FSTAT, 1, false).object;
 }
 
-int fs_fsync(uv_file fd) {
+CO_FORCE_INLINE int fs_fsync(uv_file fd) {
     uv_args_t *uv_args = uv_arguments(1, true);
     uv_args->args[0].value.integer = fd;
 
@@ -778,7 +778,7 @@ int fs_write_file(string_t path, string_t text) {
     return co_err_code();
 }
 
-void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
+CO_FORCE_INLINE void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
     if (is_tls((uv_handle_t *)client))
         co_handler(FUNC_VOID(connected), client, tls_close_free);
     else
@@ -1139,7 +1139,7 @@ static void spawning(void_t uv_args) {
     }
 }
 
-uv_stdio_container_t *stdio_fd(int fd, int flags) {
+CO_FORCE_INLINE uv_stdio_container_t *stdio_fd(int fd, int flags) {
     uv_stdio_container_t *stdio = try_calloc(1, sizeof(uv_stdio_container_t));
     stdio->flags = flags;
     stdio->data.fd = fd;
@@ -1147,7 +1147,7 @@ uv_stdio_container_t *stdio_fd(int fd, int flags) {
     return stdio;
 }
 
-uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
+CO_FORCE_INLINE uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
     uv_stdio_container_t *stdio = try_calloc(1, sizeof(uv_stdio_container_t));
     stdio->flags = flags;
     stdio->data.stream = (uv_stream_t *)handle;
@@ -1239,7 +1239,7 @@ int spawn_detach(spawn_t *child) {
     return ((routine_t *)child->handle->data)->loop_code;
 }
 
-int spawn_exit(spawn_t *child, spawn_cb exit_func) {
+CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
     co_yield();
 
