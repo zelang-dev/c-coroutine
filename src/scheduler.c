@@ -1430,8 +1430,12 @@ CO_FORCE_INLINE void sched_dec(void) {
     --thread()->used_count;
 }
 
-CO_FORCE_INLINE uv_args_t *sched_event_args(void) {
+CO_FORCE_INLINE uv_args_t *sched_server_args(void) {
     return thread()->uv_args;
+}
+
+CO_FORCE_INLINE void sched_server_set(uv_args_t uv_args) {
+    thread()->uv_args = &uv_args;
 }
 
 void coroutine_system(void) {

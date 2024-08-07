@@ -74,13 +74,9 @@
    do not use this if your application uses exceptions or setjmp/longjmp */
 /* #define CO_NO_TIB */
 
-#ifndef CO_FORCE_INLINE
-    #define CO_FORCE_INLINE RAII_INLINE
-#endif
 
-#ifndef CO_NO_INLINE
-    #define CO_NO_INLINE RAII_NO_INLINE
-#endif
+#define CO_FORCE_INLINE RAII_INLINE
+#define CO_NO_INLINE RAII_NO_INLINE
 
 /* In alignas(a), 'a' should be a power of two that is at least the type's
    alignment and at most the implementation's alignment limit.  This limit is
@@ -811,7 +807,8 @@ C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
 C_API void sched_dec(void);
-C_API uv_args_t *sched_event_args(void);
+C_API uv_args_t *sched_server_args(void);
+C_API void sched_server_set(uv_args_t);
 
 C_API void preempt_init(u32 usecs);
 C_API void preempt_disable(void);

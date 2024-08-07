@@ -21,7 +21,7 @@ static string_t const day_short_names[] = {
 #define KEEP_ALIVE "keep-alive"
 #define CLOSE "close"
 
-void_t concat_headers(void_t lines, string_t key, const_t value) {
+CO_FORCE_INLINE void_t concat_headers(void_t lines, string_t key, const_t value) {
     lines = co_concat_by(5, (string)lines, key, ": ", value, CRLF);
 
     return lines;
@@ -324,7 +324,7 @@ string http_request(http_t *this,
     return headers;
 }
 
-string get_header(http_t *this, string key) {
+CO_FORCE_INLINE string get_header(http_t *this, string key) {
     if (has_header(this, key)) {
         return hash_get((hash_t *)this->headers, key);
     }
@@ -349,7 +349,7 @@ string get_variable(http_t *this, string key, string var) {
     return "";
 }
 
-string get_parameter(http_t *this, string key) {
+CO_FORCE_INLINE string get_parameter(http_t *this, string key) {
     if (has_parameter(this, key)) {
         return hash_get(this->parameters, key);
     }
@@ -368,11 +368,11 @@ void put_header(http_t *this, string key, string value, bool force_cap) {
     hash_put(this->header, trim(temp), trim(value));
 }
 
-bool has_header(http_t *this, string key) {
+CO_FORCE_INLINE bool has_header(http_t *this, string key) {
     return hash_has((hash_t *)this->headers, key);
 }
 
-bool has_variable(http_t *this, string key, string var) {
+CO_FORCE_INLINE bool has_variable(http_t *this, string key, string var) {
     char temp[CO_SCRAPE_SIZE] = {0};
 
     snprintf(temp, CO_SCRAPE_SIZE, "%s%s", var, "=");
@@ -391,6 +391,6 @@ bool has_flag(http_t *this, string key, string flag) {
     return is_str_in(value, flag1) || is_str_in(value, flag2) || is_str_in(value, flag3);
 }
 
-bool has_parameter(http_t *this, string key) {
+CO_FORCE_INLINE bool has_parameter(http_t *this, string key) {
     return hash_has(this->parameters, key);
 }

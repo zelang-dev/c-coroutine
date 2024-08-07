@@ -69,7 +69,7 @@ void sched_event_cleanup(void_t t) {
         hash_free(co->context->wait_group);
 
     if (uv_loop_alive(uvLoop = co_loop())) {
-        if (sched_event_args() && sched_event_args()->bind_type == UV_TLS)
+        if (sched_server_args() && sched_server_args()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
         else
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
@@ -115,12 +115,12 @@ static void error_catch(void_t uv) {
 
     if (!is_empty((void_t)co_message())) {
         co->scope->is_recovered = true;
-        if (uv_loop_alive(co_loop()) && sched_event_args()) {
+        if (uv_loop_alive(co_loop()) && sched_server_args()) {
             co->halt = true;
             co->loop_erred = true;
             co->status = CO_ERRED;
             sched_event_cleanup(co);
-            memset(sched_event_args(), 0, sizeof(uv_args_t));
+            memset(sched_server_args(), 0, sizeof(uv_args_t));
         }
     }
 }
@@ -643,9 +643,8 @@ static void_t uv_init(void_t uv_args) {
                         uv_ip4_name((const struct sockaddr_in *)&name, (char *)ip, sizeof ip);
                     }
 
-                    if (is_empty(sched_event_args())) {
-                        *sched_event_args() = *uv;
-                    }
+                    if (is_empty(sched_server_args()))
+                        sched_server_set(*uv);
 
                     printf("Listening to %s:%d for%s connections, %s.\n",
                            ip,
