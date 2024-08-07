@@ -350,7 +350,6 @@ C_API void rpmalloc_shutdown(void);
         void var##_delete(void) {           \
             if(rpmalloc_##var##_tls != 0) { \
                 rpmalloc_##var##_tls = 0;   \
-                rp_free(rpmalloc_tls_get(rpmalloc_##var##_tss));    \
                 rpmalloc_tls_delete(rpmalloc_##var##_tss);   \
                 rpmalloc_##var##_tss = 0;   \
                 rpmalloc_shutdown();        \

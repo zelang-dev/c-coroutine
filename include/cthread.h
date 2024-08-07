@@ -507,6 +507,7 @@ extern "C" {
 #   define thrd_local_setup(type, var, initial, prefix)         \
         prefix thread_local type thrd_##var##_tls = initial;    \
         prefix FORCEINLINE void var##_del(void) {               \
+            thrd_##var##_tls = NULL;                            \
         }                                                       \
         prefix FORCEINLINE void var##_update(type value) {      \
             thrd_##var##_tls = value;                           \
