@@ -1355,7 +1355,7 @@ static void_t coroutine_wait(void_t v) {
     }
 }
 
-u32 co_sleep(u32 ms) {
+u32 sleep_for(u32 ms) {
     size_t when, now;
     routine_t *t;
 

@@ -4,7 +4,7 @@ channel_t *c;
 
 void *delay_co(void *arg) {
     int v = atoi(c_char_ptr(arg));
-    co_sleep(v);
+    sleep_for(v);
     printf("awake after %d ms\n", v);
     co_send(c, 0);
 

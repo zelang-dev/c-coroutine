@@ -7,7 +7,7 @@ void *worker(void *arg) {
     printf("Worker %d starting\n", wid);
     co_info_active();
 
-    co_sleep(1000);
+    sleep_for(1000);
 
     printf("Worker %d done\n", wid);
     co_info_active();
@@ -22,13 +22,13 @@ void *worker(void *arg) {
 
 int co_main(int argc, char **argv) {
     int cid[5], i;
-    wait_group_t *wg = co_wait_group();
+    wait_group_t *wg = work_group();
     for (i = 1; i <= 5; i++) {
         cid[i - 1] = co_go(worker, args_for("i", i));
     }
     wait_result_t *wgr = co_wait(wg);
 
-    printf("\nWorker # %d returned: %d\n", cid[2], co_group_get_result(wgr, cid[2]).integer);
-    printf("\nWorker # %d returned: %s\n", cid[1], co_group_get_result(wgr, cid[1]).char_ptr);
+    printf("\nWorker # %d returned: %d\n", cid[2], work_group_result(wgr, cid[2]).integer);
+    printf("\nWorker # %d returned: %s\n", cid[1], work_group_result(wgr, cid[1]).char_ptr);
     return 0;
 }

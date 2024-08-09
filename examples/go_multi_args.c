@@ -7,7 +7,7 @@ void *worker(void *arg) {
 
     for (int i = 0; i < count; i++) {
         printf("%s\n", text);
-        co_sleep(10);
+        sleep_for(10);
     }
     return 0;
 }
@@ -17,7 +17,7 @@ int co_main(int argc, char **argv) {
     co_go(worker, args_for("is", 2, "b"));
     co_go(worker, args_for("is", 3, "c"));
 
-    co_sleep(100);
+    sleep_for(100);
 
     return 0;
 }

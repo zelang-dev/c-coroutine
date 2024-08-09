@@ -37,7 +37,7 @@ func main() {
 #include "coroutine.h"
 
 void *func(void *arg) {
-    co_sleep(10 * time_Second);
+    sleep_for(10 * time_Second);
     return 0;
 }
 
@@ -46,8 +46,8 @@ int co_main(int argc, char **argv) {
     if (argc > 1)
         numRoutines = (u32)atoi(argv[1]);
 
-    co_wait_group_capacity(Kb(25));
-    wait_group_t *wg = co_wait_group();
+    work_group_capacity(Kb(25));
+    wait_group_t *wg = work_group();
     for (i = 0; i < numRoutines; i++) {
         co_go(func, NULL);
     }
