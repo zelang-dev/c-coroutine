@@ -86,7 +86,7 @@ void co_async_wait(future *f) {
     bool is_done = false;
     while (!is_done) {
         is_done = promise_done(f->value);
-        co_info(co_active());
+        co_info(co_active(), 1);
         co_yield();
     }
 }

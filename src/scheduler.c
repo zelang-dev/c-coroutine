@@ -1,5 +1,6 @@
 #include "coroutine.h"
 
+static routine_t *co_main_main = NULL;
 typedef struct {
     /* Store/hold the registers of the default coroutine thread state,
     allows the ability to switch from any function, non coroutine context. */
@@ -138,6 +139,22 @@ CO_FORCE_INLINE bool sched_is_stolen(void) {
     return gq_sys.is_multi
         && atomic_flag_load(&gq_sys.any_stealable[thread()->thrd_id])
         && atomic_load(&gq_sys.stealable_thread[thread()->thrd_id]) == gq_sys.thread_invalid;
+}
+
+CO_FORCE_INLINE bool sched_is_running(void) {
+    size_t i, has_items, *has;
+    for (i = 0; i < gq_sys.thread_count; i++) {
+        has = (size_t *)atomic_load(&gq_sys.count[i]);
+        if (is_empty(has))
+            continue;
+
+        has_items = *has;
+        if (has_items > 0 && i != gq_sys.cpu_count) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /* Check all threads run queue count for tasks to steal,
@@ -1269,6 +1286,9 @@ u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
         t->context = c;
     }
 
+    if (thread()->is_main && is_empty(co_main_main) && t->run_code == RUN_MAIN)
+        co_main_main = t;
+
     return id;
 }
 
@@ -1344,7 +1364,7 @@ static void_t coroutine_wait(void_t v) {
         }
 
         now = nsec();
-        co_info(co_active());
+        co_info(co_active(), 1);
         while ((t = thread()->sleeping.head) && now >= t->alarm_time) {
             sched_remove(&thread()->sleeping, t);
             if (!t->system && --thread()->sleeping_counted == 0)
@@ -1523,20 +1543,28 @@ static int thrd_scheduler(void) {
     routine_t *t = NULL;
     scheduler_t *l = NULL;
     int stole = 0;
+    bool is_finish;
 
     for (;;) {
+        is_finish = false;
         if (sched_is_stolen())
             sched_post_stolen(thread());
 
         if (thread()->used_count == 0 || !sched_active() || l == EMPTY) {
             if (thread()->is_main && ((!sched_is_active() && sched_is_empty()) || l == EMPTY)) {
-                sched_cleanup();
-                if (thread()->used_count > 0) {
-                    RAII_INFO("\nNo runnable coroutines! %d stalled\n", thread()->used_count);
-                    exit(1);
+                if (gq_sys.is_multi && sched_is_running()) {
+                    thread()->used_count++;
+                    is_finish = true;
+                    t = co_main_main;
                 } else {
-                    RAII_LOG("\nCoroutine scheduler exited");
-                    exit(thread()->exiting);
+                    sched_cleanup();
+                    if (thread()->used_count > 0) {
+                        RAII_INFO("\nNo runnable coroutines! %d stalled\n", thread()->used_count);
+                        exit(1);
+                    } else {
+                        RAII_LOG("\nCoroutine scheduler exited");
+                        exit(thread()->exiting);
+                    }
                 }
             } else if (thread()->used_count == 0
                        && (sched_is_active() && (!sched_is_empty() || sched_is_available()) && l != EMPTY)) {
@@ -1572,7 +1600,9 @@ static int thrd_scheduler(void) {
             }
         }
 
-        t = sched_dequeue(&thread()->run_queue);
+        if (!is_finish)
+            t = sched_dequeue(&thread()->run_queue);
+
         t->ready = false;
         thread()->running = t;
         thread()->num_others_ran++;
@@ -1614,7 +1644,9 @@ int thrd_main(void_t args) {
     while (!atomic_flag_load(&gq_sys.is_started))
         thrd_yield();
 
-    thrd_scheduler();
+    co_info(co_active(), -1);
+    if (gq_sys.is_multi)
+        thrd_scheduler();
 
     return 0;
 }
@@ -1647,13 +1679,14 @@ int main(int argc, char **argv) {
             int *n = try_malloc(sizeof(int));
             *n = i;
             if (err = thrd_add(gq_sys.threads, &thrd_main, n)) {
-                gq_sys.is_multi = false;
                 fprintf(stderr, "`thrd_main` failed to start, error: %d, falling back to single threaded.\n\n", err);
+                gq_sys.is_multi = false;
+                atomic_flag_test_and_set(&gq_sys.is_started);
                 if (thrd_destroy(gq_sys.threads, 0))
                     CO_FREE(gq_sys.threads);
 
                 CO_FREE(n);
-                gq_sys.threads = 0;
+                gq_sys.threads = NULL;
                 break;
             }
         }
@@ -1677,7 +1710,7 @@ int main(int argc, char **argv) {
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    create_routine(main_main, NULL, gq_sys.stacksize * 2, RUN_MAIN);
+    create_routine(main_main, NULL, gq_sys.stacksize * 4, RUN_MAIN);
     thrd_scheduler();
     unreachable;
 

@@ -1,7 +1,7 @@
 #include "coroutine.h"
 
 void *worker(void *arg) {
-    int wid = args_get(arg, 0).integer;
+    int wid = args_get(arg, 0).integer + 1;
     int id = co_id();
 
     printf("Worker %d starting\n", wid);
@@ -21,14 +21,15 @@ void *worker(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    int cid[5], i;
+    int cid[100], i;
+
     wait_group_t *wg = work_group();
-    for (i = 1; i <= 5; i++) {
-        cid[i - 1] = co_go(worker, args_for("i", i));
+    for (i = 0; i < 100; i++) {
+        cid[i] = co_go(worker, args_for("i", i));
     }
     wait_result_t *wgr = co_wait(wg);
 
-    printf("\nWorker # %d returned: %d\n", cid[2], work_group_result(wgr, cid[2]).integer);
-    printf("\nWorker # %d returned: %s\n", cid[1], work_group_result(wgr, cid[1]).char_ptr);
+    printf("\nWorker # %d returned: %d\n", cid[3], work_group_result(wgr, cid[3]).integer);
+    printf("\nWorker # %d returned: %s\n", cid[2], work_group_result(wgr, cid[2]).char_ptr);
     return 0;
 }

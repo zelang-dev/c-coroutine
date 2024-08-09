@@ -775,7 +775,7 @@ Other tasks continue to run during this time. */
 C_API u32 sleep_for(u32 ms);
 
 /* Print coroutine internal data state, only active in `debug` builds. */
-C_API void co_info(routine_t *t);
+C_API void co_info(routine_t *, int);
 
 /* Print `current` coroutine internal data state, only active in `debug` builds. */
 C_API void co_info_active(void);

@@ -58,7 +58,7 @@ void co_delete(routine_t *co) {
                  || co->status == CO_EVENT_DEAD)
                && !co->exiting
                ) {
-        co_info(co);
+        co_info(co, 1);
         co->flagged = true;
     } else {
 #ifdef USE_VALGRIND
@@ -219,7 +219,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
                         if (!co->loop_active && co->status == CO_NORMAL)
                             sched_enqueue(co);
 
-                        co_info(c);
+                        co_info(c, 1);
                         sched_yielding();
                     } else {
                         if ((!is_empty(co->results) && !co->loop_erred) || co->is_plain) {
@@ -317,7 +317,7 @@ string_t co_state(int status) {
     }
 }
 
-CO_FORCE_INLINE void co_info(routine_t *t) {
+CO_FORCE_INLINE void co_info(routine_t *t, int pos) {
 #ifdef USE_DEBUG
     bool line_end = false;
     if (is_empty(t)) {
@@ -325,19 +325,21 @@ CO_FORCE_INLINE void co_info(routine_t *t) {
         t = co_active();
     }
 
+    char line[SCRAPE_SIZE];
+    snprintf(line, SCRAPE_SIZE, "           \n\r\033[%dA", pos);
     fprintf(stderr, "\t\t - Thrd #%lx, cid: %lu (%s) %s cycles: %zu%s",
             co_async_self(),
             t->cid,
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->channeled ? "" : "channel"),
             co_state(t->status),
             t->cycles,
-            (line_end ? "\n" : "\n\r\033[1A")
+            (line_end ? "                   \n" : line)
     );
 #endif
 }
 
 CO_FORCE_INLINE void co_info_active(void) {
-    co_info(nullptr);
+    co_info(nullptr, 0);
 }
 
 CO_FORCE_INLINE u32 co_id(void) {
