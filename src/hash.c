@@ -29,7 +29,7 @@ https://www.andreinc.net/2021/10/02/implementing-hash-tables-in-c-part-1
 
 */
 
-oa_hash *oa_hash_new(oa_key_ops key_ops, oa_val_ops val_ops, void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx));
+oa_hash *oa_hash_new_ex(oa_key_ops key_ops, oa_val_ops val_ops, void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx), u32 cap);
 oa_hash *oa_hash_new_lp(oa_key_ops key_ops, oa_val_ops val_ops);
 void oa_hash_free(oa_hash *htable);
 void_t oa_hash_put(oa_hash *htable, const_t key, const_t value);
@@ -56,6 +56,7 @@ enum oa_ret_ops {
     PUT,
     GET
 };
+static u32 hash_initial_capacity = HASH_INIT_CAPACITY;
 
 static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, const_t key, enum oa_ret_ops op);
 static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable);
@@ -63,35 +64,32 @@ static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable);
 static CO_FORCE_INLINE bool oa_hash_is_tombstone(oa_hash *htable, size_t idx);
 static CO_FORCE_INLINE void oa_hash_put_tombstone(oa_hash *htable, size_t idx);
 
-oa_hash *oa_hash_new(
+oa_hash *oa_hash_new_ex(
     oa_key_ops key_ops,
     oa_val_ops val_ops,
-    void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx)) {
+    void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx), u32 cap) {
     oa_hash *htable = try_calloc(1, sizeof(*htable));
 
     htable->size = 0;
-    htable->capacity = HASH_INIT_CAPACITY;
+    htable->capacity = is_zero(cap) ? hash_initial_capacity : cap;
+    htable->overriden = !is_zero(cap);
     htable->val_ops = val_ops;
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
+    htable->buckets = try_calloc(1, sizeof(oa_pair) * htable->capacity);
     htable->type = CO_OA_HASH;
-
-    htable->buckets = try_calloc(1, sizeof(*(htable->buckets)) * htable->capacity);
-
-    for (int i = 0; i < htable->capacity; i++) {
-        htable->buckets[ i ] = NULL;
-    }
 
     return htable;
 }
 
 CO_FORCE_INLINE oa_hash *oa_hash_new_lp(oa_key_ops key_ops, oa_val_ops val_ops) {
-    return oa_hash_new(key_ops, val_ops, oa_hash_lp_idx);
+    return oa_hash_new_ex(key_ops, val_ops, oa_hash_lp_idx, 0);
 }
 
 void oa_hash_free(oa_hash *htable) {
+    u32 i;
     if (is_type(htable, CO_OA_HASH)) {
-        for (int i = 0; i < htable->capacity; i++) {
+        for (i = 0; i < htable->capacity; i++) {
             if (htable->buckets[i]) {
                 if (htable->buckets[i]->key)
                     htable->key_ops.free(htable->buckets[i]->key, htable->key_ops.arg);
@@ -111,7 +109,7 @@ void oa_hash_free(oa_hash *htable) {
 }
 
 static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
-    uint32_t old_capacity;
+    u32 i, old_capacity;
     oa_pair **old_buckets;
     oa_pair *crt_pair;
 
@@ -119,18 +117,13 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     if (new_capacity_64 > SIZE_MAX)
         co_panic("re-size overflow");
 
-    old_capacity = (uint32_t)htable->capacity;
+    old_capacity = htable->capacity;
     old_buckets = htable->buckets;
 
-    htable->capacity = (uint32_t)new_capacity_64;
+    htable->capacity = (u32)new_capacity_64;
     htable->size = 0;
     htable->buckets = try_calloc(1, htable->capacity * sizeof(*(htable->buckets)));
-
-    for (int i = 0; i < htable->capacity; i++) {
-        htable->buckets[ i ] = NULL;
-    };
-
-    for (size_t i = 0; i < old_capacity; i++) {
+    for (i = 0; i < old_capacity; i++) {
         crt_pair = old_buckets[ i ];
         if (NULL != crt_pair && !oa_hash_is_tombstone(htable, i)) {
             oa_hash_put(htable, crt_pair->key, crt_pair->value);
@@ -144,7 +137,7 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
 }
 
 static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable) {
-    return (htable->size / htable->capacity) > HASH_LOAD_FACTOR;
+    return (htable->size / htable->capacity) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
 }
 
 void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
@@ -296,12 +289,13 @@ void oa_hash_remove(oa_hash *htable, const_t key) {
 
 void oa_hash_print(oa_hash *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
     oa_pair *pair;
+    u32 i;
 
     printf("Hash Capacity: %zu\n", (size_t)htable->capacity);
     printf("Hash Size: %zu\n", htable->size);
 
     printf("Hash Buckets:\n");
-    for (int i = 0; i < htable->capacity; i++) {
+    for (i = 0; i < htable->capacity; i++) {
         pair = htable->buckets[ i ];
         if (NULL != pair) {
             printf("\tbucket[%d]:\n", i);
@@ -320,7 +314,8 @@ void oa_hash_print(oa_hash *htable, void (*print_key)(const_t k), void (*print_v
 
 void_t oa_hash_iter(oa_hash *htable, void_t variable, hash_iter_func func) {
     oa_pair *pair;
-    for (int i = 0; i < htable->capacity; i++) {
+    u32 i;
+    for (i = 0; i < htable->capacity; i++) {
         pair = htable->buckets[ i ];
         if (NULL != pair) {
             variable = func(variable, pair->key, pair->value);
@@ -432,20 +427,28 @@ oa_val_ops oa_val_ops_string = { oa_string_cp, CO_FREE, oa_string_eq, NULL };
 oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
 oa_val_ops oa_val_ops_channel = {oa_channel_cp, FUNC_VOID(channel_free), oa_value_eq, NULL};
 
+CO_FORCE_INLINE wait_group_t *ht_event_init(u32 size) {
+    return (wait_group_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, size);
+}
+
 CO_FORCE_INLINE wait_group_t *ht_group_init(void) {
-    return (wait_group_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx);
+    return (wait_group_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, 0);
 }
 
 CO_FORCE_INLINE ht_string_t *ht_string_init(void) {
-    return (ht_string_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx);
+    return (ht_string_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx, 0);
 }
 
 CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
-    return (wait_result_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx);
+    return (wait_result_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx, 0);
 }
 
 CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {
-    return (chan_collector_t *)oa_hash_new(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx);
+    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, 0);
+}
+
+CO_FORCE_INLINE void hash_capacity(u32 buckets) {
+    hash_initial_capacity = buckets;
 }
 
 CO_FORCE_INLINE void hash_free(hash_t *htable) {

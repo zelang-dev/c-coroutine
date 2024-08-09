@@ -45,7 +45,7 @@ json_t *json_encode(string_t desc, ...) {
 
     va_list argp;
     string key, value_char;
-    int value_bool;
+    int value_bool, i;
     JSON_Status status = JSONSuccess;
     json_t *value_any = NULL;
     JSON_Array *value_array = NULL;
@@ -55,7 +55,7 @@ json_t *json_encode(string_t desc, ...) {
     bool is_dot = false, is_array = false, is_double = false, is_int = false, is_max = false;
 
     va_start(argp, desc);
-    for (int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (status == JSONFailure)
             return NULL;
 
@@ -186,7 +186,7 @@ string json_for(string_t desc, ...) {
 
     va_list argp;
     string value_char;
-    int value_bool;
+    int value_bool, i;
     json_t *value_any = NULL;
     double value_float = 0;
     int64_t value_int = 0;
@@ -194,7 +194,7 @@ string json_for(string_t desc, ...) {
     bool is_double = false, is_int = false, is_max = false;
 
     va_start(argp, desc);
-    for (int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (status == JSONFailure)
             return NULL;
 

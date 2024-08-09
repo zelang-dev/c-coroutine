@@ -33,19 +33,15 @@
 
 #define CO_ASSERT RAII_ASSERT
 
-/* Stack size when creating a coroutine. */
 #ifndef CO_STACK_SIZE
-    #define CO_STACK_SIZE (32 * 1024)
-#endif
-
-#ifndef CO_MAIN_STACK
-    #define CO_MAIN_STACK (64 * 1024)
+    /* Stack size when creating a coroutine. */
+    #define CO_STACK_SIZE (16 * 1024)
 #endif
 
 #define ERROR_SCRAPE_SIZE 256
 
-#ifndef CO_SCRAPE_SIZE
-    #define CO_SCRAPE_SIZE (2 * 64)
+#ifndef SCRAPE_SIZE
+    #define SCRAPE_SIZE (2 * 64)
 #endif
 
 #if defined(UV_H)
@@ -406,6 +402,7 @@ struct routine_s {
     bool loop_erred;
     bool is_address;
     bool is_plain;
+    bool flagged;
 #if defined(USE_VALGRIND)
     u32 vg_stack_id;
 #endif
@@ -424,7 +421,7 @@ struct routine_s {
     routine_t *context;
     char name[ 64 ];
     char state[ 64 ];
-    char scrape[ CO_SCRAPE_SIZE ];
+    char scrape[ SCRAPE_SIZE ];
     /* Used to check stack overflow. */
     size_t magic_number;
 };
@@ -441,6 +438,8 @@ make_atomic(scheduler_t, atomic_scheduler_t)
 
 /* Global atomic queue struct */
 typedef struct {
+    /* Stack size when creating a coroutine. */
+    u32 stacksize;
     volatile bool is_multi;
     volatile bool is_takeable;
     /* Number of CPU cores this machine has,
@@ -489,7 +488,7 @@ typedef struct {
     atomic_scheduler_t run_queue;
     cacheline_pad_t _pad6;
 
-    const char powered_by[CO_SCRAPE_SIZE];
+    const char powered_by[SCRAPE_SIZE];
 } atomic_deque_t;
 
 C_API atomic_deque_t gq_sys;
@@ -641,6 +640,9 @@ C_API values_type args_get(void_t params, int item);
 C_API routine_t *co_active(void);
 
 C_API memory_t *co_scope(void);
+
+/* Set global coroutine runtime stack size, `co_main` will be double the size.*/
+C_API void co_stack_set(u32);
 
 /* Delete specified coroutine. */
 C_API void co_delete(routine_t *);
@@ -866,7 +868,8 @@ typedef struct oa_pair_s {
 typedef struct oa_hash_s oa_hash;
 struct oa_hash_s {
     value_types type;
-    int capacity;
+    bool overriden;
+    u32 capacity;
     size_t size;
     oa_pair **buckets;
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx);
@@ -874,6 +877,7 @@ struct oa_hash_s {
     oa_val_ops val_ops;
 };
 
+C_API void hash_capacity(u32);
 C_API void hash_free(hash_t *);
 C_API void_t hash_put(hash_t *, const_t, const_t);
 C_API void_t hash_replace(hash_t *, const_t, const_t);
@@ -886,9 +890,13 @@ C_API void hash_remove(hash_t *, const_t);
 C_API void hash_print(hash_t *);
 C_API void hash_print_custom(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
-/* Creates a new wait group coroutine hash table. */
+/* Creates a new wait group `event` hash table, set initial capacity. */
+C_API wait_group_t *ht_event_init(u32);
+
+/* Creates a new wait group `coroutine` hash table. */
 C_API wait_group_t *ht_group_init(void);
-/* Creates a new wait group results hash table. */
+
+/* Creates a new wait group `results` hash table. */
 C_API wait_result_t *ht_result_init(void);
 
 C_API chan_collector_t *ht_channel_init(void);
@@ -901,6 +909,9 @@ All coroutines here behaves like regular functions, meaning they return values, 
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API wait_group_t *co_wait_group(void);
+
+/* Set global wait group `hash table` initial capacity. */
+C_API void co_wait_group_capacity(u32);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */

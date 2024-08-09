@@ -21,9 +21,9 @@ void *worker(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    int cid[5];
+    int cid[5], i;
     wait_group_t *wg = co_wait_group();
-    for (int i = 1; i <= 5; i++) {
+    for (i = 1; i <= 5; i++) {
         cid[i - 1] = co_go(worker, args_for("i", i));
     }
     wait_result_t *wgr = co_wait(wg);

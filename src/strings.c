@@ -2,9 +2,9 @@
 
 string_t co_itoa(int64_t number) {
 #ifdef _WIN32
-    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%lld", number);
+    snprintf(co_active()->scrape, SCRAPE_SIZE, "%lld", number);
 #else
-    snprintf(co_active()->scrape, CO_SCRAPE_SIZE, "%ld", number);
+    snprintf(co_active()->scrape, SCRAPE_SIZE, "%ld", number);
 #endif
     return co_active()->scrape;
 }
@@ -114,17 +114,18 @@ string *str_split(string_t s, string_t delim, int *count) {
 
 string co_concat_ex(bool use_defer, int num_args, va_list ap_copy) {
     size_t strsize = 0;
+    int i;
     va_list ap;
 
     va_copy(ap, ap_copy);
-    for (int i = 0; i < num_args; i++)
+    for (i = 0; i < num_args; i++)
         strsize += strlen(va_arg(ap, string));
 
     string res = try_calloc(1, strsize + 1);
     strsize = 0;
 
     va_copy(ap, ap_copy);
-    for (int i = 0; i < num_args; i++) {
+    for (i = 0; i < num_args; i++) {
         string s = va_arg(ap, string);
         strcpy(res + strsize, s);
         strsize += strlen(s);
@@ -383,10 +384,10 @@ fileinfo_t *pathinfo(string filepath) {
 ht_string_t *co_parse_str(string lines, string sep) {
     ht_string_t *this = ht_string_init();
     defer(hash_free, this);
-    int i = 0;
+    int i = 0, x;
 
     string *token = str_split(lines, sep, &i);
-    for (int x = 0; x < i; x++) {
+    for (x = 0; x < i; x++) {
         string *parts = str_split(token[x], "=", NULL);
         if (!is_empty(parts)) {
             hash_put(this, trim(parts[0]), trim(parts[1]));
@@ -500,8 +501,8 @@ static inline size_t base64_encoded_len(size_t decoded_len) {
 }
 
 bool is_base64(u_string_t src) {
-    size_t len = strlen(src);
-    for (size_t i = 0; i < len; i++) {
+    size_t i, len = strlen(src);
+    for (i = 0; i < len; i++) {
         if (base64_decode_table[src[i]] == 0x80)
             return false;
     }

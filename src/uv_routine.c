@@ -1159,6 +1159,7 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, u
     spawn_options_t *handle = try_calloc(1, sizeof(spawn_options_t));
     uv_stdio_container_t *p;
     va_list argp;
+    int i;
 
     handle->data = !is_empty(env) ? str_split(env, ";", NULL) : NULL;
     handle->exiting_cb = NULL;
@@ -1178,7 +1179,7 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, u
 
     if (no_of_stdio > 0) {
         va_start(argp, no_of_stdio);
-        for (int i = 0; i < no_of_stdio; i++) {
+        for (i = 0; i < no_of_stdio; i++) {
             p = va_arg(argp, uv_stdio_container_t *);
             memcpy(&handle->stdio[i], p, sizeof(uv_stdio_container_t));
             CO_FREE(p);

@@ -59,6 +59,7 @@ void co_delete(routine_t *co) {
                && !co->exiting
                ) {
         co_info(co);
+        co->flagged = true;
     } else {
 #ifdef USE_VALGRIND
         if (co->vg_stack_id != 0) {
@@ -144,7 +145,7 @@ value_t co_event(callable_t fn, void_t arg) {
 
 void co_handler(func_t fn, void_t handle, func_t dtor) {
     routine_t *co = co_active();
-    wait_group_t *eg = ht_group_init();
+    wait_group_t *eg = ht_event_init(2);
 
     co->event_group = eg;
     co->event_active = true;
@@ -165,7 +166,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
 
 void co_process(func_t fn, void_t args) {
     routine_t *co = co_active();
-    wait_group_t *eg = ht_group_init();
+    wait_group_t *eg = ht_event_init(2);
 
     co->event_group = eg;
     co->event_active = true;
@@ -184,6 +185,10 @@ void co_process(func_t fn, void_t args) {
     hash_free(eg);
 }
 
+CO_FORCE_INLINE void co_wait_group_capacity(u32 size) {
+    hash_capacity(size + (size * 0.333334));
+}
+
 wait_group_t *co_wait_group(void) {
     routine_t *c = co_active();
     wait_group_t *wg = ht_group_init();
@@ -198,49 +203,49 @@ wait_result_t *co_wait(wait_group_t *wg) {
     wait_result_t *wgr = NULL;
     routine_t *co;
     bool has_erred = false;
+    u32 i;
+
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, FUNC_VOID(hash_free), wgr);
         oa_pair *pair;
         while (wg->size != 0) {
-            for (int i = 0; i < wg->capacity; i++) {
+            for (i = 0; i < wg->capacity; i++) {
                 pair = wg->buckets[i];
-                if (NULL != pair) {
-                    if (!is_empty(pair->value)) {
-                        co = (routine_t *)pair->value;
-                        if (!co_terminated(co)) {
-                            if (!co->loop_active && co->status == CO_NORMAL)
-                                sched_enqueue(co);
+                if (!is_empty(pair) && !is_empty(pair->value)) {
+                    co = (routine_t *)pair->value;
+                    if (!co_terminated(co)) {
+                        if (!co->loop_active && co->status == CO_NORMAL)
+                            sched_enqueue(co);
 
-                            co_info(c);
-                            sched_yielding();
-                        } else {
-                            if ((!is_empty(co->results) && !co->loop_erred) || co->is_plain) {
-                                if (co->is_plain)
-                                    hash_put(wgr, co_itoa(co->cid), &co->plain_results);
-                                else
-                                    hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
+                        co_info(c);
+                        sched_yielding();
+                    } else {
+                        if ((!is_empty(co->results) && !co->loop_erred) || co->is_plain) {
+                            if (co->is_plain)
+                                hash_put(wgr, co_itoa(co->cid), &co->plain_results);
+                            else
+                                hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
 
-                                if (!co->event_active && !co->is_plain && !co->is_address) {
-                                    CO_FREE(co->results);
-                                    co->results = NULL;
-                                }
+                            if (!co->event_active && !co->is_plain && !co->is_address) {
+                                CO_FREE(co->results);
+                                co->results = NULL;
                             }
-
-                            if (co->loop_erred) {
-                                hash_remove(wg, pair->key);
-                                --c->wait_counter;
-                                has_erred = true;
-                                continue;
-                            }
-
-                            if (co->loop_active)
-                                co_deferred_free(co);
-
-                            hash_delete(wg, pair->key);
-                            --c->wait_counter;
                         }
+
+                        if (co->loop_erred) {
+                            hash_remove(wg, pair->key);
+                            --c->wait_counter;
+                            has_erred = true;
+                            continue;
+                        }
+
+                        if (co->loop_active)
+                            co_deferred_free(co);
+
+                        hash_delete(wg, pair->key);
+                        --c->wait_counter;
                     }
                 }
             }

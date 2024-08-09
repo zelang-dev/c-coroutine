@@ -42,12 +42,13 @@ void *func(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    int numRoutines = 100000, i;
+    u32 numRoutines = 100000, i;
     if (argc > 1)
-        numRoutines = atoi(argv[1]);
+        numRoutines = (u32)atoi(argv[1]);
 
+    co_wait_group_capacity(Kb(25));
     wait_group_t *wg = co_wait_group();
-    for (i = 1; i <= numRoutines; i++) {
+    for (i = 0; i < numRoutines; i++) {
         co_go(func, NULL);
     }
     co_wait(wg);

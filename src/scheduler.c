@@ -20,23 +20,23 @@ typedef struct {
 
     bool info_log;
 
-    /* number of coroutines waiting in sleep mode. */
-    int sleeping_counted;
-
     /* has the coroutine sleep/wait system started. */
-    int started_wait;
+    bool started_wait;
+
+    /* number of coroutines waiting in sleep mode. */
+    u32 sleeping_counted;
 
     /* indicator for thread termination. */
-    int exiting;
+    u32 exiting;
 
     /* thread id assigned by `gq_sys` */
-    int thrd_id;
+    u32 thrd_id;
 
     /* track the number of coroutines used */
-    int used_count;
+    u32 used_count;
 
     /* number of other coroutine that ran while the current coroutine was waiting.*/
-    int num_others_ran;
+    u32 num_others_ran;
 
     /* record which coroutine sleeping in scheduler */
     scheduler_t sleeping;
@@ -303,7 +303,7 @@ C_API string_t sched_uname(void) {
                                       buffer->machine, " ",
                                       buffer->release);
 
-        strncpy((char *)gq_sys.powered_by, powered_by, CO_SCRAPE_SIZE);
+        strncpy((char *)gq_sys.powered_by, powered_by, SCRAPE_SIZE);
         CO_FREE((void_t)powered_by);
     }
 
@@ -1040,9 +1040,7 @@ CO_FORCE_INLINE void co_scheduler(void) {
 }
 
 void co_stack_check(int n) {
-    routine_t *t;
-
-    t = thread()->running;
+    routine_t *t = thread()->running;
     if ((char *)&t <= (char *)t->stack_base || (char *)&t - (char *)t->stack_base < 256 + n || t->magic_number != CO_MAGIC_NUMBER) {
         snprintf(error_message, ERROR_SCRAPE_SIZE, "coroutine stack overflow: &t=%p stack=%p n=%d\n", &t, t->stack_base, 256 + n);
         co_panic(error_message);
@@ -1090,6 +1088,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->halt = false;
     co->synced = false;
     co->ready = false;
+    co->flagged = false;
     co->run_code = RUN_NORMAL;
     co->taken = false;
     co->wait_active = false;
@@ -1273,8 +1272,12 @@ u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
     return id;
 }
 
+CO_FORCE_INLINE void co_stack_set(u32 size) {
+    gq_sys.stacksize = size;
+}
+
 CO_FORCE_INLINE u32 co_go(callable_t fn, void_t arg) {
-    return create_routine(fn, arg, CO_STACK_SIZE, RUN_NORMAL);
+    return create_routine(fn, arg, gq_sys.stacksize, RUN_NORMAL);
 }
 
 void co_yield(void) {
@@ -1294,7 +1297,7 @@ void co_yield(void) {
 }
 
 CO_FORCE_INLINE void co_execute(func_t fn, void_t arg) {
-    create_routine((callable_t)fn, arg, CO_STACK_SIZE, RUN_NORMAL);
+    create_routine((callable_t)fn, arg, gq_sys.stacksize, RUN_NORMAL);
     co_yield();
 }
 
@@ -1358,7 +1361,7 @@ u32 co_sleep(u32 ms) {
 
     if (!thread()->started_wait) {
         thread()->started_wait = 1;
-        create_routine(coroutine_wait, 0, CO_STACK_SIZE, RUN_SYSTEM);
+        create_routine(coroutine_wait, 0, gq_sys.stacksize, RUN_SYSTEM);
     }
 
     now = nsec();
@@ -1472,6 +1475,7 @@ void sched_update(routine_t *t) {
 
 void sched_cleanup(void) {
     routine_t *t;
+    u32 i;
     if (!can_cleanup)
         return;
 
@@ -1486,7 +1490,7 @@ void sched_cleanup(void) {
         if (thread()->used_count)
             coroutines_num_all--;
 
-        for (int i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
+        for (i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
             t = coroutines_all[coroutines_num_all - i];
             if (t && t->magic_number == CO_MAGIC_NUMBER) {
                 t->magic_number = -1;
@@ -1622,6 +1626,7 @@ int main(int argc, char **argv) {
 
     gq_sys.is_multi = false;
     gq_sys.is_takeable = true;
+    gq_sys.stacksize = CO_STACK_SIZE;
     gq_sys.cpu_count = sched_cpu_count();
     gq_sys.thread_count = gq_sys.cpu_count + 1;
     gq_sys.thread_invalid = gq_sys.thread_count + 61;
@@ -1672,7 +1677,7 @@ int main(int argc, char **argv) {
     ex_signal_setup();
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    create_routine(main_main, NULL, CO_MAIN_STACK, RUN_MAIN);
+    create_routine(main_main, NULL, gq_sys.stacksize * 2, RUN_MAIN);
     thrd_scheduler();
     unreachable;
 

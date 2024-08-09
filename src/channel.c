@@ -74,7 +74,7 @@ static void add_msg(msg_queue_t *a, channel_co_t *alt) {
     a->a[ a->n++ ] = alt;
 }
 
-static void del_msg(msg_queue_t *a, int i) {
+static void del_msg(msg_queue_t *a, u32 i) {
     --a->n;
     a->a[ i ] = a->a[ a->n ];
 }
@@ -126,7 +126,7 @@ static void channel_co_enqueue(channel_co_t *a) {
 }
 
 static void channel_co_dequeue(channel_co_t *a) {
-    unsigned int i;
+    u32 i;
     msg_queue_t *ar;
 
     ar = channel_msg(a->c, a->op);
@@ -313,17 +313,18 @@ static int channel_proc(channel_co_t *a) {
 }
 
 void channel_print(channel_t *c) {
+    u32 i;
     printf("--- start print channel ---\n");
     printf("buf content: [nbuf: %d, off: %d] \n", c->nbuf, c->off);
     printf("buf: ");
-    for (unsigned int i = 0; i < c->bufsize; i++) {
+    for (i = 0; i < c->bufsize; i++) {
         unsigned long *p = (unsigned long *)c->buf + i;
         printf("%ld ", *p);
     }
     printf("\n");
     printf("msg queue: ");
     channel_co_t *a = *(c->a_send.a);
-    for (unsigned int i = 0; i < c->a_send.n; i++) {
+    for (i = 0; i < c->a_send.n; i++) {
         unsigned long *p = (unsigned long *)a->v;
         printf("%ld ", *p);
         a = a->x_msg[ 0 ].x_msg;

@@ -232,9 +232,9 @@ string http_response(http_t *this, string body, http_status status, string type,
                        "</h1>")
         : body;
 
-    char scrape[CO_SCRAPE_SIZE];
-    char scrape2[CO_SCRAPE_SIZE];
-    snprintf(scrape2, CO_SCRAPE_SIZE, "%zu", strlen(this->body));
+    char scrape[SCRAPE_SIZE];
+    char scrape2[SCRAPE_SIZE];
+    snprintf(scrape2, SCRAPE_SIZE, "%zu", strlen(this->body));
 
     // Create a string out of the response data
     string lines = co_concat_by(20,
@@ -249,9 +249,9 @@ string http_response(http_t *this, string body, http_status status, string type,
     );
 
     if (!is_empty(extras)) {
-        int i = 0;
+        int x, i = 0;
         string *token = co_str_split(extras, ";", &i);
-        for (int x = 0; x < i; x++) {
+        for (x = 0; x < i; x++) {
             string *parts = co_str_split(token[x], "=", NULL);
             if (!is_empty(parts))
                 put_header(this, parts[0], parts[1], true);
@@ -289,7 +289,7 @@ string http_request(http_t *this,
         char path[] = "/";
     }
 
-    char scrape[CO_SCRAPE_SIZE];
+    char scrape[SCRAPE_SIZE];
     string headers = co_concat_by(14, method_strings[method], " ", url_array->path,
                                   " HTTP/", gcvt(this->version, 2, scrape), CRLF,
                                   "Host: ", hostname, CRLF,
@@ -305,9 +305,9 @@ string http_request(http_t *this,
     }
 
     if (!is_empty(extras)) {
-        int count = 0;
+        int x, count = 0;
         string *lines = co_str_split(extras, ";", &count);
-        for (int x = 0; x < count; x++) {
+        for (x = 0; x < count; x++) {
             string *parts = co_str_split(lines[x], "=", NULL);
             if (!is_empty(parts))
                 headers = co_concat_by(5, headers, word_toupper(parts[0], '-'), ": ", parts[1], CRLF);
@@ -334,10 +334,10 @@ CO_FORCE_INLINE string get_header(http_t *this, string key) {
 
 string get_variable(http_t *this, string key, string var) {
     if (has_variable(this, key, var)) {
-        int count = 1;
+        int x, count = 1;
         string line = get_header(this, key);
         string *sections = (is_str_in(line, "; ")) ? co_str_split(line, "; ", &count) : (string *)line;
-        for (int x = 0; x < count; x++) {
+        for (x = 0; x < count; x++) {
             string parts = sections[x];
             string *variable = co_str_split(parts, "=", NULL);
             if (is_str_eq(variable[0], var)) {
@@ -373,21 +373,21 @@ CO_FORCE_INLINE bool has_header(http_t *this, string key) {
 }
 
 CO_FORCE_INLINE bool has_variable(http_t *this, string key, string var) {
-    char temp[CO_SCRAPE_SIZE] = {0};
+    char temp[SCRAPE_SIZE] = {0};
 
-    snprintf(temp, CO_SCRAPE_SIZE, "%s%s", var, "=");
+    snprintf(temp, SCRAPE_SIZE, "%s%s", var, "=");
     return is_str_in(get_header(this, key), temp);
 }
 
 bool has_flag(http_t *this, string key, string flag) {
-    char flag1[CO_SCRAPE_SIZE] = {0};
-    char flag2[CO_SCRAPE_SIZE] = {0};
-    char flag3[CO_SCRAPE_SIZE] = {0};
+    char flag1[SCRAPE_SIZE] = {0};
+    char flag2[SCRAPE_SIZE] = {0};
+    char flag3[SCRAPE_SIZE] = {0};
     string value = get_header(this, key);
 
-    snprintf(flag1, CO_SCRAPE_SIZE, "%s%s", flag, ";");
-    snprintf(flag2, CO_SCRAPE_SIZE, "%s%s", flag, ",");
-    snprintf(flag3, CO_SCRAPE_SIZE, "%s%s", flag, "\r\n");
+    snprintf(flag1, SCRAPE_SIZE, "%s%s", flag, ";");
+    snprintf(flag2, SCRAPE_SIZE, "%s%s", flag, ",");
+    snprintf(flag3, SCRAPE_SIZE, "%s%s", flag, "\r\n");
     return is_str_in(value, flag1) || is_str_in(value, flag2) || is_str_in(value, flag3);
 }
 
