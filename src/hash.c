@@ -49,7 +49,7 @@ void oa_string_free(void_t data, void_t arg);
 void oa_string_print(const_t data);
 
 /* Probing functions */
-static inline void oa_hash_lp_idx(oa_hash *htable, size_t *idx);
+static CO_FORCE_INLINE void oa_hash_lp_idx(oa_hash *htable, size_t *idx);
 
 enum oa_ret_ops {
     DEL,
@@ -69,14 +69,17 @@ oa_hash *oa_hash_new_ex(
     oa_val_ops val_ops,
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx), u32 cap) {
     oa_hash *htable = try_calloc(1, sizeof(*htable));
-
-    htable->size = 0;
-    htable->capacity = is_zero(cap) ? hash_initial_capacity : cap;
+    u32 i, capacity = is_zero(cap) ? hash_initial_capacity : cap;
+    atomic_init(&htable->size, 0);
+    atomic_init(&htable->capacity, capacity);
     htable->overriden = !is_zero(cap);
     htable->val_ops = val_ops;
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
-    htable->buckets = try_calloc(1, sizeof(oa_pair) * htable->capacity);
+    atomic_init(&htable->buckets, try_calloc(1, sizeof(atomic_pair_t) * capacity));
+    for (i = 0; i < capacity; i++) {
+        atomic_init(&htable->buckets[i], NULL);
+    }
     htable->type = CO_OA_HASH;
 
     return htable;
@@ -87,21 +90,23 @@ CO_FORCE_INLINE oa_hash *oa_hash_new_lp(oa_key_ops key_ops, oa_val_ops val_ops) 
 }
 
 void oa_hash_free(oa_hash *htable) {
-    u32 i;
     if (is_type(htable, CO_OA_HASH)) {
-        for (i = 0; i < htable->capacity; i++) {
-            if (htable->buckets[i]) {
-                if (htable->buckets[i]->key)
-                    htable->key_ops.free(htable->buckets[i]->key, htable->key_ops.arg);
-                if (!is_empty(htable->buckets[i]->value))
-                    htable->val_ops.free(htable->buckets[i]->value);
+        u32 i, capacity = atomic_load(&htable->capacity);
+        oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_consume);
+        for (i = 0; i < capacity; i++) {
+            if (buckets[i]) {
+                if (buckets[i]->key)
+                    htable->key_ops.free(buckets[i]->key, htable->key_ops.arg);
+
+                if (!is_empty(buckets[i]->value))
+                    htable->val_ops.free(buckets[i]->value);
             }
 
-            CO_FREE(htable->buckets[i]);
+            CO_FREE(buckets[i]);
         }
 
-        if (htable->buckets)
-            CO_FREE(htable->buckets);
+        if (buckets)
+            CO_FREE(buckets);
 
         memset(htable, 0, sizeof(value_types));
         CO_FREE(htable);
@@ -113,19 +118,22 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     oa_pair **old_buckets;
     oa_pair *crt_pair;
 
-    uint64_t new_capacity_64 = (uint64_t)htable->capacity * HASH_GROWTH_FACTOR;
+    old_capacity = atomic_load_explicit(&htable->capacity, memory_order_consume);
+    uint64_t new_capacity_64 = old_capacity * HASH_GROWTH_FACTOR;
     if (new_capacity_64 > SIZE_MAX)
         co_panic("re-size overflow");
 
-    old_capacity = htable->capacity;
-    old_buckets = htable->buckets;
+    old_buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_consume);
+    atomic_init(&htable->capacity, (size_t)new_capacity_64);
+    atomic_init(&htable->size, 0);
+    atomic_init(&htable->buckets, try_calloc(1, new_capacity_64 * sizeof(*(old_buckets))));
+    for (i = 0; i < new_capacity_64; i++) {
+        atomic_init(&htable->buckets[i], NULL);
+    }
 
-    htable->capacity = (u32)new_capacity_64;
-    htable->size = 0;
-    htable->buckets = try_calloc(1, htable->capacity * sizeof(*(htable->buckets)));
     for (i = 0; i < old_capacity; i++) {
-        crt_pair = old_buckets[ i ];
-        if (NULL != crt_pair && !oa_hash_is_tombstone(htable, i)) {
+        crt_pair = old_buckets[i];
+        if (!is_empty(crt_pair) && !oa_hash_is_tombstone(htable, i)) {
             oa_hash_put(htable, crt_pair->key, crt_pair->value);
             htable->key_ops.free(crt_pair->key, htable->key_ops.arg);
             htable->val_ops.free(crt_pair->value);
@@ -137,20 +145,21 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
 }
 
 static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable) {
-    return (htable->size / htable->capacity) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
+    return (atomic_load(&htable->size) / atomic_load(&htable->capacity)) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
 }
 
 void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
-    if (oa_hash_should_grow(htable)) {
+    if (oa_hash_should_grow(htable))
         oa_hash_grow(htable);
-    }
 
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % htable->capacity;
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
-    if (NULL == htable->buckets[ idx ]) {
+    oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
+    atomic_thread_fence(memory_order_seq_cst);
+    if (is_empty(buckets[idx])) {
         // Key doesn't exist & we add it anew
-        htable->buckets[ idx ] = oa_pair_new(
+        buckets[idx] = oa_pair_new(
             hash_val,
             htable->key_ops.cp(key, htable->key_ops.arg),
             htable->val_ops.cp(value, htable->val_ops.arg));
@@ -158,146 +167,153 @@ void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
         // // Probing for the next good index
         idx = oa_hash_getidx(htable, idx, hash_val, key, PUT);
 
-        if (NULL == htable->buckets[ idx ]) {
-            htable->buckets[ idx ] = oa_pair_new(
+        if (is_empty(buckets[idx])) {
+            buckets[idx] = oa_pair_new(
                 hash_val,
                 htable->key_ops.cp(key, htable->key_ops.arg),
                 htable->val_ops.cp(value, htable->val_ops.arg));
         } else {
             // Update the existing value
             // Free the old values
-            htable->val_ops.free(htable->buckets[ idx ]->value);
-            htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
+            htable->val_ops.free(buckets[idx]->value);
+            htable->key_ops.free(buckets[idx]->key, htable->key_ops.arg);
             // Update the new values
-            htable->buckets[ idx ]->value = htable->val_ops.cp(value, htable->val_ops.arg);
-            htable->buckets[ idx ]->key = htable->val_ops.cp(key, htable->key_ops.arg);
-            htable->buckets[ idx ]->hash = hash_val;
-            --htable->size;
+            buckets[idx]->value = htable->val_ops.cp(value, htable->val_ops.arg);
+            buckets[idx]->key = htable->val_ops.cp(key, htable->key_ops.arg);
+            buckets[idx]->hash = hash_val;
+            atomic_fetch_sub(&htable->size, 1);
         }
     }
 
-    htable->size++;
-    return htable->buckets[ idx ];
+    atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
+    atomic_fetch_add(&htable->size, 1);
+    return buckets[idx];
 }
 
 void_t oa_hash_replace(oa_hash *htable, const_t key, const_t value) {
-    if (oa_hash_should_grow(htable)) {
+    if (oa_hash_should_grow(htable))
         oa_hash_grow(htable);
-    }
 
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % htable->capacity;
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
     // // Probing for the next good index
     idx = oa_hash_getidx(htable, idx, hash_val, key, PUT);
 
-    if (NULL == htable->buckets[ idx ]) {
-        htable->buckets[ idx ] = oa_pair_new(
-            hash_val,
-            htable->key_ops.cp(key, htable->key_ops.arg),
+    oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
+    atomic_thread_fence(memory_order_seq_cst);
+    if (is_empty(buckets[idx])) {
+        buckets[idx] = oa_pair_new(
+            hash_val, htable->key_ops.cp(key, htable->key_ops.arg),
             htable->val_ops.cp(value, htable->val_ops.arg));
     } else {
         // Update the new values
-        memcpy(htable->buckets[ idx ]->value, value, sizeof(htable->buckets[ idx ]->value));
-        memcpy(htable->buckets[ idx ]->key, key, sizeof(htable->buckets[ idx ]->key));
-        htable->buckets[ idx ]->hash = hash_val;
-        --htable->size;
+        memcpy(buckets[idx]->value, value, sizeof(buckets[idx]->value));
+        memcpy(buckets[idx]->key, key, sizeof(buckets[idx]->key));
+        buckets[idx]->hash = hash_val;
+        atomic_fetch_sub(&htable->size, 1);
     }
 
-    htable->size++;
-    return htable->buckets[ idx ];
+    atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
+    atomic_fetch_add(&htable->size, 1);
+    return buckets[idx];
 }
 
-inline static bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
-    if (NULL == htable->buckets[ idx ]) {
+static CO_FORCE_INLINE bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
+    oa_pair *buckets = (oa_pair *)atomic_load(&htable->buckets[idx]);
+    if (is_empty(buckets))
         return false;
-    }
-    if (NULL == htable->buckets[ idx ]->key &&
-        NULL == htable->buckets[ idx ]->value &&
-        0 == htable->buckets[ idx ]->key) {
+
+    if (is_empty(buckets->key) && is_empty(buckets->value) && 0 == buckets->hash)
         return true;
-    }
+
     return false;
 }
 
-inline static void oa_hash_put_tombstone(oa_hash *htable, size_t idx) {
-    if (NULL != htable->buckets[ idx ]) {
-        htable->buckets[ idx ]->hash = 0;
-        htable->buckets[ idx ]->key = NULL;
-        htable->buckets[ idx ]->value = NULL;
+static CO_FORCE_INLINE void oa_hash_put_tombstone(oa_hash *htable, size_t idx) {
+    if (!is_empty(atomic_get(void_t, &htable->buckets[idx]))) {
+        oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
+        atomic_thread_fence(memory_order_seq_cst);
+        buckets[idx]->hash = 0;
+        buckets[idx]->key = NULL;
+        buckets[idx]->value = NULL;
+        atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
     }
 }
 
 void_t oa_hash_get(oa_hash *htable, const_t key) {
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % htable->capacity;
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
-    if (NULL == htable->buckets[ idx ]) {
+    if (is_empty(atomic_get(void_t, htable->buckets[idx])))
         return NULL;
-    }
 
     idx = oa_hash_getidx(htable, idx, hash_val, key, GET);
 
-    return (NULL == htable->buckets[ idx ]) ? NULL : htable->buckets[ idx ]->value;
+    return is_empty(atomic_get(void_t, &htable->buckets[idx]))
+        ? NULL
+        : (atomic_get(oa_pair *, &htable->buckets[idx]))->value;
 }
 
 bool oa_hash_has(oa_hash *htable, const_t key) {
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % htable->capacity;
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
-    if (NULL == htable->buckets[ idx ]) {
+    if (is_empty(atomic_get(void_t, &htable->buckets[idx])))
         return false;
-    }
 
     idx = oa_hash_getidx(htable, idx, hash_val, key, GET);
 
-    return (NULL == htable->buckets[idx]) ? false : true;
+    return is_empty(atomic_get(void_t, &htable->buckets[idx])) ? false : true;
 }
 
 void oa_hash_delete(oa_hash *htable, const_t key) {
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % htable->capacity;
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
-    if (NULL == htable->buckets[ idx ]) {
+    if (is_empty(atomic_get(void_t, &htable->buckets[idx])))
         return;
-    }
 
     idx = oa_hash_getidx(htable, idx, hash_val, key, DEL);
-    if (NULL == htable->buckets[ idx ]) {
+    if (is_empty(atomic_get(void_t, &htable->buckets[idx])))
         return;
-    }
 
-    htable->val_ops.free(htable->buckets[ idx ]->value);
-    htable->key_ops.free(htable->buckets[ idx ]->key, htable->key_ops.arg);
-    --htable->size;
+    oa_pair **buckets = (oa_pair **)atomic_load(&htable->buckets);
+    htable->val_ops.free(buckets[idx]->value);
+    htable->key_ops.free(buckets[idx]->key, htable->key_ops.arg);
+    atomic_fetch_sub(&htable->size, 1);
 
     oa_hash_put_tombstone(htable, idx);
 }
 
 void oa_hash_remove(oa_hash *htable, const_t key) {
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % htable->capacity;
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
-    if (NULL == htable->buckets[ idx ]) {
+    if (is_empty(atomic_get(void_t, &htable->buckets[idx])))
         return;
-    }
 
-    if (htable->buckets[idx]->value)
-        htable->buckets[idx]->value = NULL;
-    --htable->size;
+    oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
+    atomic_thread_fence(memory_order_seq_cst);
+    if (buckets[idx]->value)
+        buckets[idx]->value = NULL;
+
+    atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
+    atomic_fetch_sub(&htable->size, 1);
 }
 
 void oa_hash_print(oa_hash *htable, void (*print_key)(const_t k), void (*print_val)(const_t v)) {
     oa_pair *pair;
-    u32 i;
+    u32 i, capacity = (u32)atomic_load(&htable->capacity);
 
-    printf("Hash Capacity: %zu\n", (size_t)htable->capacity);
-    printf("Hash Size: %zu\n", htable->size);
+    printf("Hash Capacity: %zu\n", (size_t)capacity);
+    printf("Hash Size: %zu\n", (size_t)atomic_load(&htable->size));
 
     printf("Hash Buckets:\n");
-    for (i = 0; i < htable->capacity; i++) {
-        pair = htable->buckets[ i ];
-        if (NULL != pair) {
+    oa_pair **buckets = (oa_pair **)atomic_load(&htable->buckets);
+    for (i = 0; i < capacity; i++) {
+        pair = buckets[i];
+        if (!is_empty(pair)) {
             printf("\tbucket[%d]:\n", i);
             if (oa_hash_is_tombstone(htable, i)) {
                 printf("\t\t TOMBSTONE");
@@ -314,12 +330,12 @@ void oa_hash_print(oa_hash *htable, void (*print_key)(const_t k), void (*print_v
 
 void_t oa_hash_iter(oa_hash *htable, void_t variable, hash_iter_func func) {
     oa_pair *pair;
-    u32 i;
-    for (i = 0; i < htable->capacity; i++) {
-        pair = htable->buckets[ i ];
-        if (NULL != pair) {
+    u32 i, capacity = (u32)atomic_load(&htable->capacity);
+    oa_pair **buckets = (oa_pair **)atomic_load(&htable->buckets);
+    for (i = 0; i < capacity; i++) {
+        pair = buckets[i];
+        if (!is_empty(pair))
             variable = func(variable, pair->key, pair->value);
-        }
     }
 
     return variable;
@@ -327,20 +343,21 @@ void_t oa_hash_iter(oa_hash *htable, void_t variable, hash_iter_func func) {
 
 static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, const_t key, enum oa_ret_ops op) {
     do {
-        if (op == PUT && oa_hash_is_tombstone(htable, idx)) {
+        if (op == PUT && oa_hash_is_tombstone(htable, idx))
+            break;
+
+        if ((atomic_get(oa_pair *, &htable->buckets[idx]))->hash == hash_val &&
+            htable->key_ops.eq(key, (atomic_get(oa_pair *, &htable->buckets[idx]))->key, htable->key_ops.arg)) {
             break;
         }
-        if (htable->buckets[ idx ]->hash == hash_val &&
-            htable->key_ops.eq(key, htable->buckets[ idx ]->key, htable->key_ops.arg)) {
-            break;
-        }
+
         htable->probing_fct(htable, &idx);
-    } while (NULL != htable->buckets[ idx ]);
+    } while (!is_empty(atomic_get(void_t, &htable->buckets[idx])));
     return idx;
 }
 
 oa_pair *oa_pair_new(uint32_t hash, const_t key, const_t value) {
-    oa_pair *p = try_calloc(1, sizeof(*p) + sizeof(key) + sizeof(value) + 2);
+    oa_pair *p = try_calloc(1, sizeof(*p) + sizeof(key) + sizeof(value) + sizeof(hash));
 
     p->hash = hash;
     p->value = (void_t)value;
@@ -349,11 +366,10 @@ oa_pair *oa_pair_new(uint32_t hash, const_t key, const_t value) {
 }
 
 // Probing functions
-static inline void oa_hash_lp_idx(oa_hash *htable, size_t *idx) {
+static CO_FORCE_INLINE void oa_hash_lp_idx(oa_hash *htable, size_t *idx) {
     (*idx)++;
-    if ((*idx) == htable->capacity) {
+    if ((*idx) == (size_t)atomic_load(&htable->capacity))
         (*idx) = 0;
-    }
 }
 
 bool oa_string_eq(const_t data1, const_t data2, void_t arg) {
@@ -421,10 +437,10 @@ CO_FORCE_INLINE void oa_string_print(const_t data) {
     printf("%s", (string_t)data);
 }
 
-oa_key_ops oa_key_ops_string = { oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL };
-oa_val_ops oa_val_ops_struct = { oa_coroutine_cp, FUNC_VOID(co_delete), oa_value_eq, NULL };
-oa_val_ops oa_val_ops_string = { oa_string_cp, CO_FREE, oa_string_eq, NULL };
-oa_val_ops oa_val_ops_value = { oa_value_cp, CO_FREE, oa_value_eq, NULL };
+oa_key_ops oa_key_ops_string = {oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL};
+oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, FUNC_VOID(co_delete), oa_value_eq, NULL};
+oa_val_ops oa_val_ops_string = {oa_string_cp, CO_FREE, oa_string_eq, NULL};
+oa_val_ops oa_val_ops_value = {oa_value_cp, CO_FREE, oa_value_eq, NULL};
 oa_val_ops oa_val_ops_channel = {oa_channel_cp, FUNC_VOID(channel_free), oa_value_eq, NULL};
 
 CO_FORCE_INLINE wait_group_t *ht_event_init(u32 size) {

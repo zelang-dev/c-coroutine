@@ -29,7 +29,7 @@ int co_main(int argc, char **argv) {
     }
     wait_result_t *wgr = co_wait(wg);
 
-    printf("\nWorker # %d returned: %d\n", cid[3], work_group_result(wgr, cid[3]).integer);
-    printf("\nWorker # %d returned: %s\n", cid[2], work_group_result(wgr, cid[2]).char_ptr);
+    printf("\nWorker # %d returned: %d\n", cid[2], work_group_result(wgr, cid[2]).integer);
+    printf("\nWorker # %d returned: %s\n", cid[1], work_group_result(wgr, cid[1]).char_ptr);
     return 0;
 }

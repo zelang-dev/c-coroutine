@@ -865,13 +865,14 @@ typedef struct oa_pair_s {
     void_t value;
 } oa_pair;
 
+make_atomic(oa_pair, atomic_pair_t);
 typedef struct oa_hash_s oa_hash;
 struct oa_hash_s {
     value_types type;
     bool overriden;
-    u32 capacity;
-    size_t size;
-    oa_pair **buckets;
+    atomic_size_t capacity;
+    atomic_size_t size;
+    atomic_pair_t **buckets;
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx);
     oa_key_ops key_ops;
     oa_val_ops val_ops;

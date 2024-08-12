@@ -44,7 +44,7 @@ jobs:
             ./go_sleep
             ./go_select
             if [ "${{ matrix.target }}" != "arm" ]; then
-                ./go_wait_group
+                ./go_work_group
                 ./go_panic
             fi
             ./co_uv_fs

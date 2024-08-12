@@ -203,18 +203,21 @@ wait_result_t *co_wait(wait_group_t *wg) {
     wait_result_t *wgr = NULL;
     routine_t *co;
     bool has_erred = false;
-    u32 i;
+    void_t key;
+    oa_pair *pair;
+    u32 i, capacity;
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, FUNC_VOID(hash_free), wgr);
-        oa_pair *pair;
-        while (wg->size != 0) {
-            for (i = 0; i < wg->capacity; i++) {
-                pair = wg->buckets[i];
+        capacity = atomic_load(&wg->capacity);
+        while (atomic_load(&wg->size) != 0) {
+            for (i = 0; i < capacity; i++) {
+                pair = atomic_get(oa_pair *, &wg->buckets[i]);
                 if (!is_empty(pair) && !is_empty(pair->value)) {
                     co = (routine_t *)pair->value;
+                    key = pair->key;
                     if (!co_terminated(co)) {
                         if (!co->loop_active && co->status == CO_NORMAL)
                             sched_enqueue(co);
@@ -235,7 +238,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
                         }
 
                         if (co->loop_erred) {
-                            hash_remove(wg, pair->key);
+                            hash_remove(wg, key);
                             --c->wait_counter;
                             has_erred = true;
                             continue;
@@ -244,7 +247,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
                         if (co->loop_active)
                             co_deferred_free(co);
 
-                        hash_delete(wg, pair->key);
+                        hash_delete(wg, key);
                         --c->wait_counter;
                     }
                 }
