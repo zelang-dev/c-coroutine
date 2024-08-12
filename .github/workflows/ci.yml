@@ -33,7 +33,7 @@ jobs:
             ./go_channel
             ./go_sleep
             ./go_select
-            ./go_work_group
+            ./go_wait_group
             ./go_panic
             ./co_uv_fs
             ./co_uv_spawn
@@ -59,11 +59,11 @@ jobs:
       - name: Run test examples
         shell: cmd
         run: |
-            cd build\Release
+            cd build\Debug
             .\go_channel.exe
             .\go_sleep.exe
             .\go_select.exe
-            .\go_work_group.exe
+            .\go_wait_group.exe
             .\go_panic.exe
             .\co_uv_fs.exe
             .\co_uv_spawn.exe

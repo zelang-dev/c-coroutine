@@ -69,11 +69,11 @@ There are five simple ways to create coroutines:
     this is a shortcut to `coroutine_create(callable, *args, CO_STACK_SIZE)`.
 2. `co_await(callable, *args);` returns your _value_ inside a generic union **value_t** type, after coroutine fully completes.
     - This is a combine shortcut to four functions:
-    1. `work_group();` returns **hash-table** storing _coroutine-id's_ of any future created,
+    1. `wait_group();` returns **hash-table** storing _coroutine-id's_ of any future created,
     2. `co_go(callable, *args);` calls, will end with a call to,
     3. `co_wait(hash-table);` will suspend current coroutine, process coroutines until all are completed,
         returns **hash-table** of results for,
-    4. `work_group_result(hash-table, coroutine-id);` returns your _value_ inside a generic union **value_t** type.
+    4. `wait_result(hash-table, coroutine-id);` returns your _value_ inside a generic union **value_t** type.
 3. `co_execute(function, *args)` creates coroutine and immediately execute, does not return any value.
 4. `co_event(callable, *args)` same as `co_await()` but for **libuv** or any event driven like library.
 5. `co_handler(function, *handle, destructor)` initial setup for coroutine background handling of **http** _request/response_,
@@ -110,14 +110,14 @@ a terminated/finish status.
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and
 execution will begin for the group of coroutines, and wait for all to finished. */
-C_API wait_group_t *work_group(void);
+C_API wait_group_t *wait_group(void);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will
 wait for all to finished. Returns hast table of results, accessible by coroutine id. */
 C_API wait_result_t co_wait(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
-C_API value_t work_group_result(wait_result_t *, int);
+C_API value_t wait_result(wait_result_t *, int);
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t *channel(void);
@@ -634,7 +634,7 @@ void_t worker(void_t arg) {
 int co_main(int argc, char **argv)
 {
     int cid[5];
-    wait_group_t *wg = work_group();
+    wait_group_t *wg = wait_group();
     for (int i = 1; i <= 5; i++) {
        cid[i-1] = co_go(worker, &i);
     }
@@ -642,10 +642,10 @@ int co_main(int argc, char **argv)
 
     printf("\nWorker # %d returned: %d\n",
            cid[2],
-           work_group_result(wgr, cid[2]).integer);
+           wait_result(wgr, cid[2]).integer);
     printf("\nWorker # %d returned: %s\n",
            cid[1],
-           work_group_result(wgr, cid[1]).string);
+           wait_result(wgr, cid[1]).string);
     return 0;
 }
 </code></pre>

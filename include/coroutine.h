@@ -909,17 +909,17 @@ C_API ht_string_t *ht_string_init(void);
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
 
 The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
-C_API wait_group_t *work_group(void);
+C_API wait_group_t *wait_group(void);
 
 /* Set global wait group `hash table` initial capacity. */
-C_API void work_group_capacity(u32);
+C_API void wait_capacity(u32);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */
 C_API wait_result_t *co_wait(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
-C_API value_t work_group_result(wait_result_t *, u32);
+C_API value_t wait_result(wait_result_t *, u32);
 
 C_API void co_result_set(routine_t *, void_t);
 C_API void co_plain_set(routine_t *, size_t);

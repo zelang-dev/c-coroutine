@@ -38,7 +38,7 @@ jobs:
             ./go_channel
             ./go_sleep
             ./go_select
-            ./go_work_group
+            ./go_wait_group
             ./go_panic
             ./co_cpp_future_wait
             ./co_uv_fs

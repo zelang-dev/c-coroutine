@@ -46,8 +46,8 @@ int co_main(int argc, char **argv) {
     if (argc > 1)
         numRoutines = (u32)atoi(argv[1]);
 
-    work_group_capacity(Kb(25));
-    wait_group_t *wg = work_group();
+    wait_capacity(Kb(25));
+    wait_group_t *wg = wait_group();
     for (i = 0; i < numRoutines; i++) {
         co_go(func, NULL);
     }

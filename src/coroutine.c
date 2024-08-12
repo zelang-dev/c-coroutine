@@ -128,13 +128,13 @@ CO_FORCE_INLINE bool co_terminated(routine_t *co) {
 }
 
 value_t co_await(callable_t fn, void_t arg) {
-    wait_group_t *wg = work_group();
+    wait_group_t *wg = wait_group();
     u32 cid = co_go(fn, arg);
     wait_result_t *wgr = co_wait(wg);
     if (is_empty(wgr))
         return;
 
-    return work_group_result(wgr, cid);
+    return wait_result(wgr, cid);
 }
 
 value_t co_event(callable_t fn, void_t arg) {
@@ -185,11 +185,11 @@ void co_process(func_t fn, void_t args) {
     hash_free(eg);
 }
 
-CO_FORCE_INLINE void work_group_capacity(u32 size) {
+CO_FORCE_INLINE void wait_capacity(u32 size) {
     hash_capacity(size + (size * 0.333334));
 }
 
-wait_group_t *work_group(void) {
+wait_group_t *wait_group(void) {
     routine_t *c = co_active();
     wait_group_t *wg = ht_group_init();
     c->wait_active = true;
@@ -262,7 +262,7 @@ wait_result_t *co_wait(wait_group_t *wg) {
     return has_erred ? NULL : wgr;
 }
 
-value_t work_group_result(wait_result_t *wgr, u32 cid) {
+value_t wait_result(wait_result_t *wgr, u32 cid) {
     if (is_empty(wgr))
         return;
 
