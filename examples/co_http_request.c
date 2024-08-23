@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int co_main(int argc, char *argv[]) {
     http_t *parser = http_for(HTTP_REQUEST, NULL, 1.1);

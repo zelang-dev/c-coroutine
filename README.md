@@ -65,16 +65,16 @@ This **page**, `coroutine.h` and _examples folder_ files is the only current doc
 The _coroutine execution_ part here is _completed_, but how it operates/behaves with other system resources is what still being developed and tested.
 
 There are five simple ways to create coroutines:
-1. `co_go(callable, *args);` schedules and returns **int** _coroutine id_, needed by other internal functions,
+1. `go(callable, *args);` schedules and returns **int** _coroutine id_, needed by other internal functions,
     this is a shortcut to `coroutine_create(callable, *args, CO_STACK_SIZE)`.
 2. `co_await(callable, *args);` returns your _value_ inside a generic union **value_t** type, after coroutine fully completes.
     - This is a combine shortcut to four functions:
     1. `wait_group();` returns **hash-table** storing _coroutine-id's_ of any future created,
-    2. `co_go(callable, *args);` calls, will end with a call to,
-    3. `co_wait(hash-table);` will suspend current coroutine, process coroutines until all are completed,
+    2. `go(callable, *args);` calls, will end with a call to,
+    3. `wait_for(hash-table);` will suspend current coroutine, process coroutines until all are completed,
         returns **hash-table** of results for,
     4. `wait_result(hash-table, coroutine-id);` returns your _value_ inside a generic union **value_t** type.
-3. `co_execute(function, *args)` creates coroutine and immediately execute, does not return any value.
+3. `launch(function, *args)` creates coroutine and immediately execute, does not return any value.
 4. `co_event(callable, *args)` same as `co_await()` but for **libuv** or any event driven like library.
 5. `co_handler(function, *handle, destructor)` initial setup for coroutine background handling of **http** _request/response_,
     the _destructor_ function is passed to `co_defer()`
@@ -108,13 +108,13 @@ same behavior of Go's waitGroups, but without passing struct or indicating when 
 All coroutines here behaves like regular functions, meaning they return values, and indicate
 a terminated/finish status.
 
-The initialization ends when `co_wait()` is called, as such current coroutine will pause, and
+The initialization ends when `wait_for()` is called, as such current coroutine will pause, and
 execution will begin for the group of coroutines, and wait for all to finished. */
 C_API wait_group_t *wait_group(void);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will
 wait for all to finished. Returns hast table of results, accessible by coroutine id. */
-C_API wait_result_t co_wait(wait_group_t *);
+C_API wait_result_t wait_for(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
 C_API value_t wait_result(wait_result_t *, int);
@@ -127,10 +127,10 @@ similar to golang channels. */
 C_API channel_t *channel_buf(int);
 
 /* Send data to the channel. */
-C_API int co_send(channel_t *, void_t);
+C_API int chan_send(channel_t *, void_t);
 
 /* Receive data from the channel. */
-C_API value_t *co_recv(channel_t *);
+C_API value_t *chan_recv(channel_t *);
 
 /* The `for_select {` macro sets up a coroutine to wait on multiple channel operations.
 Must be closed out with `} select_end;`, and if no `select_case(channel)`, `select_case_if(channel)`,
@@ -140,12 +140,12 @@ This behaves same as GoLang `select {}` statement.
 */
 for_select {
     select_case(channel) {
-        co_send(channel, void_t data);
+        chan_send(channel, void_t data);
         // Or
-        value_t *r = co_recv(channel);
+        value_t *r = chan_recv(channel);
     // Or
     } select_case_if(channel) {
-        // co_send(channel); || co_recv(channel);
+        // chan_send(channel); || chan_recv(channel);
 
     /* The `select_default` is run if no other case is ready.
     Must also closed out with `select_break;`. */
@@ -156,10 +156,10 @@ for_select {
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
-C_API int co_go(callable_t, void_t);
+C_API int go(callable_t, void_t);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
-C_API void co_execute(co_call_t, void_t);
+C_API void launch(co_call_t, void_t);
 
 /* Explicitly give up the CPU for at least ms milliseconds.
 Other tasks continue to run during this time. */
@@ -270,7 +270,7 @@ func greetings(name string) {
 <td>
 
 ```c
-# include "../include/coroutine.h"
+# include "coroutine.h"
 
 void_t greetings(void_t arg)
 {
@@ -286,8 +286,8 @@ void_t greetings(void_t arg)
 int co_main(int argc, char **argv)
 {
     puts("Start of main Goroutine");
-    co_go(greetings, "John");
-    co_go(greetings, "Mary");
+    go(greetings, "John");
+    go(greetings, "Mary");
     sleep_for(1000);
     puts("End of main Goroutine");
     return 0;
@@ -338,14 +338,14 @@ func sendData(ch chan string) {
 <td>
 
 ```c
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 void_t sendData(void_t arg)
 {
     channel_t *ch = (channel_t *)arg;
 
     // data sent to the channel
-    co_send(ch, "Received. Send Operation Successful");
+    chan_send(ch, "Received. Send Operation Successful");
     puts("No receiver! Send Operation Blocked");
 
     return 0;
@@ -357,9 +357,9 @@ int co_main(int argc, char **argv)
     channel_t *ch = channel();
 
     // function call with goroutine
-    co_go(sendData, ch);
+    go(sendData, ch);
     // receive channel data
-    printf("%s\n", co_recv(ch)->value.str);
+    printf("%s\n", chan_recv(ch)->value.str);
 
     return 0;
 }
@@ -414,7 +414,7 @@ func main() {
 <td>
 
 ```c
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int fibonacci(channel_t *c, channel_t *quit)
 {
@@ -422,12 +422,12 @@ int fibonacci(channel_t *c, channel_t *quit)
     int y = 1;
     for_select {
         select_case(c) {
-            co_send(c, &x);
+            chan_send(c, &x);
             unsigned long tmp = x + y;
             x = y;
             y = tmp;
         } select_case_if(quit) {
-            co_recv(quit);
+            chan_recv(quit);
             puts("quit");
             return 0;
         } select_break;
@@ -441,9 +441,9 @@ void_t func(void_t args)
 
     for (int i = 0; i < 10; i++)
     {
-        printf("%d\n", co_recv(c).integer);
+        printf("%d\n", chan_recv(c).integer);
     }
-    co_send(quit, 0);
+    chan_send(quit, 0);
 
     return 0;
 }
@@ -456,7 +456,7 @@ int co_main(int argc, char **argv)
 
     args[0] = c;
     args[1] = quit;
-    co_go(func, args);
+    go(func, args);
     return fibonacci(c, quit);
 }
 ```
@@ -511,7 +511,7 @@ func divByZero() {
 <td>
 
 ```c
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int div_err(int x, int y)
 {
@@ -537,7 +537,7 @@ void divByZero(void *arg)
 
 int co_main(int argc, char **argv)
 {
-    co_execute(divByZero, NULL);
+    launch(divByZero, NULL);
     printf("Although panicked. We recovered. We call mul() func\n");
     printf("mul func result: %d\n", mul(5, 10));
     return 0;
@@ -598,7 +598,7 @@ func main() {
 <td>
 
 ```c
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 void_t worker(void_t arg)
 {
@@ -622,9 +622,9 @@ int co_main(int argc, char **argv)
     wait_group_t *wg = wait_group();
     for (int i = 1; i <= 5; i++)
     {
-       cid[i-1] = co_go(worker, &i);
+       cid[i-1] = go(worker, &i);
     }
-    wait_result_t *wgr = co_wait(wg);
+    wait_result_t *wgr = wait_for(wg);
 
     printf("\nWorker # %d returned: %d\n",
            cid[2],
@@ -693,7 +693,7 @@ int main ()
 <p>
 
 ```c
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
 void_t is_prime(void_t arg)

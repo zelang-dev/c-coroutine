@@ -566,7 +566,8 @@ typedef enum {
 } pool_error_t;
 
 typedef enum {
-    pool_graceful       = 1
+    pool_graceful       = 1,
+    pool_kill           = 3
 } thrd_destroy_flags_t;
 
 /**
@@ -592,8 +593,8 @@ int thrd_add(thrd_pool_t *pool, void (*routine)(void *), void *arg);
  * @param pool  Thread pool to destroy.
  * @param flags Flags for shutdown
  *
- * Known values for flags are 0 (default) and `pool_graceful` in
- * which case the thread pool doesn't accept any new tasks but
+ * Known values for flags are 0 (default), `pool_kill` sends signal to immediately terminate,
+ * and `pool_graceful` in which case the thread pool doesn't accept any new tasks but
  * processes all pending tasks before shutdown.
  */
 int thrd_destroy(thrd_pool_t *pool, int flags);

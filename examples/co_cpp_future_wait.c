@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
 void *is_prime(void *arg) {

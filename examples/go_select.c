@@ -1,16 +1,16 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int fibonacci(channel_t *c, channel_t *quit) {
     int x = 0;
     int y = 1;
     for_select {
         select_case(c) {
-            co_send(c, &x);
+            chan_send(c, &x);
             unsigned long tmp = x + y;
             x = y;
             y = tmp;
         } select_case_if(quit) {
-            co_recv(quit);
+            chan_recv(quit);
             puts("quit");
             return 0;
         } select_break;
@@ -24,9 +24,9 @@ void *func(void *args) {
     defer(delete, c);
 
     for (int i = 0; i < 10; i++) {
-        printf("%d\n", co_recv(c).integer);
+        printf("%d\n", chan_recv(c).integer);
     }
-    co_send(quit, 0);
+    chan_send(quit, 0);
 
     printf("\nChannel `quit` type is: %d, validity: %d\n", type_of(quit), is_instance(quit));
 
@@ -42,6 +42,6 @@ void *func(void *args) {
 
 int co_main(int argc, char **argv) {
     args_t *params = args_for("pp", channel(), channel());
-    co_go(func, params);
+    go(func, params);
     return fibonacci(args_in(params, 0).object, args_in(params, 1).object);
 }

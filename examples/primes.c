@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int quiet = 0;
 int goal = 0;
@@ -9,7 +9,7 @@ void *prime_co(void *arg) {
     int p, i;
     c = arg;
 
-    p = co_recv(c).integer;
+    p = chan_recv(c).integer;
     if (p > goal)
         return 0;
     if (!quiet) {
@@ -17,11 +17,11 @@ void *prime_co(void *arg) {
         printf("%d\n", p);
     }
     nc = channel_buf(buffer);
-    co_go(prime_co, nc);
+    go(prime_co, nc);
     for (;;) {
-        i = co_recv(c).integer;
+        i = chan_recv(c).integer;
         if (i % p)
-            co_send(nc, &i);
+            chan_send(nc, &i);
     }
 
     return 0;
@@ -38,9 +38,9 @@ int co_main(int argc, char **argv) {
     printf("goal=%d\n", goal);
 
     c = channel_buf(buffer);
-    co_go(prime_co, c);
+    go(prime_co, c);
     for (i = 2;; i++)
-        co_send(c, &i);
+        chan_send(c, &i);
 
     return 0;
 }

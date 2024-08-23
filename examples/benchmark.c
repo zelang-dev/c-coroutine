@@ -46,12 +46,11 @@ int co_main(int argc, char **argv) {
     if (argc > 1)
         numRoutines = (u32)atoi(argv[1]);
 
-    wait_capacity(Kb(25));
     wait_group_t *wg = wait_group();
     for (i = 0; i < numRoutines; i++) {
-        co_go(func, NULL);
+        go(func, NULL);
     }
-    co_wait(wg);
+    wait_for(wg);
 
     printf("\nAll coroutines finished.\n");
     return 0;

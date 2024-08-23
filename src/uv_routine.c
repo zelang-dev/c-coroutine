@@ -28,8 +28,8 @@ static uv_args_t *uv_arguments(int count, bool auto_free) {
 }
 
 void_t uv_error_post(routine_t *co, int r) {
-    co->loop_erred = true;
-    co->loop_code = r;
+    co->is_event_err = true;
+    co->event_err_code = r;
     co->status = CO_ERRED;
     fprintf(stderr, "failed: %s\n", uv_strerror(r));
     return NULL;
@@ -117,7 +117,7 @@ static void error_catch(void_t uv) {
         co->scope->is_recovered = true;
         if (uv_loop_alive(co_loop()) && sched_server_args()) {
             co->halt = true;
-            co->loop_erred = true;
+            co->is_event_err = true;
             co->status = CO_ERRED;
             sched_event_cleanup(co);
             memset(sched_server_args(), 0, sizeof(uv_args_t));
@@ -184,9 +184,9 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     co->halt = true;
     if (0 == status) {
         co->is_address = true;
-        co_result_set(co, STREAM(ut->tcp_hdl));
+        co_result_set(co, streamer(ut->tcp_hdl));
     } else {
-        co->loop_code = status;
+        co->event_err_code = status;
         co_plain_set(co, -1);
     }
 
@@ -231,11 +231,11 @@ static void connection_cb(uv_stream_t *server, int status) {
         }
 
         if (uv->bind_type != UV_TLS && !r)
-            r = uv_accept(server, STREAM(handle));
+            r = uv_accept(server, streamer(handle));
 
         if (uv->bind_type != UV_TLS && !r) {
             co->is_address = true;
-            co_result_set(co, STREAM(handle));
+            co_result_set(co, streamer(handle));
         }
     }
 
@@ -244,7 +244,7 @@ static void connection_cb(uv_stream_t *server, int status) {
         if (!is_empty(handle))
             CO_FREE(handle);
 
-        co->loop_code = r;
+        co->event_err_code = r;
         co_plain_set(co, (size_t)status);
     }
 
@@ -414,7 +414,7 @@ static void_t fs_init(void_t uv_args) {
     int flags, mode;
     int result = -4058;
 
-    co_defer(FUNC_VOID(uv_fs_req_cleanup), req);
+    co_defer(VOID_FUNC(uv_fs_req_cleanup), req);
     if (fs->is_path) {
         string_t path = var_char_ptr(args[0]);
         switch (fs->fs_type) {
@@ -550,8 +550,6 @@ static void_t fs_init(void_t uv_args) {
 static void_t uv_init(void_t uv_args) {
     uv_args_t *uv = (uv_args_t *)uv_args;
     values_t *args = uv->args;
-    char ip[32];
-    struct sockaddr name;
     int length;
     int result = -4083;
 
@@ -566,7 +564,7 @@ static void_t uv_init(void_t uv_args) {
                     result = uv_tls_write((uv_tls_t *)stream, &uv->bufs, tls_write_cb);
                 } else {
                     req = co_new_by(1, sizeof(uv_write_t));
-                    result = uv_write((uv_write_t *)req, STREAM(stream), &uv->bufs, 1, write_cb);
+                    result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb);
                 }
                 break;
             case UV_CONNECT:
@@ -624,30 +622,29 @@ static void_t uv_init(void_t uv_args) {
             case UV_SERVER_LISTEN:
                 result = uv_listen((uv_stream_t *)stream, var_int(args[1]), connection_cb);
                 if (!result) {
-                    memset(&name, -1, sizeof length);
-                    length = sizeof name;
+                    length = sizeof uv->name;
                     switch (uv->bind_type) {
                         case UV_NAMED_PIPE:
                             break;
                         case UV_UDP:
-                            result = uv_udp_getsockname((const uv_udp_t *)stream, &name, &length);
+                            result = uv_udp_getsockname((const uv_udp_t *)stream, uv->name, &length);
                             break;
                         default:
-                            result = uv_tcp_getsockname((const uv_tcp_t *)stream, &name, &length);
+                            result = uv_tcp_getsockname((const uv_tcp_t *)stream, uv->name, &length);
                             break;
                     }
 
                     if (is_str_in(var_char_ptr(args[3]), ":")) {
-                        uv_ip6_name((const struct sockaddr_in6 *)&name, (char *)ip, sizeof ip);
+                        uv_ip6_name((const struct sockaddr_in6 *)uv->name, uv->ip, sizeof uv->ip);
                     } else if (is_str_in(var_char_ptr(args[3]), ".")) {
-                        uv_ip4_name((const struct sockaddr_in *)&name, (char *)ip, sizeof ip);
+                        uv_ip4_name((const struct sockaddr_in *)uv->name, uv->ip, sizeof uv->ip);
                     }
 
                     if (is_empty(sched_server_args()))
                         sched_server_set(*uv);
 
                     printf("Listening to %s:%d for%s connections, %s.\n",
-                           ip,
+                           uv->ip,
                            var_int(args[4]),
                            (uv->bind_type == UV_TLS ? " secure" : ""),
                            http_std_date(0)
@@ -682,7 +679,7 @@ static void_t uv_init(void_t uv_args) {
     }
 
     if (result) {
-        uv->context->context->loop_code = result;
+        uv->context->context->event_err_code = result;
         uv_error_post(uv->context, result);
         co_resuming(uv->context->context);
     }
@@ -780,9 +777,9 @@ int fs_write_file(string_t path, string_t text) {
 
 CO_FORCE_INLINE void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
     if (is_tls((uv_handle_t *)client))
-        co_handler(FUNC_VOID(connected), client, tls_close_free);
+        co_handler(VOID_FUNC(connected), client, tls_close_free);
     else
-        co_handler(FUNC_VOID(connected), client, uv_close_free);
+        co_handler(VOID_FUNC(connected), client, uv_close_free);
 }
 
 int stream_write(uv_stream_t *handle, string_t text) {
@@ -858,7 +855,7 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
             if (r) {
                 return uv_error_post(co_active(), r);
             }
-            return STREAM(handle);
+            return streamer(handle);
         case UV_TLS:
             if (is_str_eq(name, "localhost"))
                 uv_os_gethostname(name, &len);
@@ -992,7 +989,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
         uv_handle_set_data((uv_handle_t *)handle, (void_t)uv_args);
 
 
-    return STREAM(handle);
+    return streamer(handle);
 }
 
 void coro_uv_close(uv_handle_t *handle) {
@@ -1072,7 +1069,7 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
 
     if (!is_empty(child->handle->exiting_cb)) {
         co->user_data = (void_t)child->handle->exiting_cb;
-        co->loop_code = (signed int)exit_status;
+        co->event_err_code = (signed int)exit_status;
         co->results = &term_signal;
     }
 
@@ -1111,7 +1108,7 @@ static void spawning(void_t uv_args) {
     routine_t *co = co_active();
 
     uv_handle_set_data((uv_handle_t *)&child->process, (void_t)child);
-    co->loop_code = uv_spawn(co_loop(), child->process, child->handle->options);
+    co->event_err_code = uv_spawn(co_loop(), child->process, child->handle->options);
     defer(spawn_free, child);
     if (!is_empty(child->handle->data))
         CO_FREE(child->handle->data);
@@ -1120,7 +1117,7 @@ static void spawning(void_t uv_args) {
     CO_FREE(var_ptr(args[1]));
     uv_arguments_free(uv);
 
-    if (!co->loop_code) {
+    if (!co->event_err_code) {
         while (true) {
             if (!co_terminated(co)) {
                 co_info(co, 1);
@@ -1128,14 +1125,14 @@ static void spawning(void_t uv_args) {
             } else {
                 if (!is_empty(co->user_data)) {
                     exiting_cb = (spawn_cb)co->user_data;
-                    exiting_cb(co->loop_code, co_value(co->results).integer);
+                    exiting_cb(co->event_err_code, co_value(co->results).integer);
                 }
 
                 break;
             }
         }
     } else {
-        RAII_INFO("Process launch failed with: %s\n", uv_strerror(co->loop_code));
+        RAII_INFO("Process launch failed with: %s\n", uv_strerror(co->event_err_code));
     }
 }
 
@@ -1237,14 +1234,14 @@ int spawn_detach(spawn_t *child) {
         co_yield();
     }
 
-    return ((routine_t *)child->handle->data)->loop_code;
+    return ((routine_t *)child->handle->data)->event_err_code;
 }
 
 CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
     co_yield();
 
-    return ((routine_t *)child->handle->data)->loop_code;
+    return ((routine_t *)child->handle->data)->event_err_code;
 }
 
 int spawn_in(spawn_t *child, stdin_cb std_func) {
@@ -1253,9 +1250,9 @@ int spawn_in(spawn_t *child, stdin_cb std_func) {
     uv_args->args[0].value.object = child;
     uv_args->args[1].value.func = (callable_t)std_func;
     uv_args->args[2].value.object = ipc_in(child);
-    co_go(stdio_handler, uv_args);
+    go(stdio_handler, uv_args);
 
-    return ((routine_t *)child->handle->data)->loop_code;
+    return ((routine_t *)child->handle->data)->event_err_code;
 }
 
 int spawn_out(spawn_t *child, stdout_cb std_func) {
@@ -1264,9 +1261,9 @@ int spawn_out(spawn_t *child, stdout_cb std_func) {
     uv_args->args[0].value.object = child;
     uv_args->args[1].value.func = (callable_t)std_func;
     uv_args->args[2].value.object = ipc_out(child);
-    co_go(stdio_handler, uv_args);
+    go(stdio_handler, uv_args);
 
-    return ((routine_t *)child->handle->data)->loop_code;
+    return ((routine_t *)child->handle->data)->event_err_code;
 }
 
 int spawn_err(spawn_t *child, stderr_cb std_func) {
@@ -1275,9 +1272,9 @@ int spawn_err(spawn_t *child, stderr_cb std_func) {
     uv_args->args[0].value.object = child;
     uv_args->args[1].value.func = (callable_t)std_func;
     uv_args->args[2].value.object = ipc_err(child);
-    co_go(stdio_handler, uv_args);
+    go(stdio_handler, uv_args);
 
-    return ((routine_t *)child->handle->data)->loop_code;
+    return ((routine_t *)child->handle->data)->event_err_code;
 }
 
 CO_FORCE_INLINE int spawn_pid(spawn_t *child) {

@@ -4,7 +4,7 @@ void *sendData(void *arg) {
     channel_t *ch = (channel_t *)arg;
 
     // data sent to the channel
-    co_send(ch, "Received. Send Operation Successful");
+    chan_send(ch, "Received. Send Operation Successful");
     puts("No receiver! Send Operation Blocked");
 
     return 0;
@@ -15,9 +15,9 @@ int co_main(int argc, char **argv) {
     channel_t *ch = channel();
 
     // function call with goroutine
-    co_go(sendData, ch);
+    go(sendData, ch);
     // receive channel data
-    printf("%s\n", co_recv(ch).const_char);
+    printf("%s\n", chan_recv(ch).const_char);
 
     return 0;
 }

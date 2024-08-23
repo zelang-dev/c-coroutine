@@ -11,7 +11,7 @@
 #define C_API extern
 #endif
 
-#define STREAM(handle) ((uv_stream_t *)handle)
+#define streamer(handle) ((uv_stream_t *)handle)
 
 #define var_int(arg) (arg).value.integer
 #define var_long(arg) (arg).value.s_long

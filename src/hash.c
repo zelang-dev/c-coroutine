@@ -438,12 +438,12 @@ CO_FORCE_INLINE void oa_string_print(const_t data) {
 }
 
 oa_key_ops oa_key_ops_string = {oa_string_hash, oa_string_cp, oa_string_free, oa_string_eq, NULL};
-oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, FUNC_VOID(co_delete), oa_value_eq, NULL};
+oa_val_ops oa_val_ops_struct = {oa_coroutine_cp, VOID_FUNC(co_delete), oa_value_eq, NULL};
 oa_val_ops oa_val_ops_string = {oa_string_cp, CO_FREE, oa_string_eq, NULL};
 oa_val_ops oa_val_ops_value = {oa_value_cp, CO_FREE, oa_value_eq, NULL};
-oa_val_ops oa_val_ops_channel = {oa_channel_cp, FUNC_VOID(channel_free), oa_value_eq, NULL};
+oa_val_ops oa_val_ops_channel = {oa_channel_cp, VOID_FUNC(channel_free), oa_value_eq, NULL};
 
-CO_FORCE_INLINE wait_group_t *ht_event_init(u32 size) {
+CO_FORCE_INLINE wait_group_t *ht_wait_init(u32 size) {
     return (wait_group_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, size);
 }
 

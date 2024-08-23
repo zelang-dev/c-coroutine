@@ -29,7 +29,7 @@ channel_t *channel_create(int elem_size, int bufsize) {
     c->elem_size = elem_size;
     c->bufsize = bufsize;
     c->nbuf = 0;
-    c->tmp = s;
+    c->data = s;
     c->select_ready = false;
     c->buf = (unsigned char *)(c + 1);
     c->type = CO_CHANNEL;
@@ -47,15 +47,13 @@ CO_FORCE_INLINE channel_t *channel_buf(int elem_count) {
 }
 
 void channel_free(channel_t *c) {
-    if (is_empty(c))
-        return;
-
-    if (is_type(c, CO_CHANNEL)) {
+    if (!is_empty(c) && is_type(c, CO_CHANNEL)) {
+        c->type = -1;
         int id = c->id;
         if (!is_empty(c->name))
             CO_FREE(c->name);
 
-        CO_FREE(c->tmp);
+        CO_FREE(c->data);
         CO_FREE(c->a_recv.a);
         CO_FREE(c->a_send.a);
         memset(c, 0, sizeof(value_types));
@@ -244,7 +242,7 @@ static int channel_proc(channel_co_t *a) {
     can_block = a[ i ].op == CHANNEL_END;
 
     t = co_coroutine();
-    t->channeled = true;
+    t->is_channeling = true;
     t->taken = true;
     for (i = 0; i < n; i++) {
         a[ i ].co = t;
@@ -301,9 +299,10 @@ static int channel_proc(channel_co_t *a) {
             channel_co_enqueue(&a[ i ]);
     }
 
-    a[ 0 ].c->select_ready = true;
+    a[0].c->select_ready = true;
+    sched_checker_stealer();
     co_suspend();
-    t->channeled = false;
+    t->is_channeling = false;
 
     /*
      * the guy who ran the op took care of dequeueing us
@@ -345,11 +344,11 @@ static int _channel_op(channel_t *c, unsigned int op, void_t p, unsigned int can
     return 1;
 }
 
-int co_send(channel_t *c, void_t v) {
+int chan_send(channel_t *c, void_t v) {
     return _channel_op(c, CHANNEL_SEND, v, 1);
 }
 
-value_t co_recv(channel_t *c) {
-    _channel_op(c, CHANNEL_RECV, c->tmp, 1);
-    return c->tmp->value;
+value_t chan_recv(channel_t *c) {
+    _channel_op(c, CHANNEL_RECV, c->data, 1);
+    return c->data->value;
 }

@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 char buf[] = "blablabla\n";
 const char *path = "write.tmp";
@@ -9,7 +9,7 @@ int co_main(int argc, char *argv[]) {
     printf("\nFile closed, status: %d\n", fs_close(fd));
     fd = fs_open(__FILE__, O_RDONLY, 0);
     printf("\nFile opened, fd: %d\n", fd);
-    printf("\nFile read: %s\n", fs_read(fd, 761));
+    printf("\nFile read: %s\n", fs_read(fd, 750));
     printf("\nFile really closed, status: %d\n", fs_close(fd));
 
     fd = fs_open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);

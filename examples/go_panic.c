@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int div_err(int x, int y) {
     return x / y;
@@ -19,7 +19,7 @@ void divByZero(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    co_execute(divByZero, NULL);
+    launch(divByZero, NULL);
     printf("Although panicked. We recovered. We call mul() func\n");
     printf("mul func result: %d\n", mul(5, 10));
     return 0;

@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 int co_main(int argc, char *argv[]) {
     char hostname[UV_MAXHOSTNAMESIZE];

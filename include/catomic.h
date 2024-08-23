@@ -49,7 +49,8 @@ typedef unsigned short          c89atomic_uint16;
 typedef   signed int            c89atomic_int32;
 typedef unsigned int            c89atomic_uint32;
 #if defined(_MSC_VER) && !defined(__clang__)
-    typedef   signed __int64    c89atomic_int64;
+#define c89atomic_is_lock_free(obj) (sizeof((obj)) <= sizeof(void *))
+typedef   signed __int64    c89atomic_int64;
     typedef unsigned __int64    c89atomic_uint64;
 #else
     typedef   signed long long  c89atomic_int64;
@@ -560,18 +561,7 @@ typedef unsigned char           c89atomic_bool;
             }
         }
     #else
-        /* Can't use MemoryBarrier() for this as it require Windows headers which we want to avoid in the header section of c89atomic. */
-        #if defined(C89ATOMIC_X64)
-            #define c89atomic_thread_fence(order)   __faststorefence(), (void)order
-        #elif defined(C89ATOMIC_ARM64)
-            #define c89atomic_thread_fence(order)   __dmb(_ARM64_BARRIER_ISH), (void)order
-        #else
-            static C89ATOMIC_INLINE void c89atomic_thread_fence(c89atomic_memory_order order)
-            {
-                volatile c89atomic_uint32 barrier = 0;
-                c89atomic_fetch_add_explicit_32(&barrier, 0, order);
-            }
-        #endif  /* C89ATOMIC_X64 */
+        #define c89atomic_thread_fence(order)   MemoryBarrier()
     #endif
 
 
@@ -580,9 +570,7 @@ typedef unsigned char           c89atomic_bool;
     any reshuffling. If anybody has a better idea on this please let me know! Cannot use _ReadWriteBarrier() as it has been marked as deprecated.
     */
     #define c89atomic_compiler_fence()      c89atomic_thread_fence(c89atomic_memory_order_seq_cst)
-
-    /* I'm not sure how to implement this for MSVC. For now just using thread_fence(). */
-    #define c89atomic_signal_fence(order)   c89atomic_thread_fence(order)
+    #define c89atomic_signal_fence(order)   _ReadWriteBarrier()
 
 
     /* Atomic loads can be implemented in terms of a compare-and-swap. Need to implement as functions to silence warnings about `order` being unused. */
@@ -1902,36 +1890,22 @@ typedef unsigned char           c89atomic_bool;
 #if !defined(C89ATOMIC_HAS_NATIVE_IS_LOCK_FREE)
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_8(volatile void* ptr)
     {
-        (void)ptr;
-        return 1;
+        return (c89atomic_bool)c89atomic_is_lock_free(ptr);
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_16(volatile void* ptr)
     {
-        (void)ptr;
-        return 1;
+        return (c89atomic_bool)c89atomic_is_lock_free(ptr);
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_32(volatile void* ptr)
     {
-        (void)ptr;
-        return 1;
+        return (c89atomic_bool)c89atomic_is_lock_free(ptr);
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_64(volatile void* ptr)
     {
-        (void)ptr;
-
-        /* For 64-bit atomics, we can only safely say atomics are lock free on 64-bit architectures or x86. Otherwise we need to be conservative and assume not lock free. */
-    #if defined(C89ATOMIC_64BIT)
-        return 1;
-    #else
-        #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            return 1;
-        #else
-            return 0;
-        #endif
-    #endif
+        return (c89atomic_bool)c89atomic_is_lock_free(ptr);
     }
 #endif  /* C89ATOMIC_HAS_NATIVE_IS_LOCK_FREE */
 
@@ -2571,8 +2545,8 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #define atomic_swap(P, E, D)    __atomic_compare_exchange_n((P), (E), (D), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 
-/* reads an atomic_flag, `relaxed` */
-#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_relaxed)
+/* reads an atomic_flag */
+#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_seq_cst)
 
 /* sets an atomic_flag to false */
 #define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)

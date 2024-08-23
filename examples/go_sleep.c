@@ -1,5 +1,5 @@
 
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 void *greetings(void *arg) {
     const char *name = c_const_char(arg);
@@ -12,8 +12,8 @@ void *greetings(void *arg) {
 
 int co_main(int argc, char **argv) {
     puts("Start of main Goroutine");
-    co_go(greetings, "John");
-    co_go(greetings, "Mary");
+    go(greetings, "John");
+    go(greetings, "Mary");
     sleep_for(1000);
     puts("\nEnd of main Goroutine");
     return 0;

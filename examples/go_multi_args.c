@@ -13,9 +13,9 @@ void *worker(void *arg) {
 }
 
 int co_main(int argc, char **argv) {
-    co_go(worker, args_for("is", 4, "a"));
-    co_go(worker, args_for("is", 2, "b"));
-    co_go(worker, args_for("is", 3, "c"));
+    go(worker, args_for("is", 4, "a"));
+    go(worker, args_for("is", 2, "b"));
+    go(worker, args_for("is", 3, "c"));
 
     sleep_for(100);
 

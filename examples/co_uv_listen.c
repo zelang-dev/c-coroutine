@@ -1,4 +1,4 @@
-#include "../include/coroutine.h"
+#include "coroutine.h"
 
 void handleClient(uv_stream_t *socket) {
     string data = stream_read(socket);
@@ -8,7 +8,7 @@ void handleClient(uv_stream_t *socket) {
 
 int co_main(int argc, char *argv[]) {
     uv_stream_t *socket = stream_bind(
-        (argc > 0 && !is_empty(argv[1]) && is_str_eq(argv[1], "-s"))
+        (argc > 0 && is_str_eq(argv[1], "-s"))
         ? "https://127.0.0.1:9010"
         : "http://127.0.0.1:9010",
         0);

@@ -38,6 +38,10 @@
     #define CO_STACK_SIZE (16 * 1024)
 #endif
 
+#ifndef CO_MT_STATE
+    #define CO_MT_STATE false
+#endif
+
 #define ERROR_SCRAPE_SIZE 256
 
 #ifndef SCRAPE_SIZE
@@ -148,7 +152,7 @@
 #endif
 
 /* Function casting for single argument, no return. */
-#define FUNC_VOID(fn)		((void (*)(void_t))(fn))
+#define VOID_FUNC(fn)		((void (*)(void_t))(fn))
 #define UNUSED(x) ((void)(x))
 
 #if defined(_MSC_VER)
@@ -241,6 +245,7 @@ typedef enum {
     RUN_MAIN,
     RUN_SYSTEM,
     RUN_EVENT,
+    RUN_ASYNC,
 } run_states;
 
 #ifndef CACHELINE_SIZE
@@ -379,30 +384,32 @@ struct routine_s {
 #endif
     /* Coroutine stack size. */
     size_t stack_size;
-    size_t alarm_time;
-    /* unique coroutine id */
-    u32 cid;
-    size_t cycles;
-    co_states status;
-    signed int loop_code;
-    int wait_counter;
-    int all_coroutine_slot;
-    run_states run_code;
     bool taken;
-    bool channeled;
     bool ready;
     bool system;
     bool exiting;
     bool halt;
-    bool synced;
     bool wait_active;
-    bool loop_active;
+    bool interrupt_active;
     bool event_active;
     bool process_active;
-    bool loop_erred;
+    bool is_event_err;
     bool is_address;
+    bool is_waiting;
+    bool is_group_finish;
+    bool is_multi_wait;
+    bool is_channeling;
     bool is_plain;
     bool flagged;
+    int wait_counter;
+    int all_coroutine_slot;
+    signed int event_err_code;
+    size_t alarm_time;
+    size_t cycles;
+    /* unique coroutine id */
+    u32 cid;
+    co_states status;
+    run_states run_code;
 #if defined(USE_VALGRIND)
     u32 vg_stack_id;
 #endif
@@ -438,36 +445,22 @@ make_atomic(scheduler_t, atomic_scheduler_t)
 
 /* Global atomic queue struct */
 typedef struct {
+    volatile bool is_multi;
+    volatile bool is_finish;
+    volatile sig_atomic_t is_takeable;
     /* Stack size when creating a coroutine. */
     u32 stacksize;
-    volatile bool is_multi;
-    volatile bool is_takeable;
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
     size_t thread_count;
     size_t thread_invalid;
-    thrd_pool_t *threads;
+      //thrd_pool_t *threads;
+    thrd_t *threads;
     cacheline_pad_t pad2_;
-
-    atomic_size_t ***count;
-    cacheline_pad_t pad1_;
-
-    atomic_flag **any_stealable;
-    cacheline_pad_t pad0_;
-
-    atomic_size_t **stealable_thread;
-    cacheline_pad_t pad_;
-
-    atomic_size_t **stealable_amount;
-    cacheline_pad_t pad;
 
     atomic_flag is_started;
     cacheline_pad_t _pad1;
-
-    /* track each thread number of available coroutines */
-    atomic_size_t **available;
-    cacheline_pad_t _pad;
 
     /* track the number of global coroutines used/available */
     atomic_size_t used_count;
@@ -479,6 +472,22 @@ typedef struct {
 
     atomic_size_t n_all_coroutine;
     cacheline_pad_t _pad4;
+
+    atomic_int **count;
+    cacheline_pad_t pad1_;
+
+    atomic_flag *any_stealable;
+    cacheline_pad_t pad0_;
+
+    atomic_size_t *stealable_thread;
+    cacheline_pad_t pad_;
+
+    atomic_size_t *stealable_amount;
+    cacheline_pad_t pad;
+
+    /* track each thread number of available coroutines */
+    atomic_size_t *available;
+    cacheline_pad_t _pad;
 
     /* scheduler tracking for all coroutines */
     atomic_routine_t **all_coroutine;
@@ -546,6 +555,8 @@ typedef struct uv_args_s {
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
     evt_ctx_t ctx;
+    char ip[32];
+    struct sockaddr name[1];
 
     struct sockaddr_in6 in6[1];
     struct sockaddr_in in4[1];
@@ -578,17 +589,17 @@ typedef struct msg_queue_s {
 
 typedef struct channel_s {
     value_types type;
+    bool select_ready;
     u32 bufsize;
     u32 elem_size;
-    unsigned char *buf;
     u32 nbuf;
     u32 off;
     u32 id;
-    values_t *tmp;
+    char *name;
+    unsigned char *buf;
     msg_queue_t a_send;
     msg_queue_t a_recv;
-    char *name;
-    bool select_ready;
+    values_t *data;
 } channel_t;
 
 enum {
@@ -641,8 +652,9 @@ C_API routine_t *co_active(void);
 
 C_API memory_t *co_scope(void);
 
-/* Set global coroutine runtime stack size, `co_main` will be double the size.*/
-C_API void co_stack_set(u32);
+/* Set global coroutine `runtime` stack size,
+`co_main` preset to `64Kb`, `4x 'CO_STACK_SIZE' default: 16Kb`. */
+C_API void go_stack_set(u32);
 
 /* Delete specified coroutine. */
 C_API void co_delete(routine_t *);
@@ -749,17 +761,17 @@ similar to golang channels. */
 C_API channel_t *channel_buf(int);
 
 /* Send data to the channel. */
-C_API int co_send(channel_t *, void_t);
+C_API int chan_send(channel_t *, void_t);
 
 /* Receive data from the channel. */
-C_API value_t co_recv(channel_t *);
+C_API value_t chan_recv(channel_t *);
 
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
-C_API u32 co_go(callable_t, void_t);
+C_API u32 go(callable_t, void_t);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
-C_API void co_execute(func_t, void_t);
+C_API void launch(func_t, void_t);
 
 C_API uv_loop_t *co_loop(void);
 
@@ -803,6 +815,7 @@ exit the entire program using the given exit status. */
 C_API void sched_exit(int);
 C_API void sched_cleanup(void);
 C_API void sched_update(routine_t *);
+C_API void sched_checker_stealer(void);
 
 /* Add coroutine to current scheduler queue, appending. */
 C_API void sched_enqueue(routine_t *);
@@ -878,6 +891,12 @@ struct oa_hash_s {
     oa_val_ops val_ops;
 };
 
+typedef struct awaitable_s {
+    value_types type;
+    u32 cid;
+    wait_group_t *wg;
+} awaitable_t;
+
 C_API void hash_capacity(u32);
 C_API void hash_free(hash_t *);
 C_API void_t hash_put(hash_t *, const_t, const_t);
@@ -891,8 +910,8 @@ C_API void hash_remove(hash_t *, const_t);
 C_API void hash_print(hash_t *);
 C_API void hash_print_custom(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
-/* Creates a new wait group `event` hash table, set initial capacity. */
-C_API wait_group_t *ht_event_init(u32);
+/* Creates a new wait group hash table, and set initial capacity. */
+C_API wait_group_t *ht_wait_init(u32);
 
 /* Creates a new wait group `coroutine` hash table. */
 C_API wait_group_t *ht_group_init(void);
@@ -908,7 +927,7 @@ C_API ht_string_t *ht_string_init(void);
 
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
 
-The initialization ends when `co_wait()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
+The initialization ends when `wait_for()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API wait_group_t *wait_group(void);
 
 /* Set global wait group `hash table` initial capacity. */
@@ -916,10 +935,13 @@ C_API void wait_capacity(u32);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */
-C_API wait_result_t *co_wait(wait_group_t *);
+C_API wait_result_t *wait_for(wait_group_t *);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
 C_API value_t wait_result(wait_result_t *, u32);
+
+C_API awaitable_t *async(callable_t fn, void_t arg);
+C_API value_t await(awaitable_t *task);
 
 C_API void co_result_set(routine_t *, void_t);
 C_API void co_plain_set(routine_t *, size_t);
@@ -1127,7 +1149,7 @@ Must also closed out with `select_break()`. */
 #define c_func(value) co_data((value)).func
 #define c_cast_of(type, value) (type *)co_data((value)).object
 
-#define defer(func, arg) co_defer(FUNC_VOID(func), arg)
+#define defer(func, arg) co_defer(VOID_FUNC(func), arg)
 
 /* Cast argument to generic union values_t storage type */
 #define args_cast(x) (values_t *)((x))
