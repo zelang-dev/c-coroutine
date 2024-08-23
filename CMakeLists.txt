@@ -24,8 +24,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.14.zip
-        URL_MD5 d870db7deba89bd74d39a7ebfcdce42c
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.15.zip
+        URL_MD5 25e87f67d40fbeea7806fcb063db7984
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -85,8 +85,10 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
 endif()
 
-add_definitions(-DCO_STACK_SIZE=16384)
-target_compile_definitions(coroutine PUBLIC CO_MT_STATE=${CO_MT_STATE} PUBLIC CO_STACK_SIZE=${CO_MT_STATE} )
+target_compile_definitions(coroutine
+    PUBLIC CO_MT_STATE=${CO_MT_STATE}
+    PUBLIC CO_STACK_SIZE=${CO_STACK_SIZE}
+)
 target_include_directories(raii AFTER PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(coroutine PUBLIC raii)
