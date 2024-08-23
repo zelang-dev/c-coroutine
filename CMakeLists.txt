@@ -85,6 +85,7 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
 endif()
 
+add_definitions(-DCO_STACK_SIZE=16384 )
 target_compile_definitions(coroutine
     PUBLIC CO_MT_STATE=${CO_MT_STATE}
     PUBLIC CO_STACK_SIZE=${CO_STACK_SIZE}

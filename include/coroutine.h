@@ -455,7 +455,6 @@ typedef struct {
     size_t cpu_count;
     size_t thread_count;
     size_t thread_invalid;
-      //thrd_pool_t *threads;
     thrd_t *threads;
     cacheline_pad_t pad2_;
 

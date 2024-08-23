@@ -1512,6 +1512,7 @@ void sched_exit(int val) {
 void sched_destroy(void) {
     if (gq_sys.is_multi && thread()->is_main && gq_sys.threads) {
         size_t i;
+        atomic_thread_fence(memory_order_seq_cst);
         gq_sys.is_finish = true;
         while (sched_is_running())
             thrd_yield();
@@ -1751,6 +1752,7 @@ int main(int argc, char **argv) {
             *n = i;
             if (thrd_create(&(gq_sys.threads[i]), thrd_main, n) != thrd_success) {
                 fprintf(stderr, "`thrd_create` for `thrd_main` failed to start,\nfalling back to single thread mode.\n\n");
+                atomic_thread_fence(memory_order_seq_cst);
                 gq_sys.is_multi = false;
                 atomic_flag_test_and_set(&gq_sys.is_started);
                 CO_FREE(gq_sys.threads);
