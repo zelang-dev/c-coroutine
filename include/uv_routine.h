@@ -11,7 +11,14 @@
 #define C_API extern
 #endif
 
-#define streamer(handle) ((uv_stream_t *)handle)
+/* Cast ~libuv~ `obj` to `uv_stream_t` ptr. */
+#define streamer(obj) ((uv_stream_t *)obj)
+
+/* Cast ~libuv~ `obj` to `uv_handle_t` ptr. */
+#define handler(obj) ((uv_handle_t *)obj)
+
+/* Cast ~libuv~ `obj` to `uv_req_t` ptr. */
+#define requester(obj) ((uv_req_t *)obj)
 
 #define var_int(arg) (arg).value.integer
 #define var_long(arg) (arg).value.s_long
@@ -183,7 +190,9 @@ C_API uv_stream_t *ipc_err(spawn_t *err);
 
 C_API void coro_uv_close(uv_handle_t *);
 C_API void uv_close_free(void *handle);
-C_API void sched_event_cleanup(void *handle);
+C_API void interrupt_cleanup(void *handle);
+C_API void interrupt_notify(void *event);
+C_API void interrupt_resume(uv_async_t *handle);
 
 C_API char *fs_readfile(const char *path);
 C_API int fs_write_file(const char *path, const char *text);

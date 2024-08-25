@@ -455,7 +455,11 @@ typedef struct {
     size_t cpu_count;
     size_t thread_count;
     size_t thread_invalid;
+//#if defined(UV_H)
+ //   uv_req_t *threads;
+//#else
     thrd_t *threads;
+    //#endif
     cacheline_pad_t pad2_;
 
     atomic_flag is_started;
@@ -546,22 +550,9 @@ typedef struct {
 
 typedef struct uv_args_s {
     value_types type;
-    /* allocated array of arguments */
-    values_t *args;
-    routine_t *context;
-    string buffer;
-    uv_buf_t bufs;
-    uv_stat_t stat[1];
-    uv_statfs_t statfs[1];
-    evt_ctx_t ctx;
-    char ip[32];
-    struct sockaddr name[1];
-
-    struct sockaddr_in6 in6[1];
-    struct sockaddr_in in4[1];
-
     bool is_path;
     bool is_request;
+    int bind_type;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
@@ -569,10 +560,27 @@ typedef struct uv_args_s {
     uv_tty_mode_t tty_mode;
     uv_stdio_flags stdio_flag;
     uv_errno_t errno_code;
-    int bind_type;
+    u32 uv_id;
 
     /* total number of args in set */
     size_t n_args;
+
+    /* allocated array of arguments */
+    values_t *args;
+    routine_t *context;
+    wait_group_t *group;
+    string buffer;
+    uv_buf_t bufs;
+    uv_stat_t stat[1];
+    uv_statfs_t statfs[1];
+    evt_ctx_t ctx;
+    char ip[32];
+    struct sockaddr name[1];
+    struct sockaddr_in in4[1];
+    struct sockaddr_in6 in6[1];
+
+    uv_async_t async[1];
+    uv_loop_t loop[2];
 } uv_args_t;
 
 /*
@@ -669,6 +677,8 @@ C_API routine_t *co_current(void);
 
 /* Return coroutine executing for scheduler */
 C_API routine_t *co_coroutine(void);
+
+C_API routine_t *co_multi(void);
 
 /* Return the value in union storage type. */
 C_API value_t co_value(void_t);

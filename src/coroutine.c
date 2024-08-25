@@ -68,9 +68,18 @@ void co_delete(routine_t *co) {
         }
 #endif
         if (co->interrupt_active) {
-            co->status = CO_EVENT_DEAD;
-            co->interrupt_active = false;
-            co->is_waiting = false;
+            if (gq_sys.is_multi && co->status == CO_ERRED) {
+                sched_dec();
+                if (!is_empty(co->scope->protector))
+                    ex_unprotected_ptr(co->scope->protector);
+
+                co->magic_number = -1;
+                CO_FREE(co);
+            } else {
+                co->status = CO_EVENT_DEAD;
+                co->interrupt_active = false;
+                co->is_waiting = false;
+            }
         } else if (co->magic_number == CO_MAGIC_NUMBER) {
             co->magic_number = -1;
             CO_FREE(co);
@@ -250,7 +259,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
                             continue;
                         }
 
-                        if (co->interrupt_active)
+                        if (co->interrupt_active && co->status != CO_ERRED)
                             co_deferred_free(co);
 
                         hash_delete(wg, key);

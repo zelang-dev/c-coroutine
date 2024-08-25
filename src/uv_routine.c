@@ -62,25 +62,6 @@ void tls_close_free(void_t handle) {
     uv_tls_close((uv_tls_t *)h, (uv_tls_close_cb)CO_FREE);
 }
 
-void sched_event_cleanup(void_t t) {
-    routine_t *co = (routine_t *)t;
-    uv_loop_t *uvLoop = NULL;
-    if (co->context->wait_group)
-        hash_free(co->context->wait_group);
-
-    if (uv_loop_alive(uvLoop = co_loop())) {
-        if (sched_server_args() && sched_server_args()->bind_type == UV_TLS)
-            uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
-        else
-            uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
-
-        uv_run(uvLoop, UV_RUN_DEFAULT);
-
-        uv_stop(uvLoop);
-        uv_run(uvLoop, UV_RUN_DEFAULT);
-    }
-}
-
 static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, bool is_path) {
     uv_args->fs_type = fs_type;
     uv_args->n_args = n_args;
@@ -119,14 +100,14 @@ static void error_catch(void_t uv) {
             co->halt = true;
             co->is_event_err = true;
             co->status = CO_ERRED;
-            sched_event_cleanup(co);
+            interrupt_cleanup(co);
             memset(sched_server_args(), 0, sizeof(uv_args_t));
         }
     }
 }
 
 static void connect_cb(uv_connect_t *client, int status) {
-    uv_args_t *uv = (uv_args_t *)uv_req_get_data((uv_req_t *)client);
+    uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(client));
     values_t *args = uv->args;
     routine_t *co = uv->context;
 
@@ -151,7 +132,7 @@ CO_FORCE_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
 }
 
 void on_connect(uv_connect_t *req, int status) {
-    evt_ctx_t *ctx = (evt_ctx_t *)uv_req_get_data((uv_req_t *)req);
+    evt_ctx_t *ctx = (evt_ctx_t *)uv_req_get_data(requester(req));
     uv_args_t *uv = (uv_args_t *)ctx->data;
     values_t *args = uv->args;
     routine_t *co = uv->context;
@@ -255,7 +236,7 @@ static void connection_cb(uv_stream_t *server, int status) {
 }
 
 static void write_cb(uv_write_t *req, int status) {
-    uv_args_t *uv = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
+    uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(req));
     routine_t *co = uv->context;
     if (status < 0) {
         fprintf(stderr, "Error: %s\n", uv_strerror(status));
@@ -337,12 +318,14 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
 
 static void fs_cb(uv_fs_t *req) {
     ssize_t result = uv_fs_get_result(req);
-    uv_args_t *fs = (uv_args_t *)uv_req_get_data((uv_req_t *)req);
+    uv_args_t *fs = (uv_args_t *)uv_req_get_data(requester(req));
     routine_t *co = fs->context;
     bool override = false;
 
     if (result < 0) {
         fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
+        if (gq_sys.is_multi)
+            co->status = CO_ERRED;
     } else {
         void_t fs_ptr = uv_fs_get_ptr(req);
         uv_fs_type fs_type = uv_fs_get_type(req);
@@ -543,7 +526,7 @@ static void_t fs_init(void_t uv_args) {
     }
 
     fs->context = co_active();
-    uv_req_set_data((uv_req_t *)req, (void_t)fs);
+    uv_req_set_data(requester(req), (void_t)fs);
     return 0;
 }
 
@@ -1291,4 +1274,23 @@ CO_FORCE_INLINE uv_stream_t *ipc_out(spawn_t *out) {
 
 CO_FORCE_INLINE uv_stream_t *ipc_err(spawn_t *err) {
     return err->handle->stdio[2].data.stream;
+}
+
+void interrupt_cleanup(void_t t) {
+    routine_t *co = (routine_t *)t;
+    uv_loop_t *uvLoop = NULL;
+    if (co->context->wait_group)
+        hash_free(co->context->wait_group);
+
+    if (uv_loop_alive(uvLoop = co_loop())) {
+        if (sched_server_args() && sched_server_args()->bind_type == UV_TLS)
+            uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
+        else
+            uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
+
+        uv_run(uvLoop, UV_RUN_DEFAULT);
+
+        uv_stop(uvLoop);
+        uv_run(uvLoop, UV_RUN_DEFAULT);
+    }
 }
