@@ -20,10 +20,10 @@ void test(void_t args) {
     printf("[filename] => %s\n\n", fileinfo->filename);
 
     if (url->query) {
-       int i = 0;
+       int x, i = 0;
        char **token = co_str_split(url->query, "&", &i);
 
-       for (int x = 0; x < i; x++) {
+       for (x = 0; x < i; x++) {
            char **parts = co_str_split(token[x], "=", NULL);
            printf("%s = %s\n", parts[0], parts[1]);
        }

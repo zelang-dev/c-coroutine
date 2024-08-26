@@ -1,9 +1,10 @@
 #include "coroutine.h"
 void *co_2(void *arg) {
     channel_t *c = (channel_t *)arg;
+    int i;
 
     printf("co_2 start\n");
-    for (int i = 0; i < 10; i++) {
+    for (i = 0; i < 10; i++) {
         printf("received: %lu\n", chan_recv(c).u_long);
     }
     printf("co_2 end\n");
@@ -13,10 +14,10 @@ void *co_2(void *arg) {
 
 int co_main(int argc, char **argv) {
     channel_t *c = channel_buf(3);
-    int s;
+    int i, s;
 
     go(co_2, (void *)c);
-    for (unsigned long i = 0; i < 10; i++) {
+    for (i = 0; i < 10; i++) {
         printf("going to send number: %lu\n", i);
         s = chan_send(c, &i);
         printf("status: %d send success: %lu\n", s, i);

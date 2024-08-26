@@ -33,7 +33,7 @@ jobs:
           run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF ..
             cmake --build .
             ./go_channel
             ./go_sleep

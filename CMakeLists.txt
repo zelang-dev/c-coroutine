@@ -56,15 +56,16 @@ if(OPENSSL_FOUND)
 else()
     find_package(LibreSSL QUIET)
     if(NOT LibreSSL_FOUND)
+        set(LibreSSL_FOUND 1)
         FetchContent_Declare(libressl
             URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
             URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
         )
         FetchContent_MakeAvailable(libressl)
     endif()
-    target_compile_definitions(crypto PRIVATE LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-    target_compile_definitions(ssl PRIVATE LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-    target_compile_definitions(tls PRIVATE LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+    target_compile_definitions(crypto PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+    target_compile_definitions(ssl PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+    target_compile_definitions(tls PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
     target_link_libraries(coroutine PUBLIC crypto)
     target_link_libraries(coroutine PUBLIC ssl)
 endif()
@@ -83,10 +84,11 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
 endif()
 
-add_definitions(-DCO_STACK_SIZE=16384 )
+add_definitions(-DMT_STATE=false )
+add_definitions(-DSTACK_SIZE=16384 )
 target_compile_definitions(coroutine
-    PUBLIC CO_MT_STATE=${CO_MT_STATE}
-    PUBLIC CO_STACK_SIZE=${CO_STACK_SIZE}
+    PUBLIC CO_MT_STATE=${MT_STATE}
+    PUBLIC CO_STACK_SIZE=${STACK_SIZE}
 )
 target_include_directories(raii AFTER PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

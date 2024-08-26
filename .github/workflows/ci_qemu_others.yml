@@ -35,7 +35,7 @@ jobs:
           run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF ..
             cmake --build .
             ./chan_3
             ./primes

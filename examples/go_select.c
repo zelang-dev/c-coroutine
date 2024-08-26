@@ -20,10 +20,11 @@ int fibonacci(channel_t *c, channel_t *quit) {
 void *func(void *args) {
     channel_t *c = args_get(args, 0).object;
     channel_t *quit = args_get(args, 1).object;
+    int i;
 
     defer(delete, c);
 
-    for (int i = 0; i < 10; i++) {
+    for (i = 0; i < 10; i++) {
         printf("%d\n", chan_recv(c).integer);
     }
     chan_send(quit, 0);

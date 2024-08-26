@@ -2,8 +2,9 @@
 #include "coroutine.h"
 
 void *greetings(void *arg) {
-    const char *name = c_const_char(arg);
-    for (int i = 0; i < 3; i++) {
+    const char *name = c_char_ptr(arg);
+    int i;
+    for (i = 0; i < 3; i++) {
         printf("%d ==> %s\n", i, name);
         sleep_for(1);
     }

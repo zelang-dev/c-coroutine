@@ -33,7 +33,7 @@
 #define APPLINK_CLOSE   22
 #define APPLINK_MAX     22      /* always same as last macro */
 
-#ifndef APPMACROS_ONLY
+#if defined(APPMACROS_ONLY) && defined(_WIN32)
 
 /*
  * Normally, do not define APPLINK_NO_INCLUDES.  Define it if you are using

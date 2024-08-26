@@ -25,7 +25,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run test examples
         run: |
@@ -54,7 +54,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -A ${{ matrix.arch }}
+            cmake .. -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF -A ${{ matrix.arch }}
             cmake --build . --config Debug
       - name: Run test examples
         shell: cmd
