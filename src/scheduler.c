@@ -1575,14 +1575,19 @@ void sched_cleanup(void) {
         coroutines_all = NULL;
     }
 #ifdef UV_H
-    if (!is_empty(thread()->interrupt_notify)) {
-        uv_close(handler(thread()->interrupt_notify), NULL);
-        memset(thread()->interrupt_notify, 0, sizeof(thread()->interrupt_notify));
+    if (uv_loop_alive(thread()->interrupt_handle)) {
+        uv_walk(thread()->interrupt_handle, (uv_walk_cb)uv_close_free, NULL);
+        uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
+        uv_stop(thread()->interrupt_handle);
+        uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
     }
 
-    if (!is_empty(thread()->interrupt_handle)) {
+    if (thread()->interrupt_notify) {
+        uv_close(handler(thread()->interrupt_notify), NULL);
+    }
+
+    if (thread()->interrupt_handle) {
         uv_loop_close(thread()->interrupt_handle);
-        memset(thread()->interrupt_handle, 0, sizeof(thread()->interrupt_handle));
     }
 #endif
     CO_FREE((void_t)atomic_load(&gq_sys.run_queue));
@@ -1645,12 +1650,12 @@ static int thrd_scheduler(void) {
                 while (!gq_sys.is_finish)
                     thrd_yield();
 #ifdef UV_H
-                if (!is_empty(thread()->interrupt_notify)) {
+                if (thread()->interrupt_notify) {
                     uv_close(handler(thread()->interrupt_notify), NULL);
                     memset(thread()->interrupt_notify, 0, sizeof(thread()->interrupt_notify));
                 }
 
-                if (!is_empty(thread()->interrupt_handle)) {
+                if (thread()->interrupt_handle) {
                     uv_loop_close(thread()->interrupt_handle);
                     memset(thread()->interrupt_handle, 0, sizeof(thread()->interrupt_handle));
                 }
@@ -1764,7 +1769,7 @@ int main(int argc, char **argv) {
     atomic_flag_clear(&gq_sys.is_started);
 
 #ifdef UV_H
-    if (!gq_sys.is_multi)
+   // if (!gq_sys.is_multi)
         uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rp_free);
     RAII_INFO("%s", sched_uname());
 #endif
