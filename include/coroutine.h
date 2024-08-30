@@ -39,7 +39,7 @@
 #endif
 
 #ifndef CO_MT_STATE
-    #define CO_MT_STATE false
+    #define CO_MT_STATE true
 #endif
 
 #define ERROR_SCRAPE_SIZE 256
