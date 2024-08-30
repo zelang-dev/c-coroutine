@@ -18,9 +18,9 @@ int co_main(int argc, char **argv) {
 
     go(co_2, (void *)c);
     for (i = 0; i < 10; i++) {
-        printf("going to send number: %lu\n", i);
+        printf("going to send number: %u\n", i);
         s = chan_send(c, &i);
-        printf("status: %d send success: %lu\n", s, i);
+        printf("status: %d send success: %u\n", s, i);
     }
     printf("co_main end\n");
 

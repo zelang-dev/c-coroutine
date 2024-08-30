@@ -87,7 +87,7 @@ static void close_cb(uv_handle_t *handle) {
     routine_t *co = uv->context;
 
     co->halt = true;
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -96,12 +96,12 @@ static void error_catch(void_t uv) {
 
     if (!is_empty((void_t)co_message())) {
         co->scope->is_recovered = true;
-        if (uv_loop_alive(co_loop()) && sched_server_args()) {
+        if (uv_loop_alive(co_loop()) && interrupt_listen_args()) {
             co->halt = true;
             co->is_event_err = true;
             co->status = CO_ERRED;
             interrupt_cleanup(co);
-            memset(sched_server_args(), 0, sizeof(uv_args_t));
+            memset(interrupt_listen_args(), 0, sizeof(uv_args_t));
         }
     }
 }
@@ -122,7 +122,7 @@ static void connect_cb(uv_connect_t *client, int status) {
         co_result_set(co, args[0].value.object);
     }
 
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -171,7 +171,7 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
         co_plain_set(co, -1);
     }
 
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -230,7 +230,7 @@ static void connection_cb(uv_stream_t *server, int status) {
     }
 
     if (uv->bind_type != UV_TLS)
-        co_resuming(co->context);
+        interrupt_switch(co->context);
 
     co_scheduler();
 }
@@ -244,7 +244,7 @@ static void write_cb(uv_write_t *req, int status) {
 
     co->halt = true;
     co_plain_set(co, (size_t)status);
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -257,7 +257,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
 
     co->halt = true;
     co_plain_set(co, (size_t)status);
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -289,7 +289,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
         }
     }
 
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -312,7 +312,7 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
         }
     }
 
-    co_resuming(co->context);
+    interrupt_switch(co->context);
     co_scheduler();
 }
 
@@ -324,8 +324,6 @@ static void fs_cb(uv_fs_t *req) {
 
     if (result < 0) {
         fprintf(stderr, "Error: %s\n", uv_strerror((int)result));
-        if (gq_sys.is_multi)
-            co->status = CO_ERRED;
     } else {
         void_t fs_ptr = uv_fs_get_ptr(req);
         uv_fs_type fs_type = uv_fs_get_type(req);
@@ -379,12 +377,14 @@ static void fs_cb(uv_fs_t *req) {
     if (!override)
         co_plain_set(co, (size_t)uv_fs_get_result(req));
 
-    co_resuming(co->context);
+    interrupt_switch(co->context);
+    uv_fs_req_cleanup(req);
+    CO_FREE(req);
     co_scheduler();
 }
 
 static void_t fs_init(void_t uv_args) {
-    uv_fs_t *req = co_new_by(1, sizeof(uv_fs_t));
+    uv_fs_t *req = try_calloc(1, sizeof(uv_fs_t));
     uv_loop_t *uvLoop = co_loop();
     uv_args_t *fs = (uv_args_t *)uv_args;
     values_t *args = fs->args;
@@ -397,7 +397,6 @@ static void_t fs_init(void_t uv_args) {
     int flags, mode;
     int result = -4058;
 
-    co_defer(VOID_FUNC(uv_fs_req_cleanup), req);
     if (fs->is_path) {
         string_t path = var_char_ptr(args[0]);
         switch (fs->fs_type) {
@@ -522,6 +521,7 @@ static void_t fs_init(void_t uv_args) {
     }
 
     if (result) {
+        CO_FREE(req);
         return uv_error_post(co_active(), result);
     }
 
@@ -623,8 +623,8 @@ static void_t uv_init(void_t uv_args) {
                         uv_ip4_name((const struct sockaddr_in *)uv->name, uv->ip, sizeof uv->ip);
                     }
 
-                    if (is_empty(sched_server_args()))
-                        sched_server_set(*uv);
+                    if (is_empty(interrupt_listen_args()))
+                        interrupt_listen_set(*uv);
 
                     printf("Listening to %s:%d for%s connections, %s.\n",
                            uv->ip,
@@ -664,7 +664,7 @@ static void_t uv_init(void_t uv_args) {
     if (result) {
         uv->context->context->event_err_code = result;
         uv_error_post(uv->context, result);
-        co_resuming(uv->context->context);
+        interrupt_switch(uv->context->context);
     }
 
     return 0;
@@ -1276,14 +1276,19 @@ CO_FORCE_INLINE uv_stream_t *ipc_err(spawn_t *err) {
     return err->handle->stdio[2].data.stream;
 }
 
+CO_FORCE_INLINE void interrupt_switch(routine_t *co) {
+    if (!co_terminated(co))
+        co_switch(co);
+}
+
 void interrupt_cleanup(void_t t) {
     routine_t *co = (routine_t *)t;
-    uv_loop_t *uvLoop = NULL;
-    if (co->context->wait_group)
+    uv_loop_t *uvLoop = co_loop();
+    if (!is_empty(co) && !is_empty(co->context) && is_type(co->context->wait_group, CO_OA_HASH))
         hash_free(co->context->wait_group);
 
-    if (uv_loop_alive(uvLoop = co_loop())) {
-        if (sched_server_args() && sched_server_args()->bind_type == UV_TLS)
+    if (uv_loop_alive(uvLoop)) {
+        if (interrupt_listen_args() && interrupt_listen_args()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
         else
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);

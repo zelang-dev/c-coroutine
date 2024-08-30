@@ -68,18 +68,9 @@ void co_delete(routine_t *co) {
         }
 #endif
         if (co->interrupt_active) {
-            if (gq_sys.is_multi && co->status == CO_ERRED) {
-                sched_dec();
-                if (!is_empty(co->scope->protector))
-                    ex_unprotected_ptr(co->scope->protector);
-
-                co->magic_number = -1;
-                CO_FREE(co);
-            } else {
-                co->status = CO_EVENT_DEAD;
-                co->interrupt_active = false;
-                co->is_waiting = false;
-            }
+            co->status = CO_EVENT_DEAD;
+            co->interrupt_active = false;
+            co->is_waiting = false;
         } else if (co->magic_number == CO_MAGIC_NUMBER) {
             co->magic_number = -1;
             CO_FREE(co);
@@ -125,11 +116,6 @@ CO_FORCE_INLINE void co_suspend(void) {
 CO_FORCE_INLINE void co_yielding(routine_t *co) {
     co_stack_check(0);
     co_switch(co);
-}
-
-CO_FORCE_INLINE void co_resuming(routine_t *co) {
-    if (!co_terminated(co))
-        co_switch(co);
 }
 
 CO_FORCE_INLINE bool co_terminated(routine_t *co) {
@@ -259,7 +245,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
                             continue;
                         }
 
-                        if (co->interrupt_active && co->status != CO_ERRED)
+                        if (co->interrupt_active)
                             co_deferred_free(co);
 
                         hash_delete(wg, key);
@@ -270,8 +256,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
         }
         c->wait_active = false;
         c->wait_group = NULL;
-        if (!gq_sys.is_multi)
-            sched_dec();
+        sched_dec();
     }
 
     hash_free(wg);
@@ -360,7 +345,7 @@ CO_FORCE_INLINE void co_info(routine_t *t, int pos) {
 
     char line[SCRAPE_SIZE];
     snprintf(line, SCRAPE_SIZE, "           \n\r\033[%dA", pos);
-    fprintf(stderr, "\t\t - Thrd #%lx, cid: %lu (%s) %s cycles: %zu%s",
+    fprintf(stderr, "\t\t - Thrd #%lx, cid: %u (%s) %s cycles: %zu%s",
             co_async_self(),
             t->cid,
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->is_channeling ? "" : "channel"),

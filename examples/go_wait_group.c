@@ -23,6 +23,7 @@ void *worker(void *arg) {
 int co_main(int argc, char **argv) {
     int cid[50], i;
 
+    stack_set(Kb(32));
     wait_group_t *wg = wait_group();
     for (i = 0; i < 50; i++) {
         cid[i] = go(worker, args_for("i", i));

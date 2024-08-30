@@ -38,14 +38,16 @@ int future_func_wrapper(void_t arg) {
 
 int future_wrapper(void_t arg) {
     future_arg *f = (future_arg *)arg;
+    rpmalloc_thread_initialize();
     f->type = CO_FUTURE_ARG;
     int res = f->func(f->arg);
     promise_set(f->value, res);
     if (f->type == CO_FUTURE_ARG) {
         memset(f, 0, sizeof(value_types));
-        CO_FREE(f);
+        rpfree(f);
     }
 
+    rpmalloc_thread_finalize(1);
     thrd_exit(res);
     return res;
 }

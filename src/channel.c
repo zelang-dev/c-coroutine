@@ -300,7 +300,7 @@ static int channel_proc(channel_co_t *a) {
     }
 
     a[0].c->select_ready = true;
-    sched_checker_stealer();
+    co_stealer();
     co_suspend();
     t->is_channeling = false;
 

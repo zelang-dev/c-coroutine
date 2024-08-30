@@ -117,10 +117,11 @@
 #endif
 
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
-    #define CO_MALLOC RAII_MALLOC
-    #define CO_FREE RAII_FREE
-    #define CO_REALLOC RAII_REALLOC
-    #define CO_CALLOC RAII_CALLOC
+    #define CO_MALLOC rpmalloc
+    #define CO_FREE rpfree
+    #define CO_REALLOC rprealloc
+    #define CO_CALLOC rpcalloc
+    #define CO_MEMALIGN rpmemalign
 #endif
 
 #if defined(__clang__)
@@ -455,11 +456,11 @@ typedef struct {
     size_t cpu_count;
     size_t thread_count;
     size_t thread_invalid;
-//#if defined(UV_H)
- //   uv_req_t *threads;
-//#else
     thrd_t *threads;
-    //#endif
+#ifdef UV_H
+    uv_loop_t *loops;
+    // uv_async_t *async;
+#endif
     cacheline_pad_t pad2_;
 
     atomic_flag is_started;
@@ -560,7 +561,6 @@ typedef struct uv_args_s {
     uv_tty_mode_t tty_mode;
     uv_stdio_flags stdio_flag;
     uv_errno_t errno_code;
-    u32 uv_id;
 
     /* total number of args in set */
     size_t n_args;
@@ -568,7 +568,7 @@ typedef struct uv_args_s {
     /* allocated array of arguments */
     values_t *args;
     routine_t *context;
-    wait_group_t *group;
+
     string buffer;
     uv_buf_t bufs;
     uv_stat_t stat[1];
@@ -578,9 +578,6 @@ typedef struct uv_args_s {
     struct sockaddr name[1];
     struct sockaddr_in in4[1];
     struct sockaddr_in6 in6[1];
-
-    uv_async_t async[1];
-    uv_loop_t loop[2];
 } uv_args_t;
 
 /*
@@ -625,7 +622,9 @@ struct channel_co_s {
     channel_co_t *x_msg;
 };
 
+#ifdef UV_H
 C_API uv_loop_t *co_loop(void);
+#endif
 
 /**
 * Returns generic union `values_type` of argument, will auto `release/free`
@@ -658,10 +657,6 @@ C_API values_type args_get(void_t params, int item);
 C_API routine_t *co_active(void);
 
 C_API memory_t *co_scope(void);
-
-/* Set global coroutine `runtime` stack size,
-`co_main` preset to `64Kb`, `4x 'CO_STACK_SIZE' default: 16Kb`. */
-C_API void go_stack_set(u32);
 
 /* Delete specified coroutine. */
 C_API void co_delete(routine_t *);
@@ -696,7 +691,13 @@ C_API void co_scheduler(void);
 /* Yield to specified coroutine, passing data. */
 C_API void co_yielding(routine_t *);
 
-C_API void co_resuming(routine_t *);
+/* Multithreading checker for available coroutines, if any,
+transfers from `global run queue` to current thread `local run queue`.
+
+If `Main thread` caller, checks global run queue,
+and assign availability count for threads. Will also globally
+signal all child threads to start there execution. */
+C_API void co_stealer(void);
 
 /* Returns the status of the coroutine. */
 C_API co_states co_status(routine_t *);
@@ -782,6 +783,10 @@ C_API u32 go(callable_t, void_t);
 /* Creates an coroutine of given function with argument, and immediately execute. */
 C_API void launch(func_t, void_t);
 
+/* Set global coroutine `runtime` stack size,
+`co_main` preset to `64Kb`, `4x 'CO_STACK_SIZE' default: 16Kb`. */
+C_API void stack_set(u32);
+
 C_API uv_loop_t *co_loop(void);
 
 C_API value_t co_event(callable_t, void_t arg);
@@ -822,17 +827,13 @@ C_API int sched_yielding(void);
 /* Exit the current coroutine. If this is the last non-system coroutine,
 exit the entire program using the given exit status. */
 C_API void sched_exit(int);
-C_API void sched_cleanup(void);
-C_API void sched_update(routine_t *);
-C_API void sched_checker_stealer(void);
 
 /* Add coroutine to current scheduler queue, appending. */
 C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
 C_API void sched_dec(void);
-C_API uv_args_t *sched_server_args(void);
-C_API void sched_server_set(uv_args_t);
+C_API bool sched_is_main(void);
 
 C_API void preempt_init(u32 usecs);
 C_API void preempt_disable(void);
@@ -853,6 +854,11 @@ C_API void chan_collector_free(void);
 C_API void channel_print(channel_t *);
 C_API channel_t *channel_create(int, int);
 C_API void channel_free(channel_t *);
+
+C_API uv_args_t *interrupt_listen_args(void);
+C_API void interrupt_listen_set(uv_args_t);
+C_API void interrupt_switch(routine_t *);
+
 
 #if defined(_WIN32) || defined(_WIN64)
 C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);

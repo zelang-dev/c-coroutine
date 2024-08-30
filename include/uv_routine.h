@@ -189,7 +189,6 @@ C_API uv_stream_t *ipc_out(spawn_t *out);
 C_API uv_stream_t *ipc_err(spawn_t *err);
 
 C_API void coro_uv_close(uv_handle_t *);
-C_API void uv_close_free(void *handle);
 C_API void interrupt_cleanup(void *handle);
 C_API void interrupt_notify(void *event);
 C_API void interrupt_resume(uv_async_t *handle);

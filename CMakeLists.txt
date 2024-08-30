@@ -84,12 +84,6 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
 endif()
 
-add_definitions(-DMT_STATE=false )
-add_definitions(-DSTACK_SIZE=16384 )
-target_compile_definitions(coroutine
-    PUBLIC CO_MT_STATE=${MT_STATE}
-    PUBLIC CO_STACK_SIZE=${STACK_SIZE}
-)
 target_include_directories(raii AFTER PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(coroutine PUBLIC raii)
