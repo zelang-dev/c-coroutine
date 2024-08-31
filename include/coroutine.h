@@ -117,11 +117,10 @@
 #endif
 
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
-    #define CO_MALLOC rpmalloc
-    #define CO_FREE rpfree
-    #define CO_REALLOC rprealloc
-    #define CO_CALLOC rpcalloc
-    #define CO_MEMALIGN rpmemalign
+    #define CO_MALLOC RAII_MALLOC
+    #define CO_FREE RAII_FREE
+    #define CO_REALLOC RAII_REALLOC
+    #define CO_CALLOC RAII_CALLOC
 #endif
 
 #if defined(__clang__)
