@@ -1,4 +1,7 @@
-#define _GNU_SOURCE
+#ifndef _WIN32
+#   define _GNU_SOURCE
+#endif
+
 #include "coroutine.h"
 
 typedef struct {
@@ -32,8 +35,17 @@ typedef struct {
     /* record which coroutine is executing for scheduler */
     routine_t *running;
 
+    cacheline_pad_t pad1;
     /* coroutines's FIFO scheduler queue */
-    scheduler_t run_queue;
+    scheduler_t run_queue[1];
+    cacheline_pad_t pad2;
+
+#ifdef UV_H
+    uv_loop_t interrupt_buffer[1];
+    uv_loop_t *interrupt_handle;
+    uv_args_t *uv_args;
+#endif
+
 
     /* Store/hold the registers of the default coroutine thread state,
     allows the ability to switch from any function, non coroutine context. */
@@ -46,13 +58,6 @@ typedef struct {
     /* Variable holding the previous running coroutine per thread. */
     routine_t *current_handle;
     routine_t *multi_handle;
-
-#ifdef UV_H
-    uv_args_t *uv_args;
-    uv_loop_t *interrupt_handle;
-    //uv_async_t *interrupt_notify;
-    //uv_work_t *interrupt_thread;
-#endif
 } thread_processor_t;
 thrd_static(thread_processor_t, thread, NULL)
 
@@ -107,7 +112,7 @@ CO_FORCE_INLINE bool sched_local_empty(void) {
 
 /* Check `local` run queue `head` for not `NULL`. */
 CO_FORCE_INLINE bool sched_active(void) {
-    return thread()->run_queue.head != NULL;
+    return thread()->run_queue->head != NULL;
 }
 
 /* Check `global` run queue `head` for not `NULL`. */
@@ -217,11 +222,11 @@ static void sched_post_stolen(thread_processor_t *r) {
 
     available = used_count / 2;
     for (i = 0; i < used_count; i++) {
-        if (&r->run_queue.head != NULL) {
+        if (r->run_queue->head != NULL) {
             if (available == 0)
                 break;
 
-            t = sched_dequeue(&r->run_queue);
+            t = sched_dequeue(r->run_queue);
             if (t->run_code == RUN_NORMAL) {
                 r->used_count--;
                 available--;
@@ -419,17 +424,6 @@ static void co_func(void) {
 /* Utility for aligning addresses. */
 static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align) {
     return (addr + (align - 1)) & ~(align - 1);
-}
-
-void interrupt_notify(void *event) {
-    int r;
-    //uv_handle_set_data(handler(thread()->interrupt_notify), event);
-    //if (r = uv_async_send(thread()->interrupt_notify))
-    //    fprintf(stderr, "Error: %s\n", uv_strerror(r));
-}
-
-void interrupt_resume(uv_async_t *handle) {
-    //interrupt_switch((routine_t *)uv_handle_get_data(handler(thread()->interrupt_notify)));
 }
 
 uv_loop_t *co_loop(void) {
@@ -1236,7 +1230,7 @@ CO_FORCE_INLINE void sched_enqueue(routine_t *t) {
     if (gq_sys.is_multi && is_false(t->taken))
         sched_enqueue_atomic(t);
     else
-        sched_add(&thread()->run_queue, t);
+        sched_add(thread()->run_queue, t);
 }
 
 CO_FORCE_INLINE routine_t *sched_dequeue(scheduler_t *l) {
@@ -1255,7 +1249,7 @@ static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
         atomic_fetch_sub(&gq_sys.used_count, 1);
         t = sched_dequeue(l);
         r->used_count++;
-        sched_add(&r->run_queue, t);
+        sched_add(r->run_queue, t);
     }
 
     atomic_store_explicit(&q->run_queue, l, memory_order_release);
@@ -1272,7 +1266,7 @@ static void sched_steal_available(atomic_deque_t *q) {
         t = sched_dequeue(l);
         t->taken = true;
         thread()->used_count++;
-        sched_add(&thread()->run_queue, t);
+        sched_add(thread()->run_queue, t);
     }
 
     atomic_store_explicit(&q->run_queue, l, memory_order_release);
@@ -1632,11 +1626,6 @@ static void sched_cleanup(void) {
     }
 #ifdef UV_H
     interrupt_cleanup(NULL);
-   /* if (thread()->interrupt_notify) {
-        uv_close(handler(thread()->interrupt_notify), NULL);
-        thread()->interrupt_notify = NULL;
-    }*/
-
     if (thread()->interrupt_handle) {
         uv_loop_close(thread()->interrupt_handle);
         CO_FREE(thread()->interrupt_handle);
@@ -1690,17 +1679,13 @@ static int thrd_scheduler(void) {
                 gq_sys.is_takeable--;
                 atomic_store(&gq_sys.stealable_amount[thread()->thrd_id], 0);
             } else if (!thread()->is_main && gq_sys.is_multi) {
-                atomic_thread_fence(memory_order_seq_cst);
                 RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
                 /* Wait for global exit signal */
+                atomic_thread_fence(memory_order_seq_cst);
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();
 
 #ifdef UV_H
-                /* if (thread()->interrupt_notify) {
-                     uv_close(handler(thread()->interrupt_notify), NULL);
-                     thread()->interrupt_notify = NULL;
-                 }*/
                 if (&gq_sys.loops[thread()->thrd_id]) {
                     uv_loop_close(&gq_sys.loops[thread()->thrd_id]);
                     memset(&gq_sys.loops[thread()->thrd_id], 0, sizeof(&gq_sys.loops[thread()->thrd_id]));
@@ -1715,7 +1700,7 @@ static int thrd_scheduler(void) {
             }
         }
 
-        t = sched_dequeue(&thread()->run_queue);
+        t = sched_dequeue(thread()->run_queue);
         t->ready = false;
         thread()->running = t;
         thread()->num_others_ran++;
@@ -1755,25 +1740,23 @@ int thrd_main(void_t args) {
     rpfree(args);
     rpmalloc_thread_initialize();
 
-    atomic_thread_fence(memory_order_seq_cst);
-    uv_loop_t *uvLoop = &(gq_sys.loops[id]);
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    sched_init(false, id);
 
     /* Wait for global start signal */
     while (!atomic_flag_load(&gq_sys.is_started))
         thrd_yield();
 
+    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi) {
 #ifdef UV_H
-        thread()->interrupt_handle = uvLoop;
-        //thread()->interrupt_notify = &gq_sys.async[id];
+        thread()->interrupt_handle = &(gq_sys.loops[id]);
 #endif
-        co_info(co_active(), -1);
+        sched_init(false, id);
         if (sched_is_available())
             sched_steal_available(&gq_sys);
 
+        co_info(co_active(), -1);
         thrd_scheduler();
     }
 
@@ -1830,14 +1813,12 @@ int main(int argc, char **argv) {
 
 #ifdef UV_H
         gq_sys.loops = try_calloc(gq_sys.cpu_count, sizeof(uv_loop_t));
-        //gq_sys.async = try_calloc(gq_sys.cpu_count, sizeof(uv_async_t));
 #endif
         for (i = 0; i < gq_sys.cpu_count; i++) {
             int *args = try_malloc(sizeof(int));
             *args = i;
 #ifdef UV_H
             err = uv_loop_init(&gq_sys.loops[i]);
-            //err &= uv_async_init(&gq_sys.loops[i], &gq_sys.async[i], interrupt_resume);
 #endif
             if (!err && thrd_create(&(gq_sys.threads[i]), thrd_main, args) != thrd_success) {
                 fprintf(stderr, "`thrd_create` for `thrd_main` failed to start,\nfalling back to single thread mode.\n\n");
@@ -1858,7 +1839,6 @@ int main(int argc, char **argv) {
 #ifdef UV_H
     thread()->interrupt_handle = try_calloc(1, sizeof(uv_loop_t));
     uv_loop_init(thread()->interrupt_handle);
-    //uv_async_init(thread()->interrupt_handle, thread()->interrupt_notify, interrupt_resume);
 #endif
     sched_init(true, gq_sys.cpu_count);
     create_routine(main_main, NULL, gq_sys.stacksize * 4, RUN_MAIN);

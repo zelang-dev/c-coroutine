@@ -46,7 +46,7 @@ set_property(TARGET coroutine PROPERTY POSITION_INDEPENDENT_CODE True)
 target_link_libraries(coroutine PUBLIC uv_a)
 
 find_package(OpenSSL 0.9.8...<3.0.0)
-if(OPENSSL_FOUND)
+if(OPENSSL_FOUND AND WIN32)
     target_include_directories(coroutine BEFORE PUBLIC ${OPENSSL_INCLUDE_DIR})
     add_definitions(-DOPENSSL_USE_STATIC_LIBS=TRUE)
     add_definitions(-DOPENSSL_MSVC_STATIC_RT=TRUE)

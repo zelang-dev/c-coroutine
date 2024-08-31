@@ -459,7 +459,6 @@ typedef struct {
     thrd_t *threads;
 #ifdef UV_H
     uv_loop_t *loops;
-    // uv_async_t *async;
 #endif
     cacheline_pad_t pad2_;
 
