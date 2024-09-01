@@ -106,7 +106,7 @@ char *coroutine_get_state(void);
 
 /* Check `thread` local coroutine use count for zero. */
 CO_FORCE_INLINE bool sched_local_empty(void) {
-    return thread()->used_count <= 0;
+    return thread()->used_count == 0;
 }
 
 /* Check `local` run queue `head` for not `NULL`. */
@@ -302,10 +302,14 @@ static void sched_init(bool is_main, u32 thread_id) {
     thread()->thrd_id = thread_id;
     thread()->sleep_activated = false;
     thread()->sleeping_counted = 0;
+    thread()->used_count  = 0;
     thread()->sleep_id  = 0;
     thread()->active_handle = NULL;
     thread()->main_handle = NULL;
     thread()->current_handle = NULL;
+    thread()->multi_handle = NULL;
+    thread()->interrupt_handle = NULL;
+    thread()->interrupt_default = NULL;
     if (gq_sys.is_multi)
         atomic_store(&gq_sys.count[thread_id], &thread()->used_count);
 }
@@ -425,7 +429,7 @@ static CO_FORCE_INLINE size_t _co_align_forward(size_t addr, size_t align) {
     return (addr + (align - 1)) & ~(align - 1);
 }
 
-uv_loop_t *co_loop(void) {
+CO_FORCE_INLINE uv_loop_t *co_loop(void) {
     if (!is_empty(thread()->interrupt_handle))
         return thread()->interrupt_handle;
     else if (is_empty(thread()->interrupt_default))
@@ -1413,6 +1417,9 @@ static void_t coroutine_wait(void_t v) {
     size_t now;
 
     coroutine_system();
+    if (gq_sys.is_multi && is_empty(thread()->multi_handle))
+        thread()->multi_handle = co_current();
+
     coroutine_name("coroutine_wait");
     for (;;) {
         /* let everyone else run */
@@ -1428,7 +1435,6 @@ static void_t coroutine_wait(void_t v) {
             sched_enqueue(t);
         }
 
-        atomic_thread_fence(memory_order_seq_cst);
         if (gq_sys.is_multi && gq_sys.is_finish) {
             if (!thread()->is_main) {
                 has = (int *)atomic_load(&gq_sys.count[thread()->thrd_id]);
@@ -1556,8 +1562,8 @@ static void sched_free(void) {
 }
 
 static void sched_destroy(void) {
+    size_t i;
     if (gq_sys.is_multi && thread()->is_main && gq_sys.threads) {
-        size_t i;
         atomic_thread_fence(memory_order_seq_cst);
         gq_sys.is_finish = true;
         while (sched_is_running())
@@ -1572,15 +1578,35 @@ static void sched_destroy(void) {
 
         atomic_flag_clear(&gq_sys.is_started);
         for (i = 0; i < gq_sys.cpu_count; i++) {
-            if (thread()->sleeping_counted > 0) {
-                pthread_cancel(gq_sys.threads[i]);
-            }
+            atomic_thread_fence(memory_order_seq_cst);
+            if (&gq_sys.threads[i]) {
+                if (thread()->sleeping_counted > 0)
+                    pthread_cancel(gq_sys.threads[i]);
 
-            if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
-                fprintf(stderr, "`thrd_join` failed!\n");
+                if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
+                    fprintf(stderr, "`thrd_join` failed!\n");
+
+                memset(&gq_sys.threads[i], 0, sizeof(gq_sys.threads[i]));
+            }
         }
 
         sched_free();
+    } else if (gq_sys.is_multi && !thread()->is_main && gq_sys.threads) {
+        i = thread()->thrd_id;
+        atomic_store(&gq_sys.count[i], NULL);
+        if (thread()->interrupt_default) {
+            uv_loop_close(thread()->interrupt_default);
+            thread()->interrupt_default = NULL;
+        }
+
+        atomic_store(&gq_sys.available[i], 0);
+        atomic_store(&gq_sys.stealable_amount[i], 0);
+        atomic_flag_clear(&gq_sys.any_stealable[i]);
+        if (&gq_sys.threads[i]) {
+            pthread_cancel(gq_sys.threads[i]);
+            atomic_thread_fence(memory_order_seq_cst);
+            memset(&gq_sys.threads[i], 0, sizeof(gq_sys.threads[i]));
+        }
     }
 }
 
@@ -1598,11 +1624,13 @@ static void sched_update(routine_t *t) {
 static void sched_cleanup(void) {
     routine_t *t;
     u32 i;
-    if (!can_cleanup)
-        return;
+    if (thread()->is_main) {
+        if (!can_cleanup)
+            return;
 
-    atomic_thread_fence(memory_order_seq_cst);
-    can_cleanup = false;
+        atomic_thread_fence(memory_order_seq_cst);
+        can_cleanup = false;
+    }
 #ifdef UV_H
     interrupt_cleanup(NULL);
     if (!is_empty(thread()->interrupt_handle)) {
@@ -1611,29 +1639,31 @@ static void sched_cleanup(void) {
     }
 #endif
     sched_destroy();
-    chan_collector_free();
-    co_collector_free();
-    size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
-    routine_t **coroutines_all = (routine_t **)atomic_load(&gq_sys.all_coroutine);
+    if (thread()->is_main) {
+        chan_collector_free();
+        co_collector_free();
+        size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
+        routine_t **coroutines_all = (routine_t **)atomic_load(&gq_sys.all_coroutine);
 
-    if (coroutines_num_all) {
-        if (thread()->used_count)
-            coroutines_num_all--;
+        if (coroutines_num_all) {
+            if (thread()->used_count)
+                coroutines_num_all--;
 
-        for (i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
-            t = coroutines_all[coroutines_num_all - i];
-            if (t && t->magic_number == CO_MAGIC_NUMBER) {
-                t->magic_number = -1;
-                CO_FREE(t);
+            for (i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
+                t = coroutines_all[coroutines_num_all - i];
+                if (t && t->magic_number == CO_MAGIC_NUMBER) {
+                    t->magic_number = -1;
+                    CO_FREE(t);
+                }
             }
         }
-    }
 
-    if (!is_empty(coroutines_all)) {
-        CO_FREE(coroutines_all);
-        coroutines_all = NULL;
+        if (!is_empty(coroutines_all)) {
+            CO_FREE(coroutines_all);
+            coroutines_all = NULL;
+        }
+        CO_FREE((void_t)atomic_load(&gq_sys.run_queue));
     }
-    CO_FREE((void_t)atomic_load(&gq_sys.run_queue));
 }
 
 static int thrd_scheduler(void) {
@@ -1685,13 +1715,14 @@ static int thrd_scheduler(void) {
                 /* Wait for global exit signal */
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();
+
+                atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
 #ifdef UV_H
                 if (thread()->interrupt_default) {
                     uv_loop_close(thread()->interrupt_default);
                     thread()->interrupt_default = NULL;
                 }
 #endif
-                atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
                 RAII_INFO("Thrd #%lx exiting.\n", co_async_self());
                 return thread()->exiting;
             } else {
