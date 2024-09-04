@@ -30,7 +30,7 @@ extern "C" {
 # define RPMALLOC_ATTRIB_ALLOC_SIZE2(count, size)  __attribute__((alloc_size(count, size)))
 # endif
 # define RPMALLOC_CDECL
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && !defined(__TINYC__)
 # define RPMALLOC_EXPORT
 # define RPMALLOC_ALLOCATOR __declspec(allocator) __declspec(restrict)
 # define RPMALLOC_ATTRIB_MALLOC
@@ -312,9 +312,23 @@ typedef void (*tls_dtor_t)(void *);
 typedef void(__stdcall *tls_dtor_t)(PVOID lpFlsData);
 #endif
 #endif
+
 #include <stdlib.h>
 #include <stdbool.h>
-#include "catomic.h"
+
+#if !defined(__TINYC__)
+#   include "catomic.h"
+#else
+#   ifdef _WIN32
+#       undef WIN32_LEAN_AND_MEAN
+#       define __TINY_ATOMIC__ 1
+#       include <atomic.h>
+#       include <intrin.h>
+#   else
+#       include <stdatomic.h>
+#   endif
+#   include "catomic.h"
+#endif
 
 C_API int rpmalloc_tls_create(tls_t *key, tls_dtor_t dtor);
 C_API void rpmalloc_tls_delete(tls_t key);
@@ -322,7 +336,58 @@ C_API void *rpmalloc_tls_get(tls_t key);
 C_API int rpmalloc_tls_set(tls_t key, void *val);
 C_API void rpmalloc_shutdown(void);
 
-#ifndef thread_storage
+#if defined(__TINYC__) && !defined(thread_storage)
+#define thread_storage_get(type, var)                   \
+        type* var(void) {                               \
+            if (rpmalloc_##var##_tls == 0) {            \
+                rpmalloc_##var##_tls = sizeof(type);    \
+                rpmalloc_initialize();                  \
+                atexit(rpmalloc_finalize);              \
+                if (pthread_key_create(&rpmalloc_##var##_tss, (tls_dtor_t)rp_free) == 0)    \
+                    atexit(var##_delete);               \
+                else                                    \
+                    goto err;                           \
+            }                                           \
+            void *ptr = pthread_getspecific(rpmalloc_##var##_tss); \
+            if (ptr == NULL) {                          \
+                ptr = rp_malloc(rpmalloc_##var##_tls);  \
+                if (ptr == NULL)                        \
+                    goto err;                           \
+                if ((pthread_setspecific(rpmalloc_##var##_tss, ptr)) != 0)	\
+                    goto err;                           \
+            }                                           \
+            return (type *)ptr;                         \
+        err:                                            \
+            return NULL;                                \
+        }
+
+#define thread_storage_delete(type, var)    \
+        void var##_delete(void) {           \
+            if(rpmalloc_##var##_tls != 0) { \
+                rpmalloc_##var##_tls = 0;   \
+                rp_free(pthread_getspecific(rpmalloc_##var##_tss));    \
+                pthread_key_delete(rpmalloc_##var##_tss);   \
+                rpmalloc_##var##_tss = 0;   \
+                rpmalloc_finalize();        \
+            }                               \
+        }
+
+/* Initialize and setup thread local storage `var` name as functions. */
+#define thread_storage(type, var)           \
+        int rpmalloc_##var##_tls = 0;       \
+        tls_t rpmalloc_##var##_tss = 0;     \
+        thread_storage_delete(type, var)    \
+        thread_storage_get(type, var)
+
+#define thread_storage_proto(type, var, prefix) \
+        prefix int rpmalloc_##var##_tls;        \
+        prefix tls_t rpmalloc_##var##_tss;      \
+        prefix type* var(void);                 \
+        prefix void var##_delete(void);
+
+/* Creates a compile time thread local storage variable */
+#define thread_storage_create(type, var) thread_storage_proto(type, var, C_API)
+#elif !defined(thread_storage) /* __TINYC__ */
 #define thread_storage_get(type, var)                   \
         type* var(void) {                               \
             if (rpmalloc_##var##_tls == 0) {            \

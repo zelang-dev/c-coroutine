@@ -418,8 +418,8 @@ extern "C" {
 #endif
 
 #ifndef thrd_local
-#ifdef emulate_tls
-#   define thrd_local_return(type, var)    return (type)tss_get(thrd_##var##_tss);
+#if defined(emulate_tls) || defined(__TINYC__)
+#   define thrd_local_return(type, var)    return (type *)tss_get(thrd_##var##_tss);
 #   define thrd_local_get(type, var, initial, prefix)   \
         prefix type* var(void) {                        \
             if (thrd_##var##_tls == 0) {	            \
@@ -461,7 +461,7 @@ extern "C" {
             *var() = value;                                 \
         }                                                   \
         prefix FORCEINLINE bool is_##var##_empty(void) {    \
-            return is_empty(tss_get(thrd_##var##_tss));     \
+            return *(type *)tss_get(thrd_##var##_tss) == initial;     \
         }
 
     /* Initialize and setup thread local storage `var name` as functions. */
@@ -474,12 +474,13 @@ extern "C" {
         thrd_local_get(type, var, initial, )
 
 #   define thrd_static(type, var, initial)      \
+        static type *var(void);                 \
+        static void var##_del(void);            \
+        static bool is_##var##_empty(void);     \
         thrd_local_setup(type, var, initial, static)  \
         thrd_local_get(type, var, initial, static)
 
-#   define thrd_static_plain(type, var, initial)      \
-        thrd_local_setup(type, var, initial, static)  \
-        thrd_local_get(type, var, initial, static)
+#   define thrd_static_plain(type, var, initial)    thrd_static(type, var, initial)
 
 #   define thrd_local_proto(type, var, prefix)  \
         prefix int thrd_##var##_tls;            \
