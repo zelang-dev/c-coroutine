@@ -1329,7 +1329,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint8 c89atomic_compare_and_swap_8(volatile c89atomic_uint8* dst, c89atomic_uint8 expected, c89atomic_uint8 desired)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_uchar *)dst, &expected, (unsigned char)desired);
+            return atomic_compare_exchange_strong((atomic_uchar *)dst, (unsigned char)expected, (unsigned char)desired);
 #else
             c89atomic_uint8 result;
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
@@ -1345,7 +1345,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint16 c89atomic_compare_and_swap_16(volatile c89atomic_uint16* dst, c89atomic_uint16 expected, c89atomic_uint16 desired)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_ushort *)dst, &expected, (unsigned short)desired);
+            return atomic_compare_exchange_strong((atomic_ushort *)dst, (unsigned short)expected, (unsigned short)desired);
 #else
             c89atomic_uint16 result;
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
@@ -1361,7 +1361,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint32 c89atomic_compare_and_swap_32(volatile c89atomic_uint32* dst, c89atomic_uint32 expected, c89atomic_uint32 desired)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_uint *)dst, (unsigned int*)&expected, (unsigned int)desired);
+            return atomic_compare_exchange_strong((atomic_uint *)dst, (unsigned int)expected, (unsigned int)desired);
 #else
             c89atomic_uint32 result;
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
@@ -1377,7 +1377,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint64 c89atomic_compare_and_swap_64(volatile c89atomic_uint64* dst, c89atomic_uint64 expected, c89atomic_uint64 desired)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long*)&expected, (unsigned long)desired);
+            return atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long)expected, (unsigned long)desired);
 #else
             volatile c89atomic_uint64 result;
         #if defined(C89ATOMIC_X86)
@@ -1406,7 +1406,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint8 c89atomic_exchange_explicit_8(volatile c89atomic_uint8* dst, c89atomic_uint8 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
+            return (unsigned char)atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
 #else
             c89atomic_uint8 result = 0;
             (void)order;
@@ -1424,7 +1424,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint16 c89atomic_exchange_explicit_16(volatile c89atomic_uint16* dst, c89atomic_uint16 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_exchange_explicit((atomic_ushort *)dst, (unsigned short)src, order);
+            return (unsigned short)atomic_exchange_explicit((atomic_ushort *)dst, (unsigned short)src, order);
 #else
             c89atomic_uint16 result = 0;
             (void)order;
@@ -1442,7 +1442,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint32 c89atomic_exchange_explicit_32(volatile c89atomic_uint32* dst, c89atomic_uint32 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_exchange_explicit((atomic_uint *)dst, (unsigned int)src, order);
+            return (unsigned int)atomic_exchange_explicit((atomic_uint *)dst, (unsigned int)src, order);
 #else
             c89atomic_uint32 result;
             (void)order;
@@ -1460,7 +1460,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint64 c89atomic_exchange_explicit_64(volatile c89atomic_uint64* dst, c89atomic_uint64 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_exchange_explicit((atomic_ulong *)dst, (unsigned long)src, order);
+            return (unsigned long long)atomic_exchange_explicit((atomic_ullong *)dst, (unsigned long long)src, order);
 #else
             c89atomic_uint64 result;
             (void)order;
@@ -1484,7 +1484,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint8 c89atomic_fetch_add_explicit_8(volatile c89atomic_uint8* dst, c89atomic_uint8 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_fetch_add_explicit((atomic_uchar *)dst, (unsigned char)src, order);
+            return (unsigned char)atomic_fetch_add_explicit((atomic_uchar *)dst, (unsigned char)src, order);
 #else
             c89atomic_uint8 result;
             (void)order;
@@ -1502,7 +1502,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint16 c89atomic_fetch_add_explicit_16(volatile c89atomic_uint16* dst, c89atomic_uint16 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_fetch_add_explicit((atomic_short *)dst, (unsigned short)src, order);
+            return (unsigned short)atomic_fetch_add_explicit((atomic_short *)dst, (unsigned short)src, order);
 #else
             c89atomic_uint16 result;
             (void)order;
@@ -1520,7 +1520,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint32 c89atomic_fetch_add_explicit_32(volatile c89atomic_uint32* dst, c89atomic_uint32 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_fetch_add_explicit((atomic_uint *)dst, (unsigned int)src, order);
+            return (unsigned int)atomic_fetch_add_explicit((atomic_uint *)dst, (unsigned int)src, order);
 #else
             c89atomic_uint32 result;
             (void)order;
@@ -1538,7 +1538,7 @@ typedef unsigned char           c89atomic_bool;
         static C89ATOMIC_INLINE c89atomic_uint64 c89atomic_fetch_add_explicit_64(volatile c89atomic_uint64* dst, c89atomic_uint64 src, c89atomic_memory_order order)
         {
 #if (defined(__TINY_ATOMIC__))
-            return atomic_fetch_add_explicit((atomic_ulong *)dst, (unsigned long)src, order);
+            return (unsigned long long)atomic_fetch_add_explicit((atomic_ullong *)dst, (unsigned long long)src, order);
 #else
         #if defined(C89ATOMIC_X86)
             c89atomic_uint64 oldValue;
@@ -2535,7 +2535,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #endif
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_cas_32(atomic_uint *a, c89atomic_uint32 *cmp, c89atomic_uint32 set) {
 #if (defined(__TINY_ATOMIC__))
-        return atomic_compare_exchange_strong(a, cmp, set);
+        return atomic_compare_exchange_strong((atomic_uint *)a, (unsigned int*)cmp, set);
 #else
         c89atomic_int32 initial_cmp = *cmp;
         c89atomic_int32 initial_a = _InterlockedCompareExchange((atomic_long *)a, set, initial_cmp);
@@ -2549,7 +2549,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_cas_64(atomic_ullong *a, c89atomic_uint64 *cmp, c89atomic_uint64 set) {
 #if (defined(__TINY_ATOMIC__))
-        return atomic_compare_exchange_strong(a, cmp, set);
+        return atomic_compare_exchange_strong((atomic_ullong *)a, (unsigned long *)cmp, set);
 #else
         c89atomic_int64 initial_cmp = *cmp;
         c89atomic_int64 initial_a = _InterlockedCompareExchange64((atomic_llong *)a, (c89atomic_int64)set, (c89atomic_int64)initial_cmp);
@@ -2563,7 +2563,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_swap(atomic_ptr_t *a, void **cmp, void *set) {
 #if defined(__TINY_ATOMIC__)
-        return atomic_compare_exchange_strong(a, cmp, set);
+        return atomic_compare_exchange_strong((atomic_uintptr_t *)a, (uintptr_t *)cmp, (uintptr_t *)set);
 #else
         void *initial_cmp = *cmp;
         void *initial_a = _InterlockedCompareExchangePointer((void *volatile *)a, set, initial_cmp);

@@ -342,7 +342,7 @@ C_API void rpmalloc_shutdown(void);
             if (rpmalloc_##var##_tls == 0) {            \
                 rpmalloc_##var##_tls = sizeof(type);    \
                 rpmalloc_initialize();                  \
-                atexit(rpmalloc_finalize);              \
+                atexit(rpmalloc_shutdown);              \
                 if (pthread_key_create(&rpmalloc_##var##_tss, (tls_dtor_t)rp_free) == 0)    \
                     atexit(var##_delete);               \
                 else                                    \
@@ -368,7 +368,6 @@ C_API void rpmalloc_shutdown(void);
                 rp_free(pthread_getspecific(rpmalloc_##var##_tss));    \
                 pthread_key_delete(rpmalloc_##var##_tss);   \
                 rpmalloc_##var##_tss = 0;   \
-                rpmalloc_finalize();        \
             }                               \
         }
 
