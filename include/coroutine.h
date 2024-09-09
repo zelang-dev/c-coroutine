@@ -271,21 +271,13 @@ typedef hash_t chan_collector_t;
 typedef hash_t co_collector_t;
 
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
-    #define USE_NATIVE 1
+#   define USE_NATIVE 1
 #elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
-    #define USE_NATIVE 1
-#elif defined(__clang__) || defined(__GNUC__)
-  #if defined(__arm__)
-    #define USE_NATIVE 1
-  #elif defined(__aarch64__)
-    #define USE_NATIVE 1
-  #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-    #define USE_NATIVE 1
-  #else
-    #define USE_UCONTEXT 1
-  #endif
+#   define USE_NATIVE 1
+#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__)|| defined(__powerpc64__) || defined(__ARM_EABI__) || defined(__riscv))
+#   define USE_NATIVE 1
 #else
-    #define USE_UCONTEXT 1
+#   define USE_UCONTEXT 1
 #endif
 
 #if defined(USE_UCONTEXT)
@@ -344,6 +336,18 @@ struct routine_s {
 #endif
 #elif defined(__i386) || defined(__i386__)
     void_t eip, *esp, *ebp, *ebx, *esi, *edi;
+#elif defined(__riscv)
+    void *s[12]; /* s0-s11 */
+    void *ra;
+    void *pc;
+    void *sp;
+#ifdef __riscv_flen
+#if __riscv_flen == 64
+    double fs[12]; /* fs0-fs11 */
+#elif __riscv_flen == 32
+    float fs[12]; /* fs0-fs11 */
+#endif
+#endif /* __riscv_flen */
 #elif defined(__ARM_EABI__)
 #ifndef __SOFTFP__
     void_t f[ 16 ];

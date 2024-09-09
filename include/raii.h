@@ -4,6 +4,7 @@
 #include "rtypes.h"
 #include "exception.h"
 #include "cthread.h"
+#include "catomic.h"
 #include <stdio.h>
 #include <time.h>
 

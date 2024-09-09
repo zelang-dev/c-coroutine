@@ -9,7 +9,8 @@
  *
  */
 
-#pragma once
+#ifndef RP_MALLOC_H
+#define RP_MALLOC_H
 
 #include <stddef.h>
 
@@ -316,20 +317,6 @@ typedef void(__stdcall *tls_dtor_t)(PVOID lpFlsData);
 #include <stdlib.h>
 #include <stdbool.h>
 
-#if !defined(__TINYC__)
-#   include "catomic.h"
-#else
-#   ifdef _WIN32
-#       undef WIN32_LEAN_AND_MEAN
-#       define __TINY_ATOMIC__ 1
-#       include <atomic.h>
-#       include <intrin.h>
-#   else
-#       include <stdatomic.h>
-#   endif
-#   include "catomic.h"
-#endif
-
 C_API int rpmalloc_tls_create(tls_t *key, tls_dtor_t dtor);
 C_API void rpmalloc_tls_delete(tls_t key);
 C_API void *rpmalloc_tls_get(tls_t key);
@@ -490,3 +477,4 @@ C_API void RPMALLOC_CDECL rp_free(void *ptr);
 #ifdef __cplusplus
 }
 #endif
+#endif /* RP_MALLOC_H */

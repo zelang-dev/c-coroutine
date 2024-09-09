@@ -28,7 +28,6 @@ extern "C" {
 #   define __ATOMIC_ACQ_REL 4
 #   define __ATOMIC_SEQ_CST 5
 #endif
-
 #ifndef _STDATOMIC_H
 /* Memory ordering */
 typedef enum {
@@ -40,7 +39,6 @@ typedef enum {
 	memory_order_seq_cst = __ATOMIC_SEQ_CST,
 } memory_order;
 #endif
-
 typedef int c89atomic_memory_order;
 
 /* Sized Types */
@@ -1328,58 +1326,59 @@ typedef unsigned char           c89atomic_bool;
         /* compare_and_swap() */
         static C89ATOMIC_INLINE c89atomic_uint8 c89atomic_compare_and_swap_8(volatile c89atomic_uint8* dst, c89atomic_uint8 expected, c89atomic_uint8 desired)
         {
-#if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_uchar *)dst, (unsigned char)expected, (unsigned char)desired);
-#else
             c89atomic_uint8 result;
+
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                return (c89atomic_uint8)atomic_compare_exchange_strong((atomic_uchar *)dst, (unsigned char*)&expected, (unsigned char)desired);
+            #else
+                __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint16 c89atomic_compare_and_swap_16(volatile c89atomic_uint16* dst, c89atomic_uint16 expected, c89atomic_uint16 desired)
         {
-#if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_ushort *)dst, (unsigned short)expected, (unsigned short)desired);
-#else
             c89atomic_uint16 result;
+
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                return (c89atomic_uint16)atomic_compare_exchange_strong((atomic_ushort *)dst, (unsigned short*)&expected, (unsigned short)desired);
+            #else
+                __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint32 c89atomic_compare_and_swap_32(volatile c89atomic_uint32* dst, c89atomic_uint32 expected, c89atomic_uint32 desired)
         {
-#if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_uint *)dst, (unsigned int)expected, (unsigned int)desired);
-#else
             c89atomic_uint32 result;
+
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                return (c89atomic_uint32)atomic_compare_exchange_strong((atomic_int *)dst, (unsigned int*)&expected, (unsigned int)desired);
+            #else
+                __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint64 c89atomic_compare_and_swap_64(volatile c89atomic_uint64* dst, c89atomic_uint64 expected, c89atomic_uint64 desired)
         {
-#if (defined(__TINY_ATOMIC__))
-            return atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long)expected, (unsigned long)desired);
-#else
             volatile c89atomic_uint64 result;
+
         #if defined(C89ATOMIC_X86)
             /*
             We can't use the standard CMPXCHG here because x86 does not support it with 64-bit values. We need to instead use CMPXCHG8B
@@ -1389,8 +1388,12 @@ typedef unsigned char           c89atomic_bool;
             */
             c89atomic_uint32 resultEAX;
             c89atomic_uint32 resultEDX;
-            __asm__ __volatile__("push %%ebx; xchg %5, %%ebx; lock; cmpxchg8b %0; pop %%ebx" : "+m"(*dst), "=a"(resultEAX), "=d"(resultEDX) : "a"(expected & 0xFFFFFFFF), "d"(expected >> 32), "r"(desired & 0xFFFFFFFF), "c"(desired >> 32) : "cc");
-            result = ((c89atomic_uint64)resultEDX << 32) | resultEAX;
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                return (c89atomic_uint64)atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long*)&expected, (unsigned long)desired);
+            #else
+                __asm__ __volatile__("push %%ebx; xchg %5, %%ebx; lock; cmpxchg8b %0; pop %%ebx" : "+m"(*dst), "=a"(resultEAX), "=d"(resultEDX) : "a"(expected & 0xFFFFFFFF), "d"(expected >> 32), "r"(desired & 0xFFFFFFFF), "c"(desired >> 32) : "cc");
+                result = ((c89atomic_uint64)resultEDX << 32) | resultEAX;
+            #endif
         #elif defined(C89ATOMIC_X64)
             __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
         #else
@@ -1398,71 +1401,71 @@ typedef unsigned char           c89atomic_bool;
         #endif
 
             return result;
-#endif
         }
 
 
         /* exchange() */
         static C89ATOMIC_INLINE c89atomic_uint8 c89atomic_exchange_explicit_8(volatile c89atomic_uint8* dst, c89atomic_uint8 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned char)atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
-#else
             c89atomic_uint8 result = 0;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                return (c89atomic_uint8)atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
+            #else
+                __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint16 c89atomic_exchange_explicit_16(volatile c89atomic_uint16* dst, c89atomic_uint16 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned short)atomic_exchange_explicit((atomic_ushort *)dst, (unsigned short)src, order);
-#else
             c89atomic_uint16 result = 0;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint16)atomic_exchange_explicit((atomic_ushort *)dst, (unsigned short)src, order);
+            #else
+                __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint32 c89atomic_exchange_explicit_32(volatile c89atomic_uint32* dst, c89atomic_uint32 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned int)atomic_exchange_explicit((atomic_uint *)dst, (unsigned int)src, order);
-#else
             c89atomic_uint32 result;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint32)atomic_exchange_explicit((atomic_uint *)dst, (unsigned int)src, order);
+            #else
+                __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint64 c89atomic_exchange_explicit_64(volatile c89atomic_uint64* dst, c89atomic_uint64 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned long long)atomic_exchange_explicit((atomic_ullong *)dst, (unsigned long long)src, order);
-#else
             c89atomic_uint64 result;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86)
@@ -1470,76 +1473,79 @@ typedef unsigned char           c89atomic_bool;
                 result = *dst;
             } while (c89atomic_compare_and_swap_64(dst, result, src) != result);
         #elif defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint64)atomic_exchange_explicit((atomic_ulong *)dst, (unsigned long)src, order);
+            #else
+                __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
 
         /* fetch_add() */
         static C89ATOMIC_INLINE c89atomic_uint8 c89atomic_fetch_add_explicit_8(volatile c89atomic_uint8* dst, c89atomic_uint8 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned char)atomic_fetch_add_explicit((atomic_uchar *)dst, (unsigned char)src, order);
-#else
             c89atomic_uint8 result;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint8)atomic_fetch_add_explicit((atomic_uchar *)dst, (unsigned char)src, order);
+            #else
+                __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint16 c89atomic_fetch_add_explicit_16(volatile c89atomic_uint16* dst, c89atomic_uint16 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned short)atomic_fetch_add_explicit((atomic_short *)dst, (unsigned short)src, order);
-#else
             c89atomic_uint16 result;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint16)atomic_fetch_add_explicit((atomic_ushort *)dst, (unsigned short)src, order);
+            #else
+                __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint32 c89atomic_fetch_add_explicit_32(volatile c89atomic_uint32* dst, c89atomic_uint32 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned int)atomic_fetch_add_explicit((atomic_uint *)dst, (unsigned int)src, order);
-#else
             c89atomic_uint32 result;
+
             (void)order;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint32)atomic_fetch_add_explicit((atomic_uint *)dst, (unsigned int)src, order);
+            #else
+                __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #endif
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
             return result;
-#endif
         }
 
         static C89ATOMIC_INLINE c89atomic_uint64 c89atomic_fetch_add_explicit_64(volatile c89atomic_uint64* dst, c89atomic_uint64 src, c89atomic_memory_order order)
         {
-#if (defined(__TINY_ATOMIC__))
-            return (unsigned long long)atomic_fetch_add_explicit((atomic_ullong *)dst, (unsigned long long)src, order);
-#else
         #if defined(C89ATOMIC_X86)
             c89atomic_uint64 oldValue;
             c89atomic_uint64 newValue;
@@ -1557,11 +1563,14 @@ typedef unsigned char           c89atomic_bool;
 
             (void)order;
 
-            __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
+                result = (c89atomic_uint64)atomic_fetch_add_explicit((atomic_ulong *)dst, (unsigned long)src, order);
+            #else
+                __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
+            #endif
 
             return result;
         #endif
-#endif
         }
 
         /* fetch_sub() */
@@ -2503,16 +2512,9 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_flag_clear_explicit(pSpinlock, c89atomic_memory_order_release);
 }
 
-/* reads an atomic_flag */
-#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_seq_cst)
-
 #ifdef _WIN32
     typedef volatile void *atomic_ptr_t;
-#   define make_atomic(type, var)  typedef volatile type var;
-#   define atomic_cas_32(obj, expected, desired) c89atomic_cas_32((atomic_uint *)obj, (c89atomic_uint32)expected, (c89atomic_uint32)desired)
-#   define atomic_cas(obj, expected, desired) c89atomic_cas_64((atomic_ullong *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired)
-#   define atomic_swap(obj, expected, desired) c89atomic_swap((atomic_ptr_t *)obj, (void **)expected, (void *)desired)
-#ifndef __TINY_ATOMIC__
+#ifndef _STDATOMIC_H
     typedef volatile c89atomic_flag atomic_flag;
     typedef volatile c89atomic_bool atomic_bool;
     typedef volatile c89atomic_int8 atomic_char;
@@ -2533,9 +2535,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     typedef volatile intmax_t atomic_intmax_t;
     typedef volatile uintmax_t atomic_uintmax_t;
 #endif
+
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_cas_32(atomic_uint *a, c89atomic_uint32 *cmp, c89atomic_uint32 set) {
-#if (defined(__TINY_ATOMIC__))
-        return atomic_compare_exchange_strong((atomic_uint *)a, (unsigned int*)cmp, set);
+#if defined(__TINYC__) && defined(_WIN32) && (defined(__arm__) || defined(__i386__)) && !defined(_MSC_VER)
+        return (c89atomic_bool)atomic_compare_exchange_strong((atomic_uint *)a, (unsigned int *)&cmp, set);
 #else
         c89atomic_int32 initial_cmp = *cmp;
         c89atomic_int32 initial_a = _InterlockedCompareExchange((atomic_long *)a, set, initial_cmp);
@@ -2548,8 +2551,8 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_cas_64(atomic_ullong *a, c89atomic_uint64 *cmp, c89atomic_uint64 set) {
-#if (defined(__TINY_ATOMIC__))
-        return atomic_compare_exchange_strong((atomic_ullong *)a, (unsigned long *)cmp, set);
+#if defined(__TINYC__) && defined(_WIN32) && (defined(__arm__) || defined(__i386__)) && !defined(_MSC_VER)
+        return (c89atomic_bool)atomic_compare_exchange_strong((atomic_ulong *)a, (unsigned long *)&cmp, set);
 #else
         c89atomic_int64 initial_cmp = *cmp;
         c89atomic_int64 initial_a = _InterlockedCompareExchange64((atomic_llong *)a, (c89atomic_int64)set, (c89atomic_int64)initial_cmp);
@@ -2562,8 +2565,8 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_swap(atomic_ptr_t *a, void **cmp, void *set) {
-#if defined(__TINY_ATOMIC__)
-        return atomic_compare_exchange_strong((atomic_uintptr_t *)a, (uintptr_t *)cmp, (uintptr_t *)set);
+#if defined(__TINYC__) && defined(_WIN32) && (defined(__arm__) || defined(__i386__)) && !defined(_MSC_VER)
+        return (c89atomic_bool)atomic_compare_exchange_strong((atomic_uintptr_t *)a, (uintptr_t *)&cmp, (uintptr_t *)&set);
 #else
         void *initial_cmp = *cmp;
         void *initial_a = _InterlockedCompareExchangePointer((void *volatile *)a, set, initial_cmp);
@@ -2574,8 +2577,13 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
         return ret;
 #endif
     }
+
+#define make_atomic(type, var)  typedef volatile type var;
+#define atomic_cas_32(obj, expected, desired) c89atomic_cas_32((atomic_int *)obj, (c89atomic_int32 *)expected, (c89atomic_int32)desired)
+#define atomic_cas(obj, expected, desired) c89atomic_cas_64((atomic_llong *)obj, (c89atomic_int64 *)expected, (c89atomic_int64)desired)
+#define atomic_swap(obj, expected, desired) c89atomic_swap((atomic_ptr_t *)obj, (void **)expected, (void *)desired)
 #else
-    typedef volatile _Atomic(void *)atomic_ptr_t;
+typedef volatile _Atomic(void *)atomic_ptr_t;
 #   define make_atomic(type, var)  typedef volatile _Atomic(type)var;
 
 #if defined(_STDATOMIC_H)
@@ -2588,25 +2596,25 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #   define atomic_swap(P, E, D)    __atomic_compare_exchange_n((P), (E), (D), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 #ifndef _STDATOMIC_H
-    typedef volatile _Atomic(c89atomic_flag)atomic_flag;
-    typedef volatile _Atomic(c89atomic_bool)atomic_bool;
-    typedef volatile _Atomic(c89atomic_int8)atomic_char;
-    typedef volatile _Atomic(c89atomic_int8)atomic_schar;
-    typedef volatile _Atomic(c89atomic_uint8)atomic_uchar;
-    typedef volatile _Atomic(c89atomic_int16)atomic_short;
-    typedef volatile _Atomic(c89atomic_uint16)atomic_ushort;
-    typedef volatile _Atomic(c89atomic_int32)atomic_int;
-    typedef volatile _Atomic(c89atomic_uint32)atomic_uint;
-    typedef volatile _Atomic(signed long)atomic_long;
-    typedef volatile _Atomic(unsigned long)atomic_ulong;
-    typedef volatile _Atomic(c89atomic_int64)atomic_llong;
-    typedef volatile _Atomic(c89atomic_uint64)atomic_ullong;
-    typedef volatile _Atomic(intptr_t)atomic_intptr_t;
-    typedef volatile _Atomic(uintptr_t)atomic_uintptr_t;
-    typedef volatile _Atomic(__SIZE_TYPE__)atomic_size_t;
-    typedef volatile _Atomic(__PTRDIFF_TYPE__)atomic_ptrdiff_t;
-    typedef volatile _Atomic(intmax_t)atomic_intmax_t;
-    typedef volatile _Atomic(uintmax_t)atomic_uintmax_t;
+typedef volatile _Atomic(c89atomic_flag)atomic_flag;
+typedef volatile _Atomic(c89atomic_bool)atomic_bool;
+typedef volatile _Atomic(c89atomic_int8)atomic_char;
+typedef volatile _Atomic(c89atomic_int8)atomic_schar;
+typedef volatile _Atomic(c89atomic_uint8)atomic_uchar;
+typedef volatile _Atomic(c89atomic_int16)atomic_short;
+typedef volatile _Atomic(c89atomic_uint16)atomic_ushort;
+typedef volatile _Atomic(c89atomic_int32)atomic_int;
+typedef volatile _Atomic(c89atomic_uint32)atomic_uint;
+typedef volatile _Atomic(signed long)atomic_long;
+typedef volatile _Atomic(unsigned long)atomic_ulong;
+typedef volatile _Atomic(c89atomic_int64)atomic_llong;
+typedef volatile _Atomic(c89atomic_uint64)atomic_ullong;
+typedef volatile _Atomic(intptr_t)atomic_intptr_t;
+typedef volatile _Atomic(uintptr_t)atomic_uintptr_t;
+typedef volatile _Atomic(__SIZE_TYPE__)atomic_size_t;
+typedef volatile _Atomic(__PTRDIFF_TYPE__)atomic_ptrdiff_t;
+typedef volatile _Atomic(intmax_t)atomic_intmax_t;
+typedef volatile _Atomic(uintmax_t)atomic_uintmax_t;
 #endif
 #endif
 
@@ -2618,7 +2626,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #   define atomic_get(type, obj)  (type)c89atomic_load_64((c89atomic_uint64 *)obj)
 #endif
 
-#if !defined(__TINYC__)
+#if !defined(_STDATOMIC_H)
+/* reads an atomic_flag */
+#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_seq_cst)
+
 /* sets an atomic_flag to false */
 #define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)
 /* sets an atomic_flag to false */

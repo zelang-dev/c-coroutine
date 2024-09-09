@@ -400,12 +400,13 @@ int timespec_get(struct timespec *ts, int base);
 extern "C" {
 #endif
 
+#if !defined(ZE_MALLOC) || !defined(ZE_FREE) || !defined(ZE_REALLOC)|| !defined(ZE_CALLOC)
 #include "rpmalloc.h"
-#if !defined(C11_MALLOC) || !defined(C11_FREE) || !defined(C11_REALLOC)|| !defined(C11_CALLOC)
-#define C11_MALLOC malloc
-#define C11_FREE free
-#define C11_REALLOC realloc
-#define C11_CALLOC calloc
+#define ZE_MALLOC malloc
+#define ZE_FREE free
+#define ZE_REALLOC realloc
+#define ZE_CALLOC calloc
+#define ZE_MEMALIGN memalign
 #endif
 
 #ifndef TIME_UTC
@@ -424,14 +425,14 @@ extern "C" {
         prefix type* var(void) {                        \
             if (thrd_##var##_tls == 0) {	            \
                 thrd_##var##_tls = sizeof(type);        \
-                if (tss_create(&thrd_##var##_tss, C11_FREE) == thrd_success)	\
+                if (tss_create(&thrd_##var##_tss, ZE_FREE) == thrd_success)	\
                     atexit(var##_del);      \
                 else                        \
                       goto err;			    \
             }								\
             void *ptr = tss_get(thrd_##var##_tss);  \
             if (ptr == NULL) {                      \
-                ptr = C11_MALLOC(thrd_##var##_tls); \
+                ptr = ZE_MALLOC(thrd_##var##_tls); \
                 if (ptr == NULL)		    \
                     goto err;			    \
                 if ((tss_set(thrd_##var##_tss, ptr)) != thrd_success)	\
@@ -446,7 +447,7 @@ extern "C" {
         prefix void var##_del(void) {       \
             if (thrd_##var##_tls != 0) {    \
                 thrd_##var##_tls = 0;       \
-                C11_FREE(tss_get(thrd_##var##_tss));    \
+                ZE_FREE(tss_get(thrd_##var##_tss));    \
                 tss_delete(thrd_##var##_tss);           \
                 thrd_##var##_tss = -1;      \
             }                               \
@@ -457,11 +458,11 @@ extern "C" {
         prefix int thrd_##var##_tls = 0;                    \
         prefix tss_t thrd_##var##_tss = 0;                  \
         thrd_local_del(type, var, initial, prefix)          \
-        prefix FORCEINLINE void var##_update(type value) {  \
-            *var() = value;                                 \
+        prefix FORCEINLINE void var##_update(type *value) {  \
+            *var() = *value;                                 \
         }                                                   \
         prefix FORCEINLINE bool is_##var##_empty(void) {    \
-            return *(type *)tss_get(thrd_##var##_tss) == initial;     \
+            return (type *)tss_get(thrd_##var##_tss) == (type *)initial;     \
         }
 
     /* Initialize and setup thread local storage `var name` as functions. */

@@ -785,6 +785,8 @@ routine_t *co_derive(void_t memory, size_t size) {
 #define MIN_STACK_FRAME 0x20lu
 #define STACK_ALIGN 0x10lu
 
+static void co_init(void) {}
+
 void swap_context(routine_t *read, routine_t *write);
 __asm__(
     ".text\n"
@@ -1001,6 +1003,241 @@ routine_t *co_derive(void_t memory, size_t size) {
 #endif
     return context;
 }
+
+#elif defined(__ARM_EABI__)
+void swap_context(routine_t *from, routine_t *to);
+__asm__(
+    ".text\n"
+#ifdef __APPLE__
+    ".globl _swap_context\n"
+    "_swap_context:\n"
+#else
+    ".globl swap_context\n"
+    ".type swap_context #function\n"
+    ".hidden swap_context\n"
+    "swap_context:\n"
+#endif
+
+#ifndef __SOFTFP__
+    "vstmia r0!, {d8-d15}\n"
+#endif
+    "stmia r0, {r4-r11, lr}\n"
+    ".byte 0xE5, 0x80,  0xD0, 0x24\n" /* should be "str sp, [r0, #9*4]\n", it's causing vscode display issue */
+#ifndef __SOFTFP__
+    "vldmia r1!, {d8-d15}\n"
+#endif
+    ".byte 0xE5, 0x91, 0xD0, 0x24\n" /* should be "ldr sp, [r1, #9*4]\n", it's causing vscode display issue */
+    "ldmia r1, {r4-r11, pc}\n"
+#ifndef __APPLE__
+    ".size swap_context, .-swap_context\n"
+#endif
+);
+
+static void co_init(void) {}
+
+routine_t *co_derive(void_t memory, size_t size) {
+    routine_t *ctx = (routine_t *)memory;
+    if (!co_swap) {
+        co_swap = (void (*)(routine_t *, routine_t *))swap_context;
+    }
+
+    ctx->d[0] = memory;
+    ctx->d[1] = (void *)(co_awaitable);
+    ctx->d[2] = (void *)(co_done);
+    ctx->lr = (void *)(co_awaitable);
+    ctx->sp = (void *)((size_t)memory + size);
+#ifdef USE_VALGRIND
+    size_t stack_addr = _co_align_forward((size_t)memory + sizeof(routine_t), 16);
+    ctx->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+#endif
+
+    return ctx;
+}
+
+#elif defined(__riscv)
+void swap_context(routine_t *from, routine_t *to);
+__asm__(
+    ".text\n"
+    ".globl swap_context\n"
+    ".type swap_context @function\n"
+    ".hidden swap_context\n"
+    "swap_context:\n"
+#if __riscv_xlen == 64
+    "  sd s0, 0x00(a0)\n"
+    "  sd s1, 0x08(a0)\n"
+    "  sd s2, 0x10(a0)\n"
+    "  sd s3, 0x18(a0)\n"
+    "  sd s4, 0x20(a0)\n"
+    "  sd s5, 0x28(a0)\n"
+    "  sd s6, 0x30(a0)\n"
+    "  sd s7, 0x38(a0)\n"
+    "  sd s8, 0x40(a0)\n"
+    "  sd s9, 0x48(a0)\n"
+    "  sd s10, 0x50(a0)\n"
+    "  sd s11, 0x58(a0)\n"
+    "  sd ra, 0x60(a0)\n"
+    "  sd ra, 0x68(a0)\n" // pc
+    "  sd sp, 0x70(a0)\n"
+#ifdef __riscv_flen
+#if __riscv_flen == 64
+    "  fsd fs0, 0x78(a0)\n"
+    "  fsd fs1, 0x80(a0)\n"
+    "  fsd fs2, 0x88(a0)\n"
+    "  fsd fs3, 0x90(a0)\n"
+    "  fsd fs4, 0x98(a0)\n"
+    "  fsd fs5, 0xa0(a0)\n"
+    "  fsd fs6, 0xa8(a0)\n"
+    "  fsd fs7, 0xb0(a0)\n"
+    "  fsd fs8, 0xb8(a0)\n"
+    "  fsd fs9, 0xc0(a0)\n"
+    "  fsd fs10, 0xc8(a0)\n"
+    "  fsd fs11, 0xd0(a0)\n"
+    "  fld fs0, 0x78(a1)\n"
+    "  fld fs1, 0x80(a1)\n"
+    "  fld fs2, 0x88(a1)\n"
+    "  fld fs3, 0x90(a1)\n"
+    "  fld fs4, 0x98(a1)\n"
+    "  fld fs5, 0xa0(a1)\n"
+    "  fld fs6, 0xa8(a1)\n"
+    "  fld fs7, 0xb0(a1)\n"
+    "  fld fs8, 0xb8(a1)\n"
+    "  fld fs9, 0xc0(a1)\n"
+    "  fld fs10, 0xc8(a1)\n"
+    "  fld fs11, 0xd0(a1)\n"
+#else
+#error "Unsupported RISC-V FLEN"
+#endif
+#endif //  __riscv_flen
+    "  ld s0, 0x00(a1)\n"
+    "  ld s1, 0x08(a1)\n"
+    "  ld s2, 0x10(a1)\n"
+    "  ld s3, 0x18(a1)\n"
+    "  ld s4, 0x20(a1)\n"
+    "  ld s5, 0x28(a1)\n"
+    "  ld s6, 0x30(a1)\n"
+    "  ld s7, 0x38(a1)\n"
+    "  ld s8, 0x40(a1)\n"
+    "  ld s9, 0x48(a1)\n"
+    "  ld s10, 0x50(a1)\n"
+    "  ld s11, 0x58(a1)\n"
+    "  ld ra, 0x60(a1)\n"
+    "  ld a2, 0x68(a1)\n" // pc
+    "  ld sp, 0x70(a1)\n"
+    "  jr a2\n"
+#elif __riscv_xlen == 32
+    "  sw s0, 0x00(a0)\n"
+    "  sw s1, 0x04(a0)\n"
+    "  sw s2, 0x08(a0)\n"
+    "  sw s3, 0x0c(a0)\n"
+    "  sw s4, 0x10(a0)\n"
+    "  sw s5, 0x14(a0)\n"
+    "  sw s6, 0x18(a0)\n"
+    "  sw s7, 0x1c(a0)\n"
+    "  sw s8, 0x20(a0)\n"
+    "  sw s9, 0x24(a0)\n"
+    "  sw s10, 0x28(a0)\n"
+    "  sw s11, 0x2c(a0)\n"
+    "  sw ra, 0x30(a0)\n"
+    "  sw ra, 0x34(a0)\n" // pc
+    "  sw sp, 0x38(a0)\n"
+#ifdef __riscv_flen
+#if __riscv_flen == 64
+    "  fsd fs0, 0x3c(a0)\n"
+    "  fsd fs1, 0x44(a0)\n"
+    "  fsd fs2, 0x4c(a0)\n"
+    "  fsd fs3, 0x54(a0)\n"
+    "  fsd fs4, 0x5c(a0)\n"
+    "  fsd fs5, 0x64(a0)\n"
+    "  fsd fs6, 0x6c(a0)\n"
+    "  fsd fs7, 0x74(a0)\n"
+    "  fsd fs8, 0x7c(a0)\n"
+    "  fsd fs9, 0x84(a0)\n"
+    "  fsd fs10, 0x8c(a0)\n"
+    "  fsd fs11, 0x94(a0)\n"
+    "  fld fs0, 0x3c(a1)\n"
+    "  fld fs1, 0x44(a1)\n"
+    "  fld fs2, 0x4c(a1)\n"
+    "  fld fs3, 0x54(a1)\n"
+    "  fld fs4, 0x5c(a1)\n"
+    "  fld fs5, 0x64(a1)\n"
+    "  fld fs6, 0x6c(a1)\n"
+    "  fld fs7, 0x74(a1)\n"
+    "  fld fs8, 0x7c(a1)\n"
+    "  fld fs9, 0x84(a1)\n"
+    "  fld fs10, 0x8c(a1)\n"
+    "  fld fs11, 0x94(a1)\n"
+#elif __riscv_flen == 32
+    "  fsw fs0, 0x3c(a0)\n"
+    "  fsw fs1, 0x40(a0)\n"
+    "  fsw fs2, 0x44(a0)\n"
+    "  fsw fs3, 0x48(a0)\n"
+    "  fsw fs4, 0x4c(a0)\n"
+    "  fsw fs5, 0x50(a0)\n"
+    "  fsw fs6, 0x54(a0)\n"
+    "  fsw fs7, 0x58(a0)\n"
+    "  fsw fs8, 0x5c(a0)\n"
+    "  fsw fs9, 0x60(a0)\n"
+    "  fsw fs10, 0x64(a0)\n"
+    "  fsw fs11, 0x68(a0)\n"
+    "  flw fs0, 0x3c(a1)\n"
+    "  flw fs1, 0x40(a1)\n"
+    "  flw fs2, 0x44(a1)\n"
+    "  flw fs3, 0x48(a1)\n"
+    "  flw fs4, 0x4c(a1)\n"
+    "  flw fs5, 0x50(a1)\n"
+    "  flw fs6, 0x54(a1)\n"
+    "  flw fs7, 0x58(a1)\n"
+    "  flw fs8, 0x5c(a1)\n"
+    "  flw fs9, 0x60(a1)\n"
+    "  flw fs10, 0x64(a1)\n"
+    "  flw fs11, 0x68(a1)\n"
+#else
+#error "Unsupported RISC-V FLEN"
+#endif
+#endif // __riscv_flen
+    "  lw s0, 0x00(a1)\n"
+    "  lw s1, 0x04(a1)\n"
+    "  lw s2, 0x08(a1)\n"
+    "  lw s3, 0x0c(a1)\n"
+    "  lw s4, 0x10(a1)\n"
+    "  lw s5, 0x14(a1)\n"
+    "  lw s6, 0x18(a1)\n"
+    "  lw s7, 0x1c(a1)\n"
+    "  lw s8, 0x20(a1)\n"
+    "  lw s9, 0x24(a1)\n"
+    "  lw s10, 0x28(a1)\n"
+    "  lw s11, 0x2c(a1)\n"
+    "  lw ra, 0x30(a1)\n"
+    "  lw a2, 0x34(a1)\n" // pc
+    "  lw sp, 0x38(a1)\n"
+    "  jr a2\n"
+#else
+#error "Unsupported RISC-V XLEN"
+#endif // __riscv_xlen
+    ".size swap_context, .-swap_context\n"
+);
+
+static void co_init(void) {}
+
+routine_t *co_derive(void_t memory, size_t size) {
+    routine_t *ctx = (routine_t *)memory;
+    if (!co_swap) {
+        co_swap = (void (*)(routine_t *, routine_t *))swap_context;
+    }
+
+    ctx->s[0] = memory;
+    ctx->s[1] = (void *)(co_awaitable);
+    ctx->pc = (void *)(co_awaitable);
+    ctx->ra = (void *)(co_done);
+    ctx->sp = (void *)((size_t)memory + size);
+#ifdef USE_VALGRIND
+    size_t stack_addr = _co_align_forward((size_t)memory + sizeof(routine_t), 16);
+    ctx->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+#endif
+
+    return ctx;
+}
+
 #else
 #define USE_OTHER 1
 #endif
