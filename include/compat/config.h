@@ -159,6 +159,8 @@
 
 #if defined(__TINYC__)
 #define NO_OLDNAMES 1
+#define PTW32_CLEANUP_C 1
+#define __PTW32_CLEANUP_C 1
 
 #ifdef HAVE_HIDDEN_VISIBILITY_ATTRIBUTE
 #ifdef LIBFFI_ASM

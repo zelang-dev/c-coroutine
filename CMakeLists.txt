@@ -22,8 +22,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.21.zip
-        URL_MD5 a8dc834a92dac70307d87840bacecf3c
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.22.zip
+        URL_MD5 9fa73479988cf9dfbe993fe2b399c353
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -80,7 +80,7 @@ endif()
 
 if(WIN32)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG ")
-    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions(-D_CRT_SECURE_NO_DEPRECATE -DPTW32_STATIC_LIB)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
 endif()
 
