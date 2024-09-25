@@ -22,8 +22,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.22.zip
-        URL_MD5 9fa73479988cf9dfbe993fe2b399c353
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.0.23.zip
+        URL_MD5 7a773a9b33e1d7e04db1aab9e38ec42a
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -31,8 +31,8 @@ endif()
 find_package(libuv QUIET)
 if(NOT libuv_FOUND)
     FetchContent_Declare(libuv
-        URL https://github.com/libuv/libuv/archive/refs/tags/v1.48.0.zip
-        URL_MD5 67d0e50ac6e95de12b09b17ff8baed0f
+        URL https://github.com/libuv/libuv/archive/refs/tags/v1.49.0.zip
+        URL_MD5 da312f4f1b0e687ed5e3b7f37b04e9c4
     )
     FetchContent_MakeAvailable(libuv)
 endif()
