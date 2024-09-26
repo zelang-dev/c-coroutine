@@ -1114,7 +1114,7 @@ typedef unsigned char           c89atomic_bool;
 
     #define c89atomic_compiler_fence() __asm__ __volatile__("":::"memory")
 
-    #if defined(__GNUC__)
+    #if defined(__GNUC__) && !defined(__APPLE__)
         /* Legacy GCC atomic built-ins. Everything is a full memory barrier. */
         #define c89atomic_thread_fence(order) __sync_synchronize(), (void)order
 
