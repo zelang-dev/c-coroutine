@@ -2006,9 +2006,10 @@ static void_t main_main(void_t v) {
 int thrd_main(void_t args) {
     int id = *(int *)args;
     CO_FREE(args);
-#ifndef _WIN32
+#ifdef RP_MALLOC_H
     rpmalloc_thread_initialize();
 #endif
+
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
@@ -2026,7 +2027,7 @@ int thrd_main(void_t args) {
         thrd_scheduler();
     }
 
-#ifndef _WIN32
+#ifdef RP_MALLOC_H
     rpmalloc_thread_finalize(1);
 #endif
     thrd_exit(thread()->exiting);
@@ -2037,7 +2038,7 @@ int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
     int i, err = 0;
-#ifndef _WIN32
+#ifdef RP_MALLOC_H
     rpmalloc_initialize();
 #endif
     exception_setup_func = sched_unwind_setup;
@@ -2060,7 +2061,6 @@ int main(int argc, char **argv) {
     atomic_flag_clear(&gq_sys.is_started);
 
 #ifdef UV_H
-    //uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rp_free);
     RAII_INFO("%s", sched_uname());
 #endif
     if (gq_sys.is_multi && (gq_sys.threads = try_calloc(gq_sys.cpu_count, sizeof(thrd_t)))) {
@@ -2095,7 +2095,7 @@ int main(int argc, char **argv) {
             }
         }
 
-#ifndef _WIN32
+#ifdef RP_MALLOC_H
         atexit(rpmalloc_shutdown);
 #endif
     }

@@ -118,7 +118,7 @@
 
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
     #define CO_MALLOC RAII_MALLOC
-    #define CO_FREE RAII_FREE
+    #define CO_FREE rpfree
     #define CO_REALLOC RAII_REALLOC
     #define CO_CALLOC RAII_CALLOC
 #endif

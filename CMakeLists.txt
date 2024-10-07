@@ -12,6 +12,10 @@ include(CTest)
 
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
