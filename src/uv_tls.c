@@ -9,6 +9,7 @@
 //%///////////////////////////////////////////////////////////////////////////
 
 #include "uv_routine.h"
+#include "rpmalloc.h"
 #ifndef CO_ASSERT
   #if defined(USE_DEBUG)
     #include <assert.h>

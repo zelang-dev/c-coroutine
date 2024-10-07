@@ -1787,10 +1787,6 @@ void sched_exit(int val) {
 }
 
 static void sched_free(void) {
-    atomic_thread_fence(memory_order_seq_cst);
-    CO_FREE(gq_sys.threads);
-    gq_sys.threads = NULL;
-
     CO_FREE((void_t)atomic_load(&gq_sys.count));
     CO_FREE((void_t)atomic_load(&gq_sys.available));
     CO_FREE((void_t)atomic_load(&gq_sys.stealable_thread));
@@ -1816,7 +1812,7 @@ static void sched_destroy(void) {
         atomic_flag_clear(&gq_sys.is_started);
         for (i = 0; i < gq_sys.cpu_count; i++) {
             atomic_thread_fence(memory_order_seq_cst);
-            if (&gq_sys.threads[i]) {
+            if (&gq_sys.threads[i] != 0) {
                 if (thread()->sleeping_counted > 0)
                     pthread_cancel(gq_sys.threads[i]);
 
@@ -1827,6 +1823,9 @@ static void sched_destroy(void) {
             }
         }
 
+        atomic_thread_fence(memory_order_seq_cst);
+        CO_FREE(gq_sys.threads);
+        gq_sys.threads = NULL;
         sched_free();
     } else if (gq_sys.is_multi && !thread()->is_main && gq_sys.threads) {
         i = thread()->thrd_id;
@@ -1881,25 +1880,25 @@ static void sched_cleanup(void) {
         co_collector_free();
         size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
         routine_t **coroutines_all = (routine_t **)atomic_load(&gq_sys.all_coroutine);
+        if (!is_empty(coroutines_all)) {
+            if (coroutines_num_all) {
+                if (thread()->used_count)
+                    coroutines_num_all--;
 
-        if (coroutines_num_all) {
-            if (thread()->used_count)
-                coroutines_num_all--;
-
-            for (i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
-                t = coroutines_all[coroutines_num_all - i];
-                if (t && t->magic_number == CO_MAGIC_NUMBER) {
-                    t->magic_number = -1;
-                    CO_FREE(t);
+                for (i = 0; i < (coroutines_num_all + (thread()->used_count != 0)); i++) {
+                    t = coroutines_all[coroutines_num_all - i];
+                    if (t && t->magic_number == CO_MAGIC_NUMBER) {
+                        t->magic_number = -1;
+                        CO_FREE(t);
+                    }
                 }
             }
-        }
 
-        if (!is_empty(coroutines_all)) {
-            CO_FREE(coroutines_all);
-            coroutines_all = NULL;
+            CO_FREE((void_t)coroutines_all);
+            atomic_init(&gq_sys.all_coroutine, NULL);
+            CO_FREE((void_t)atomic_load(&gq_sys.run_queue));
+            atomic_init(&gq_sys.run_queue, NULL);
         }
-        CO_FREE((void_t)atomic_load(&gq_sys.run_queue));
     }
 }
 
@@ -2058,6 +2057,7 @@ int main(int argc, char **argv) {
     atomic_init(&gq_sys.id_generate, 0);
     atomic_init(&gq_sys.used_count, 0);
     atomic_init(&gq_sys.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
+    atomic_init(&gq_sys.all_coroutine, try_calloc(1, sizeof(atomic_routine_t)));
     atomic_flag_clear(&gq_sys.is_started);
 
 #ifdef UV_H
