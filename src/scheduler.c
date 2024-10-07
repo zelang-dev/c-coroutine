@@ -2096,6 +2096,8 @@ int main(int argc, char **argv) {
         }
     }
 
+    }
+
 #ifdef RP_MALLOC_H
         atexit(rpmalloc_shutdown);
 #endif
