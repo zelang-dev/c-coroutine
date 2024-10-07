@@ -2095,10 +2095,11 @@ int main(int argc, char **argv) {
             }
         }
 
+    }
+
 #ifdef RP_MALLOC_H
         atexit(rpmalloc_shutdown);
 #endif
-    }
 
     RAII_LOG("");
     json_set_allocation_functions(try_malloc, CO_FREE);
