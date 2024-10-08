@@ -36,7 +36,7 @@
 #if !defined(RAII_MALLOC) || !defined(RAII_FREE) || !defined(RAII_REALLOC)|| !defined(RAII_CALLOC)
   #include "rpmalloc.h"
   #define RAII_MALLOC malloc
-  #define RAII_FREE free
+  #define RAII_FREE rpfree
   #define RAII_REALLOC realloc
   #define RAII_CALLOC calloc
   #define RAII_MEMALIGN memalign

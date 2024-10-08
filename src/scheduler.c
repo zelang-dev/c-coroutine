@@ -138,6 +138,10 @@ CO_FORCE_INLINE bool sched_is_available(void) {
     return gq_sys.is_multi && atomic_load(&gq_sys.available[thread()->thrd_id]) > 0;
 }
 
+CO_FORCE_INLINE bool sched_is_sleeping(void) {
+    return (thread()->sleeping_counted > 0 && sched_active());
+}
+
 /* Check for thread steal status marking,
 the thread to receive another thread's `run queue`. */
 CO_FORCE_INLINE bool sched_is_stealable(size_t id) {
@@ -371,22 +375,22 @@ static void co_done(void) {
         co->status = CO_DEAD;
     }
 
-    /* Force child threads to return to `main` thread coroutine.
-    Todo: Refactor to have each child thread have own return coroutine,
-    this issue is apparent when using `wait groups` and `sleep_for`,
-    first part execution is in correct thread,
-    after sleep/switch resuming execution is in `main` thread. */
     if (gq_sys.is_multi && co->system && gq_sys.is_finish) {
         thread()->used_count = 0;
-        thread()->sleeping_counted = 0;
         co_switch(co_current());
     }
 
-    co_scheduler();
+    if (gq_sys.is_multi && !thread()->is_main)
+        co_switch(thread()->multi_handle);
+    else
+        co_scheduler();
 }
 
 static void co_awaitable(void) {
     routine_t *co = co_active();
+    if (gq_sys.is_multi && !thread()->is_main && !thread()->multi_handle)
+        thread()->multi_handle = thread()->active_handle;
+
     try {
         if (co->interrupt_active) {
             co->func(co->args);
@@ -412,16 +416,14 @@ static void co_awaitable(void) {
         }
     } end_try;
 
-    /* Must force call to finish returning in multi threading mode for child threads.
-    Todo: Needs general refactoring for multithreading, currently returning to
-    main thread to finish execution. */
-    if (gq_sys.is_multi && co->system && gq_sys.is_finish)
+    if (gq_sys.is_multi && !thread()->is_main)
         co_done();
 }
 
 static void co_func(void) {
     co_awaitable();
-    co_done(); /* called only if coroutine function returns */
+    if (thread()->is_main)
+        co_done(); /* called only if coroutine function returns */
 }
 
 /* Utility for aligning addresses. */
@@ -1654,9 +1656,6 @@ static void_t coroutine_wait(void_t v) {
     size_t now;
 
     coroutine_system();
-    if (gq_sys.is_multi && is_empty(thread()->multi_handle))
-        thread()->multi_handle = co_current();
-
     coroutine_name("coroutine_wait");
     for (;;) {
         /* let everyone else run */
@@ -1674,6 +1673,7 @@ static void_t coroutine_wait(void_t v) {
 
         if (gq_sys.is_multi && gq_sys.is_finish) {
             if (!thread()->is_main) {
+                thread()->sleeping_counted = 0;
                 has = (int *)atomic_load(&gq_sys.count[thread()->thrd_id]);
                 if (!is_empty(has))
                     atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
@@ -1823,7 +1823,6 @@ static void sched_destroy(void) {
             }
         }
 
-        atomic_thread_fence(memory_order_seq_cst);
         CO_FREE(gq_sys.threads);
         gq_sys.threads = NULL;
         sched_free();
@@ -1868,7 +1867,6 @@ static void sched_cleanup(void) {
         can_cleanup = false;
     }
 #ifdef UV_H
-    interrupt_cleanup(NULL);
     if (!is_empty(thread()->interrupt_handle)) {
         uv_loop_close(thread()->interrupt_handle);
         thread()->interrupt_handle = NULL;
@@ -1928,10 +1926,7 @@ static int thrd_scheduler(void) {
                     sched_steal_available(&gq_sys);
                 else
                     sched_steal(&gq_sys, thread(), 1);
-            } else if (l != EMPTY && gq_sys.is_multi
-                       && thread()->sleeping_counted > 0 && sched_active() && !gq_sys.is_finish) {
-                    thread()->used_count++;
-            } else if (l != EMPTY && !gq_sys.is_finish && sched_is_any_available()) {
+            } else if (l != EMPTY && !gq_sys.is_finish && !sched_is_sleeping() && sched_is_any_available()) {
                 while (atomic_flag_load(&gq_sys.any_stealable[thread()->thrd_id]))
                     thrd_yield();
 
@@ -1945,7 +1940,7 @@ static int thrd_scheduler(void) {
                 sched_steal(&gq_sys, thread(), stole);
                 gq_sys.is_takeable--;
                 atomic_store(&gq_sys.stealable_amount[thread()->thrd_id], 0);
-            } else if (!thread()->is_main && gq_sys.is_multi) {
+            } else if (!thread()->is_main && gq_sys.is_multi && thread()->sleeping_counted == 0) {
                 atomic_thread_fence(memory_order_seq_cst);
                 RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
                 /* Wait for global exit signal */
@@ -1961,7 +1956,7 @@ static int thrd_scheduler(void) {
 #endif
                 RAII_INFO("Thrd #%lx exiting.\n", co_async_self());
                 return thread()->exiting;
-            } else {
+            } else if (!sched_is_sleeping()) {
                 l = EMPTY;
                 continue;
             }
@@ -2005,9 +2000,7 @@ static void_t main_main(void_t v) {
 int thrd_main(void_t args) {
     int id = *(int *)args;
     CO_FREE(args);
-#ifdef RP_MALLOC_H
-    rpmalloc_thread_initialize();
-#endif
+    raii_rpmalloc_init();
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -2026,9 +2019,7 @@ int thrd_main(void_t args) {
         thrd_scheduler();
     }
 
-#ifdef RP_MALLOC_H
     rpmalloc_thread_finalize(1);
-#endif
     thrd_exit(thread()->exiting);
     return 0;
 }
@@ -2037,9 +2028,8 @@ int main(int argc, char **argv) {
     main_argc = argc;
     main_argv = argv;
     int i, err = 0;
-#ifdef RP_MALLOC_H
-    rpmalloc_initialize();
-#endif
+
+    raii_rpmalloc_init();
     exception_setup_func = sched_unwind_setup;
     exception_unwind_func = (ex_unwind_func)co_deferred_free;
     exception_ctrl_c_func = (ex_terminate_func)sched_destroy;
@@ -2056,8 +2046,8 @@ int main(int argc, char **argv) {
     gq_sys.thread_invalid = gq_sys.thread_count + 61;
     atomic_init(&gq_sys.id_generate, 0);
     atomic_init(&gq_sys.used_count, 0);
+    atomic_init(&gq_sys.all_coroutine, NULL);
     atomic_init(&gq_sys.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
-    atomic_init(&gq_sys.all_coroutine, try_calloc(1, sizeof(atomic_routine_t)));
     atomic_flag_clear(&gq_sys.is_started);
 
 #ifdef UV_H
@@ -2095,10 +2085,6 @@ int main(int argc, char **argv) {
             }
         }
     }
-
-#ifdef RP_MALLOC_H
-        atexit(rpmalloc_shutdown);
-#endif
 
     RAII_LOG("");
     json_set_allocation_functions(try_malloc, CO_FREE);

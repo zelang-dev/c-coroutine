@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.11...3.14)
 
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 project(c-coroutine LANGUAGES C)
 
 set(CMAKE_C_STANDARD 90)
@@ -12,10 +16,6 @@ include(CTest)
 
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
-if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
-    cmake_policy(SET CMP0135 NEW)
-endif()
-
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
@@ -26,8 +26,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.1.0.zip
-        URL_MD5 a6a6a2d136bcb2b0160cdea86247f5ee
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.1.1.zip
+        URL_MD5 9abcd1429dbffd73a2172c74cca0df99
     )
     FetchContent_MakeAvailable(raii)
 endif()

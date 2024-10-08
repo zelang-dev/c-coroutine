@@ -461,6 +461,11 @@ are only valid between these sections.
 
 #define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }
 
+/* extern declaration
+*/
+C_API bool raii_rpmalloc_set;
+C_API void raii_rpmalloc_init(void);
+
 thrd_local_extern(memory_t, raii)
 thrd_local_extern(ex_context_t, except)
 
