@@ -374,11 +374,6 @@ static void co_done(void) {
         co->status = CO_DEAD;
     }
 
-    if (gq_sys.is_multi && co->system && gq_sys.is_finish) {
-        thread()->used_count = 0;
-        co_switch(co_current());
-    }
-
     if (gq_sys.is_multi && !thread()->is_main)
         co_switch(thread()->multi_handle);
     else
@@ -1794,6 +1789,21 @@ static void sched_free(void) {
     CO_FREE((void_t)atomic_load(&gq_sys.any_stealable));
 }
 
+static void sched_shutdown_interrupt(void) {
+#ifdef UV_H
+    if (thread()->interrupt_handle) {
+        interrupt_cleanup(NULL);
+        uv_loop_close(thread()->interrupt_handle);
+        thread()->interrupt_handle = NULL;
+    }
+
+    if (thread()->interrupt_default) {
+        uv_loop_close(thread()->interrupt_default);
+        thread()->interrupt_default = NULL;
+    }
+#endif
+}
+
 static void sched_destroy(void) {
     size_t i;
     if (gq_sys.is_multi && thread()->is_main && gq_sys.threads) {
@@ -1812,14 +1822,14 @@ static void sched_destroy(void) {
         atomic_flag_clear(&gq_sys.is_started);
         for (i = 0; i < gq_sys.cpu_count; i++) {
             atomic_thread_fence(memory_order_seq_cst);
-            if (&gq_sys.threads[i] != 0) {
-                if (thread()->sleeping_counted > 0)
-                    pthread_cancel(gq_sys.threads[i]);
+            if (thread()->sleeping_counted > 0 && *(int *)&gq_sys.threads[i] != -1)
+                pthread_cancel(gq_sys.threads[i]);
 
+            if (*(int *)&gq_sys.threads[i] != -1) {
                 if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
                     fprintf(stderr, "`thrd_join` failed!\n");
 
-                memset(&gq_sys.threads[i], 0, sizeof(gq_sys.threads[i]));
+                memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
             }
         }
 
@@ -1829,18 +1839,14 @@ static void sched_destroy(void) {
     } else if (gq_sys.is_multi && !thread()->is_main && gq_sys.threads) {
         i = thread()->thrd_id;
         atomic_store(&gq_sys.count[i], NULL);
-        if (thread()->interrupt_default) {
-            uv_loop_close(thread()->interrupt_default);
-            thread()->interrupt_default = NULL;
-        }
-
         atomic_store(&gq_sys.available[i], 0);
         atomic_store(&gq_sys.stealable_amount[i], 0);
         atomic_flag_clear(&gq_sys.any_stealable[i]);
-        if (&gq_sys.threads[i]) {
+        sched_shutdown_interrupt();
+        if (*(int *)&gq_sys.threads[i] != -1) {
             pthread_cancel(gq_sys.threads[i]);
             atomic_thread_fence(memory_order_seq_cst);
-            memset(&gq_sys.threads[i], 0, sizeof(gq_sys.threads[i]));
+            memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
         }
     }
 }
@@ -1866,15 +1872,10 @@ static void sched_cleanup(void) {
         atomic_thread_fence(memory_order_seq_cst);
         can_cleanup = false;
     }
-#ifdef UV_H
-    if (thread()->interrupt_handle) {
-        interrupt_cleanup(NULL);
-        uv_loop_close(thread()->interrupt_handle);
-        thread()->interrupt_handle = NULL;
-    }
-#endif
+
     sched_destroy();
     if (thread()->is_main) {
+        sched_shutdown_interrupt();
         chan_collector_free();
         co_collector_free();
         size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
@@ -1948,18 +1949,7 @@ static int thrd_scheduler(void) {
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();
 
-#ifdef UV_H
-                if (thread()->interrupt_handle) {
-                    interrupt_cleanup(NULL);
-                    uv_loop_close(thread()->interrupt_handle);
-                    thread()->interrupt_handle = NULL;
-                }
-
-                if (thread()->interrupt_default) {
-                    uv_loop_close(thread()->interrupt_default);
-                    thread()->interrupt_default = NULL;
-                }
-#endif
+                sched_shutdown_interrupt();
                 RAII_INFO("Thrd #%lx exiting.\n", co_async_self());
                 return thread()->exiting;
             } else if (!sched_is_sleeping()) {
@@ -2023,6 +2013,7 @@ int thrd_main(void_t args) {
 
         co_info(co_active(), -1);
         thrd_scheduler();
+        memset(&gq_sys.threads[thread()->thrd_id], -1, sizeof(gq_sys.threads[thread()->thrd_id]));
     }
 
     rpmalloc_thread_finalize(1);
