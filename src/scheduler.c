@@ -363,7 +363,6 @@ string_t sched_uname(void) {
         CO_FREE((void_t)powered_by);
     }
 
-
     return gq_sys.powered_by;
 }
 
@@ -389,7 +388,7 @@ static void co_done(void) {
 static void co_awaitable(void) {
     routine_t *co = co_active();
     if (gq_sys.is_multi && !thread()->is_main && !thread()->multi_handle)
-        thread()->multi_handle = thread()->active_handle;
+        thread()->multi_handle = thread()->current_handle;
 
     try {
         if (co->interrupt_active) {
@@ -1671,6 +1670,7 @@ static void_t coroutine_wait(void_t v) {
             sched_enqueue(t);
         }
 
+        atomic_thread_fence(memory_order_seq_cst);
         if (gq_sys.is_multi && gq_sys.is_finish) {
             if (!thread()->is_main) {
                 thread()->sleeping_counted = 0;
@@ -1867,7 +1867,8 @@ static void sched_cleanup(void) {
         can_cleanup = false;
     }
 #ifdef UV_H
-    if (!is_empty(thread()->interrupt_handle)) {
+    if (thread()->interrupt_handle) {
+        interrupt_cleanup(NULL);
         uv_loop_close(thread()->interrupt_handle);
         thread()->interrupt_handle = NULL;
     }
@@ -1947,8 +1948,13 @@ static int thrd_scheduler(void) {
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();
 
-                atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
 #ifdef UV_H
+                if (thread()->interrupt_handle) {
+                    interrupt_cleanup(NULL);
+                    uv_loop_close(thread()->interrupt_handle);
+                    thread()->interrupt_handle = NULL;
+                }
+
                 if (thread()->interrupt_default) {
                     uv_loop_close(thread()->interrupt_default);
                     thread()->interrupt_default = NULL;
