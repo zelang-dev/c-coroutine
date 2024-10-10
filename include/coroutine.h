@@ -900,6 +900,7 @@ typedef struct oa_hash_s oa_hash;
 struct oa_hash_s {
     value_types type;
     bool overriden;
+    bool resize_free;
     atomic_size_t capacity;
     atomic_size_t size;
     atomic_pair_t **buckets;

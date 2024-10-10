@@ -159,6 +159,7 @@ CO_FORCE_INLINE bool sched_is_stolen(void) {
 }
 
 static bool sched_is_running(void) {
+    atomic_thread_fence(memory_order_seq_cst);
     if (!gq_sys.is_multi)
         return false;
 
@@ -179,6 +180,7 @@ static bool sched_is_running(void) {
 if so mark the other thread stealable and pause `current` thread,
 until other thread post available tasks to `global` run queue. */
 static bool sched_is_any_available(void) {
+    atomic_thread_fence(memory_order_seq_cst);
     if (!gq_sys.is_multi || gq_sys.is_finish)
         return false;
 
@@ -211,6 +213,7 @@ static bool sched_is_any_available(void) {
 /* Transfer an thread's `marked` local run queue to `global` run queue,
 the amount/count was set by `sched_is_any_available`. */
 static void sched_post_stolen(thread_processor_t *r) {
+    atomic_thread_fence(memory_order_seq_cst);
     if (!gq_sys.is_multi)
         return;
 
@@ -258,6 +261,7 @@ static void sched_post_stolen(thread_processor_t *r) {
 /* Calculate the amount each thread can take from `global` run queue,
 the amount/count is over threshold set by `sched_is_takeable`. */
 static void sched_post_available(void) {
+    atomic_thread_fence(memory_order_seq_cst);
     if (!gq_sys.is_multi)
         return;
 
@@ -410,6 +414,7 @@ static void co_awaitable(void) {
         }
     } end_try;
 
+    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && !thread()->is_main)
         co_done();
 }
@@ -1539,6 +1544,7 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
     coroutines_all[coroutines_num_all] = NULL;
     atomic_store_explicit(&q->id_generate, generate_id, memory_order_release);
     atomic_store_explicit(&q->n_all_coroutine, coroutines_num_all, memory_order_release);
+    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && t->run_code == RUN_NORMAL) {
         atomic_fetch_add(&gq_sys.used_count, 1);
     } else {
@@ -1596,6 +1602,7 @@ awaitable_t *async(callable_t fn, void_t arg) {
     awaitable_t *awaitable = try_calloc(1, sizeof(awaitable_t));
     routine_t *c = co_active();
     wait_group_t *wg = ht_wait_init(2);
+    wg->resize_free = false;
     c->wait_active = true;
     c->wait_group = wg;
     c->is_group_finish = false;
@@ -1795,11 +1802,19 @@ static void sched_shutdown_interrupt(bool cleaning) {
         interrupt_cleanup(NULL);
 
     if (thread()->interrupt_handle) {
+        if (!cleaning) {
+            uv_stop(thread()->interrupt_handle);
+            uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
+        }
+
         uv_loop_close(thread()->interrupt_handle);
         thread()->interrupt_handle = NULL;
-    }
+    } else if (thread()->interrupt_default) {
+        if (!cleaning) {
+            uv_stop(thread()->interrupt_handle);
+            uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
+        }
 
-    if (thread()->interrupt_default) {
         uv_loop_close(thread()->interrupt_default);
         thread()->interrupt_default = NULL;
     }
@@ -1845,9 +1860,9 @@ static void sched_destroy(void) {
         atomic_store(&gq_sys.stealable_amount[i], 0);
         atomic_flag_clear(&gq_sys.any_stealable[i]);
         sched_shutdown_interrupt(false);
+        atomic_thread_fence(memory_order_seq_cst);
         if (*(int *)&gq_sys.threads[i] != -1) {
             pthread_cancel(gq_sys.threads[i]);
-            atomic_thread_fence(memory_order_seq_cst);
             if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
                 fprintf(stderr, "`thrd_join` failed!\n");
             memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
@@ -1946,9 +1961,10 @@ static int thrd_scheduler(void) {
                 sched_steal(&gq_sys, thread(), stole);
                 gq_sys.is_takeable--;
                 atomic_store(&gq_sys.stealable_amount[thread()->thrd_id], 0);
-            } else if (!thread()->is_main && gq_sys.is_multi && thread()->sleeping_counted == 0) {
+            } else if (!thread()->is_main && gq_sys.is_multi && thread()->sleeping_counted == 0 || gq_sys.is_finish) {
                 atomic_thread_fence(memory_order_seq_cst);
                 RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
+                atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
                 /* Wait for global exit signal */
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();

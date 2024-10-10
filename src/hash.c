@@ -73,6 +73,7 @@ oa_hash *oa_hash_new_ex(
     atomic_init(&htable->size, 0);
     atomic_init(&htable->capacity, capacity);
     htable->overriden = !is_zero(cap);
+    htable->resize_free = true;
     htable->val_ops = val_ops;
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
@@ -133,7 +134,9 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
         if (!is_empty(crt_pair) && !oa_hash_is_tombstone(htable, i)) {
             oa_hash_put(htable, crt_pair->key, crt_pair->value);
             htable->key_ops.free(crt_pair->key, htable->key_ops.arg);
-            htable->val_ops.free(crt_pair->value);
+            if (htable->resize_free)
+                htable->val_ops.free(crt_pair->value);
+
             CO_FREE(crt_pair);
         }
     }

@@ -3,8 +3,12 @@
 thrd_static(co_collector_t, coroutine_list, NULL)
 
 void co_collector(routine_t *co) {
-    if (is_coroutine_list_empty())
-        coroutine_list_update(ht_group_init());
+    wait_group_t *wg;
+    if (is_coroutine_list_empty()) {
+        wg = ht_group_init();
+        wg->resize_free = false;
+        coroutine_list_update(wg);
+    }
 
     if (co->magic_number == CO_MAGIC_NUMBER)
         hash_put(coroutine_list(), co_itoa(co->cid), co);
@@ -146,6 +150,7 @@ value_t co_event(callable_t fn, void_t arg) {
 void co_handler(func_t fn, void_t handle, func_t dtor) {
     routine_t *co = co_active();
     wait_group_t *eg = ht_wait_init(2);
+    eg->resize_free = false;
 
     co->event_group = eg;
     co->event_active = true;
@@ -167,6 +172,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
 void co_process(func_t fn, void_t args) {
     routine_t *co = co_active();
     wait_group_t *eg = ht_wait_init(2);
+    eg->resize_free = false;
 
     co->event_group = eg;
     co->event_active = true;
@@ -192,6 +198,7 @@ CO_FORCE_INLINE void wait_capacity(u32 size) {
 wait_group_t *wait_group(void) {
     routine_t *c = co_active();
     wait_group_t *wg = ht_group_init();
+    wg->resize_free = false;
     c->wait_active = true;
     c->wait_group = wg;
     c->is_group_finish = false;
