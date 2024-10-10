@@ -118,6 +118,7 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     oa_pair **old_buckets;
     oa_pair *crt_pair;
 
+    atomic_thread_fence(memory_order_seq_cst);
     old_capacity = atomic_load_explicit(&htable->capacity, memory_order_consume);
     uint64_t new_capacity_64 = old_capacity * HASH_GROWTH_FACTOR;
     if (new_capacity_64 > SIZE_MAX)
@@ -127,10 +128,6 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     atomic_init(&htable->capacity, (size_t)new_capacity_64);
     atomic_init(&htable->size, 0);
     atomic_init(&htable->buckets, try_calloc(1, new_capacity_64 * sizeof(*(old_buckets))));
-    for (i = 0; i < new_capacity_64; i++) {
-        atomic_init(&htable->buckets[i], NULL);
-    }
-
     for (i = 0; i < old_capacity; i++) {
         crt_pair = old_buckets[i];
         if (!is_empty(crt_pair) && !oa_hash_is_tombstone(htable, i)) {

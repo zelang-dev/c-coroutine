@@ -1475,6 +1475,7 @@ static void sched_enqueue_atomic(routine_t *t) {
 
 CO_FORCE_INLINE void sched_enqueue(routine_t *t) {
     t->ready = true;
+    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && is_false(t->taken))
         sched_enqueue_atomic(t);
     else
@@ -1491,7 +1492,7 @@ CO_FORCE_INLINE routine_t *sched_dequeue(scheduler_t *l) {
 static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
     int i;
     routine_t *t;
-    scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
+    scheduler_t *l = (scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
     for (i = 0; i < count; i++) {
         atomic_fetch_sub(&gq_sys.used_count, 1);
@@ -1508,7 +1509,7 @@ the amount/count was set by `sched_is_takeable` and `sched_post_available`. */
 static void sched_steal_available(atomic_deque_t *q) {
     routine_t *t;
     size_t i, available = atomic_load_explicit(&q->available[thread()->thrd_id], memory_order_acquire);
-    scheduler_t *l = ((scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire));
+    scheduler_t *l = (scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
     for (i = 0; i < available; i++) {
         t = sched_dequeue(l);
@@ -1609,16 +1610,15 @@ awaitable_t *async(callable_t fn, void_t arg) {
 
 void co_stealer(void) {
     atomic_thread_fence(memory_order_seq_cst);
-    if (thread()->is_main && gq_sys.is_multi) {
-        if (sched_is_takeable())
-            sched_post_available();
-
-        if (!atomic_flag_load(&gq_sys.is_started))
-            atomic_flag_test_and_set(&gq_sys.is_started);
-    }
+    if (gq_sys.is_multi && thread()->is_main && sched_is_takeable())
+        sched_post_available();
 
     if (sched_is_available())
         sched_steal_available(&gq_sys);
+
+    atomic_thread_fence(memory_order_seq_cst);
+    if (gq_sys.is_multi && thread()->is_main && !atomic_flag_load(&gq_sys.is_started))
+        atomic_flag_test_and_set(&gq_sys.is_started);
 }
 
 CO_FORCE_INLINE void co_yield(void) {
@@ -2008,6 +2008,7 @@ int thrd_main(void_t args) {
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi) {
         sched_init(false, id);
+        thrd_yield();
         if (sched_is_available())
             sched_steal_available(&gq_sys);
 
