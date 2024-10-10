@@ -1789,10 +1789,12 @@ static void sched_free(void) {
     CO_FREE((void_t)atomic_load(&gq_sys.any_stealable));
 }
 
-static void sched_shutdown_interrupt(void) {
+static void sched_shutdown_interrupt(bool cleaning) {
 #ifdef UV_H
-    if (thread()->interrupt_handle) {
+    if (cleaning)
         interrupt_cleanup(NULL);
+
+    if (thread()->interrupt_handle) {
         uv_loop_close(thread()->interrupt_handle);
         thread()->interrupt_handle = NULL;
     }
@@ -1806,8 +1808,8 @@ static void sched_shutdown_interrupt(void) {
 
 static void sched_destroy(void) {
     size_t i;
+    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && thread()->is_main && gq_sys.threads) {
-        atomic_thread_fence(memory_order_seq_cst);
         gq_sys.is_finish = true;
         while (sched_is_running())
             thrd_yield();
@@ -1842,10 +1844,12 @@ static void sched_destroy(void) {
         atomic_store(&gq_sys.available[i], 0);
         atomic_store(&gq_sys.stealable_amount[i], 0);
         atomic_flag_clear(&gq_sys.any_stealable[i]);
-        sched_shutdown_interrupt();
+        sched_shutdown_interrupt(false);
         if (*(int *)&gq_sys.threads[i] != -1) {
             pthread_cancel(gq_sys.threads[i]);
             atomic_thread_fence(memory_order_seq_cst);
+            if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
+                fprintf(stderr, "`thrd_join` failed!\n");
             memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
         }
     }
@@ -1875,7 +1879,7 @@ static void sched_cleanup(void) {
 
     sched_destroy();
     if (thread()->is_main) {
-        sched_shutdown_interrupt();
+        sched_shutdown_interrupt(!can_cleanup);
         chan_collector_free();
         co_collector_free();
         size_t coroutines_num_all = atomic_load(&gq_sys.n_all_coroutine);
@@ -1949,7 +1953,7 @@ static int thrd_scheduler(void) {
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();
 
-                sched_shutdown_interrupt();
+                sched_shutdown_interrupt(true);
                 RAII_INFO("Thrd #%lx exiting.\n", co_async_self());
                 return thread()->exiting;
             } else if (!sched_is_sleeping()) {
