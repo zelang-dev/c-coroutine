@@ -388,7 +388,7 @@ static void co_done(void) {
 static void co_awaitable(void) {
     routine_t *co = co_active();
     if (gq_sys.is_multi && !thread()->is_main && !thread()->multi_handle)
-        thread()->multi_handle = thread()->active_buffer;
+        thread()->multi_handle = thread()->current_handle;
 
     try {
         if (co->interrupt_active) {
