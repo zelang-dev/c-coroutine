@@ -57,6 +57,8 @@ typedef struct {
     routine_t *main_handle;
     /* Variable holding the previous running coroutine per thread. */
     routine_t *current_handle;
+
+    mtx_t queue_lock[1];
 } thread_processor_t;
 thrd_static(thread_processor_t, thread, NULL)
 
@@ -64,6 +66,7 @@ static void(fastcall *co_swap)(routine_t *, routine_t *) = 0;
 static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
 static volatile sig_atomic_t can_cleanup = true;
+static volatile sig_atomic_t can_wait_errorless = true;
 static int main_argc;
 static char **main_argv;
 
@@ -71,6 +74,119 @@ static char **main_argv;
  * circumstances, used to verify that nobody uses non-initialized entries.
  */
 static scheduler_t *EMPTY = (scheduler_t *)0x100, *ABORT = (scheduler_t *)0x200;
+
+/* These are non-NULL pointers that will result in page faults under normal
+ * circumstances, used to verify that nobody uses non-initialized entries.
+ */
+static routine_t *EMPTY_T = (routine_t *)0x100, *ABORT_T = (routine_t *)0x200;
+
+/*
+ * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal`
+ *
+ * Modified from a work-stealing scheduler described in
+ * Robert D. Blumofe, Christopher F. Joerg, Bradley C. Kuszmaul, Charles E.
+ * Leiserson, Keith H. Randall, and Yuli Zhou. Cilk: An efficient multithreaded
+ * runtime system. In Proceedings of the Fifth ACM SIGPLAN Symposium on
+ * Principles and Practice of Parallel Programming (PPoPP), pages 207-216,
+ * Santa Barbara, California, July 1995.
+ * http://supertech.csail.mit.edu/papers/PPoPP95.pdf
+ *
+ * However, that refers to an outdated model of Cilk; an update appears in
+ * the essential idea of work stealing mentioned in Leiserson and Platt,
+ * Programming Parallel Applications in Cilk
+ */
+void deque_init(deque_t *q, int size_hint) {
+    atomic_init(&q->top, 0);
+    atomic_init(&q->bottom, 0);
+    deque_array_t *a = try_calloc(1, sizeof(deque_array_t) + sizeof(routine_t *) * size_hint);
+    atomic_init(&a->size, size_hint);
+    atomic_init(&q->array, a);
+}
+
+void deque_resize(deque_t *q) {
+    deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
+    size_t old_size = a->size;
+    size_t new_size = old_size * 2;
+    deque_array_t *new = try_calloc(1, sizeof(deque_array_t) + sizeof(routine_t *) * new_size);
+    atomic_init(&new->size, new_size);
+    size_t i, t = atomic_load_explicit(&q->top, memory_order_relaxed);
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed);
+    for (i = t; i < b; i++)
+        new->buffer[i % new_size] = a->buffer[i % old_size];
+
+    atomic_store_explicit(&q->array, new, memory_order_relaxed);
+    /* The question arises as to the appropriate timing for releasing memory
+     * associated with the previous array denoted by *a. In the original Chase
+     * and Lev paper, this task was undertaken by the garbage collector, which
+     * presumably possessed knowledge about ongoing steal operations by other
+     * threads that might attempt to access data within the array.
+     *
+     * In our context, the responsible deallocation of *a cannot occur at this
+     * point, as another thread could potentially be in the process of reading
+     * from it. Thus, we opt to abstain from freeing *a in this context,
+     * resulting in memory leakage. It is worth noting that our expansion
+     * strategy for these queues involves consistent doubling of their size;
+     * this design choice ensures that any leaked memory remains bounded by the
+     * memory actively employed by the functional queues.
+     */
+    CO_FREE(a);
+}
+
+routine_t *deque_take(deque_t *q) {
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed) - 1;
+    deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
+    atomic_store_explicit(&q->bottom, b, memory_order_relaxed);
+    atomic_thread_fence(memory_order_seq_cst);
+    size_t t = atomic_load_explicit(&q->top, memory_order_relaxed);
+    routine_t *x;
+    if (t <= b) {
+        /* Non-empty queue */
+        x = (routine_t *)atomic_load_explicit(&a->buffer[b % a->size], memory_order_relaxed);
+        if (t == b) {
+            /* Single last element in queue */
+            if (!atomic_cas(&q->top, &t, t + 1))
+                /* Failed race */
+                x = EMPTY_T;
+            atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
+        }
+    } else { /* Empty queue */
+        x = EMPTY_T;
+        atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
+    }
+
+    return x;
+}
+
+void deque_push(deque_t *q, routine_t *w) {
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_relaxed);
+    size_t t = atomic_load_explicit(&q->top, memory_order_acquire);
+    deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
+    if (b - t > a->size - 1) { /* Full queue */
+        deque_resize(q);
+        a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
+    }
+
+    atomic_store_explicit(&a->buffer[b % a->size], w, memory_order_relaxed);
+    atomic_thread_fence(memory_order_release);
+    atomic_store_explicit(&q->bottom, b + 1, memory_order_relaxed);
+}
+
+routine_t *deque_steal(deque_t *q) {
+    size_t t = atomic_load_explicit(&q->top, memory_order_acquire);
+    atomic_thread_fence(memory_order_seq_cst);
+    size_t b = atomic_load_explicit(&q->bottom, memory_order_acquire);
+    routine_t *x = EMPTY_T;
+    if (t < b) {
+        /* Non-empty queue */
+        deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_consume);
+        x = (routine_t *)atomic_load_explicit(&a->buffer[t % a->size], memory_order_relaxed);
+        if (!atomic_cas(&q->top, &t, t + 1))
+            /* Failed race */
+            return ABORT_T;
+    }
+
+    return x;
+}
 
 /* Global queue system atomic data. */
 atomic_deque_t gq_sys = {0};
@@ -114,9 +230,9 @@ CO_FORCE_INLINE bool sched_active(void) {
     return thread()->run_queue.head != NULL;
 }
 
-/* Check `global` run queue `head` for not `NULL`. */
+/* Check `global` run queue for coroutines. */
 CO_FORCE_INLINE bool sched_is_active(void) {
-    return !is_empty(((scheduler_t *)atomic_load(&gq_sys.run_queue))->head);
+    return atomic_load(&gq_sys.deque_run_queue->top) <= atomic_load(&gq_sys.deque_run_queue->bottom) - 1;
 }
 
 CO_FORCE_INLINE bool sched_is_started(void) {
@@ -135,7 +251,8 @@ CO_FORCE_INLINE bool sched_is_takeable(void) {
 
 /* Check for available/assigned tasks for `current` thread. */
 CO_FORCE_INLINE bool sched_is_available(void) {
-    return gq_sys.is_multi && atomic_load(&gq_sys.available[thread()->thrd_id]) > 0;
+    atomic_thread_fence(memory_order_seq_cst);
+    return gq_sys.is_multi && (int)atomic_load(&gq_sys.available[thread()->thrd_id]) > 0;
 }
 
 CO_FORCE_INLINE bool sched_is_sleeping(void) {
@@ -201,9 +318,6 @@ static bool sched_is_any_available(void) {
     if (last != 0) {
         atomic_store(&gq_sys.stealable_thread[id], gq_sys.thread_invalid);
         atomic_store(&gq_sys.stealable_thread[thread()->thrd_id], id);
-
-        atomic_flag_test_and_set(&gq_sys.any_stealable[id]);
-        atomic_flag_test_and_set(&gq_sys.any_stealable[thread()->thrd_id]);
         return true;
     }
 
@@ -241,11 +355,11 @@ static void sched_post_stolen(thread_processor_t *r) {
                 available--;
                 amount++;
                 t->taken = false;
-                sched_enqueue(t);
             } else {
                 t->taken = true;
-                sched_enqueue(t);
             }
+
+            sched_enqueue(t);
         }
     }
 
@@ -321,6 +435,9 @@ static void sched_init(bool is_main, u32 thread_id) {
     thread()->multi_handle = NULL;
     thread()->interrupt_handle = NULL;
     thread()->interrupt_default = NULL;
+    atomic_thread_fence(memory_order_seq_cst);
+    if (gq_sys.is_multi)
+        mtx_init(thread()->queue_lock, mtx_plain);
 }
 
 void sched_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
@@ -387,6 +504,7 @@ static void co_done(void) {
 
 static void co_awaitable(void) {
     routine_t *co = co_active();
+    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && !thread()->is_main && !thread()->multi_handle)
         thread()->multi_handle = thread()->current_handle;
 
@@ -398,9 +516,12 @@ static void co_awaitable(void) {
             co_deferred_free(co);
         }
     } catch_if {
+        if (is_str_eq(err, "sig_int") || is_str_eq(err, "sig_segv") || is_str_eq(err, "sig_abrt"))
+            can_wait_errorless = false;
+
         co_deferred_free(co);
-        if (co->scope->is_recovered)
-           ex_flags_reset();
+        if (co->scope->is_recovered || co_catch("sig_winch"))
+            ex_flags_reset();
     } finally {
         if (co->is_event_err) {
             co->halt = true;
@@ -415,7 +536,6 @@ static void co_awaitable(void) {
         }
     } end_try;
 
-    atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && !thread()->is_main)
         co_done();
 }
@@ -1380,7 +1500,8 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
         thread()->main_handle = thread()->active_handle;
 
 #ifdef UV_H
-    if (!thread()->interrupt_handle) {
+    atomic_thread_fence(memory_order_seq_cst);
+    if (gq_sys.is_interruptable && !thread()->interrupt_handle) {
         thread()->interrupt_handle = thread()->interrupt_buffer;
         if (uv_loop_init(thread()->interrupt_handle)) {
             fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
@@ -1429,6 +1550,8 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
 }
 
 void co_switch(routine_t *handle) {
+    if (handle == NULL)
+        return;
 #if defined(_M_X64) || defined(_M_IX86)
     register routine_t *co_previous_handle = thread()->active_handle;
 #else
@@ -1473,10 +1596,9 @@ static void sched_remove(scheduler_t *l, routine_t *t) {
 }
 
 static void sched_enqueue_atomic(routine_t *t) {
-    scheduler_t *list = (scheduler_t *)atomic_load_explicit(&gq_sys.run_queue, memory_order_acquire);
-    atomic_thread_fence(memory_order_seq_cst);
-    sched_add(list, t);
-    atomic_store_explicit(&gq_sys.run_queue, list, memory_order_release);
+    mtx_lock(thread()->queue_lock);
+    deque_push(gq_sys.deque_run_queue, t);
+    mtx_unlock(thread()->queue_lock);
 }
 
 CO_FORCE_INLINE void sched_enqueue(routine_t *t) {
@@ -1499,34 +1621,29 @@ CO_FORCE_INLINE routine_t *sched_dequeue(scheduler_t *l) {
 }
 
 /* Transfer `count` tasks from `global` run queue to `local` run queue. */
-static void sched_steal(atomic_deque_t *q, thread_processor_t *r, int count) {
+static void sched_steal(thread_processor_t *r, int count) {
     int i;
     routine_t *t;
-    scheduler_t *l = (scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire);
-    atomic_thread_fence(memory_order_seq_cst);
+
     for (i = 0; i < count; i++) {
-        t = sched_dequeue(l);
-        if (t == NULL)
+        t = deque_steal(gq_sys.deque_run_queue);
+        if (t == ABORT_T || t == EMPTY_T || t == NULL)
             continue;
 
         atomic_fetch_sub(&gq_sys.used_count, 1);
         r->used_count++;
         sched_add(&r->run_queue, t);
     }
-
-    atomic_store_explicit(&q->run_queue, l, memory_order_release);
 }
 
 /* Transfer tasks from `global` run queue to current thread's `local` run queue,
 the amount/count was set by `sched_is_takeable` and `sched_post_available`. */
-static void sched_steal_available(atomic_deque_t *q) {
+static void sched_steal_available(void) {
     routine_t *t;
-    size_t i, count = 0, available = atomic_load_explicit(&q->available[thread()->thrd_id], memory_order_acquire);
-    scheduler_t *l = (scheduler_t *)atomic_load_explicit(&q->run_queue, memory_order_acquire);
-    atomic_thread_fence(memory_order_seq_cst);
+    size_t i, count = 0, available = atomic_load_explicit(&gq_sys.available[thread()->thrd_id], memory_order_acquire);
     for (i = 0; i < available; i++) {
-        t = sched_dequeue(l);
-        if (t == NULL)
+        t = deque_take(gq_sys.deque_run_queue);
+        if (t == ABORT_T || t == EMPTY_T || t == NULL)
             continue;
 
         t->taken = true;
@@ -1534,15 +1651,13 @@ static void sched_steal_available(atomic_deque_t *q) {
         thread()->used_count++;
         sched_add(&thread()->run_queue, t);
     }
-
-    atomic_store_explicit(&q->run_queue, l, memory_order_release);
-    atomic_store_explicit(&q->available[thread()->thrd_id], (available - count), memory_order_release);
+    atomic_store_explicit(&gq_sys.available[thread()->thrd_id], (available - count), memory_order_release);
 }
 
-static void sched_adjust(atomic_deque_t *q, routine_t *t) {
-    size_t generate_id = atomic_load_explicit(&q->id_generate, memory_order_acquire);
-    size_t coroutines_num_all = atomic_load_explicit(&q->n_all_coroutine, memory_order_acquire);
-    routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&q->all_coroutine, memory_order_acquire);
+static void sched_adjust(routine_t *t) {
+    size_t generate_id = atomic_load_explicit(&gq_sys.id_generate, memory_order_acquire);
+    size_t coroutines_num_all = atomic_load_explicit(&gq_sys.n_all_coroutine, memory_order_acquire);
+    routine_t **coroutines_all = (routine_t **)atomic_load_explicit(&gq_sys.all_coroutine, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
     if (coroutines_num_all % 64 == 0) {
         coroutines_all = CO_REALLOC(coroutines_all, (coroutines_num_all + 64) * sizeof(coroutines_all[0]));
@@ -1554,8 +1669,8 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
     t->all_coroutine_slot = coroutines_num_all;
     coroutines_all[coroutines_num_all++] = t;
     coroutines_all[coroutines_num_all] = NULL;
-    atomic_store_explicit(&q->id_generate, generate_id, memory_order_release);
-    atomic_store_explicit(&q->n_all_coroutine, coroutines_num_all, memory_order_release);
+    atomic_store_explicit(&gq_sys.id_generate, generate_id, memory_order_release);
+    atomic_store_explicit(&gq_sys.n_all_coroutine, coroutines_num_all, memory_order_release);
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && t->run_code == RUN_NORMAL) {
         atomic_fetch_add(&gq_sys.used_count, 1);
@@ -1565,7 +1680,7 @@ static void sched_adjust(atomic_deque_t *q, routine_t *t) {
     }
 
     sched_enqueue(t);
-    atomic_store_explicit(&q->all_coroutine, coroutines_all, memory_order_release);
+    atomic_store_explicit(&gq_sys.all_coroutine, coroutines_all, memory_order_release);
 }
 
 u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
@@ -1577,7 +1692,7 @@ u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
         t->run_code = RUN_EVENT;
     else
         t->run_code = code;
-    sched_adjust(&gq_sys, t);
+    sched_adjust(t);
     id = t->cid;
     if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
@@ -1633,7 +1748,7 @@ void co_stealer(void) {
         sched_post_available();
 
     if (sched_is_available())
-        sched_steal_available(&gq_sys);
+        sched_steal_available();
 
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && thread()->is_main && !atomic_flag_load(&gq_sys.is_started))
@@ -1656,7 +1771,8 @@ static size_t nsec(void) {
 }
 
 static CO_FORCE_INLINE int coroutine_loop(int mode) {
-    return CO_EVENT_LOOP(co_loop(), mode);
+    atomic_thread_fence(memory_order_seq_cst);
+    return !gq_sys.is_interruptable ? -1 : CO_EVENT_LOOP(co_loop(), mode);
 }
 
 CO_FORCE_INLINE void coroutine_interrupt(void) {
@@ -1685,7 +1801,7 @@ static void_t coroutine_wait(void_t v) {
         }
 
         atomic_thread_fence(memory_order_seq_cst);
-        if (gq_sys.is_multi && gq_sys.is_finish) {
+        if (gq_sys.is_multi && (gq_sys.is_finish || !can_wait_errorless)) {
             if (!thread()->is_main) {
                 thread()->sleeping_counted = 0;
                 has = (int *)atomic_load(&gq_sys.count[thread()->thrd_id]);
@@ -1774,12 +1890,63 @@ CO_FORCE_INLINE void sched_dec(void) {
     --thread()->used_count;
 }
 
+static void sched_shutdown_interrupt(bool cleaning) {
+#ifdef UV_H
+    atomic_thread_fence(memory_order_seq_cst);
+    if (gq_sys.is_interruptable) {
+        if (cleaning && can_wait_errorless)
+            interrupt_cleanup(NULL);
+
+        if (thread()->interrupt_handle) {
+            if (!cleaning && can_wait_errorless) {
+                uv_stop(thread()->interrupt_handle);
+                uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
+            }
+
+            uv_loop_close(thread()->interrupt_handle);
+            thread()->interrupt_handle = NULL;
+        } else if (thread()->interrupt_default) {
+            if (!cleaning && can_wait_errorless) {
+                uv_stop(thread()->interrupt_handle);
+                uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
+            }
+
+            uv_loop_close(thread()->interrupt_default);
+            thread()->interrupt_default = NULL;
+        }
+    }
+#endif
+}
+
 CO_FORCE_INLINE uv_args_t *interrupt_listen_args(void) {
     return thread()->uv_args;
 }
 
 CO_FORCE_INLINE void interrupt_listen_set(uv_args_t uv_args) {
     thread()->uv_args = &uv_args;
+}
+
+void co_interrupt_on(void) {
+#ifdef UV_H
+    if (!thread()->interrupt_handle) {
+        thread()->interrupt_handle = thread()->interrupt_buffer;
+        if (uv_loop_init(thread()->interrupt_handle)) {
+            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+            thread()->interrupt_handle = NULL;
+        }
+    }
+#endif
+
+    atomic_thread_fence(memory_order_seq_cst);
+    gq_sys.is_interruptable = true;
+    gq_sys.stacksize = CO_STACK_SIZE * 4;
+}
+
+void co_interrupt_off(void) {
+    sched_shutdown_interrupt(true);
+    atomic_thread_fence(memory_order_seq_cst);
+    gq_sys.is_interruptable = false;
+    gq_sys.stacksize = CO_STACK_SIZE;
 }
 
 CO_FORCE_INLINE bool sched_is_main(void) {
@@ -1806,31 +1973,7 @@ static void sched_free(void) {
     CO_FREE((void_t)atomic_load(&gq_sys.stealable_thread));
     CO_FREE((void_t)atomic_load(&gq_sys.stealable_amount));
     CO_FREE((void_t)atomic_load(&gq_sys.any_stealable));
-}
-
-static void sched_shutdown_interrupt(bool cleaning) {
-#ifdef UV_H
-    if (cleaning)
-        interrupt_cleanup(NULL);
-
-    if (thread()->interrupt_handle) {
-        if (!cleaning) {
-            uv_stop(thread()->interrupt_handle);
-            uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
-        }
-
-        uv_loop_close(thread()->interrupt_handle);
-        thread()->interrupt_handle = NULL;
-    } else if (thread()->interrupt_default) {
-        if (!cleaning) {
-            uv_stop(thread()->interrupt_handle);
-            uv_run(thread()->interrupt_handle, UV_RUN_DEFAULT);
-        }
-
-        uv_loop_close(thread()->interrupt_default);
-        thread()->interrupt_default = NULL;
-    }
-#endif
+    CO_FREE(gq_sys.deque_run_queue);
 }
 
 static void sched_destroy(void) {
@@ -1838,7 +1981,7 @@ static void sched_destroy(void) {
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi && thread()->is_main && gq_sys.threads) {
         gq_sys.is_finish = true;
-        while (sched_is_running())
+        while (sched_is_running() && can_wait_errorless)
             thrd_yield();
 
         for (i = 0; i < gq_sys.thread_count; i++) {
@@ -1850,36 +1993,37 @@ static void sched_destroy(void) {
 
         atomic_flag_clear(&gq_sys.is_started);
         for (i = 0; i < gq_sys.cpu_count; i++) {
-            atomic_thread_fence(memory_order_seq_cst);
             if (thread()->sleeping_counted > 0 && *(int *)&gq_sys.threads[i] != -1)
                 pthread_cancel(gq_sys.threads[i]);
 
-            if (*(int *)&gq_sys.threads[i] != -1) {
-                if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
-                    fprintf(stderr, "`thrd_join` failed!\n");
+            atomic_thread_fence(memory_order_seq_cst);
+            if (can_wait_errorless) {
+                if (*(int *)&gq_sys.threads[i] != -1) {
+                    if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
+                        fprintf(stderr, "`thrd_join` failed!\n");
 
-                memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
+                    memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
+                }
             }
         }
 
         CO_FREE(gq_sys.threads);
         gq_sys.threads = NULL;
         sched_free();
+        mtx_destroy(thread()->queue_lock);
     } else if (gq_sys.is_multi && !thread()->is_main && gq_sys.threads) {
         i = thread()->thrd_id;
-        atomic_store(&gq_sys.count[i], NULL);
-        atomic_store(&gq_sys.available[i], 0);
-        atomic_store(&gq_sys.stealable_amount[i], 0);
-        atomic_flag_clear(&gq_sys.any_stealable[i]);
-        sched_shutdown_interrupt(false);
-        atomic_thread_fence(memory_order_seq_cst);
         if (*(int *)&gq_sys.threads[i] != -1) {
-            pthread_cancel(gq_sys.threads[i]);
-            if (thrd_join(gq_sys.threads[i], NULL) != thrd_success)
-                fprintf(stderr, "`thrd_join` failed!\n");
             memset(&gq_sys.threads[i], -1, sizeof(gq_sys.threads[i]));
+            atomic_store(&gq_sys.count[i], NULL);
+            atomic_store(&gq_sys.available[i], 0);
+            atomic_store(&gq_sys.stealable_amount[i], 0);
+            atomic_flag_clear(&gq_sys.any_stealable[i]);
+            sched_shutdown_interrupt(false);
+            mtx_destroy(thread()->queue_lock);
         }
     }
+
 }
 
 static void sched_update(routine_t *t) {
@@ -1927,8 +2071,6 @@ static void sched_cleanup(void) {
 
             CO_FREE((void_t)coroutines_all);
             atomic_init(&gq_sys.all_coroutine, NULL);
-            CO_FREE((void_t)atomic_load(&gq_sys.run_queue));
-            atomic_init(&gq_sys.run_queue, NULL);
         }
     }
 }
@@ -1943,8 +2085,8 @@ static int thrd_scheduler(void) {
             sched_post_stolen(thread());
 
         if (sched_local_empty() || !sched_active() || l == EMPTY) {
-            if (thread()->is_main && (l == EMPTY || gq_sys.is_finish
-                                      || (!sched_is_active() && sched_is_empty() && !sched_is_running()))) {
+            if (thread()->is_main && (l == EMPTY || gq_sys.is_finish || !can_wait_errorless
+                    || (!sched_is_active() && sched_is_empty() && !sched_is_running()))) {
                 sched_cleanup();
                 if (thread()->used_count > 0) {
                     RAII_INFO("\nNo runnable coroutines! %d stalled\n", thread()->used_count);
@@ -1953,53 +2095,58 @@ static int thrd_scheduler(void) {
                     RAII_LOG("\nCoroutine scheduler exited");
                     exit(0);
                 }
-            } else if (sched_local_empty()
-                       && (sched_is_active() && (!sched_is_empty() || sched_is_available()) && l != EMPTY)) {
+            } else if (gq_sys.is_multi && sched_local_empty() && !gq_sys.is_finish && l != EMPTY
+                       && (sched_is_active() || !sched_is_sleeping() || !sched_is_empty() || sched_is_available())) {
                 if (sched_is_available())
-                    sched_steal_available(&gq_sys);
-                else
-                    sched_steal(&gq_sys, thread(), 1);
-            } else if (l != EMPTY && !gq_sys.is_finish && !sched_is_sleeping() && sched_is_any_available()) {
-                while (atomic_flag_load(&gq_sys.any_stealable[thread()->thrd_id]))
-                    thrd_yield();
+                    sched_steal_available();
+                else if (sched_is_active())
+                    sched_steal(thread(), 1);
+                else if (sched_is_any_available()) {
+                    stole = (int)atomic_load(&gq_sys.stealable_thread[thread()->thrd_id]);
+                    atomic_flag_test_and_set(&gq_sys.any_stealable[stole]);
+                    atomic_flag_test_and_set(&gq_sys.any_stealable[thread()->thrd_id]);
+                    while (atomic_flag_load(&gq_sys.any_stealable[thread()->thrd_id]) && can_wait_errorless)
+                        thrd_yield();
 
-                l = NULL;
-                stole = (int)atomic_load(&gq_sys.stealable_amount[thread()->thrd_id]);
-                if (is_zero(stole)) {
-                    l = EMPTY;
-                    continue;
-                }
+                    l = NULL;
+                    stole = (int)atomic_load(&gq_sys.stealable_amount[thread()->thrd_id]);
+                    if (is_zero(stole)) {
+                        RAII_HERE();
+                        l = EMPTY;
+                        continue;
+                    }
 
-                count = (int)atomic_load(&gq_sys.used_count);
-                sched_steal(&gq_sys, thread(), stole);
-                gq_sys.is_takeable--;
-                atomic_store(&gq_sys.stealable_amount[thread()->thrd_id], 0);
-                if (count == (int)atomic_load(&gq_sys.used_count)) {
-                    l = EMPTY;
-                    continue;
+                    count = (int)atomic_load(&gq_sys.used_count);
+                    sched_steal(thread(), stole);
+                    gq_sys.is_takeable--;
+                    atomic_store(&gq_sys.stealable_amount[thread()->thrd_id], 0);
+                    if (count == (int)atomic_load(&gq_sys.used_count)) {
+                        RAII_HERE();
+                        l = EMPTY;
+                        continue;
+                    }
                 }
-            } else if (!thread()->is_main && gq_sys.is_multi && (thread()->sleeping_counted == 0 || gq_sys.is_finish || l == EMPTY)) {
-                atomic_thread_fence(memory_order_seq_cst);
-                RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
+            } else if (!thread()->is_main && sched_local_empty() && gq_sys.is_multi && (thread()->sleeping_counted == 0 || gq_sys.is_finish || l == EMPTY)) {
                 atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
-                /* Wait for global exit signal */
+                RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
+                /* Wait for global exit signal
+                atomic_thread_fence(memory_order_seq_cst);
                 while (atomic_flag_load(&gq_sys.is_started) && !gq_sys.is_finish)
                     thrd_yield();
-
+                */
                 sched_shutdown_interrupt(false);
-                RAII_INFO("Thrd #%lx exiting.\n", co_async_self());
+                RAII_INFO("Thrd #%lx exiting, %d runnable coroutines.\n", co_async_self(), thread()->used_count);
                 return thread()->exiting;
-            } else if (!sched_is_sleeping()) {
+            } else if (!sched_is_sleeping() && sched_local_empty()) {
+                RAII_HERE();
                 l = EMPTY;
                 continue;
             }
         }
 
         t = sched_dequeue(&thread()->run_queue);
-        if (t == NULL) {
-            l = EMPTY;
+        if (t == NULL)
             continue;
-        }
 
         t->ready = false;
         thread()->running = t;
@@ -2036,7 +2183,7 @@ static void_t main_main(void_t v) {
 }
 
 int thrd_main(void_t args) {
-    int id = *(int *)args;
+    int res, id = *(int *)args;
     CO_FREE(args);
     raii_rpmalloc_init();
 
@@ -2052,16 +2199,14 @@ int thrd_main(void_t args) {
     if (gq_sys.is_multi) {
         atomic_store(&gq_sys.count[id], &thread()->used_count);
         thrd_yield();
-        if (sched_is_available())
-            sched_steal_available(&gq_sys);
-
         co_info(co_active(), -1);
-        thrd_scheduler();
+        res = thrd_scheduler();
         memset(&gq_sys.threads[id], -1, sizeof(gq_sys.threads[id]));
     }
 
+    mtx_destroy(thread()->queue_lock);
     rpmalloc_thread_finalize(1);
-    thrd_exit(thread()->exiting);
+    thrd_exit(res);
     return 0;
 }
 
@@ -2079,16 +2224,16 @@ int main(int argc, char **argv) {
 
     atomic_thread_fence(memory_order_seq_cst);
     gq_sys.is_multi = CO_MT_STATE;
+    gq_sys.is_interruptable = true;
     gq_sys.is_finish = false;
     gq_sys.is_takeable = 0;
-    gq_sys.stacksize = CO_STACK_SIZE;
+    gq_sys.stacksize = CO_STACK_SIZE * 4;
     gq_sys.cpu_count = sched_cpu_count();
     gq_sys.thread_count = gq_sys.cpu_count + 1;
     gq_sys.thread_invalid = gq_sys.thread_count + 61;
     atomic_init(&gq_sys.id_generate, 0);
     atomic_init(&gq_sys.used_count, 0);
     atomic_init(&gq_sys.all_coroutine, NULL);
-    atomic_init(&gq_sys.run_queue, try_calloc(1, sizeof(atomic_scheduler_t)));
     atomic_flag_clear(&gq_sys.is_started);
 
 #ifdef UV_H
@@ -2130,9 +2275,12 @@ int main(int argc, char **argv) {
     RAII_LOG("");
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    create_routine(main_main, NULL, gq_sys.stacksize * 4, RUN_MAIN);
-    if (gq_sys.is_multi)
+    create_routine(main_main, NULL, gq_sys.stacksize * 16, RUN_MAIN);
+    if (gq_sys.is_multi) {
         atomic_store(&gq_sys.count[gq_sys.cpu_count], &thread()->used_count);
+        gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
+        deque_init(gq_sys.deque_run_queue, HASH_INIT_CAPACITY * gq_sys.thread_count);
+    }
 
     thrd_scheduler();
     unreachable;

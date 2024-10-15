@@ -35,7 +35,7 @@
 
 #ifndef CO_STACK_SIZE
     /* Stack size when creating a coroutine. */
-    #define CO_STACK_SIZE (16 * 1024)
+    #define CO_STACK_SIZE (4 * 1024)
 #endif
 
 #ifndef CO_MT_STATE
@@ -444,11 +444,24 @@ typedef struct scheduler_s {
     routine_t *tail;
 } scheduler_t;
 
-make_atomic(routine_t, atomic_routine_t)
+make_atomic(routine_t *, atomic_routine_t)
 make_atomic(scheduler_t, atomic_scheduler_t)
+
+typedef struct {
+    atomic_size_t size;
+    atomic_routine_t buffer[];
+} deque_array_t;
+
+make_atomic(deque_array_t *, atomic_array_t)
+typedef struct {
+    /* Assume that they never overflow */
+    atomic_size_t top, bottom;
+    atomic_array_t array;
+} deque_t;
 
 /* Global atomic queue struct */
 typedef struct {
+    volatile bool is_interruptable;
     volatile bool is_multi;
     volatile bool is_finish;
     volatile sig_atomic_t is_takeable;
@@ -460,9 +473,11 @@ typedef struct {
     size_t thread_count;
     size_t thread_invalid;
     thrd_t *threads;
-#ifdef UV_H
-    uv_loop_t *loops;
-#endif
+
+    /* Global coroutine run queue */
+    deque_t *deque_run_queue;
+
+    const char powered_by[SCRAPE_SIZE];
     cacheline_pad_t pad2_;
 
     atomic_flag is_started;
@@ -498,12 +513,6 @@ typedef struct {
     /* scheduler tracking for all coroutines */
     atomic_routine_t **all_coroutine;
     cacheline_pad_t _pad5;
-
-    /* Global coroutines's FIFO run queue */
-    atomic_scheduler_t run_queue;
-    cacheline_pad_t _pad6;
-
-    const char powered_by[SCRAPE_SIZE];
 } atomic_deque_t;
 
 C_API atomic_deque_t gq_sys;
@@ -860,7 +869,8 @@ C_API void channel_free(channel_t *);
 C_API uv_args_t *interrupt_listen_args(void);
 C_API void interrupt_listen_set(uv_args_t);
 C_API void interrupt_switch(routine_t *);
-
+C_API void co_interrupt_on(void);
+C_API void co_interrupt_off(void);
 
 #if defined(_WIN32) || defined(_WIN64)
 C_API struct tm *gmtime_r(const time_t *timer, struct tm *buf);
@@ -947,6 +957,8 @@ All coroutines here behaves like regular functions, meaning they return values, 
 
 The initialization ends when `wait_for()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
 C_API wait_group_t *wait_group(void);
+
+C_API wait_group_t *wait_group_by(u32 capacity);
 
 /* Set global wait group `hash table` initial capacity. */
 C_API void wait_capacity(u32);

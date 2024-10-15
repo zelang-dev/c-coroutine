@@ -57,6 +57,7 @@ enum oa_ret_ops {
     GET
 };
 static u32 hash_initial_capacity = HASH_INIT_CAPACITY;
+static bool hash_initial_override = false;
 
 static size_t oa_hash_getidx(oa_hash *htable, size_t idx, uint32_t hash_val, const_t key, enum oa_ret_ops op);
 static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable);
@@ -78,9 +79,6 @@ oa_hash *oa_hash_new_ex(
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
     atomic_init(&htable->buckets, try_calloc(1, sizeof(atomic_pair_t) * capacity));
-    for (i = 0; i < capacity; i++) {
-        atomic_init(&htable->buckets[i], NULL);
-    }
     htable->type = CO_OA_HASH;
 
     return htable;
@@ -145,7 +143,8 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
 }
 
 static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable) {
-    return (atomic_load(&htable->size) / atomic_load(&htable->capacity)) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
+    return (!hash_initial_override || htable->overriden) &&
+        (atomic_load(&htable->size) / atomic_load(&htable->capacity)) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
 }
 
 void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
@@ -452,19 +451,20 @@ CO_FORCE_INLINE wait_group_t *ht_group_init(void) {
 }
 
 CO_FORCE_INLINE ht_string_t *ht_string_init(void) {
-    return (ht_string_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx, 0);
+    return (ht_string_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx, 10);
 }
 
 CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
-    return (wait_result_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx, 0);
+    return (wait_result_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx, 10);
 }
 
 CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {
-    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, 0);
+    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, HASH_INIT_CAPACITY);
 }
 
 CO_FORCE_INLINE void hash_capacity(u32 buckets) {
     hash_initial_capacity = buckets;
+    hash_initial_override = true;
 }
 
 CO_FORCE_INLINE void hash_free(hash_t *htable) {

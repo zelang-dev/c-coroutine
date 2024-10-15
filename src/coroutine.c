@@ -206,6 +206,17 @@ wait_group_t *wait_group(void) {
     return wg;
 }
 
+wait_group_t *wait_group_by(u32 capacity) {
+    routine_t *c = co_active();
+    wait_group_t *wg = ht_wait_init(capacity + (capacity * 0.333334));
+    wg->resize_free = false;
+    c->wait_active = true;
+    c->wait_group = wg;
+    c->is_group_finish = false;
+
+    return wg;
+}
+
 wait_result_t *wait_for(wait_group_t *wg) {
     routine_t *c = co_active();
     wait_result_t *wgr = NULL;
@@ -213,15 +224,16 @@ wait_result_t *wait_for(wait_group_t *wg) {
     bool has_erred = false;
     void_t key;
     oa_pair *pair;
-    u32 i;
+    u32 i, capacity;
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, VOID_FUNC(hash_free), wgr);
+        capacity = (u32)atomic_load(&wg->capacity);
         while (atomic_load(&wg->size) != 0) {
-            for (i = 0; i < atomic_load(&wg->capacity); i++) {
+            for (i = 0; i < capacity; i++) {
                 pair = atomic_get(oa_pair *, &wg->buckets[i]);
                 if (!is_empty(pair) && !is_empty(pair->value)) {
                     co = (routine_t *)pair->value;
