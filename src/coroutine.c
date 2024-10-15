@@ -231,8 +231,8 @@ wait_result_t *wait_for(wait_group_t *wg) {
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, VOID_FUNC(hash_free), wgr);
-        capacity = (u32)atomic_load(&wg->capacity);
         while (atomic_load(&wg->size) != 0) {
+            capacity = (u32)atomic_load(&wg->capacity);
             for (i = 0; i < capacity; i++) {
                 pair = atomic_get(oa_pair *, &wg->buckets[i]);
                 if (!is_empty(pair) && !is_empty(pair->value)) {
