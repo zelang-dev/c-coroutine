@@ -2275,13 +2275,13 @@ int main(int argc, char **argv) {
     RAII_LOG("");
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    create_routine(main_main, NULL, gq_sys.stacksize * 16, RUN_MAIN);
     if (gq_sys.is_multi) {
         atomic_store(&gq_sys.count[gq_sys.cpu_count], &thread()->used_count);
         gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
         deque_init(gq_sys.deque_run_queue, HASH_INIT_CAPACITY * gq_sys.thread_count);
     }
 
+    create_routine(main_main, NULL, gq_sys.stacksize * 16, RUN_MAIN);
     thrd_scheduler();
     unreachable;
 
