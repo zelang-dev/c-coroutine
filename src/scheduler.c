@@ -505,7 +505,7 @@ static void co_done(void) {
 static void co_awaitable(void) {
     routine_t *co = co_active();
     atomic_thread_fence(memory_order_seq_cst);
-    if (gq_sys.is_multi && !thread()->is_main && !thread()->multi_handle)
+    if (gq_sys.is_multi && !thread()->multi_handle && !thread()->is_main)
         thread()->multi_handle = thread()->current_handle;
 
     try {
@@ -2111,7 +2111,6 @@ static int thrd_scheduler(void) {
                     l = NULL;
                     stole = (int)atomic_load(&gq_sys.stealable_amount[thread()->thrd_id]);
                     if (is_zero(stole)) {
-                        RAII_HERE();
                         l = EMPTY;
                         continue;
                     }
@@ -2121,12 +2120,11 @@ static int thrd_scheduler(void) {
                     gq_sys.is_takeable--;
                     atomic_store(&gq_sys.stealable_amount[thread()->thrd_id], 0);
                     if (count == (int)atomic_load(&gq_sys.used_count)) {
-                        RAII_HERE();
                         l = EMPTY;
                         continue;
                     }
                 }
-            } else if (!thread()->is_main && sched_local_empty() && gq_sys.is_multi && (thread()->sleeping_counted == 0 || gq_sys.is_finish || l == EMPTY)) {
+            } else if (gq_sys.is_multi && !thread()->is_main && sched_local_empty() && (thread()->sleeping_counted == 0 || gq_sys.is_finish || l == EMPTY)) {
                 atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
                 RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
                 /* Wait for global exit signal
@@ -2198,7 +2196,6 @@ int thrd_main(void_t args) {
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi) {
         atomic_store(&gq_sys.count[id], &thread()->used_count);
-        thrd_yield();
         co_info(co_active(), -1);
         res = thrd_scheduler();
         memset(&gq_sys.threads[id], -1, sizeof(gq_sys.threads[id]));
@@ -2262,13 +2259,6 @@ int main(int argc, char **argv) {
             atomic_init(&gq_sys.stealable_thread, try_calloc(gq_sys.thread_count, sizeof(atomic_size_t)));
             atomic_init(&gq_sys.stealable_amount, try_calloc(gq_sys.thread_count, sizeof(atomic_size_t)));
             atomic_init(&gq_sys.any_stealable, try_calloc(gq_sys.thread_count, sizeof(atomic_flag)));
-            for (i = 0; i < gq_sys.thread_count; i++) {
-                atomic_init(&gq_sys.count[i], NULL);
-                atomic_init(&gq_sys.available[i], 0);
-                atomic_init(&gq_sys.stealable_thread[i], 0);
-                atomic_init(&gq_sys.stealable_amount[i], 0);
-                atomic_flag_clear(&gq_sys.any_stealable[i]);
-            }
         }
     }
 
@@ -2281,7 +2271,7 @@ int main(int argc, char **argv) {
         deque_init(gq_sys.deque_run_queue, HASH_INIT_CAPACITY * gq_sys.thread_count);
     }
 
-    create_routine(main_main, NULL, gq_sys.stacksize * 16, RUN_MAIN);
+    create_routine(main_main, NULL, gq_sys.stacksize * 8, RUN_MAIN);
     thrd_scheduler();
     unreachable;
 
