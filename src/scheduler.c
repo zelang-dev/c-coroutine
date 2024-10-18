@@ -228,7 +228,7 @@ CO_FORCE_INLINE bool sched_active(void) {
 
 /* Check `global` run queue for coroutines. */
 CO_FORCE_INLINE bool sched_is_active(void) {
-    return atomic_load(&gq_sys.deque_run_queue->top) <= atomic_load(&gq_sys.deque_run_queue->bottom) - 1;
+    return (int)atomic_load(&gq_sys.deque_run_queue->top) <= (int)atomic_load(&gq_sys.deque_run_queue->bottom) - 1;
 }
 
 CO_FORCE_INLINE bool sched_is_started(void) {
@@ -2155,7 +2155,6 @@ static int thrd_scheduler(void) {
                 RAII_INFO("Thrd #%lx exiting, %d runnable coroutines.\n", co_async_self(), sched_count());
                 return thread()->exiting;
             } else if (!sched_is_sleeping() && sched_empty()) {
-                RAII_HERE();
                 l = EMPTY;
                 continue;
             }
