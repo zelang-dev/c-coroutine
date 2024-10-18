@@ -192,12 +192,12 @@ void co_process(func_t fn, void_t args) {
 }
 
 CO_FORCE_INLINE void wait_capacity(u32 size) {
-    hash_capacity(size + (size * 0.333334));
+    hash_capacity(size + (size * 0.0025));
 }
 
-wait_group_t *wait_group(void) {
+static wait_group_t *wait_group_ex(u32 capacity) {
     routine_t *c = co_active();
-    wait_group_t *wg = ht_group_init();
+    wait_group_t *wg = ht_wait_init(capacity + (capacity * 0.0025));
     wg->resize_free = false;
     c->wait_active = true;
     c->wait_group = wg;
@@ -206,15 +206,12 @@ wait_group_t *wait_group(void) {
     return wg;
 }
 
-wait_group_t *wait_group_by(u32 capacity) {
-    routine_t *c = co_active();
-    wait_group_t *wg = ht_wait_init(capacity + (capacity * 0.333334));
-    wg->resize_free = false;
-    c->wait_active = true;
-    c->wait_group = wg;
-    c->is_group_finish = false;
+CO_FORCE_INLINE wait_group_t *wait_group(void) {
+    return wait_group_ex(0);
+}
 
-    return wg;
+CO_FORCE_INLINE wait_group_t *wait_group_by(u32 capacity) {
+    return wait_group_ex(capacity);
 }
 
 wait_result_t *wait_for(wait_group_t *wg) {
@@ -228,6 +225,10 @@ wait_result_t *wait_for(wait_group_t *wg) {
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
+        atomic_thread_fence(memory_order_seq_cst);
+        if (gq_sys.is_multi && is_empty(gq_sys.thread_wait_group))
+            gq_sys.thread_wait_group = wg;
+
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, VOID_FUNC(hash_free), wgr);
@@ -236,6 +237,11 @@ wait_result_t *wait_for(wait_group_t *wg) {
             for (i = 0; i < capacity; i++) {
                 pair = atomic_get(oa_pair *, &wg->buckets[i]);
                 if (!is_empty(pair) && !is_empty(pair->value)) {
+                    /* Todo: handle each thread coroutines in wait group. */
+                    if (gq_sys.is_multi && sched_count() <= 0) {
+                        co_panic("Error, coroutine overflowed!");
+                    }
+
                     co = (routine_t *)pair->value;
                     key = pair->key;
                     if (!co_terminated(co)) {

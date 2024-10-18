@@ -243,6 +243,7 @@ typedef enum {
 typedef enum {
     RUN_NORMAL,
     RUN_MAIN,
+    RUN_THRD,
     RUN_SYSTEM,
     RUN_EVENT,
     RUN_ASYNC,
@@ -473,15 +474,15 @@ typedef struct {
     size_t thread_count;
     size_t thread_invalid;
     thrd_t *threads;
-
-    /* Global coroutine run queue */
-    deque_t *deque_run_queue;
-
+    wait_group_t *thread_wait_group;
     const char powered_by[SCRAPE_SIZE];
     cacheline_pad_t pad2_;
 
     atomic_flag is_started;
     cacheline_pad_t _pad1;
+
+    atomic_size_t take_count;
+    cacheline_pad_t _pad6;
 
     /* track the number of global coroutines used/available */
     atomic_size_t used_count;
@@ -513,6 +514,10 @@ typedef struct {
     /* scheduler tracking for all coroutines */
     atomic_routine_t **all_coroutine;
     cacheline_pad_t _pad5;
+
+    /* Global coroutine run queue */
+    deque_t *deque_run_queue;
+    cacheline_pad_t _pad7;
 } atomic_deque_t;
 
 C_API atomic_deque_t gq_sys;
@@ -843,6 +848,8 @@ C_API void sched_exit(int);
 C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
+C_API int sched_is_valid(void);
+C_API int sched_count(void);
 C_API void sched_dec(void);
 C_API bool sched_is_main(void);
 
