@@ -219,32 +219,37 @@ wait_result_t *wait_for(wait_group_t *wg) {
     wait_result_t *wgr = NULL;
     routine_t *co;
     bool has_erred = false;
+    bool has_completed = false;
     void_t key;
     oa_pair *pair;
-    u32 i, capacity;
+    u32 i, capacity, wait_counter = 0;
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
-        atomic_thread_fence(memory_order_seq_cst);
-        if (gq_sys.is_multi && is_empty(gq_sys.thread_wait_group))
-            gq_sys.thread_wait_group = wg;
-
         co_yield();
         wgr = ht_result_init();
         co_deferred(c, VOID_FUNC(hash_free), wgr);
-        while (atomic_load(&wg->size) != 0) {
+        atomic_thread_fence(memory_order_seq_cst);
+        if (gq_sys.is_multi && gq_sys.is_threading_waitable) {
+            wait_counter = gq_sys.thread_waitable_count;
+            gq_sys.thread_wait_group[wait_counter - 1] = wg;
+            gq_sys.thread_result_group[wait_counter - 1] = wgr;
+        }
+
+        while (atomic_load(&wg->size) != 0 && !has_completed) {
             capacity = (u32)atomic_load(&wg->capacity);
             for (i = 0; i < capacity; i++) {
                 pair = atomic_get(oa_pair *, &wg->buckets[i]);
                 if (!is_empty(pair) && !is_empty(pair->value)) {
-                    /* Todo: handle each thread coroutines in wait group. */
-                    if (gq_sys.is_multi && sched_count() <= 0) {
-                        co_panic("Error, coroutine overflowed!");
-                    }
-
                     co = (routine_t *)pair->value;
                     key = pair->key;
-                    if (!co_terminated(co)) {
+                    if (gq_sys.is_multi && sched_count() == 0) {
+                        has_completed = true;
+                        break;
+                    } else if (gq_sys.is_multi && co->tid != sched_id()) {
+                        co_yield();
+                        continue;
+                    } else if (!co_terminated(co)) {
                         if (!co->interrupt_active && co->status == CO_NORMAL)
                             sched_enqueue(co);
 
@@ -265,7 +270,6 @@ wait_result_t *wait_for(wait_group_t *wg) {
 
                         if (co->is_event_err) {
                             hash_remove(wg, key);
-                            --c->wait_counter;
                             has_erred = true;
                             continue;
                         }
@@ -274,13 +278,21 @@ wait_result_t *wait_for(wait_group_t *wg) {
                             co_deferred_free(co);
 
                         hash_delete(wg, key);
-                        --c->wait_counter;
                     }
                 }
             }
         }
+
+        while (gq_sys.is_multi && atomic_load(&wg->size) != 0)
+            co_yield();
+
         c->wait_active = false;
         c->wait_group = NULL;
+        if (gq_sys.is_multi && wait_counter) {
+            gq_sys.thread_wait_group[wait_counter - 1] = NULL;
+            gq_sys.thread_result_group[wait_counter - 1] = NULL;
+        }
+
         sched_dec();
     }
 

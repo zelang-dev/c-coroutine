@@ -39,7 +39,7 @@
 #endif
 
 #ifndef CO_MT_STATE
-    #define CO_MT_STATE false
+    #define CO_MT_STATE true
 #endif
 
 #define ERROR_SCRAPE_SIZE 256
@@ -406,13 +406,14 @@ struct routine_s {
     bool is_channeling;
     bool is_plain;
     bool flagged;
-    int wait_counter;
     int all_coroutine_slot;
     signed int event_err_code;
     size_t alarm_time;
     size_t cycles;
     /* unique coroutine id */
     u32 cid;
+    /* thread id assigned in `gq_sys` */
+    u32 tid;
     co_states status;
     run_states run_code;
 #if defined(USE_VALGRIND)
@@ -465,16 +466,19 @@ typedef struct {
     volatile bool is_interruptable;
     volatile bool is_multi;
     volatile bool is_finish;
+    volatile bool is_threading_waitable;
     volatile sig_atomic_t is_takeable;
     /* Stack size when creating a coroutine. */
     u32 stacksize;
+    u32 thread_waitable_count;
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
     size_t thread_count;
     size_t thread_invalid;
     thrd_t *threads;
-    wait_group_t *thread_wait_group;
+    wait_group_t **thread_wait_group;
+    wait_result_t **thread_result_group;
     const char powered_by[SCRAPE_SIZE];
     cacheline_pad_t pad2_;
 
@@ -850,6 +854,7 @@ C_API routine_t *sched_dequeue(scheduler_t *);
 
 C_API int sched_is_valid(void);
 C_API int sched_count(void);
+C_API u32 sched_id(void);
 C_API void sched_dec(void);
 C_API bool sched_is_main(void);
 
