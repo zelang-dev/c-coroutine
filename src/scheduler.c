@@ -27,8 +27,6 @@ typedef struct {
 
     u32 sleep_id;
 
-    routine_t *multi_handle;
-
     /* record which coroutine sleeping in scheduler */
     scheduler_t sleeping;
 
@@ -79,7 +77,9 @@ static routine_t *EMPTY_T = (routine_t *)0x100, *ABORT_T = (routine_t *)0x200;
 /*
  * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal`
  *
- * Modified from a work-stealing scheduler described in
+ * Modified from https://github.com/sysprog21/concurrent-programs/blob/master/work-steal/work-steal.c
+ *
+ * A work-stealing scheduler described in
  * Robert D. Blumofe, Christopher F. Joerg, Bradley C. Kuszmaul, Charles E.
  * Leiserson, Keith H. Randall, and Yuli Zhou. Cilk: An efficient multithreaded
  * runtime system. In Proceedings of the Fifth ACM SIGPLAN Symposium on
@@ -445,7 +445,6 @@ static void sched_init(bool is_main, u32 thread_id) {
     thread()->active_handle = NULL;
     thread()->main_handle = NULL;
     thread()->current_handle = NULL;
-    thread()->multi_handle = NULL;
     thread()->interrupt_handle = NULL;
     thread()->interrupt_default = NULL;
     atomic_thread_fence(memory_order_seq_cst);
@@ -1468,10 +1467,6 @@ CO_FORCE_INLINE routine_t *co_current(void) {
     return thread()->current_handle;
 }
 
-CO_FORCE_INLINE routine_t *co_multi(void) {
-    return thread()->multi_handle;
-}
-
 CO_FORCE_INLINE routine_t *co_coroutine(void) {
     return thread()->running;
 }
@@ -2285,9 +2280,6 @@ static void_t thrd_main_main(void_t v) {
     (void)v;
 
     coroutine_name("thrd_main_main");
-    if (!thread()->multi_handle)
-        thread()->multi_handle = thread()->current_handle;
-
     co_info(co_active(), -1);
     while (!sched_empty() && can_wait_errorless) {
         if (thrd_is_waitable(gq_sys.thread_waitable_count))
@@ -2314,7 +2306,7 @@ static  int thrd_main(void_t args) {
 
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi) {
-        create_routine(thrd_main_main, NULL, gq_sys.stacksize * 4, RUN_THRD);
+        create_routine(thrd_main_main, NULL, gq_sys.stacksize * 2, RUN_THRD);
         res = thrd_scheduler();
         memset(&gq_sys.threads[id], -1, sizeof(gq_sys.threads[id]));
     }
@@ -2371,6 +2363,8 @@ int main(int argc, char **argv) {
         atomic_init(&gq_sys.stealable_thread, try_calloc(gq_sys.thread_count, sizeof(atomic_size_t)));
         atomic_init(&gq_sys.stealable_amount, try_calloc(gq_sys.thread_count, sizeof(atomic_size_t)));
         atomic_init(&gq_sys.any_stealable, try_calloc(gq_sys.thread_count, sizeof(atomic_flag)));
+        gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
+        deque_init(gq_sys.deque_run_queue, HASH_INIT_CAPACITY);
         for (i = 0; i < gq_sys.cpu_count; i++) {
             int *n = try_malloc(sizeof(int));
             *n = i;
@@ -2390,11 +2384,6 @@ int main(int argc, char **argv) {
     RAII_LOG("");
     json_set_allocation_functions(try_malloc, CO_FREE);
     sched_init(true, gq_sys.cpu_count);
-    if (gq_sys.is_multi) {
-        gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
-        deque_init(gq_sys.deque_run_queue, HASH_INIT_CAPACITY * gq_sys.thread_count);
-    }
-
     create_routine(main_main, NULL, gq_sys.stacksize * 4, RUN_MAIN);
     thrd_scheduler();
     unreachable;
