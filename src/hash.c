@@ -459,7 +459,7 @@ CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
 }
 
 CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {
-    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, HASH_INIT_CAPACITY);
+    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, HASH_INIT_CAPACITY/2);
 }
 
 CO_FORCE_INLINE void hash_capacity(u32 buckets) {

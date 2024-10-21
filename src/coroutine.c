@@ -5,7 +5,7 @@ thrd_static(co_collector_t, coroutine_list, NULL)
 void co_collector(routine_t *co) {
     wait_group_t *wg;
     if (is_coroutine_list_empty()) {
-        wg = ht_group_init();
+        wg = ht_wait_init(HASH_INIT_CAPACITY/2);
         wg->resize_free = false;
         coroutine_list_update(wg);
     }

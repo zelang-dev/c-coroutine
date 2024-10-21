@@ -11,14 +11,14 @@ static CO_FORCE_INLINE void signal_unblock(void) {
 }
 #else
 static sigset_t signal_ctrl;
-static inline void signal_block(void) {
+static CO_FORCE_INLINE void signal_block(void) {
     sigset_t block_set;
     sigfillset(&block_set);
     sigdelset(&block_set, SIGINT);
     sigprocmask(SIG_BLOCK, &block_set, &signal_ctrl);
 }
 
-static inline void signal_unblock(void) {
+static CO_FORCE_INLINE void signal_unblock(void) {
     sigprocmask(SIG_SETMASK, &signal_ctrl, NULL);
 }
 #endif

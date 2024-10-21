@@ -5,8 +5,12 @@ thrd_static(chan_collector_t, chan_list, NULL)
 static char error_message[ERROR_SCRAPE_SIZE] = {0};
 
 void chan_collector(channel_t *ch) {
-    if (is_chan_list_empty())
-        chan_list_update(ht_channel_init());
+    chan_collector_t *chan;
+    if (is_chan_list_empty()) {
+        chan = ht_channel_init();
+        chan->resize_free = false;
+        chan_list_update(chan);
+    }
 
     if (is_type(ch, CO_CHANNEL))
         hash_put(chan_list(), co_itoa(ch->id), ch);

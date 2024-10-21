@@ -461,11 +461,16 @@ typedef struct {
     atomic_array_t array;
 } deque_t;
 
-/* Global atomic queue struct */
+/* Global system control queue struct */
 typedef struct {
+    /* Exception/error indicator, only private `co_awaitable()`
+    will clear to break any possible infinite wait/loop condition,
+    normal cleanup code will not be executed. */
+    volatile bool is_errorless;
     volatile bool is_interruptable;
     volatile bool is_multi;
     volatile bool is_finish;
+    volatile bool is_resuming;
     volatile bool is_threading_waitable;
     volatile sig_atomic_t is_takeable;
     /* Stack size when creating a coroutine. */
