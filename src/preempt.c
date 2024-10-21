@@ -1,3 +1,16 @@
+/*
+ * Modified from https://github.com/sysprog21/concurrent-programs/blob/master/preempt_sched/task_sched.c
+ *
+ * TODO: Preemptive multitasking in userspace based on SIGALRM signal or SetTimer under Windows,
+ * simulating an OS timer interrupt.
+ *
+ * Execution of each coroutine can be preempted by SetTimer/SIGALRM signal,
+ * each coroutine is an execution context, which can do a voluntary scheduling or be preempted by a timer,
+ * and in that case nonvoluntary scheduling occurs.
+ *
+ * The default time slice is 10ms, that means that each 10ms SIGALRM/SetTimer fires and
+ * next context is scheduled by round robin algorithm.
+ */
 #include "coroutine.h"
 
 #ifdef _WIN32
