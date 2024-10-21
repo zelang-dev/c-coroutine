@@ -16,6 +16,9 @@ typedef struct {
     /* track the number of coroutines used */
     int used_count;
 
+    /* track the number of coroutines in wait group */
+    int group_count;
+
     /* indicator for thread termination. */
     u32 exiting;
 
@@ -409,6 +412,7 @@ static void sched_post_available(void) {
 
         gq_sys.thread_wait_group[wait_counter] = NULL;
         gq_sys.thread_result_group[wait_counter] = NULL;
+        gq_sys.thread_wait_group[gq_sys.thread_waitable_count] = NULL;
         gq_sys.is_threading_waitable = true;
     }
 }
@@ -1657,6 +1661,7 @@ static void sched_steal_available(void) {
 
         atomic_store_explicit(&gq_sys.available[thread()->thrd_id], (available - count), memory_order_release);
         if ((available - count) == 0) {
+            thread()->group_count = available;
             atomic_fetch_add(&gq_sys.take_count, 1);
             if (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) {
                 atomic_thread_fence(memory_order_acquire);
@@ -1904,6 +1909,14 @@ CO_FORCE_INLINE void sched_dec(void) {
     --thread()->used_count;
 }
 
+CO_FORCE_INLINE int sched_group_count(void) {
+    return thread()->group_count;
+}
+
+CO_FORCE_INLINE void sched_group_dec(void) {
+    --thread()->group_count;
+}
+
 CO_FORCE_INLINE bool sched_is_main(void) {
     return thread()->is_main;
 }
@@ -1969,7 +1982,6 @@ void co_interrupt_off(void) {
 
 void coroutine_system(void) {
     if (!thread()->running->system) {
-        thread()->running->tid = thread()->thrd_id;
         thread()->running->system = true;
         --thread()->used_count;
     }
@@ -2261,6 +2273,12 @@ static void thrd_wait_for(u32 wait_count) {
                     if (co->is_event_err) {
                         hash_remove(wg, key);
                         has_erred = true;
+                        sched_group_dec();
+                        if (sched_group_count() == 0) {
+                            has_completed = true;
+                            break;
+                        }
+
                         continue;
                     }
 
@@ -2268,7 +2286,8 @@ static void thrd_wait_for(u32 wait_count) {
                         co_deferred_free(co);
 
                     hash_delete(wg, key);
-                    if (sched_count() == 0) {
+                    sched_group_dec();
+                    if (sched_group_count() == 0) {
                         has_completed = true;
                         break;
                     }

@@ -858,10 +858,12 @@ C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
 C_API int sched_is_valid(void);
-C_API int sched_count(void);
-C_API u32 sched_id(void);
-C_API void sched_dec(void);
 C_API bool sched_is_main(void);
+C_API u32 sched_id(void);
+C_API int sched_count(void);
+C_API void sched_dec(void);
+C_API int sched_group_count(void);
+C_API void sched_group_dec(void);
 
 C_API void preempt_init(u32 usecs);
 C_API void preempt_disable(void);

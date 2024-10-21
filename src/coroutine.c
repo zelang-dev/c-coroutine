@@ -243,7 +243,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
                 if (!is_empty(pair) && !is_empty(pair->value)) {
                     co = (routine_t *)pair->value;
                     key = pair->key;
-                    if (gq_sys.is_multi && sched_count() == 0) {
+                    if (gq_sys.is_multi && sched_group_count() == 0) {
                         has_completed = true;
                         break;
                     } else if (gq_sys.is_multi && co->tid != sched_id()) {
@@ -271,6 +271,8 @@ wait_result_t *wait_for(wait_group_t *wg) {
                         if (co->is_event_err) {
                             hash_remove(wg, key);
                             has_erred = true;
+                            if (gq_sys.is_multi)
+                                sched_group_dec();
                             continue;
                         }
 
@@ -278,6 +280,8 @@ wait_result_t *wait_for(wait_group_t *wg) {
                             co_deferred_free(co);
 
                         hash_delete(wg, key);
+                        if (gq_sys.is_multi)
+                            sched_group_dec();
                     }
                 }
             }
