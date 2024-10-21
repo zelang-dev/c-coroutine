@@ -35,8 +35,8 @@ endif()
 find_package(libuv QUIET)
 if(NOT libuv_FOUND)
     FetchContent_Declare(libuv
-        URL https://github.com/libuv/libuv/archive/refs/tags/v1.49.0.zip
-        URL_MD5 da312f4f1b0e687ed5e3b7f37b04e9c4
+        URL https://github.com/libuv/libuv/archive/refs/tags/v1.49.2.zip
+        URL_MD5 e637c8dd733d75d59a0570b01cef815a
     )
     FetchContent_MakeAvailable(libuv)
 endif()
