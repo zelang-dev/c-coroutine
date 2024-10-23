@@ -1662,12 +1662,14 @@ static void sched_steal_available(void) {
         atomic_store_explicit(&gq_sys.available[thread()->thrd_id], (available - count), memory_order_release);
         if ((available - count) == 0) {
             thread()->group_count = available;
-            atomic_fetch_add(&gq_sys.take_count, 1);
-            if (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) {
-                atomic_thread_fence(memory_order_acquire);
-                atomic_init(&gq_sys.deque_run_queue->top, 0);
-                atomic_init(&gq_sys.deque_run_queue->bottom, 0);
-                atomic_thread_fence(memory_order_release);
+            if (gq_sys.is_threading_waitable) {
+                atomic_fetch_add(&gq_sys.take_count, 1);
+                if (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) {
+                    atomic_thread_fence(memory_order_acquire);
+                    atomic_init(&gq_sys.deque_run_queue->top, 0);
+                    atomic_init(&gq_sys.deque_run_queue->bottom, 0);
+                    atomic_thread_fence(memory_order_release);
+                }
             }
         }
     }
@@ -1768,11 +1770,13 @@ void co_stealer(void) {
     if (sched_is_available())
         sched_steal_available();
 
-    if (gq_sys.is_multi && sched_is_main() && !atomic_flag_load(&gq_sys.is_started))
-        atomic_flag_test_and_set(&gq_sys.is_started);
+    if (gq_sys.is_multi && sched_is_main()) {
+        if (!atomic_flag_load(&gq_sys.is_started))
+            atomic_flag_test_and_set(&gq_sys.is_started);
 
-    if (gq_sys.is_multi && sched_is_main() && (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) && !sched_is_active())
-        atomic_init(&gq_sys.take_count, 0);
+        if (!sched_is_active() && atomic_load(&gq_sys.take_count) == gq_sys.thread_count)
+            atomic_init(&gq_sys.take_count, 0);
+    }
 }
 
 CO_FORCE_INLINE void co_yield(void) {
