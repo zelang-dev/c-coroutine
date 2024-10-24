@@ -463,7 +463,8 @@ CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {
 }
 
 CO_FORCE_INLINE void hash_capacity(u32 buckets) {
-    hash_initial_capacity = buckets;
+    atomic_thread_fence(memory_order_seq_cst);
+    gq_sys.capacity = hash_initial_capacity = buckets;
     hash_initial_override = true;
 }
 

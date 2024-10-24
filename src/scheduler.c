@@ -76,23 +76,6 @@ static scheduler_t *EMPTY = (scheduler_t *)0x100, *ABORT = (scheduler_t *)0x200;
  */
 static routine_t *EMPTY_T = (routine_t *)0x100, *ABORT_T = (routine_t *)0x200;
 
-/*
- * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal`
- *
- * Modified from https://github.com/sysprog21/concurrent-programs/blob/master/work-steal/work-steal.c
- *
- * A work-stealing scheduler described in
- * Robert D. Blumofe, Christopher F. Joerg, Bradley C. Kuszmaul, Charles E.
- * Leiserson, Keith H. Randall, and Yuli Zhou. Cilk: An efficient multithreaded
- * runtime system. In Proceedings of the Fifth ACM SIGPLAN Symposium on
- * Principles and Practice of Parallel Programming (PPoPP), pages 207-216,
- * Santa Barbara, California, July 1995.
- * http://supertech.csail.mit.edu/papers/PPoPP95.pdf
- *
- * However, that refers to an outdated model of Cilk; an update appears in
- * the essential idea of work stealing mentioned in Leiserson and Platt,
- * Programming Parallel Applications in Cilk
- */
 void deque_init(deque_t *q, int size_hint) {
     atomic_init(&q->top, 0);
     atomic_init(&q->bottom, 0);
@@ -184,6 +167,20 @@ routine_t *deque_steal(deque_t *q) {
     }
 
     return x;
+}
+
+void deque_free(deque_t *q) {
+    deque_array_t *a = NULL;
+    if (!is_empty(q)) {
+        a = atomic_get(deque_array_t *, &q->array);
+        if (!is_empty(a)) {
+            CO_FREE((void_t)a);
+            atomic_store(&q->array, NULL);
+        }
+
+        memset(q, 0, sizeof(q));
+        CO_FREE(q);
+    }
 }
 
 /* Global queue system atomic data. */
@@ -2006,17 +2003,6 @@ static void sched_free(void) {
     CO_FREE((void_t)atomic_load(&gq_sys.stealable_thread));
     CO_FREE((void_t)atomic_load(&gq_sys.stealable_amount));
     CO_FREE((void_t)atomic_load(&gq_sys.any_stealable));
-
-    if (!is_empty(gq_sys.deque_run_queue)) {
-        if (!is_empty(gq_sys.deque_run_queue->array)) {
-            CO_FREE(gq_sys.deque_run_queue->array);
-            gq_sys.deque_run_queue->array = NULL;
-        }
-
-        CO_FREE(gq_sys.deque_run_queue);
-        gq_sys.deque_run_queue = NULL;
-    }
-
     if (!is_empty(gq_sys.thread_wait_group)) {
         CO_FREE(gq_sys.thread_wait_group);
         gq_sys.thread_wait_group = NULL;
@@ -2026,6 +2012,8 @@ static void sched_free(void) {
         CO_FREE(gq_sys.thread_result_group);
         gq_sys.thread_result_group = NULL;
     }
+
+    deque_free(gq_sys.deque_run_queue);
 }
 
 static void sched_destroy(void) {
@@ -2240,6 +2228,7 @@ static void thrd_wait_for(u32 wait_count) {
     if (wait_count == 0)
         return;
 
+    atomic_thread_fence(memory_order_seq_cst);
     wait_group_t *wg = gq_sys.thread_wait_group[wait_count - 1];
     wait_result_t *wgr = gq_sys.thread_result_group[wait_count - 1];
     if (wg == NULL || wgr == NULL)
@@ -2308,7 +2297,8 @@ static void_t thrd_main_main(void_t v) {
 
     coroutine_name("co_thrd_main #%d", (int)sched_id());
     co_info(co_active(), -1);
-    while (!sched_empty() && gq_sys.is_errorless) {
+    atomic_thread_fence(memory_order_seq_cst);
+    while (!sched_empty() && gq_sys.is_errorless && !gq_sys.is_finish) {
         if (thrd_is_waitable(gq_sys.thread_waitable_count))
             thrd_wait_for(gq_sys.thread_waitable_count);
         else
@@ -2373,12 +2363,14 @@ int main(int argc, char **argv) {
     gq_sys.is_threading_waitable = false;
     gq_sys.is_takeable = 0;
     gq_sys.stacksize = CO_STACK_SIZE * 4;
+    gq_sys.capacity = HASH_INIT_CAPACITY;
     gq_sys.cpu_count = sched_cpu_count();
     gq_sys.thread_count = gq_sys.cpu_count + 1;
     gq_sys.thread_invalid = gq_sys.thread_count + 61;
     gq_sys.thread_waitable_count = 0;
     gq_sys.thread_wait_group = NULL;
     gq_sys.thread_result_group = NULL;
+    gq_sys.deque_run_queue = NULL;
     atomic_init(&gq_sys.id_generate, 0);
     atomic_init(&gq_sys.used_count, 0);
     atomic_init(&gq_sys.take_count, 0);
@@ -2395,8 +2387,6 @@ int main(int argc, char **argv) {
         atomic_init(&gq_sys.stealable_thread, try_calloc(gq_sys.thread_count, sizeof(atomic_size_t)));
         atomic_init(&gq_sys.stealable_amount, try_calloc(gq_sys.thread_count, sizeof(atomic_size_t)));
         atomic_init(&gq_sys.any_stealable, try_calloc(gq_sys.thread_count, sizeof(atomic_flag)));
-        gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
-        deque_init(gq_sys.deque_run_queue, HASH_INIT_CAPACITY);
         for (i = 0; i < gq_sys.cpu_count; i++) {
             int *n = try_malloc(sizeof(int));
             *n = i;

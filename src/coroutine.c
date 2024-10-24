@@ -197,6 +197,15 @@ CO_FORCE_INLINE void wait_capacity(u32 size) {
 
 static wait_group_t *wait_group_ex(u32 capacity) {
     routine_t *c = co_active();
+    if (!is_zero(capacity))
+        wait_capacity(capacity);
+
+    atomic_thread_fence(memory_order_seq_cst);
+    if (gq_sys.is_multi && is_empty(gq_sys.deque_run_queue)) {
+        gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
+        deque_init(gq_sys.deque_run_queue, gq_sys.capacity);
+    }
+
     wait_group_t *wg = ht_wait_init(capacity + (capacity * 0.0025));
     wg->resize_free = false;
     c->wait_active = true;

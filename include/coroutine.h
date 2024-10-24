@@ -461,6 +461,25 @@ typedef struct {
     atomic_array_t array;
 } deque_t;
 
+/*
+ * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal`
+ *
+ * Modified from https://github.com/sysprog21/concurrent-programs/blob/master/work-steal/work-steal.c
+ *
+ * A work-stealing scheduler described in
+ * Robert D. Blumofe, Christopher F. Joerg, Bradley C. Kuszmaul, Charles E.
+ * Leiserson, Keith H. Randall, and Yuli Zhou. Cilk: An efficient multithreaded
+ * runtime system. In Proceedings of the Fifth ACM SIGPLAN Symposium on
+ * Principles and Practice of Parallel Programming (PPoPP), pages 207-216,
+ * Santa Barbara, California, July 1995.
+ * http://supertech.csail.mit.edu/papers/PPoPP95.pdf
+ *
+ * However, that refers to an outdated model of Cilk; an update appears in
+ * the essential idea of work stealing mentioned in Leiserson and Platt,
+ * Programming Parallel Applications in Cilk
+ */
+C_API void deque_init(deque_t *q, int size_hint);
+
 /* Global system control queue struct */
 typedef struct {
     /* Exception/error indicator, only private `co_awaitable()`
@@ -475,6 +494,7 @@ typedef struct {
     volatile sig_atomic_t is_takeable;
     /* Stack size when creating a coroutine. */
     u32 stacksize;
+    u32 capacity;
     u32 thread_waitable_count;
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
