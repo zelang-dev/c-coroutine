@@ -2220,7 +2220,6 @@ static bool thrd_is_waitable(u32 wait_count) {
 
 static void thrd_wait_for(u32 wait_count) {
     routine_t *co, *c = co_active();
-    bool has_erred = false;
     bool has_completed = false;
     void_t key;
     oa_pair *pair;
@@ -2265,7 +2264,7 @@ static void thrd_wait_for(u32 wait_count) {
 
                     if (co->is_event_err) {
                         hash_remove(wg, key);
-                        has_erred = true;
+                        wg->has_erred = true;
                         sched_group_dec();
                         if (sched_group_count() == 0) {
                             has_completed = true;

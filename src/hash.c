@@ -75,6 +75,7 @@ oa_hash *oa_hash_new_ex(
     atomic_init(&htable->capacity, capacity);
     htable->overriden = !is_zero(cap);
     htable->resize_free = true;
+    htable->has_erred = false;
     htable->val_ops = val_ops;
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
@@ -459,7 +460,7 @@ CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
 }
 
 CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {
-    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, HASH_INIT_CAPACITY/2);
+    return (chan_collector_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_channel, oa_hash_lp_idx, HASH_INIT_CAPACITY/4);
 }
 
 CO_FORCE_INLINE void hash_capacity(u32 buckets) {

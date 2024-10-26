@@ -132,7 +132,7 @@ CO_FORCE_INLINE void launch(func_t fn, void_t arg) {
 }
 
 value_t co_await(callable_t fn, void_t arg) {
-    wait_group_t *wg = wait_group();
+    wait_group_t *wg = wait_group_by(2);
     u32 cid = go(fn, arg);
     wait_result_t *wgr = wait_for(wg);
     if (is_empty(wgr))
@@ -197,7 +197,7 @@ CO_FORCE_INLINE void wait_capacity(u32 size) {
 
 static wait_group_t *wait_group_ex(u32 capacity) {
     routine_t *c = co_active();
-    if (!is_zero(capacity))
+    if (!is_zero(capacity) && (capacity > gq_sys.thread_count * 2))
         wait_capacity(capacity);
 
     atomic_thread_fence(memory_order_seq_cst);
@@ -279,7 +279,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
 
                         if (co->is_event_err) {
                             hash_remove(wg, key);
-                            has_erred = true;
+                            wg->has_erred = true;
                             if (gq_sys.is_multi)
                                 sched_group_dec();
                             continue;
@@ -309,6 +309,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
         sched_dec();
     }
 
+    has_erred = wg->has_erred;
     hash_free(wg);
     return has_erred ? NULL : wgr;
 }
