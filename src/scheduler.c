@@ -1532,7 +1532,7 @@ routine_t *co_create(size_t size, callable_t func, void_t args) {
     co->is_plain = false;
     co->is_address = false;
     co->is_waiting = false;
-    co->is_multi_wait = false;
+    co->is_group = false;
     co->is_group_finish = true;
     co->event_err_code = 0;
     co->args = args;
@@ -1650,6 +1650,7 @@ static void sched_steal_available(void) {
                 break;
 
             t->taken = true;
+            t->is_group = true;
             t->tid = thread()->thrd_id;
             count++;
             thread()->used_count++;
@@ -1720,7 +1721,6 @@ u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
     } else if (c->wait_active && !is_empty(c->wait_group) && !c->is_group_finish) {
         t->is_waiting = true;
         t->is_address = true;
-        t->is_multi_wait = gq_sys.is_multi;
         hash_put(c->wait_group, co_itoa(id), t);
     }
 
@@ -1914,10 +1914,6 @@ CO_FORCE_INLINE int sched_group_count(void) {
     return thread()->group_count;
 }
 
-CO_FORCE_INLINE void sched_group_dec(void) {
-    --thread()->group_count;
-}
-
 CO_FORCE_INLINE bool sched_is_main(void) {
     return thread()->is_main;
 }
@@ -1978,7 +1974,7 @@ void co_interrupt_off(void) {
     sched_shutdown_interrupt(true);
     atomic_thread_fence(memory_order_seq_cst);
     gq_sys.is_interruptable = false;
-    gq_sys.stacksize = CO_STACK_SIZE;
+    gq_sys.stacksize = CO_STACK_SIZE + 1024;
 }
 
 void coroutine_system(void) {
@@ -2156,7 +2152,7 @@ static int thrd_scheduler(void) {
                     l = EMPTY;
                     continue;
                 }
-            } else if (gq_sys.is_multi && !sched_is_main() && (thread()->sleeping_counted == 0 || gq_sys.is_finish || l == EMPTY || !gq_sys.is_errorless)) {
+            } else if (gq_sys.is_multi && !sched_is_main() && (sched_empty() || gq_sys.is_finish || l == EMPTY || !gq_sys.is_errorless)) {
                 atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
                 RAII_INFO("Thrd #%lx waiting to exit.\n", co_async_self());
                 /* Wait for global exit signal */
@@ -2172,9 +2168,6 @@ static int thrd_scheduler(void) {
                     RAII_INFO("Thrd #%lx exiting, %d runnable coroutines.\n", co_async_self(), sched_count());
                     return thread()->exiting;
                 }
-            } else if (sched_empty()) {
-                l = EMPTY;
-                continue;
             }
         }
 
@@ -2193,8 +2186,11 @@ static int thrd_scheduler(void) {
 
         thread()->running = NULL;
         if (t->halt || t->exiting) {
-            if (!t->system)
+            if (!t->system) {
                 --thread()->used_count;
+                if (gq_sys.is_multi && t->is_group)
+                    --thread()->group_count;
+            }
 
             if (gq_sys.is_multi && t->run_code == RUN_THRD) {
                 thread()->used_count++;
@@ -2236,11 +2232,17 @@ static void thrd_wait_for(u32 wait_count) {
     while (atomic_load(&wg->size) != 0 && !has_completed) {
         capacity = (u32)atomic_load(&wg->capacity);
         for (i = 0; i < capacity; i++) {
+            if (sched_group_count() == 0) {
+                has_completed = true;
+                break;
+            }
+
             pair = atomic_get(oa_pair *, &wg->buckets[i]);
             if (!is_empty(pair) && !is_empty(pair->value)) {
                 co = (routine_t *)pair->value;
                 key = pair->key;
                 if (co->tid != sched_id()) {
+                    /* TODO: rework thread's local run queue setup, for large capacities thread will spend to much time skipping */
                     co_yield();
                     continue;
                 } else if (!co_terminated(co)) {
@@ -2265,12 +2267,6 @@ static void thrd_wait_for(u32 wait_count) {
                     if (co->is_event_err) {
                         hash_remove(wg, key);
                         wg->has_erred = true;
-                        sched_group_dec();
-                        if (sched_group_count() == 0) {
-                            has_completed = true;
-                            break;
-                        }
-
                         continue;
                     }
 
@@ -2278,11 +2274,6 @@ static void thrd_wait_for(u32 wait_count) {
                         co_deferred_free(co);
 
                     hash_delete(wg, key);
-                    sched_group_dec();
-                    if (sched_group_count() == 0) {
-                        has_completed = true;
-                        break;
-                    }
                 }
             }
         }
@@ -2322,7 +2313,7 @@ static  int thrd_main(void_t args) {
 
     atomic_thread_fence(memory_order_seq_cst);
     if (gq_sys.is_multi) {
-        create_routine(thrd_main_main, NULL, gq_sys.stacksize * 2, RUN_THRD);
+        create_routine(thrd_main_main, NULL, gq_sys.stacksize * 3, RUN_THRD);
         res = thrd_scheduler();
         sched_shutdown_interrupt(false);
         chan_collector_free();

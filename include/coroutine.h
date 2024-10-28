@@ -402,7 +402,7 @@ struct routine_s {
     bool is_address;
     bool is_waiting;
     bool is_group_finish;
-    bool is_multi_wait;
+    bool is_group;
     bool is_channeling;
     bool is_plain;
     bool flagged;
@@ -883,7 +883,6 @@ C_API u32 sched_id(void);
 C_API int sched_count(void);
 C_API void sched_dec(void);
 C_API int sched_group_count(void);
-C_API void sched_group_dec(void);
 
 C_API void preempt_init(u32 usecs);
 C_API void preempt_disable(void);

@@ -256,6 +256,7 @@ wait_result_t *wait_for(wait_group_t *wg) {
                         has_completed = true;
                         break;
                     } else if (gq_sys.is_multi && co->tid != sched_id()) {
+                        /* TODO: rework thread's local run queue setup, for large capacities thread will spend to much time skipping */
                         co_yield();
                         continue;
                     } else if (!co_terminated(co)) {
@@ -280,8 +281,6 @@ wait_result_t *wait_for(wait_group_t *wg) {
                         if (co->is_event_err) {
                             hash_remove(wg, key);
                             wg->has_erred = true;
-                            if (gq_sys.is_multi)
-                                sched_group_dec();
                             continue;
                         }
 
@@ -289,8 +288,6 @@ wait_result_t *wait_for(wait_group_t *wg) {
                             co_deferred_free(co);
 
                         hash_delete(wg, key);
-                        if (gq_sys.is_multi)
-                            sched_group_dec();
                     }
                 }
             }
