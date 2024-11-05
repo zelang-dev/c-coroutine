@@ -23,11 +23,11 @@ void *worker(void *arg) {
 int co_main(int argc, char **argv) {
     int cid[50], i;
 
-    wait_group_t *wg = wait_group_by(50);
+    wait_group_t wg = wait_group_by(50);
     for (i = 0; i < 50; i++) {
         cid[i] = go(worker, args_for("i", i));
     }
-    wait_result_t *wgr = wait_for(wg);
+    wait_result_t wgr = wait_for(wg);
 
     printf("\nWorker # %d returned: %d\n", cid[2], wait_result(wgr, cid[2]).integer);
     printf("\nWorker # %d returned: %s\n", cid[1], wait_result(wgr, cid[1]).char_ptr);

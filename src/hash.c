@@ -76,6 +76,7 @@ oa_hash *oa_hash_new_ex(
     htable->overriden = !is_zero(cap);
     htable->resize_free = true;
     htable->has_erred = false;
+    htable->grouping = NULL;
     htable->val_ops = val_ops;
     htable->key_ops = key_ops;
     htable->probing_fct = probing_fct;
@@ -118,13 +119,12 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     oa_pair **old_buckets;
     oa_pair *crt_pair;
 
-    atomic_thread_fence(memory_order_seq_cst);
-    old_capacity = atomic_load_explicit(&htable->capacity, memory_order_consume);
+    old_capacity = atomic_load(&htable->capacity);
     uint64_t new_capacity_64 = old_capacity * HASH_GROWTH_FACTOR;
     if (new_capacity_64 > SIZE_MAX)
         co_panic("re-size overflow");
 
-    old_buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_consume);
+    old_buckets = (oa_pair **)atomic_load(&htable->buckets);
     atomic_init(&htable->capacity, (size_t)new_capacity_64);
     atomic_init(&htable->size, 0);
     atomic_init(&htable->buckets, try_calloc(1, new_capacity_64 * sizeof(*(old_buckets))));
@@ -156,7 +156,6 @@ void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
     size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
 
     oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
-    atomic_thread_fence(memory_order_seq_cst);
     if (is_empty(buckets[idx])) {
         // Key doesn't exist & we add it anew
         buckets[idx] = oa_pair_new(
@@ -201,7 +200,6 @@ void_t oa_hash_replace(oa_hash *htable, const_t key, const_t value) {
     idx = oa_hash_getidx(htable, idx, hash_val, key, PUT);
 
     oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
-    atomic_thread_fence(memory_order_seq_cst);
     if (is_empty(buckets[idx])) {
         buckets[idx] = oa_pair_new(
             hash_val, htable->key_ops.cp(key, htable->key_ops.arg),
@@ -232,8 +230,7 @@ static CO_FORCE_INLINE bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
 
 static CO_FORCE_INLINE void oa_hash_put_tombstone(oa_hash *htable, size_t idx) {
     if (!is_empty(atomic_get(void_t, &htable->buckets[idx]))) {
-        oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
-        atomic_thread_fence(memory_order_seq_cst);
+        oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_consume);
         buckets[idx]->hash = 0;
         buckets[idx]->key = NULL;
         buckets[idx]->value = NULL;
@@ -281,6 +278,7 @@ void oa_hash_delete(oa_hash *htable, const_t key) {
     oa_pair **buckets = (oa_pair **)atomic_load(&htable->buckets);
     htable->val_ops.free(buckets[idx]->value);
     htable->key_ops.free(buckets[idx]->key, htable->key_ops.arg);
+    atomic_store(&htable->buckets, buckets);
     atomic_fetch_sub(&htable->size, 1);
 
     oa_hash_put_tombstone(htable, idx);
@@ -443,20 +441,20 @@ oa_val_ops oa_val_ops_string = {oa_string_cp, CO_FREE, oa_string_eq, NULL};
 oa_val_ops oa_val_ops_value = {oa_value_cp, CO_FREE, oa_value_eq, NULL};
 oa_val_ops oa_val_ops_channel = {oa_channel_cp, VOID_FUNC(channel_free), oa_value_eq, NULL};
 
-CO_FORCE_INLINE wait_group_t *ht_wait_init(u32 size) {
-    return (wait_group_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, size);
+CO_FORCE_INLINE wait_group_t ht_wait_init(u32 size) {
+    return (wait_group_t)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, size);
 }
 
-CO_FORCE_INLINE wait_group_t *ht_group_init(void) {
-    return (wait_group_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, 0);
+CO_FORCE_INLINE wait_group_t ht_group_init(void) {
+    return (wait_group_t)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_struct, oa_hash_lp_idx, 0);
 }
 
 CO_FORCE_INLINE ht_string_t *ht_string_init(void) {
-    return (ht_string_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx, 10);
+    return (ht_string_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_string, oa_hash_lp_idx, gq_sys.thread_count);
 }
 
-CO_FORCE_INLINE wait_result_t *ht_result_init(void) {
-    return (wait_result_t *)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx, 10);
+CO_FORCE_INLINE wait_result_t ht_result_init(void) {
+    return (wait_result_t)oa_hash_new_ex(oa_key_ops_string, oa_val_ops_value, oa_hash_lp_idx, gq_sys.thread_count);
 }
 
 CO_FORCE_INLINE chan_collector_t *ht_channel_init(void) {

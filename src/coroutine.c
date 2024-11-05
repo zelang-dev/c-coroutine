@@ -3,7 +3,7 @@
 thrd_static(co_collector_t, coroutine_list, NULL)
 
 void co_collector(routine_t *co) {
-    wait_group_t *wg;
+    wait_group_t wg;
     if (is_coroutine_list_empty()) {
         wg = ht_wait_init(HASH_INIT_CAPACITY/2);
         wg->resize_free = false;
@@ -23,14 +23,29 @@ CO_FORCE_INLINE co_collector_t *co_collector_list(void) {
     return coroutine_list();
 }
 
+args_t *args_for(const char *desc, ...) {
+    va_list ap;
+    args_t *params;
+
+    va_start(ap, desc);
+    params = raii_args_for(co_scope(), desc, ap);
+    va_end(ap);
+
+    return params;
+}
+
 values_type args_get(void_t params, int item) {
-    args_t *args = (args_t *)params;
-    if (!args->defer_set) {
-        args->defer_set = true;
-        defer(args_free, args);
+    if (is_type(params, RAII_ARGS)) {
+        args_t *args = (args_t *)params;
+        if (!args->defer_set) {
+            args->defer_set = true;
+            defer(args_free, args);
+        }
+
+        return args_in(args, item);
     }
 
-    return args_in(args, item);
+    return ((raii_values_t *)0)->value;
 }
 
 void delete(void_t ptr) {
@@ -132,9 +147,9 @@ CO_FORCE_INLINE void launch(func_t fn, void_t arg) {
 }
 
 value_t co_await(callable_t fn, void_t arg) {
-    wait_group_t *wg = wait_group_by(2);
+    wait_group_t wg = wait_group_by(2);
     u32 cid = go(fn, arg);
-    wait_result_t *wgr = wait_for(wg);
+    wait_result_t wgr = wait_for(wg);
     if (is_empty(wgr))
         return;
 
@@ -149,7 +164,8 @@ value_t co_event(callable_t fn, void_t arg) {
 
 void co_handler(func_t fn, void_t handle, func_t dtor) {
     routine_t *co = co_active();
-    wait_group_t *eg = ht_wait_init(2);
+    wait_group_t eg = ht_wait_init(2);
+    eg->grouping = ht_result_init();
     eg->resize_free = false;
 
     co->event_group = eg;
@@ -171,7 +187,7 @@ void co_handler(func_t fn, void_t handle, func_t dtor) {
 
 void co_process(func_t fn, void_t args) {
     routine_t *co = co_active();
-    wait_group_t *eg = ht_wait_init(2);
+    wait_group_t eg = ht_wait_init(2);
     eg->resize_free = false;
 
     co->event_group = eg;
@@ -195,18 +211,18 @@ CO_FORCE_INLINE void wait_capacity(u32 size) {
     hash_capacity(size + (size * 0.0025));
 }
 
-static wait_group_t *wait_group_ex(u32 capacity) {
+static wait_group_t wait_group_ex(u32 capacity) {
     routine_t *c = co_active();
     if (!is_zero(capacity) && (capacity > gq_sys.thread_count * 2))
         wait_capacity(capacity);
 
-    atomic_thread_fence(memory_order_seq_cst);
-    if (gq_sys.is_multi && is_empty(gq_sys.deque_run_queue)) {
+    if (atomic_flag_load(&gq_sys.is_multi) && is_empty(gq_sys.deque_run_queue)) {
         gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
         deque_init(gq_sys.deque_run_queue, gq_sys.capacity);
     }
 
-    wait_group_t *wg = ht_wait_init(capacity + (capacity * 0.0025));
+    wait_group_t wg = ht_wait_init(capacity + (capacity * 0.0025));
+    wg->grouping = ht_result_init();
     wg->resize_free = false;
     c->wait_active = true;
     c->wait_group = wg;
@@ -215,57 +231,80 @@ static wait_group_t *wait_group_ex(u32 capacity) {
     return wg;
 }
 
-CO_FORCE_INLINE wait_group_t *wait_group(void) {
+CO_FORCE_INLINE wait_group_t wait_group(void) {
     return wait_group_ex(0);
 }
 
-CO_FORCE_INLINE wait_group_t *wait_group_by(u32 capacity) {
+CO_FORCE_INLINE wait_group_t wait_group_by(u32 capacity) {
     return wait_group_ex(capacity);
 }
 
-wait_result_t *wait_for(wait_group_t *wg) {
-    routine_t *c = co_active();
-    wait_result_t *wgr = NULL;
-    routine_t *co;
-    bool has_erred = false;
-    bool has_completed = false;
+wait_result_t wait_for(wait_group_t wg) {
+    routine_t *co, *c = co_active();
+    wait_result_t wgr = NULL;
+    wait_group_t *wait_group;
     void_t key;
     oa_pair *pair;
-    u32 i, capacity, wait_counter = 0;
+    deque_t *gq;
+    u32 i, capacity, group_id = 0, id = 0;
+    bool has_erred = false, has_completed = false, is_multi = atomic_flag_load(&gq_sys.is_multi);
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
         co_yield();
-        wgr = ht_result_init();
-        co_deferred(c, VOID_FUNC(hash_free), wgr);
-        atomic_thread_fence(memory_order_seq_cst);
-        if (gq_sys.is_multi && gq_sys.is_threading_waitable) {
-            wait_counter = gq_sys.thread_waitable_count;
-            gq_sys.thread_wait_group[wait_counter - 1] = wg;
-            gq_sys.thread_result_group[wait_counter - 1] = wgr;
+
+        if (is_multi && atomic_flag_load(&gq_sys.is_threading_waitable)) {
+            group_id = atomic_load(&gq_sys.group_id);
+            if (group_id) {
+                id = group_id - 1;
+                gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
+                wait_group = (wait_group_t *)atomic_load(&gq_sys.wait_group);
+                wait_group[id] = wg;
+                atomic_store(&gq_sys.wait_group, wait_group);
+                atomic_flag_clear(&gq_sys.is_resuming);
+            }
         }
 
+        wgr = wg->grouping;
+        co_deferred(c, VOID_FUNC(hash_free), wgr);
+        if (is_multi && group_id)
+            capacity = gq[sched_id()].capacity + 1;
+
         while (atomic_load(&wg->size) != 0 && !has_completed) {
-            capacity = (u32)atomic_load(&wg->capacity);
+            if (!group_id)
+                capacity = (u32)atomic_load(&wg->capacity);
+
             for (i = 0; i < capacity; i++) {
-                pair = atomic_get(oa_pair *, &wg->buckets[i]);
-                if (!is_empty(pair) && !is_empty(pair->value)) {
-                    co = (routine_t *)pair->value;
-                    key = pair->key;
-                    if (gq_sys.is_multi && sched_group_count() == 0) {
+                if (is_multi && group_id) {
+                    co = deque_take(&gq[sched_id()]);
+                    if (co == EMPTY_T) {
                         has_completed = true;
                         break;
-                    } else if (gq_sys.is_multi && co->tid != sched_id()) {
-                        /* TODO: rework thread's local run queue setup, for large capacities thread will spend to much time skipping */
-                        co_yield();
-                        continue;
-                    } else if (!co_terminated(co)) {
+                    }
+
+                    key = (void_t)co_itoa(co->cid);
+                } else {
+                    pair = atomic_get(oa_pair *, &wg->buckets[i]);
+                    if (!is_empty(pair) && !is_empty(pair->value)) {
+                        co = (routine_t *)pair->value;
+                        key = pair->key;
+                    }
+                }
+
+                if (!is_empty(co)) {
+                    if (!co_terminated(co)) {
+                        if (is_multi && group_id)
+                            deque_push(&gq[sched_id()], co);
+
                         if (!co->interrupt_active && co->status == CO_NORMAL)
                             sched_enqueue(co);
 
                         co_info(c, 1);
                         sched_yielding();
                     } else {
+                        if (is_multi && group_id)
+                            capacity--;
+
                         if ((!is_empty(co->results) && !co->is_event_err) || co->is_plain) {
                             if (co->is_plain)
                                 hash_put(wgr, co_itoa(co->cid), &co->plain_results);
@@ -291,41 +330,50 @@ wait_result_t *wait_for(wait_group_t *wg) {
                     }
                 }
             }
+            i = 0;
+            if (is_multi && group_id)
+                capacity = gq[sched_id()].capacity + 1;
         }
 
-        while (gq_sys.is_multi && atomic_load(&wg->size) != 0)
-            co_yield();
-
+        has_erred = wg->has_erred;
         c->wait_active = false;
         c->wait_group = NULL;
-        if (gq_sys.is_multi && wait_counter) {
-            gq_sys.thread_wait_group[wait_counter - 1] = NULL;
-            gq_sys.thread_result_group[wait_counter - 1] = NULL;
+        if (is_multi && group_id) {
+            deque_clear(&gq[sched_id()]);
+            while (atomic_load(&wg->size) != 0)
+                co_yield();
+
+            gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
+            atomic_store(&gq_sys.wait_queue[id], NULL);
+            wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
+            wgr = wg->grouping;
+            atomic_store_explicit(&gq_sys.wait_group[id], NULL, memory_order_release);
+            CO_FREE((void_t)gq);
         }
 
         sched_dec();
+        hash_free(wg);
+        return has_erred ? NULL : wgr;
     }
 
-    has_erred = wg->has_erred;
-    hash_free(wg);
-    return has_erred ? NULL : wgr;
+    return NULL;
 }
 
-value_t wait_result(wait_result_t *wgr, u32 cid) {
+value_t wait_result(wait_result_t wgr, u32 cid) {
     if (is_empty(wgr))
         return;
 
     return ((values_t *)hash_get(wgr, co_itoa(cid)))->value;
 }
 
-value_t await(awaitable_t *task) {
+value_t await(awaitable_t task) {
     if (!is_empty(task) && is_type(task, CO_ROUTINE)) {
         task->type = -1;
         u32 cid = task->cid;
-        wait_group_t *wg = task->wg;
+        wait_group_t wg = task->wg;
         CO_FREE(task);
         co_active()->wait_group = wg;
-        wait_result_t *wgr = wait_for(wg);
+        wait_result_t wgr = wait_for(wg);
         if (!is_empty(wgr))
             return wait_result(wgr, cid);
     }
@@ -392,14 +440,14 @@ CO_FORCE_INLINE void co_info(routine_t *t, int pos) {
     }
 
     char line[SCRAPE_SIZE];
-    snprintf(line, SCRAPE_SIZE, "           \n\r\033[%dA", pos);
+    snprintf(line, SCRAPE_SIZE, "\e[0K\n\r\033[%dA", pos);
     fprintf(stderr, "\t\t - Thrd #%lx, cid: %u (%s) %s cycles: %zu%s",
             co_async_self(),
             t->cid,
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->is_channeling ? "" : "channel"),
             co_state(t->status),
             t->cycles,
-            (line_end ? "                   \n" : line)
+            (line_end ? "\e[0K\n" : line)
     );
 #endif
 }

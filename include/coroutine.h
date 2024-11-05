@@ -225,9 +225,10 @@ typedef enum {
     CO_NO_INSTANCE
 } value_types;
 
-typedef void_t(*callable_t)(void_t);
+typedef void_t (*callable_t)(void_t);
 typedef int (*thrd_func_t)(void *);
 typedef void (*any_func_t)(void_t, ...);
+typedef void_t (*multi_func_t)(void_t, ...);
 
 /* Coroutine states. */
 typedef enum {
@@ -266,8 +267,8 @@ typedef struct routine_s routine_t;
 typedef struct oa_hash_s hash_t;
 typedef struct json_value_t json_t;
 typedef hash_t ht_string_t;
-typedef hash_t wait_group_t;
-typedef hash_t wait_result_t;
+typedef hash_t *wait_group_t;
+typedef hash_t *wait_result_t;
 typedef hash_t chan_collector_t;
 typedef hash_t co_collector_t;
 
@@ -406,7 +407,6 @@ struct routine_s {
     bool is_channeling;
     bool is_plain;
     bool flagged;
-    int all_coroutine_slot;
     signed int event_err_code;
     size_t alarm_time;
     size_t cycles;
@@ -447,6 +447,8 @@ typedef struct scheduler_s {
 } scheduler_t;
 
 make_atomic(routine_t *, atomic_routine_t)
+make_atomic(wait_group_t, atomic_wait_t)
+make_atomic(wait_result_t, atomic_result_t)
 make_atomic(scheduler_t, atomic_scheduler_t)
 
 typedef struct {
@@ -456,13 +458,15 @@ typedef struct {
 
 make_atomic(deque_array_t *, atomic_array_t)
 typedef struct {
+    size_t capacity;
     /* Assume that they never overflow */
     atomic_size_t top, bottom;
     atomic_array_t array;
 } deque_t;
+make_atomic(deque_t *, thread_deque_t)
 
 /*
- * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal`
+ * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal` `deque_resize`
  *
  * Modified from https://github.com/sysprog21/concurrent-programs/blob/master/work-steal/work-steal.c
  *
@@ -478,78 +482,102 @@ typedef struct {
  * the essential idea of work stealing mentioned in Leiserson and Platt,
  * Programming Parallel Applications in Cilk
  */
-C_API void deque_init(deque_t *q, int size_hint);
+C_API void deque_init(deque_t *q, u32 size_hint);
+C_API void deque_push(deque_t *q, routine_t *w);
+C_API routine_t *deque_take(deque_t *q);
+C_API routine_t *deque_steal(deque_t *q);
+C_API void deque_resize(deque_t *q);
+C_API routine_t *deque_peek(deque_t *q, u32 index);
+C_API void deque_reset(deque_t *q, u32 shrink);
+C_API void deque_free(deque_t *q);
+C_API void deque_clear(deque_t *q);
 
 /* Global system control queue struct */
 typedef struct {
-    /* Exception/error indicator, only private `co_awaitable()`
-    will clear to break any possible infinite wait/loop condition,
-    normal cleanup code will not be executed. */
-    volatile bool is_errorless;
-    volatile bool is_interruptable;
-    volatile bool is_multi;
-    volatile bool is_finish;
-    volatile bool is_resuming;
-    volatile bool is_threading_waitable;
     volatile sig_atomic_t is_takeable;
+
     /* Stack size when creating a coroutine. */
     u32 stacksize;
     u32 capacity;
-    u32 thread_waitable_count;
+
     /* Number of CPU cores this machine has,
     it determents the number of threads to use. */
     size_t cpu_count;
     size_t thread_count;
     size_t thread_invalid;
     thrd_t *threads;
-    wait_group_t **thread_wait_group;
-    wait_result_t **thread_result_group;
     const char powered_by[SCRAPE_SIZE];
-    cacheline_pad_t pad2_;
+    cacheline_pad_t pad20;
+
+    /* Exception/error indicator, only private `co_awaitable()`
+    will clear to break any possible infinite wait/loop condition,
+    normal cleanup code will not be executed. */
+    atomic_flag is_errorless;
+    cacheline_pad_t pad19;
+
+    atomic_flag is_interruptable;
+    cacheline_pad_t pad18;
+
+    atomic_flag is_multi;
+    cacheline_pad_t pad17;
+
+    atomic_flag is_finish;
+    cacheline_pad_t pad16;
+
+    atomic_flag is_threading_waitable;
+    cacheline_pad_t pad15;
 
     atomic_flag is_started;
-    cacheline_pad_t _pad1;
+    cacheline_pad_t pad14;
+
+    atomic_flag is_resuming;
+    cacheline_pad_t pad13;
 
     atomic_size_t take_count;
-    cacheline_pad_t _pad6;
+    cacheline_pad_t pad12;
 
-    /* track the number of global coroutines used/available */
-    atomic_size_t used_count;
-    cacheline_pad_t _pad2;
+    /* track the number of global coroutines active/available */
+    atomic_size_t active_count;
+    cacheline_pad_t pad11;
+
+    atomic_size_t group_id;
+    cacheline_pad_t pad10;
 
     /* coroutine unique id generator */
     atomic_size_t id_generate;
-    cacheline_pad_t _pad3;
-
-    atomic_size_t n_all_coroutine;
-    cacheline_pad_t _pad4;
+    cacheline_pad_t pad9;
 
     atomic_int **count;
-    cacheline_pad_t pad1_;
+    cacheline_pad_t pad8;
 
     atomic_flag *any_stealable;
-    cacheline_pad_t pad0_;
+    cacheline_pad_t pad7;
 
     atomic_size_t *stealable_thread;
-    cacheline_pad_t pad_;
+    cacheline_pad_t pad6;
 
     atomic_size_t *stealable_amount;
-    cacheline_pad_t pad;
+    cacheline_pad_t pad5;
 
     /* track each thread number of available coroutines */
     atomic_size_t *available;
-    cacheline_pad_t _pad;
+    cacheline_pad_t pad1;
 
-    /* scheduler tracking for all coroutines */
-    atomic_routine_t **all_coroutine;
-    cacheline_pad_t _pad5;
+    /* Global `wait_group` track queue */
+    atomic_wait_t *wait_group;
+    cacheline_pad_t pad4;
+
+    /* Holds running ~coroutines~ in each Thread local `wait_group` queue */
+    thread_deque_t *wait_queue;
+    cacheline_pad_t pad3;
 
     /* Global coroutine run queue */
     deque_t *deque_run_queue;
-    cacheline_pad_t _pad7;
+    cacheline_pad_t pad2;
 } atomic_deque_t;
 
 C_API atomic_deque_t gq_sys;
+C_API routine_t *EMPTY_T;
 
 /* Generic simple union storage types. */
 typedef union {
@@ -578,6 +606,8 @@ typedef struct values_s {
     value_t value;
     value_types type;
 } values_t;
+
+typedef void_t(*callable_args_t)(args_t *);
 
 typedef struct {
     value_types type;
@@ -681,6 +711,7 @@ C_API uv_loop_t *co_loop(void);
 * @param item index number
 */
 C_API values_type args_get(void_t params, int item);
+
 /**
 * Creates an container for arbitrary arguments passing to an `coroutine` or `thread`.
 * Use `args_get()` or `args_in()` for retrieval.
@@ -696,7 +727,7 @@ C_API values_type args_get(void_t params, int item);
 * * `p` void pointer for any arbitrary object
 * @param arguments indexed by `desc` format order
 */
-#define args_for(desc, ...) raii_args_for(co_scope(), desc, __VA_ARGS__)
+C_API args_t *args_for(const char *desc, ...);
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);
@@ -824,6 +855,7 @@ C_API value_t chan_recv(channel_t *);
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
 C_API u32 go(callable_t, void_t);
+C_API u32 go_for(callable_args_t fn, const char *desc, ...);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
 C_API void launch(func_t, void_t);
@@ -882,7 +914,6 @@ C_API bool sched_is_main(void);
 C_API u32 sched_id(void);
 C_API int sched_count(void);
 C_API void sched_dec(void);
-C_API int sched_group_count(void);
 
 C_API void preempt_init(u32 usecs);
 C_API void preempt_disable(void);
@@ -952,6 +983,7 @@ struct oa_hash_s {
     bool has_erred;
     atomic_size_t capacity;
     atomic_size_t size;
+    hash_t *grouping;
     atomic_pair_t **buckets;
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx);
     oa_key_ops key_ops;
@@ -961,8 +993,8 @@ struct oa_hash_s {
 typedef struct awaitable_s {
     value_types type;
     u32 cid;
-    wait_group_t *wg;
-} awaitable_t;
+    wait_group_t wg;
+} *awaitable_t;
 
 C_API void hash_capacity(u32);
 C_API void hash_free(hash_t *);
@@ -978,13 +1010,13 @@ C_API void hash_print(hash_t *);
 C_API void hash_print_custom(hash_t *, void (*print_key)(const_t k), void (*print_val)(const_t v));
 
 /* Creates a new wait group hash table, and set initial capacity. */
-C_API wait_group_t *ht_wait_init(u32);
+C_API wait_group_t ht_wait_init(u32);
 
 /* Creates a new wait group `coroutine` hash table. */
-C_API wait_group_t *ht_group_init(void);
+C_API wait_group_t ht_group_init(void);
 
 /* Creates a new wait group `results` hash table. */
-C_API wait_result_t *ht_result_init(void);
+C_API wait_result_t ht_result_init(void);
 
 C_API chan_collector_t *ht_channel_init(void);
 
@@ -995,22 +1027,23 @@ C_API ht_string_t *ht_string_init(void);
 All coroutines here behaves like regular functions, meaning they return values, and indicate a terminated/finish status.
 
 The initialization ends when `wait_for()` is called, as such current coroutine will pause, and execution will begin for the group of coroutines, and wait for all to finished. */
-C_API wait_group_t *wait_group(void);
+C_API wait_group_t wait_group(void);
 
-C_API wait_group_t *wait_group_by(u32 capacity);
+C_API wait_group_t wait_group_by(u32 capacity);
 
 /* Set global wait group `hash table` initial capacity. */
 C_API void wait_capacity(u32);
 
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */
-C_API wait_result_t *wait_for(wait_group_t *);
+C_API wait_result_t wait_for(wait_group_t);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
-C_API value_t wait_result(wait_result_t *, u32);
+C_API value_t wait_result(wait_result_t, u32);
 
-C_API awaitable_t *async(callable_t fn, void_t arg);
-C_API value_t await(awaitable_t *task);
+C_API awaitable_t async_for(callable_args_t fn, const char *desc, ...);
+C_API awaitable_t async(callable_t fn, void_t arg);
+C_API value_t await(awaitable_t task);
 
 C_API void co_result_set(routine_t *, void_t);
 C_API void co_plain_set(routine_t *, size_t);

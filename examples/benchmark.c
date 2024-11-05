@@ -47,7 +47,7 @@ int co_main(int argc, char **argv) {
         numRoutines = (u32)atoi(argv[1]);
 
     co_interrupt_off();
-    wait_group_t *wg = wait_group_by(numRoutines);
+    wait_group_t wg = wait_group_by(numRoutines);
     for (i = 0; i < numRoutines; i++) {
         go(func, NULL);
     }
