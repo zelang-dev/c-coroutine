@@ -1649,8 +1649,8 @@ static void sched_steal_available(void) {
     size_t i, id, count = 0, available = atomic_load_explicit(&gq_sys.available[thread()->thrd_id], memory_order_relaxed);
     if (available > 0) {
         if (atomic_flag_load(&gq_sys.is_threading_waitable) && (int)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed)) {
-            id = (size_t)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed) - 1;
-            gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_relaxed);
+            id = (size_t)atomic_load(&gq_sys.group_id) - 1;
+            gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
         }
 
         for (i = 0; i < available; i++) {
@@ -1674,10 +1674,10 @@ static void sched_steal_available(void) {
         if (!is_empty(gq)) {
             gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_relaxed);
             gq[thread()->thrd_id].capacity = (int)count;
-            atomic_store_explicit(&gq_sys.wait_queue[id], gq, memory_order_relaxed);
+            atomic_store(&gq_sys.wait_queue[id], gq);
         }
     }
-    atomic_store_explicit(&gq_sys.available[thread()->thrd_id], (available - count), memory_order_relaxed);
+    atomic_store(&gq_sys.available[thread()->thrd_id], (available - count));
 
     if (available > 0) {
         if ((available - count) == 0) {
@@ -2283,8 +2283,10 @@ static void thrd_wait_for(u32 wait_id) {
                 }
 
                 if (co->is_event_err) {
-                    hash_remove(wg, key);
+                    wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
                     wg->has_erred = true;
+                    atomic_store_explicit(&gq_sys.wait_group[id], wg, memory_order_release);
+                    hash_remove(wg, key);
                     continue;
                 }
 
@@ -2315,10 +2317,8 @@ static void_t thrd_main_main(void_t v) {
     while (atomic_flag_load_explicit(&gq_sys.is_resuming, memory_order_relaxed))
         ;
 
-    group_id = (u32)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
-    while (!sched_empty()
-           && atomic_flag_load_explicit(&gq_sys.is_errorless, memory_order_relaxed)
-           && !atomic_flag_load_explicit(&gq_sys.is_finish, memory_order_relaxed)) {
+    group_id = (u32)atomic_load(&gq_sys.group_id);
+    while (!sched_empty() && atomic_flag_load(&gq_sys.is_errorless) && !atomic_flag_load(&gq_sys.is_finish)) {
         if ((wait_id = (u32)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed)) != group_id) {
             group_id = wait_id;
             already = true;
