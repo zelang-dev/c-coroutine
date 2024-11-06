@@ -1629,9 +1629,10 @@ static void sched_steal(thread_processor_t *r, int count) {
 
     for (i = 0; i < count; i++) {
         t = deque_steal(gq_sys.deque_run_queue);
-        if (t == NULL)
+        if (t == NULL) {
+            --i;
             continue;
-        else if (t == EMPTY_T)
+        } else if (t == EMPTY_T)
             break;
 
         atomic_fetch_sub(&gq_sys.active_count, 1);
@@ -1645,11 +1646,11 @@ the amount/count was set by `sched_is_takeable` and `sched_post_available`. */
 static void sched_steal_available(void) {
     routine_t *t = NULL;
     deque_t *gq = NULL;
-    size_t i, id, count = 0, available = atomic_load(&gq_sys.available[thread()->thrd_id]);
+    size_t i, id, count = 0, available = atomic_load_explicit(&gq_sys.available[thread()->thrd_id], memory_order_relaxed);
     if (available > 0) {
-        if (atomic_flag_load(&gq_sys.is_threading_waitable) && (int)atomic_load(&gq_sys.group_id)) {
-            id = (size_t)atomic_load(&gq_sys.group_id) - 1;
-            gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
+        if (atomic_flag_load(&gq_sys.is_threading_waitable) && (int)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed)) {
+            id = (size_t)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed) - 1;
+            gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_relaxed);
         }
 
         for (i = 0; i < available; i++) {
@@ -1671,12 +1672,12 @@ static void sched_steal_available(void) {
         }
 
         if (!is_empty(gq)) {
-            gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_acquire);
+            gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_relaxed);
             gq[thread()->thrd_id].capacity = (int)count;
-            atomic_store_explicit(&gq_sys.wait_queue[id], gq, memory_order_release);
+            atomic_store_explicit(&gq_sys.wait_queue[id], gq, memory_order_relaxed);
         }
     }
-    atomic_store(&gq_sys.available[thread()->thrd_id], (available - count));
+    atomic_store_explicit(&gq_sys.available[thread()->thrd_id], (available - count), memory_order_relaxed);
 
     if (available > 0) {
         if ((available - count) == 0) {
@@ -1722,7 +1723,7 @@ static void sched_adjust(void) {
     atomic_store_explicit(&gq_sys.group_id, group_id, memory_order_release);
     atomic_store_explicit(&gq_sys.wait_group, wait_group, memory_order_release);
     atomic_store_explicit(&gq_sys.wait_queue, wait_queue, memory_order_release);
-    atomic_flag_test_and_set(&gq_sys.is_resuming);
+    atomic_flag_test_and_set_explicit(&gq_sys.is_resuming, memory_order_acquire);
 }
 
 u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
@@ -2311,12 +2312,13 @@ static void_t thrd_main_main(void_t v) {
     if (sched_is_available())
         sched_steal_available();
 
-    while (atomic_flag_load(&gq_sys.is_resuming))
+    while (atomic_flag_load_explicit(&gq_sys.is_resuming, memory_order_relaxed))
         ;
 
-    co_yield();
     group_id = (u32)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
-    while (!sched_empty() && atomic_flag_load(&gq_sys.is_errorless) && !atomic_flag_load(&gq_sys.is_finish)) {
+    while (!sched_empty()
+           && atomic_flag_load_explicit(&gq_sys.is_errorless, memory_order_relaxed)
+           && !atomic_flag_load_explicit(&gq_sys.is_finish, memory_order_relaxed)) {
         if ((wait_id = (u32)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed)) != group_id) {
             group_id = wait_id;
             already = true;

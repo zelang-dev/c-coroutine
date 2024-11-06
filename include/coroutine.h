@@ -12,6 +12,10 @@
 #include "uv_routine.h"
 #include "raii.h"
 
+#if !defined(_STDATOMIC_H)
+#define atomic_flag_load_explicit(ptr, order)	c89atomic_flag_load_explicit((atomic_flag *)ptr, order)
+#endif
+
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
     #define S_IRUSR S_IREAD  /* read, user */

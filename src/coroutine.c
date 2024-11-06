@@ -254,14 +254,14 @@ wait_result_t wait_for(wait_group_t wg) {
         co_yield();
 
         if (is_multi && atomic_flag_load(&gq_sys.is_threading_waitable)) {
-            group_id = atomic_load(&gq_sys.group_id);
+            group_id = atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
             if (group_id) {
                 id = group_id - 1;
-                gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
-                wait_group = (wait_group_t *)atomic_load(&gq_sys.wait_group);
+                gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_relaxed);
+                wait_group = (wait_group_t *)atomic_load_explicit(&gq_sys.wait_group, memory_order_relaxed);
                 wait_group[id] = wg;
                 atomic_store(&gq_sys.wait_group, wait_group);
-                atomic_flag_clear(&gq_sys.is_resuming);
+                atomic_flag_clear_explicit(&gq_sys.is_resuming, memory_order_release);
             }
         }
 
