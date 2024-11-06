@@ -456,9 +456,8 @@ static void sched_init(bool is_main, u32 thread_id) {
     thread()->current_handle = NULL;
     thread()->interrupt_handle = NULL;
     thread()->interrupt_default = NULL;
-    if (atomic_flag_load(&gq_sys.is_multi)) {
+    if (atomic_flag_load(&gq_sys.is_multi))
         atomic_store(&gq_sys.count[thread_id], &thread()->used_count);
-    }
 }
 
 void sched_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
@@ -2104,8 +2103,6 @@ static void sched_destroy(void) {
 }
 
 static void sched_cleanup(void) {
-    routine_t *t;
-    u32 i;
     if (sched_is_main()) {
         if (!can_cleanup)
             return;
@@ -2180,7 +2177,7 @@ static int thrd_scheduler(void) {
                        && (sched_empty() || l == SCHED_EMPTY_T
                            || atomic_flag_load(&gq_sys.is_finish) || !atomic_flag_load(&gq_sys.is_errorless))) {
                 atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
-                RAII_INFO("Thrd #%lx waiting to exit.\e[0K\n", co_async_self());
+                RAII_INFO("Thrd #%lx waiting to exit.\033[0K\n", co_async_self());
                 /* Wait for global exit signal */
                 while (!atomic_flag_load(&gq_sys.is_finish) && !atomic_flag_load(&gq_sys.is_resuming))
                     thrd_yield();
@@ -2188,10 +2185,10 @@ static int thrd_scheduler(void) {
                 if (atomic_flag_load(&gq_sys.is_resuming) && sched_is_available()) {
                     atomic_store(&gq_sys.count[thread()->thrd_id], &thread()->used_count);
                     sched_steal_available();
-                    RAII_INFO("Thrd #%lx resuming, %d runnable coroutines.\e[0K\n", co_async_self(), sched_count());
+                    RAII_INFO("Thrd #%lx resuming, %d runnable coroutines.\033[0K\n", co_async_self(), sched_count());
                     l = NULL;
                 } else {
-                    RAII_INFO("Thrd #%lx exiting, %d runnable coroutines.\e[0K\n", co_async_self(), sched_count());
+                    RAII_INFO("Thrd #%lx exiting, %d runnable coroutines.\033[0K\n", co_async_self(), sched_count());
                     return thread()->exiting;
                 }
             }
@@ -2241,7 +2238,6 @@ static void thrd_wait_for(u32 wait_id) {
     wait_group_t wg = NULL;
     deque_t *gq;
     void_t key;
-    oa_pair *pair;
     u32 i, capacity, id;
     if (wait_id == 0)
         return;

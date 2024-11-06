@@ -442,14 +442,14 @@ CO_FORCE_INLINE void co_info(routine_t *t, int pos) {
     }
 
     char line[SCRAPE_SIZE];
-    snprintf(line, SCRAPE_SIZE, "\e[0K\n\r\033[%dA", pos);
+    snprintf(line, SCRAPE_SIZE, "\033[0K\n\r\033[%dA", pos);
     fprintf(stderr, "\t\t - Thrd #%lx, cid: %u (%s) %s cycles: %zu%s",
             co_async_self(),
             t->cid,
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->is_channeling ? "" : "channel"),
             co_state(t->status),
             t->cycles,
-            (line_end ? "\e[0K\n" : line)
+            (line_end ? "\033[0K\n" : line)
     );
 #endif
 }

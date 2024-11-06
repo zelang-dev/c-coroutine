@@ -70,7 +70,7 @@ oa_hash *oa_hash_new_ex(
     oa_val_ops val_ops,
     void (*probing_fct)(struct oa_hash_s *htable, size_t *from_idx), u32 cap) {
     oa_hash *htable = try_calloc(1, sizeof(*htable));
-    u32 i, capacity = is_zero(cap) ? hash_initial_capacity : cap;
+    u32 capacity = is_zero(cap) ? hash_initial_capacity : cap;
     atomic_init(&htable->size, 0);
     atomic_init(&htable->capacity, capacity);
     htable->overriden = !is_zero(cap);
@@ -230,7 +230,7 @@ static CO_FORCE_INLINE bool oa_hash_is_tombstone(oa_hash *htable, size_t idx) {
 
 static CO_FORCE_INLINE void oa_hash_put_tombstone(oa_hash *htable, size_t idx) {
     if (!is_empty(atomic_get(void_t, &htable->buckets[idx]))) {
-        oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_consume);
+        oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
         buckets[idx]->hash = 0;
         buckets[idx]->key = NULL;
         buckets[idx]->value = NULL;
@@ -275,10 +275,10 @@ void oa_hash_delete(oa_hash *htable, const_t key) {
     if (is_empty(atomic_get(void_t, &htable->buckets[idx])))
         return;
 
-    oa_pair **buckets = (oa_pair **)atomic_load(&htable->buckets);
+    oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
     htable->val_ops.free(buckets[idx]->value);
     htable->key_ops.free(buckets[idx]->key, htable->key_ops.arg);
-    atomic_store(&htable->buckets, buckets);
+    atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
     atomic_fetch_sub(&htable->size, 1);
 
     oa_hash_put_tombstone(htable, idx);
@@ -292,7 +292,6 @@ void oa_hash_remove(oa_hash *htable, const_t key) {
         return;
 
     oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
-    atomic_thread_fence(memory_order_seq_cst);
     if (buckets[idx]->value)
         buckets[idx]->value = NULL;
 
