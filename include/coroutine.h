@@ -511,6 +511,9 @@ typedef struct {
     size_t thread_invalid;
     thrd_t *threads;
     const char powered_by[SCRAPE_SIZE];
+    cacheline_pad_t pad21;
+
+    atomic_flag is_queue;
     cacheline_pad_t pad20;
 
     /* Exception/error indicator, only private `co_awaitable()`
@@ -913,6 +916,7 @@ C_API void sched_exit(int);
 C_API void sched_enqueue(routine_t *);
 C_API routine_t *sched_dequeue(scheduler_t *);
 
+C_API bool sched_is_assignable(size_t);
 C_API int sched_is_valid(void);
 C_API bool sched_is_main(void);
 C_API u32 sched_id(void);
@@ -985,6 +989,7 @@ struct oa_hash_s {
     bool overriden;
     bool resize_free;
     bool has_erred;
+    size_t group_capacity;
     atomic_size_t capacity;
     atomic_size_t size;
     hash_t *grouping;
@@ -1041,6 +1046,7 @@ C_API void wait_capacity(u32);
 /* Pauses current coroutine, and begin execution for given coroutine wait group object, will wait for all to finish.
 Returns hast table of results, accessible by coroutine id. */
 C_API wait_result_t wait_for(wait_group_t);
+C_API wait_result_t wait_for_ex(wait_group_t);
 
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
 C_API value_t wait_result(wait_result_t, u32);

@@ -223,6 +223,9 @@ static wait_group_t wait_group_ex(u32 capacity) {
 
     wait_group_t wg = ht_wait_init(capacity + (capacity * 0.0025));
     wg->grouping = ht_result_init();
+    if (sched_is_assignable(capacity))
+        wg->group_capacity = capacity / gq_sys.thread_count;
+
     wg->resize_free = false;
     c->wait_active = true;
     c->wait_group = wg;
@@ -239,6 +242,105 @@ CO_FORCE_INLINE wait_group_t wait_group_by(u32 capacity) {
     return wait_group_ex(capacity);
 }
 
+wait_result_t wait_for_ex(wait_group_t wg) {
+    routine_t *co, *c = co_active();
+    wait_result_t wgr = NULL;
+    wait_group_t *wait_group;
+    void_t key;
+    oa_pair *pair;
+    u32 i, group_capacity, capacity, group_id = 0, id = 0;
+    bool has_erred = false, has_completed = false, is_multi = atomic_flag_load(&gq_sys.is_multi);
+
+    if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
+        c->is_group_finish = true;
+        atomic_flag_clear(&gq_sys.is_queue);
+        co_yield();
+
+        if (is_multi && atomic_flag_load(&gq_sys.is_threading_waitable)) {
+            group_id = atomic_load(&gq_sys.group_id);
+            if (group_id) {
+                id = group_id - 1;
+                wait_group = (wait_group_t *)atomic_load(&gq_sys.wait_group);
+                wait_group[id] = wg;
+                atomic_store(&gq_sys.wait_group, wait_group);
+            }
+            group_capacity = wg->group_capacity;
+        }
+
+        wgr = wg->grouping;
+        co_deferred(c, VOID_FUNC(hash_free), wgr);
+        while (atomic_load(&wg->size) != 0 && !has_completed) {
+            capacity = (u32)atomic_load(&wg->capacity);
+            for (i = 0; i < capacity; i++) {
+                pair = atomic_get(oa_pair *, &wg->buckets[i]);
+                if (!is_empty(pair) && !is_empty(pair->value)) {
+                    co = (routine_t *)pair->value;
+                    key = pair->key;
+                    if (is_multi && group_id && group_capacity == 0) {
+                        has_completed = true;
+                        break;
+                    } else if (is_multi && co->tid != sched_id()) {
+                        continue;
+                    } else if (!co_terminated(co)) {
+                        if (!co->interrupt_active && co->status == CO_NORMAL)
+                            sched_enqueue(co);
+
+                        co_info(c, 1);
+                        sched_yielding();
+                    } else {
+                        if (is_multi && group_id)
+                            group_capacity--;
+
+                        if ((!is_empty(co->results) && !co->is_event_err) || co->is_plain) {
+                            if (co->is_plain)
+                                hash_put(wgr, co_itoa(co->cid), &co->plain_results);
+                            else
+                                hash_put(wgr, co_itoa(co->cid), (co->is_address ? &co->results : co->results));
+
+                            if (!co->event_active && !co->is_plain && !co->is_address) {
+                                CO_FREE(co->results);
+                                co->results = NULL;
+                            }
+                        }
+
+                        if (co->is_event_err) {
+                            wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
+                            wg->has_erred = true;
+                            atomic_store_explicit(&gq_sys.wait_group[id], wg, memory_order_release);
+                            hash_remove(wg, key);
+                            continue;
+                        }
+
+                        if (co->interrupt_active)
+                            co_deferred_free(co);
+
+                        hash_delete(wg, key);
+                    }
+                }
+            }
+            i = 0;
+        }
+
+        has_erred = wg->has_erred;
+        c->wait_active = false;
+        c->wait_group = NULL;
+        if (is_multi && group_id) {
+            while (atomic_load(&wg->size) != 0)
+                co_yield();
+
+            wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
+            wgr = wg->grouping;
+            atomic_store_explicit(&gq_sys.wait_group[id], NULL, memory_order_release);
+        }
+
+        sched_dec();
+        hash_free(wg);
+        return has_erred ? NULL : wgr;
+    }
+
+    return NULL;
+}
+
 wait_result_t wait_for(wait_group_t wg) {
     routine_t *co, *c = co_active();
     wait_result_t wgr = NULL;
@@ -251,6 +353,7 @@ wait_result_t wait_for(wait_group_t wg) {
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
+        atomic_flag_test_and_set(&gq_sys.is_queue);
         co_yield();
 
         if (is_multi && atomic_flag_load(&gq_sys.is_threading_waitable)) {
