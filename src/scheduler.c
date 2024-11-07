@@ -27,6 +27,20 @@ typedef struct {
 
     u32 sleep_id;
 
+    /* Store/hold the registers of the default coroutine thread state,
+    allows the ability to switch from any function, non coroutine context. */
+    routine_t active_buffer[3];
+
+    /* Variable holding the current running coroutine per thread. */
+    routine_t *active_handle;
+
+    /* Variable holding the main target that gets called once an coroutine
+    function fully completes and return. */
+    routine_t *main_handle;
+
+    /* Variable holding the previous running coroutine per thread. */
+    routine_t *current_handle;
+
     /* record which coroutine sleeping in scheduler */
     scheduler_t sleeping;
 
@@ -37,22 +51,11 @@ typedef struct {
     scheduler_t run_queue;
 
 #ifdef UV_H
+    uv_args_t *uv_args;
     uv_loop_t interrupt_buffer[1];
     uv_loop_t *interrupt_handle;
     uv_loop_t *interrupt_default;
-    uv_args_t *uv_args;
 #endif
-
-    /* Store/hold the registers of the default coroutine thread state,
-    allows the ability to switch from any function, non coroutine context. */
-    routine_t active_buffer[1];
-    /* Variable holding the current running coroutine per thread. */
-    routine_t *active_handle;
-    /* Variable holding the main target that gets called once an coroutine
-    function fully completes and return. */
-    routine_t *main_handle;
-    /* Variable holding the previous running coroutine per thread. */
-    routine_t *current_handle;
 } thread_processor_t;
 thrd_static(thread_processor_t, thread, NULL)
 
@@ -1864,7 +1867,6 @@ CO_FORCE_INLINE void coroutine_interrupt(void) {
 }
 
 static void_t coroutine_wait(void_t v) {
-    int *has;
     routine_t *t;
     size_t now;
 
