@@ -2214,7 +2214,7 @@ static int thrd_scheduler(void) {
             if (!t->system)
                 --thread()->used_count;
 
-            if (is_multi && (t->run_code == RUN_THRD || t->run_code == RUN_MAIN))
+            if (is_multi && (t->run_code == RUN_THRD || t->run_code == RUN_MAIN) && sched_count() < 0)
                 thread()->used_count++;
 
             if (!t->is_waiting && !t->is_channeling && !t->is_event_err) {
