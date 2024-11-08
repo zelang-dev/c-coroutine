@@ -2418,9 +2418,9 @@ static void_t thrd_main_main(void_t v) {
         if (thrd_is_waitable(group_id) && already) {
             already = false;
             if (atomic_flag_load(&gq_sys.is_queue))
-                thrd_wait_for(group_id);
-            else
                 thrd_wait_for_ex(group_id);
+            else
+                thrd_wait_for(group_id);
 
             if (sched_count() == 1 && sched_is_sleeping())
                 sched_dec();
