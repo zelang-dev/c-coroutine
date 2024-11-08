@@ -242,7 +242,7 @@ CO_FORCE_INLINE wait_group_t wait_group_by(u32 capacity) {
     return wait_group_ex(capacity);
 }
 
-wait_result_t wait_for_ex(wait_group_t wg) {
+wait_result_t wait_for(wait_group_t wg) {
     routine_t *co, *c = co_active();
     wait_result_t wgr = NULL;
     wait_group_t *wait_group;
@@ -342,7 +342,7 @@ wait_result_t wait_for_ex(wait_group_t wg) {
     return NULL;
 }
 
-wait_result_t wait_for(wait_group_t wg) {
+wait_result_t wait_for_ex(wait_group_t wg) {
     routine_t *co, *c = co_active();
     wait_result_t wgr = NULL;
     wait_group_t *wait_group;

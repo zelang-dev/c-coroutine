@@ -420,6 +420,7 @@ static void sched_post_available(void) {
         atomic_flag_clear(&gq_sys.is_resuming);
         atomic_fetch_sub(&gq_sys.active_count, active);
         atomic_fetch_add(&gq_sys.available[gq_sys.cpu_count], active);
+        atomic_flag_clear(&gq_sys.is_threading_waitable);
     } else {
         sched_adjust();
         if (!atomic_flag_load(&gq_sys.is_started))
@@ -1653,7 +1654,7 @@ static void sched_steal_available(void) {
     size_t i, id, group_id, count = 0, available = atomic_load_explicit(&gq_sys.available[thread()->thrd_id], memory_order_relaxed);
     if (available > 0) {
         group_id = atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
-        if (group_id && atomic_flag_load(&gq_sys.is_threading_waitable) && atomic_flag_load(&gq_sys.is_queue)) {
+        if (atomic_flag_load(&gq_sys.is_queue) && group_id && atomic_flag_load(&gq_sys.is_threading_waitable)) {
             id = group_id - 1;
             gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
         }
@@ -2406,10 +2407,6 @@ static void_t thrd_main_main(void_t v) {
     co_info(co_active(), -1);
     if (sched_is_available())
         sched_steal_available();
-
-    while (atomic_flag_load(&gq_sys.is_queue)
-           && atomic_flag_load_explicit(&gq_sys.is_resuming, memory_order_relaxed))
-        ;
 
     group_id = (u32)atomic_load(&gq_sys.group_id);
     while (!sched_empty() && atomic_flag_load(&gq_sys.is_errorless) && !atomic_flag_load(&gq_sys.is_finish)) {
