@@ -269,10 +269,11 @@ wait_result_t wait_for_ex(wait_group_t wg) {
 
         wgr = wg->grouping;
         co_deferred(c, VOID_FUNC(hash_free), wgr);
+        atomic_flag_clear(&gq_sys.is_resuming);
         while (atomic_load(&wg->size) != 0 && !has_completed) {
             capacity = (u32)atomic_load(&wg->capacity);
             for (i = 0; i < capacity; i++) {
-                pair = atomic_get(oa_pair *, &wg->buckets[i]);
+                pair = (oa_pair *)atomic_load_explicit(&wg->buckets[i], memory_order_relaxed);
                 if (!is_empty(pair) && !is_empty(pair->value)) {
                     co = (routine_t *)pair->value;
                     key = pair->key;

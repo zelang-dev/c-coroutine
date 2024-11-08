@@ -1294,8 +1294,5 @@ void interrupt_cleanup(void_t t) {
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
 
         uv_run(uvLoop, UV_RUN_DEFAULT);
-
-        uv_stop(uvLoop);
-        uv_run(uvLoop, UV_RUN_DEFAULT);
     }
 }

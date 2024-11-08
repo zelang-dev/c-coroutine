@@ -41,6 +41,8 @@ typedef struct {
     /* Variable holding the previous running coroutine per thread. */
     routine_t *current_handle;
 
+    routine_t *multi;
+
     /* record which coroutine sleeping in scheduler */
     scheduler_t sleeping;
 
@@ -51,7 +53,7 @@ typedef struct {
     scheduler_t run_queue;
 
 #ifdef UV_H
-    uv_args_t *uv_args;
+    uv_args_t *interrupt_args;
     uv_loop_t interrupt_buffer[1];
     uv_loop_t *interrupt_handle;
     uv_loop_t *interrupt_default;
@@ -446,16 +448,17 @@ static size_t sched_cpu_count(void) {
 
 static void sched_init(bool is_main, u32 thread_id) {
     thread()->is_main = is_main;
-    thread()->uv_args = NULL;
     thread()->exiting = 0;
     thread()->thrd_id = thread_id;
     thread()->sleep_activated = false;
     thread()->sleeping_counted = 0;
     thread()->used_count = 0;
     thread()->sleep_id = 0;
+    thread()->multi = NULL;
     thread()->active_handle = NULL;
     thread()->main_handle = NULL;
     thread()->current_handle = NULL;
+    thread()->interrupt_args = NULL;
     thread()->interrupt_handle = NULL;
     thread()->interrupt_default = NULL;
     if (atomic_flag_load(&gq_sys.is_multi))
@@ -2028,11 +2031,11 @@ static void sched_shutdown_interrupt(bool cleaning) {
 }
 
 CO_FORCE_INLINE uv_args_t *interrupt_listen_args(void) {
-    return thread()->uv_args;
+    return thread()->interrupt_args;
 }
 
 CO_FORCE_INLINE void interrupt_listen_set(uv_args_t uv_args) {
-    thread()->uv_args = &uv_args;
+    thread()->interrupt_args = &uv_args;
 }
 
 void co_interrupt_on(void) {
@@ -2088,7 +2091,7 @@ static void sched_free(void) {
 static void sched_destroy(void) {
     size_t i;
     if (atomic_flag_load(&gq_sys.is_multi) && sched_is_main() && gq_sys.threads) {
-       atomic_flag_test_and_set(&gq_sys.is_finish);
+        atomic_flag_test_and_set(&gq_sys.is_finish);
         while (sched_is_running() && atomic_flag_load(&gq_sys.is_errorless))
             thrd_yield();
 
@@ -2231,8 +2234,12 @@ static int thrd_scheduler(void) {
             if (!t->system)
                 --thread()->used_count;
 
-            if (is_multi && (t->run_code == RUN_THRD || t->run_code == RUN_MAIN) && sched_count() < 0)
-                thread()->used_count++;
+            if (is_multi && (t->run_code == RUN_THRD || t->run_code == RUN_MAIN)) {
+                if (sched_count() < 0)
+                    thread()->used_count++;
+
+                l = SCHED_EMPTY_T;
+            }
 
             if (!t->is_waiting && !t->is_channeling && !t->is_event_err) {
                 co_delete(t);
@@ -2269,7 +2276,12 @@ static void thrd_wait_for_ex(u32 wait_id) {
     while (atomic_load(&wg->size) != 0 && !has_completed) {
         capacity = (u32)atomic_load(&wg->capacity);
         for (i = 0; i < capacity; i++) {
-            pair = atomic_get(oa_pair *, &wg->buckets[i]);
+            if (group_capacity == 0) {
+                has_completed = true;
+                break;
+            }
+
+            pair = (oa_pair *)atomic_load_explicit(&wg->buckets[i], memory_order_relaxed);
             if (!is_empty(pair) && !is_empty(pair->value)) {
                 co = (routine_t *)pair->value;
                 key = pair->key;
@@ -2307,10 +2319,6 @@ static void thrd_wait_for_ex(u32 wait_id) {
                         co_deferred_free(co);
 
                     hash_delete(wg, key);
-                    if (group_capacity == 0) {
-                        has_completed = true;
-                        break;
-                    }
                 }
             }
         }
@@ -2399,9 +2407,9 @@ static void_t thrd_main_main(void_t v) {
     if (sched_is_available())
         sched_steal_available();
 
-    if (atomic_flag_load(&gq_sys.is_queue))
-        while (atomic_flag_load_explicit(&gq_sys.is_resuming, memory_order_relaxed))
-            ;
+    while (atomic_flag_load(&gq_sys.is_queue)
+           && atomic_flag_load_explicit(&gq_sys.is_resuming, memory_order_relaxed))
+        ;
 
     group_id = (u32)atomic_load(&gq_sys.group_id);
     while (!sched_empty() && atomic_flag_load(&gq_sys.is_errorless) && !atomic_flag_load(&gq_sys.is_finish)) {
