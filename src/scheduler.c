@@ -29,7 +29,7 @@ typedef struct {
 
     /* Store/hold the registers of the default coroutine thread state,
     allows the ability to switch from any function, non coroutine context. */
-    routine_t active_buffer[3];
+    routine_t active_buffer[4];
 
     /* Variable holding the current running coroutine per thread. */
     routine_t *active_handle;
@@ -40,8 +40,6 @@ typedef struct {
 
     /* Variable holding the previous running coroutine per thread. */
     routine_t *current_handle;
-
-    routine_t *multi;
 
     /* record which coroutine sleeping in scheduler */
     scheduler_t sleeping;
@@ -455,7 +453,6 @@ static void sched_init(bool is_main, u32 thread_id) {
     thread()->sleeping_counted = 0;
     thread()->used_count = 0;
     thread()->sleep_id = 0;
-    thread()->multi = NULL;
     thread()->active_handle = NULL;
     thread()->main_handle = NULL;
     thread()->current_handle = NULL;
@@ -2418,9 +2415,9 @@ static void_t thrd_main_main(void_t v) {
         if (thrd_is_waitable(group_id) && already) {
             already = false;
             if (atomic_flag_load(&gq_sys.is_queue))
-                thrd_wait_for_ex(group_id);
-            else
                 thrd_wait_for(group_id);
+            else
+                thrd_wait_for_ex(group_id);
 
             if (sched_count() == 1 && sched_is_sleeping())
                 sched_dec();

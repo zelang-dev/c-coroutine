@@ -119,12 +119,13 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     oa_pair **old_buckets;
     oa_pair *crt_pair;
 
-    old_capacity = atomic_load(&htable->capacity);
+    atomic_thread_fence(memory_order_acquire);
+    old_capacity = atomic_load_explicit(&htable->capacity, memory_order_consume);
     uint64_t new_capacity_64 = old_capacity * HASH_GROWTH_FACTOR;
     if (new_capacity_64 > SIZE_MAX)
         co_panic("re-size overflow");
 
-    old_buckets = (oa_pair **)atomic_load(&htable->buckets);
+    old_buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_consume);
     atomic_init(&htable->capacity, (size_t)new_capacity_64);
     atomic_init(&htable->size, 0);
     atomic_init(&htable->buckets, try_calloc(1, new_capacity_64 * sizeof(*(old_buckets))));
@@ -141,11 +142,12 @@ static CO_FORCE_INLINE void oa_hash_grow(oa_hash *htable) {
     }
 
     CO_FREE(old_buckets);
+    atomic_thread_fence(memory_order_release);
 }
 
 static CO_FORCE_INLINE bool oa_hash_should_grow(oa_hash *htable) {
     return (!hash_initial_override || htable->overriden) &&
-        (atomic_load(&htable->size) / atomic_load(&htable->capacity)) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
+        (atomic_load_explicit(&htable->size, memory_order_relaxed) / atomic_load_explicit(&htable->capacity, memory_order_relaxed)) > (htable->overriden ? .95 : HASH_LOAD_FACTOR);
 }
 
 void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
@@ -153,7 +155,7 @@ void_t oa_hash_put(oa_hash *htable, const_t key, const_t value) {
         oa_hash_grow(htable);
 
     uint32_t hash_val = htable->key_ops.hash(key, htable->key_ops.arg);
-    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
+    size_t idx = hash_val % (u32)atomic_load_explicit(&htable->capacity, memory_order_relaxed);
 
     oa_pair **buckets = (oa_pair **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
     if (is_empty(buckets[idx])) {
