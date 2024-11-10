@@ -33,6 +33,7 @@
     #endif
 #endif
 
+#define EX_MAX_NAME_LEN  256
 #if !defined(RAII_MALLOC) || !defined(RAII_FREE) || !defined(RAII_REALLOC)|| !defined(RAII_CALLOC)
   #include "rpmalloc.h"
   #define RAII_MALLOC malloc
@@ -63,23 +64,23 @@
     #endif
 #endif
 
-#ifndef RAII_ASSERT
-  #if defined(USE_DEBUG)
-    #include <assert.h>
-    #define RAII_ASSERT(c) assert(c)
-  #else
-    #define RAII_ASSERT(c)
-  #endif
-#endif
-
-#ifdef USE_DEBUG
-    #define RAII_LOG(s) puts(s)
-    #define RAII_INFO(s, ...) printf(s, __VA_ARGS__ )
-    #define RAII_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
+#if defined(USE_DEBUG)
+#   include <assert.h>
+#   define RAII_ASSERT(c) assert(c)
+#   define RAII_LOG(s) puts(s)
+#   define RAII_INFO(s, ...) printf(s, __VA_ARGS__ )
+#   define RAII_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
+#   ifdef _WIN32
+#       include <DbgHelp.h>
+#       pragma comment(lib,"Dbghelp.lib")
+#   else
+#       include <execinfo.h>
+#   endif
 #else
-    #define RAII_LOG(s) (void)s
-    #define RAII_INFO(s, ...)  (void)s
-    #define RAII_HERE()  (void)0
+#   define RAII_ASSERT(c)
+#   define RAII_LOG(s) (void)s
+#   define RAII_INFO(s, ...)  (void)s
+#   define RAII_HERE()  (void)0
 #endif
 
  /* Public API qualifier. */
@@ -93,6 +94,7 @@ extern "C" {
 
 typedef struct ex_ptr_s ex_ptr_t;
 typedef struct ex_context_s ex_context_t;
+typedef struct ex_backtrace_s ex_backtrace_t;
 typedef void (*ex_setup_func)(ex_context_t *, const char *, const char *);
 typedef void (*ex_terminate_func)(void);
 typedef void (*ex_unwind_func)(void *);
@@ -118,6 +120,8 @@ C_API void ex_signal_setup(void);
 
 /* Reset signal handler to default */
 C_API void ex_signal_default(void);
+C_API void ex_backtrace(ex_backtrace_t *ex);
+C_API void ex_trace_set(ex_context_t *ex, void_t ctx);
 
 #ifdef _WIN32
 #define EXCEPTION_PANIC 0xE0000001
@@ -153,11 +157,13 @@ enum {
 #define EX_MAKE()                                               \
     const char *const err = ((void)err, ex_err.ex);             \
     const char *const err_file = ((void)err_file, ex_err.file); \
+    ex_backtrace_t *const err_backtrace = ((void)err_backtrace, ex_err.backtrace); \
     const int err_line = ((void)err_line, ex_err.line)
 
 #define EX_MAKE_IF()                                            \
     const char *const err = ((void)err, !is_empty((void *)ex_err.panic) ? ex_err.panic : ex_err.ex);    \
     const char *const err_file = ((void)err_file, ex_err.file); \
+    ex_backtrace_t *const err_backtrace = ((void)err_backtrace, ex_err.backtrace); \
     const int err_line = ((void)err_line, ex_err.line)
 
 /* macros
@@ -356,17 +362,36 @@ throws an exception of given message. */
 /* types
 */
 
+struct ex_backtrace_s {
+#ifdef _WIN32
+    CONTEXT ctx[1];
+    HANDLE process;
+    HANDLE thread;
+#else
+    void *ctx[EX_MAX_NAME_LEN];
+    size_t size;
+    char **dump;
+#endif
+};
+
 /* stack of exception */
 struct ex_context_s {
     int type;
-    void *data;
-    void *prev;
     bool is_unwind;
     bool is_rethrown;
     bool is_guarded;
     bool is_raii;
     bool is_emulated;
+    int unstack;
     int volatile caught;
+
+    /* The line from whence this handler was made, in order to backtrace it later (if we want to). */
+    int volatile line;
+
+    /* Which is our active state? */
+    int volatile state;
+    void *data;
+    void *prev;
 
     /* The handler in the stack (which is a FILO container). */
     ex_context_t *next;
@@ -384,13 +409,7 @@ struct ex_context_s {
     /* The file from whence this handler was made, in order to backtrace it later (if we want to). */
     const char *volatile file;
 
-    /* The line from whence this handler was made, in order to backtrace it later (if we want to). */
-    int volatile line;
-
-    /* Which is our active state? */
-    int volatile state;
-
-    int unstack;
+    ex_backtrace_t backtrace[1];
 
     /* The program state in which the handler was created, and the one to which it shall return. */
     ex_jmp_buf buf;

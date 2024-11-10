@@ -26,8 +26,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.1.1.zip
-        URL_MD5 9abcd1429dbffd73a2172c74cca0df99
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.1.2.zip
+        URL_MD5 39ff624a2e00e938a40d0de0b96a3855
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -78,7 +78,7 @@ target_include_directories(coroutine
     PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG -D USE_VALGRIND ")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -rdynamic -D USE_DEBUG -D USE_VALGRIND ")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
 endif()
 
