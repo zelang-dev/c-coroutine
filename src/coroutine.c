@@ -269,7 +269,6 @@ wait_result_t wait_for(wait_group_t wg) {
 
         wgr = wg->grouping;
         co_deferred(c, VOID_FUNC(hash_free), wgr);
-        atomic_flag_clear(&gq_sys.is_resuming);
         while (atomic_load(&wg->size) != 0 && !has_completed) {
             capacity = (u32)atomic_load(&wg->capacity);
             for (i = 0; i < capacity; i++) {
@@ -365,7 +364,6 @@ wait_result_t wait_for_ex(wait_group_t wg) {
                 wait_group = (wait_group_t *)atomic_load(&gq_sys.wait_group);
                 wait_group[id] = wg;
                 atomic_store(&gq_sys.wait_group, wait_group);
-                atomic_flag_clear_explicit(&gq_sys.is_resuming, memory_order_release);
             }
         }
 

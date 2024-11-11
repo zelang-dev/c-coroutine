@@ -421,8 +421,6 @@ static void sched_post_available(void) {
         atomic_flag_clear(&gq_sys.is_threading_waitable);
     } else {
         sched_adjust();
-        if (!atomic_flag_load(&gq_sys.is_started))
-            atomic_flag_test_and_set(&gq_sys.is_started);
     }
 }
 
@@ -1738,8 +1736,6 @@ static void sched_adjust(void) {
         sched_adjust_queue(group_id);
 
     sched_adjust_group(group_id);
-    if (atomic_flag_load(&gq_sys.is_queue))
-        atomic_flag_test_and_set_explicit(&gq_sys.is_resuming, memory_order_acquire);
 }
 
 u32 create_routine(callable_t fn, void_t arg, u32 stack, run_states code) {
@@ -1850,8 +1846,13 @@ awaitable_t async(callable_t fn, void_t arg) {
 }
 
 void co_stealer(void) {
-    if (atomic_flag_load(&gq_sys.is_multi) && sched_is_main() && sched_is_takeable())
-        sched_post_available();
+    if (atomic_flag_load(&gq_sys.is_multi) && sched_is_main()) {
+        if (sched_is_takeable())
+            sched_post_available();
+
+        if (!atomic_flag_load(&gq_sys.is_started))
+            atomic_flag_test_and_set(&gq_sys.is_started);
+    }
 
     if (sched_is_available())
         sched_steal_available();
@@ -2421,8 +2422,10 @@ static void_t thrd_main_main(void_t v) {
 
             if (sched_count() == 1 && sched_is_sleeping())
                 sched_dec();
-        } else {
+        } else if (sched_count() > 1) {
             co_yield();
+        } else {
+            break;
         }
     }
 
@@ -2492,10 +2495,10 @@ int main(int argc, char **argv) {
     atomic_flag_clear(&gq_sys.is_queue);
     atomic_flag_clear(&gq_sys.is_started);
     atomic_flag_clear(&gq_sys.is_finish);
+    atomic_flag_clear(&gq_sys.is_resuming);
     atomic_flag_clear(&gq_sys.is_threading_waitable);
     atomic_flag_test_and_set(&gq_sys.is_errorless);
     atomic_flag_test_and_set(&gq_sys.is_interruptable);
-    atomic_flag_test_and_set(&gq_sys.is_resuming);
 
 #ifdef UV_H
     RAII_INFO("%s", sched_uname());
