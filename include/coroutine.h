@@ -39,7 +39,7 @@
 
 #ifndef CO_STACK_SIZE
     /* Stack size when creating a coroutine. */
-    #define CO_STACK_SIZE (4 * 1024)
+    #define CO_STACK_SIZE (6 * 1024)
 #endif
 
 #ifndef CO_MT_STATE
@@ -470,7 +470,7 @@ typedef struct {
 make_atomic(deque_t *, thread_deque_t)
 
 /*
- * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal` `deque_resize`
+ * `deque_init` `deque_resize` `deque_take` `deque_push` `deque_steal`
  *
  * Modified from https://github.com/sysprog21/concurrent-programs/blob/master/work-steal/work-steal.c
  *
@@ -480,7 +480,7 @@ make_atomic(deque_t *, thread_deque_t)
  * runtime system. In Proceedings of the Fifth ACM SIGPLAN Symposium on
  * Principles and Practice of Parallel Programming (PPoPP), pages 207-216,
  * Santa Barbara, California, July 1995.
- * http://supertech.csail.mit.edu/papers/PPoPP95.pdf
+ * https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F21/handouts/papers/Cilk-PPoPP95.pdf
  *
  * However, that refers to an outdated model of Cilk; an update appears in
  * the essential idea of work stealing mentioned in Leiserson and Platt,
