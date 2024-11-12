@@ -35,17 +35,13 @@ args_t *args_for(const char *desc, ...) {
 }
 
 values_type args_get(void_t params, int item) {
-    if (is_type(params, RAII_ARGS)) {
-        args_t *args = (args_t *)params;
-        if (!args->defer_set) {
-            args->defer_set = true;
-            defer(args_free, args);
-        }
-
-        return args_in(args, item);
+    args_t *args = (args_t *)params;
+    if (!args->defer_set) {
+        args->defer_set = true;
+        defer(args_free, args);
     }
 
-    return ((raii_values_t *)0)->value;
+    return args_in(args, item);
 }
 
 void delete(void_t ptr) {
@@ -219,6 +215,11 @@ static wait_group_t wait_group_ex(u32 capacity) {
     if (atomic_flag_load(&gq_sys.is_multi) && is_empty(gq_sys.deque_run_queue)) {
         gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
         deque_init(gq_sys.deque_run_queue, gq_sys.capacity);
+    } else if (atomic_flag_load(&gq_sys.is_multi) && atomic_load_explicit(&gq_sys.deque_run_queue->array->size, memory_order_relaxed) < gq_sys.capacity) {
+        deque_array_t *a = (deque_array_t *)atomic_load_explicit(&gq_sys.deque_run_queue->array, memory_order_acquire);
+        a = try_realloc(a, sizeof(deque_array_t) + sizeof(routine_t *) * gq_sys.capacity);
+        atomic_store(&a->size, gq_sys.capacity);
+        atomic_store_explicit(&gq_sys.deque_run_queue->array, a, memory_order_release);
     }
 
     wait_group_t wg = ht_wait_init(capacity + (capacity * 0.0025));

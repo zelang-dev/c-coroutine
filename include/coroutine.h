@@ -39,7 +39,7 @@
 
 #ifndef CO_STACK_SIZE
     /* Stack size when creating a coroutine. */
-    #define CO_STACK_SIZE (6 * 1024)
+    #define CO_STACK_SIZE (16 * 1024)
 #endif
 
 #ifndef CO_MT_STATE
