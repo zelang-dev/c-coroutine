@@ -513,9 +513,6 @@ typedef struct {
     const char powered_by[SCRAPE_SIZE];
     cacheline_pad_t pad21;
 
-    atomic_flag is_queue;
-    cacheline_pad_t pad20;
-
     /* Exception/error indicator, only private `co_awaitable()`
     will clear to break any possible infinite wait/loop condition,
     normal cleanup code will not be executed. */
@@ -574,8 +571,8 @@ typedef struct {
     atomic_wait_t *wait_group;
     cacheline_pad_t pad4;
 
-    /* Holds running ~coroutines~ in each Thread local `wait_group` queue */
-    thread_deque_t *wait_queue;
+    /* Thread start index into `wait_group` queue */
+    atomic_uint *group_index;
     cacheline_pad_t pad3;
 
     /* Global coroutine run queue */

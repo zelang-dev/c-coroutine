@@ -1649,14 +1649,13 @@ static void sched_steal(thread_processor_t *r, int count) {
 the amount/count was set by `sched_is_takeable` and `sched_post_available`. */
 static void sched_steal_available(void) {
     routine_t *t = NULL;
-    deque_t *gq = NULL;
+    u32 *gi = NULL;
     size_t i, id, group_id = 0, count = 0, available = atomic_load(&gq_sys.available[thread()->thrd_id]);
     if (available > 0) {
         group_id = (size_t)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
-        if (atomic_flag_load(&gq_sys.is_queue) && group_id && atomic_flag_load(&gq_sys.is_threading_waitable)) {
-            id = group_id - 1;
-            gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
-        }
+        id = group_id - 1;
+        if (group_id && atomic_flag_load(&gq_sys.is_threading_waitable))
+            gi = (u32 *)atomic_load(&gq_sys.group_index[id]);
 
         for (i = 0; i < available; i++) {
             t = deque_steal(gq_sys.deque_run_queue);
@@ -1672,14 +1671,10 @@ static void sched_steal_available(void) {
             count++;
             thread()->used_count++;
             sched_add(thread()->run_queue, t);
-            if (!is_empty(gq))
-                deque_push(&gq[thread()->thrd_id], t);
-        }
-
-        if (!is_empty(gq)) {
-            gq = (deque_t *)atomic_load_explicit(&gq_sys.wait_queue[id], memory_order_relaxed);
-            gq[thread()->thrd_id].capacity = (int)count;
-            atomic_store(&gq_sys.wait_queue[id], gq);
+            if (!is_empty(gi) && gi[thread()->thrd_id] == -1) {
+                gi[thread()->thrd_id] = i;
+                atomic_store(&gq_sys.group_index[id], gi);
+            }
         }
     }
     atomic_store(&gq_sys.available[thread()->thrd_id], (available - count));
@@ -1691,34 +1686,10 @@ static void sched_steal_available(void) {
                 if (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) {
                     gq_sys.is_takeable--;
                     atomic_init(&gq_sys.take_count, 0);
-                    if (!is_empty(gq)) {
-                        atomic_thread_fence(memory_order_acquire);
-                        deque_reset(gq_sys.deque_run_queue, gq_sys.thread_count);
-                        atomic_thread_fence(memory_order_release);
-                    }
                 }
             }
         }
     }
-}
-
-static void sched_adjust_queue(size_t group_id) {
-    size_t wait_id, available, i;
-    deque_t **wait_queue, *gq = try_calloc(gq_sys.thread_count, sizeof(deque_t));
-    for (i = 0; i < gq_sys.thread_count; i++) {
-        available = atomic_load(&gq_sys.available[i]);
-        deque_init(&gq[i], available);
-        gq[i].capacity = available;
-    }
-
-    wait_queue = (deque_t **)atomic_load_explicit(&gq_sys.wait_queue, memory_order_acquire);
-    wait_id = group_id - 1;
-    if (wait_id % gq_sys.thread_count == 0)
-        wait_queue = try_realloc(wait_queue, (wait_id + gq_sys.thread_count) * sizeof(wait_queue[0]));
-
-    wait_queue[wait_id] = gq;
-    wait_queue[group_id] = NULL;
-    atomic_store_explicit(&gq_sys.wait_queue, wait_queue, memory_order_release);
 }
 
 static void sched_adjust_group(size_t group_id) {
@@ -1735,10 +1706,20 @@ static void sched_adjust_group(size_t group_id) {
 
 static void sched_adjust(void) {
     gq_sys.is_takeable++;
-    size_t group_id = atomic_fetch_add(&gq_sys.group_id, 1) + 1;
-    if (atomic_flag_load(&gq_sys.is_queue))
-        sched_adjust_queue(group_id);
+    u32 *gi, **group_index;
+    size_t i, wait_id, group_id = atomic_fetch_add(&gq_sys.group_id, 1) + 1;
+    gi = try_calloc(gq_sys.thread_count, sizeof(u32) * 2);
+    for (i = 0; i < gq_sys.thread_count; i++)
+        gi[i] = -1;
 
+    group_index = (u32 **)atomic_load_explicit(&gq_sys.group_index, memory_order_acquire);
+    wait_id = group_id - 1;
+    if (wait_id % gq_sys.thread_count == 0)
+        group_index = try_realloc(group_index, (wait_id + gq_sys.thread_count) * sizeof(group_index[0]));
+
+    group_index[wait_id] = gi;
+    group_index[group_id] = NULL;
+    atomic_store_explicit(&gq_sys.group_index, group_index, memory_order_release);
     sched_adjust_group(group_id);
 }
 
@@ -2086,7 +2067,7 @@ static void sched_free(void) {
     CO_FREE((void_t)atomic_load(&gq_sys.stealable_amount));
     CO_FREE((void_t)atomic_load(&gq_sys.any_stealable));
     CO_FREE((void_t)atomic_load(&gq_sys.wait_group));
-    CO_FREE((void_t)atomic_load(&gq_sys.wait_queue));
+    CO_FREE((void_t)atomic_load(&gq_sys.group_index));
 
     deque_free(gq_sys.deque_run_queue);
 }
@@ -2169,13 +2150,9 @@ static int thrd_scheduler(void) {
             } else if (is_multi && sched_empty() && !atomic_flag_load(&gq_sys.is_finish) && l != SCHED_EMPTY_T
                        && (sched_is_active() || !sched_is_sleeping() || !sched_is_empty() || sched_is_available())) {
                 if (sched_is_available()) {
-                    RAII_HERE();
                     sched_steal_available();
-                    RAII_HERE();
                 } else if (sched_is_active()) {
-                    RAII_HERE();
                     sched_steal(thread(), 1);
-                    RAII_HERE();
                 } else if (!sched_is_main() && !sched_is_sleeping() && sched_is_any_available()) {
                     stole = (int)atomic_load(&gq_sys.stealable_thread[thread()->thrd_id]);
                     atomic_flag_test_and_set(&gq_sys.any_stealable[stole]);
@@ -2264,25 +2241,26 @@ static bool thrd_is_waitable(u32 wait_id) {
         && !is_empty((wait_group_t)atomic_load(&gq_sys.wait_group[wait_id - 1]));
 }
 
-static void thrd_wait_for_ex(u32 wait_id) {
+static void thrd_wait_for(u32 wait_id) {
     routine_t *co, *c = co_active();
     wait_result_t wgr = NULL;
     wait_group_t wg = NULL;
     bool has_erred = false, has_completed = false;
     void_t key;
     oa_pair *pair;
-    u32 i, group_capacity, capacity, id;
+    u32 i, *gi, group_capacity, capacity, id, begin = 0;
     if (wait_id == 0)
         return;
 
     id = wait_id - 1;
+    gi = (u32 *)atomic_load(&gq_sys.group_index[id]);
+    begin = gi[sched_id()];
     wg = (wait_group_t)atomic_load(&gq_sys.wait_group[id]);
     wgr = wg->grouping;
     group_capacity = wg->group_capacity;
-
     while (atomic_load(&wg->size) != 0 && !has_completed) {
         capacity = (u32)atomic_load(&wg->capacity);
-        for (i = 0; i < capacity; i++) {
+        for (i = begin; i < capacity; i++) {
             if (group_capacity == 0) {
                 has_completed = true;
                 break;
@@ -2329,78 +2307,9 @@ static void thrd_wait_for_ex(u32 wait_id) {
                 }
             }
         }
-        i = 0;
+        i = begin;
     }
 
-    sched_dec();
-}
-
-static void thrd_wait_for(u32 wait_id) {
-    routine_t *co, *c = co_active();
-    bool has_completed = false;
-    wait_result_t wgr = NULL;
-    wait_group_t wg = NULL;
-    deque_t *gq;
-    void_t key;
-    u32 i, capacity, id;
-    if (wait_id == 0)
-        return;
-
-    id = wait_id - 1;
-    gq = (deque_t *)atomic_load(&gq_sys.wait_queue[id]);
-    wg = (wait_group_t)atomic_load(&gq_sys.wait_group[id]);
-    wgr = wg->grouping;
-    capacity = gq[thread()->thrd_id].capacity + 1;
-
-    while (atomic_load(&wg->size) != 0 && !has_completed) {
-        for (i = 0; i < capacity; i++) {
-            co = deque_take(&gq[thread()->thrd_id]);
-            if (co == EMPTY_T) {
-                has_completed = true;
-                break;
-            }
-
-            key = (void_t)co_itoa(co->cid);
-            if (!co_terminated(co)) {
-                deque_push(&gq[thread()->thrd_id], co);
-                if (!co->interrupt_active && co->status == CO_NORMAL)
-                    sched_enqueue(co);
-
-                co_info(c, 1);
-                sched_yielding();
-            } else {
-                capacity--;
-                if ((!is_empty(co->results) && !co->is_event_err) || co->is_plain) {
-                    if (co->is_plain)
-                        hash_put(wgr, key, &co->plain_results);
-                    else
-                        hash_put(wgr, key, (co->is_address ? &co->results : co->results));
-
-                    if (!co->event_active && !co->is_plain && !co->is_address) {
-                        CO_FREE(co->results);
-                        co->results = NULL;
-                    }
-                }
-
-                if (co->is_event_err) {
-                    wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
-                    wg->has_erred = true;
-                    atomic_store_explicit(&gq_sys.wait_group[id], wg, memory_order_release);
-                    hash_remove(wg, key);
-                    continue;
-                }
-
-                if (co->interrupt_active)
-                    co_deferred_free(co);
-
-                hash_delete(wg, key);
-            }
-        }
-        i = 0;
-        capacity = gq[thread()->thrd_id].capacity + 1;
-    }
-
-    deque_clear(&gq[thread()->thrd_id]);
     sched_dec();
 }
 
@@ -2423,11 +2332,7 @@ static void_t thrd_main_main(void_t v) {
 
         if (thrd_is_waitable(group_id) && already) {
             already = false;
-            if (atomic_flag_load(&gq_sys.is_queue))
-                thrd_wait_for(group_id);
-            else
-                thrd_wait_for_ex(group_id);
-
+            thrd_wait_for(group_id);
             if (sched_count() == 1 && sched_is_sleeping())
                 sched_dec();
         } else if (sched_count() > 1) {
@@ -2450,8 +2355,8 @@ static  int thrd_main(void_t args) {
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
     /* Wait for global start signal */
-    while (!atomic_flag_load(&gq_sys.is_started))
-        thrd_yield();
+    while (!atomic_flag_load_explicit(&gq_sys.is_started, memory_order_relaxed))
+        ;
 
     if (atomic_flag_load(&gq_sys.is_multi)) {
         create_routine(thrd_main_main, NULL, gq_sys.stacksize * 3, RUN_THRD);
@@ -2498,9 +2403,8 @@ int main(int argc, char **argv) {
     atomic_init(&gq_sys.take_count, 0);
     atomic_init(&gq_sys.group_id, 0);
     atomic_init(&gq_sys.wait_group, NULL);
-    atomic_init(&gq_sys.wait_queue, NULL);
+    atomic_init(&gq_sys.group_index, NULL);
     atomic_flag_clear(&gq_sys.is_multi);
-    atomic_flag_clear(&gq_sys.is_queue);
     atomic_flag_clear(&gq_sys.is_started);
     atomic_flag_clear(&gq_sys.is_finish);
     atomic_flag_clear(&gq_sys.is_resuming);
