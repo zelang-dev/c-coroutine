@@ -723,6 +723,8 @@ C_API values_type args_get(void_t params, int item);
 * @param desc format, similar to `printf()`:
 * * `i` unsigned integer,
 * * `d` signed integer,
+* * `l` signed long,
+* * `z` size_t - max size,
 * * `c` character,
 * * `s` string,
 * * `a` array,

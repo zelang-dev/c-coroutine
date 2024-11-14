@@ -185,6 +185,8 @@ C_API void args_free(args_t *params);
 * @param desc format, similar to `printf()`:
 * * `i` unsigned integer,
 * * `d` signed integer,
+* * `l` signed long,
+* * `z` size_t - max size,
 * * `c` character,
 * * `s` string,
 * * `a` array,
