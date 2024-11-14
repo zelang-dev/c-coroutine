@@ -1655,7 +1655,7 @@ static void sched_steal_available(void) {
         group_id = (size_t)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
         id = group_id - 1;
         if (group_id && atomic_flag_load(&gq_sys.is_threading_waitable))
-            gi = (u32 *)atomic_load(&gq_sys.group_index[id]);
+            gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_relaxed);
 
         for (i = 0; i < available; i++) {
             t = deque_steal(gq_sys.deque_run_queue);
@@ -1686,6 +1686,11 @@ static void sched_steal_available(void) {
                 if (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) {
                     gq_sys.is_takeable--;
                     atomic_init(&gq_sys.take_count, 0);
+                    if (!is_empty(gi)) {
+                        atomic_thread_fence(memory_order_acquire);
+                        deque_reset(gq_sys.deque_run_queue, gq_sys.thread_count);
+                        atomic_thread_fence(memory_order_release);
+                    }
                 }
             }
         }
