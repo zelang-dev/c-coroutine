@@ -256,10 +256,10 @@ wait_result_t wait_for(wait_group_t wg) {
         c->is_group_finish = true;
         co_yield();
         if (is_multi && atomic_flag_load(&gq_sys.is_threading_waitable)) {
-            group_id = atomic_load(&gq_sys.group_id);
+            group_id = atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
             if (group_id) {
                 id = group_id - 1;
-                gi = (u32 *)atomic_load(&gq_sys.group_index[id]);
+                gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_relaxed);
                 begin = gi[sched_id()];
                 wait_group = (wait_group_t *)atomic_load(&gq_sys.wait_group);
                 wait_group[id] = wg;
@@ -270,8 +270,8 @@ wait_result_t wait_for(wait_group_t wg) {
 
         wgr = wg->grouping;
         co_deferred(c, VOID_FUNC(hash_free), wgr);
-        while (atomic_load(&wg->size) != 0 && !has_completed) {
-            capacity = (u32)atomic_load(&wg->capacity);
+        while (atomic_load_explicit(&wg->size, memory_order_relaxed) != 0 && !has_completed) {
+            capacity = (u32)atomic_load_explicit(&wg->capacity, memory_order_relaxed);
             for (i = begin; i < capacity; i++) {
                 pair = (oa_pair *)atomic_load_explicit(&wg->buckets[i], memory_order_relaxed);
                 if (!is_empty(pair) && !is_empty(pair->value)) {

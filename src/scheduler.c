@@ -267,17 +267,18 @@ CO_FORCE_INLINE bool sched_is_active(void) {
 
 /* Check `global` run queue count for zero. */
 CO_FORCE_INLINE bool sched_is_empty(void) {
-    return atomic_load(&gq_sys.active_count) == 0;
+    return atomic_load_explicit(&gq_sys.active_count, memory_order_relaxed) == 0;
 }
 
 /* Check `global` run queue count for tasks available over threshold for assigning. */
 CO_FORCE_INLINE bool sched_is_takeable(void) {
-    return !gq_sys.is_takeable && atomic_load(&gq_sys.active_count) > 0;
+    return !gq_sys.is_takeable && atomic_load_explicit(&gq_sys.active_count, memory_order_relaxed) > 0;
 }
 
 /* Check for available/assigned tasks for `current` thread. */
 CO_FORCE_INLINE bool sched_is_available(void) {
-    return atomic_flag_load(&gq_sys.is_multi) && (int)atomic_load(&gq_sys.available[thread()->thrd_id]) > 0;
+    return atomic_flag_load(&gq_sys.is_multi)
+        && (int)atomic_load_explicit(&gq_sys.available[thread()->thrd_id], memory_order_relaxed) > 0;
 }
 
 CO_FORCE_INLINE bool sched_is_sleeping(void) {
@@ -289,7 +290,7 @@ the thread to receive another thread's `run queue`. */
 CO_FORCE_INLINE bool sched_is_stealable(size_t id) {
     return atomic_flag_load(&gq_sys.is_multi)
         && atomic_flag_load(&gq_sys.any_stealable[id])
-        && atomic_load(&gq_sys.stealable_thread[id]) == thread()->thrd_id;
+        && atomic_load_explicit(&gq_sys.stealable_thread[id], memory_order_relaxed) == thread()->thrd_id;
 }
 
 /* Check `current` thread steal status marking,
@@ -297,7 +298,7 @@ the thread giving up tasks to another thread's `run queue`. */
 CO_FORCE_INLINE bool sched_is_stolen(void) {
     return atomic_flag_load(&gq_sys.is_multi) && !sched_is_main()
         && atomic_flag_load(&gq_sys.any_stealable[thread()->thrd_id])
-        && atomic_load(&gq_sys.stealable_thread[thread()->thrd_id]) == gq_sys.thread_invalid;
+        && atomic_load_explicit(&gq_sys.stealable_thread[thread()->thrd_id], memory_order_relaxed) == gq_sys.thread_invalid;
 }
 
 static bool sched_is_running(void) {
@@ -307,7 +308,7 @@ static bool sched_is_running(void) {
     size_t i;
     int *has;
     for (i = 0; i < gq_sys.cpu_count; i++) {
-        has = (int *)atomic_load(&gq_sys.count[i]);
+        has = (int *)atomic_load_explicit(&gq_sys.count[i], memory_order_relaxed);
         if (is_empty(has) || (!is_empty(has) && *has <= 0))
             continue;
 
@@ -327,7 +328,7 @@ static bool sched_is_any_available(void) {
     int *has;
     size_t i, has_items, id = 0, last = 0;
     for (i = 0; i < gq_sys.cpu_count; i++) {
-        has = (int *)atomic_load(&gq_sys.count[i]);
+        has = (int *)atomic_load_explicit(&gq_sys.count[i], memory_order_relaxed);
         if (is_empty(has) || (!is_empty(has) && *has <= 0))
             continue;
 
@@ -404,10 +405,10 @@ static void sched_post_available(void) {
         return;
 
     /* Return if previous posting wasn't taken yet. */
-    if (atomic_load(&gq_sys.available[gq_sys.cpu_count]) > 0 || gq_sys.is_takeable)
+    if (atomic_load_explicit(&gq_sys.available[gq_sys.cpu_count], memory_order_relaxed) > 0 || gq_sys.is_takeable)
         return;
 
-    size_t available, i, active = atomic_load(&gq_sys.active_count);
+    size_t available, i, active = atomic_load_explicit(&gq_sys.active_count, memory_order_relaxed);
     bool is_threading_waitable = sched_is_assignable(active);
     if (is_threading_waitable) {
         atomic_flag_test_and_set(&gq_sys.is_threading_waitable);
@@ -1650,7 +1651,7 @@ the amount/count was set by `sched_is_takeable` and `sched_post_available`. */
 static void sched_steal_available(void) {
     routine_t *t = NULL;
     u32 *gi = NULL;
-    size_t i, id, group_id = 0, count = 0, available = atomic_load(&gq_sys.available[thread()->thrd_id]);
+    size_t i, id, group_id = 0, count = 0, available = atomic_load_explicit(&gq_sys.available[thread()->thrd_id], memory_order_relaxed);
     if (available > 0) {
         group_id = (size_t)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
         id = group_id - 1;
@@ -1683,7 +1684,7 @@ static void sched_steal_available(void) {
         if ((available - count) == 0) {
             if (atomic_flag_load(&gq_sys.is_threading_waitable)) {
                 atomic_fetch_add(&gq_sys.take_count, 1);
-                if (atomic_load(&gq_sys.take_count) == gq_sys.thread_count) {
+                if (atomic_load_explicit(&gq_sys.take_count, memory_order_relaxed) == gq_sys.thread_count) {
                     gq_sys.is_takeable--;
                     atomic_init(&gq_sys.take_count, 0);
                     if (!is_empty(gi)) {
@@ -2258,13 +2259,13 @@ static void thrd_wait_for(u32 wait_id) {
         return;
 
     id = wait_id - 1;
-    gi = (u32 *)atomic_load(&gq_sys.group_index[id]);
+    gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_relaxed);
     begin = gi[sched_id()];
-    wg = (wait_group_t)atomic_load(&gq_sys.wait_group[id]);
+    wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_relaxed);
     wgr = wg->grouping;
     group_capacity = wg->group_capacity;
-    while (atomic_load(&wg->size) != 0 && !has_completed) {
-        capacity = (u32)atomic_load(&wg->capacity);
+    while (atomic_load_explicit(&wg->size, memory_order_relaxed) != 0 && !has_completed) {
+        capacity = (u32)atomic_load_explicit(&wg->capacity, memory_order_relaxed);
         for (i = begin; i < capacity; i++) {
             if (group_capacity == 0) {
                 has_completed = true;
@@ -2328,7 +2329,7 @@ static void_t thrd_main_main(void_t v) {
     if (sched_is_available())
         sched_steal_available();
 
-    group_id = (u32)atomic_load(&gq_sys.group_id);
+    group_id = (u32)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
     while (!sched_empty() && atomic_flag_load(&gq_sys.is_errorless) && !atomic_flag_load(&gq_sys.is_finish)) {
         if ((wait_id = (u32)atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed)) != group_id) {
             group_id = wait_id;
