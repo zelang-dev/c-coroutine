@@ -1971,7 +1971,7 @@ make_atomic(void *, atomic_ptr_t)
         }
     #endif
     #if defined(C89ATOMIC_HAS_64)
-        static C89ATOMIC_INLINE c89atomic_bool c89atomic_compare_exchange_strong_explicit_64(volatile c89atomic_uint64* dst, volatile c89atomic_uint64* expected, c89atomic_uint64 desired, c89atomic_memory_order successOrder, c89atomic_memory_order failureOrder)
+        static C89ATOMIC_INLINE c89atomic_bool c89atomic_compare_exchange_strong_explicit_64(volatile c89atomic_uint64* dst, c89atomic_uint64* expected, c89atomic_uint64 desired, c89atomic_memory_order successOrder, c89atomic_memory_order failureOrder)
         {
             c89atomic_uint64 expectedValue;
             c89atomic_uint64 result;
@@ -2552,7 +2552,13 @@ static C89ATOMIC_INLINE double c89atomic_compare_and_swap_f64(volatile double* d
 /* Spinlock */
 typedef c89atomic_flag c89atomic_spinlock;
 
-static C89ATOMIC_INLINE void c89atomic_spinlock_lock(volatile c89atomic_spinlock* pSpinlock)
+#ifndef _STDATOMIC_H
+    make_atomic(c89atomic_flag, atomic_flag)
+#endif
+
+make_atomic(c89atomic_spinlock, atomic_spinlock)
+
+static C89ATOMIC_INLINE void c89atomic_spinlock_lock(atomic_spinlock *pSpinlock)
 {
     for (;;) {
         if (c89atomic_flag_test_and_set_explicit(pSpinlock, c89atomic_memory_order_acquire) == 0) {
@@ -2565,14 +2571,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_lock(volatile c89atomic_spinlock
     }
 }
 
-static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlock* pSpinlock)
+static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(atomic_spinlock *pSpinlock)
 {
     c89atomic_flag_clear_explicit(pSpinlock, c89atomic_memory_order_release);
 }
-
-#ifndef _STDATOMIC_H
-    make_atomic(c89atomic_flag, atomic_flag)
-#endif
 
 #ifdef _WIN32
     typedef volatile void *atomic_ptr_t;
@@ -2641,9 +2643,14 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #   define atomic_get(type, obj)  (type)c89atomic_load_64((atomic_ullong *)obj)
 #endif
 
+#define atomic_lock(mutex)   c89atomic_spinlock_lock((atomic_spinlock *)mutex)
+#define atomic_unlock(mutex) c89atomic_spinlock_unlock((atomic_spinlock *)mutex)
+
 #if !defined(_STDATOMIC_H)
 /* reads an atomic_flag */
 #define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_seq_cst)
+/* reads an atomic_flag */
+#define atomic_flag_load_explicit(ptr, order)	c89atomic_flag_load_explicit((atomic_flag *)ptr, order)
 
 /* sets an atomic_flag to false */
 #define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)
@@ -2786,7 +2793,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #define atomic_compare_exchange_strong(obj, expected, desired) atomic_cas((atomic_ullong *)obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong_explicit(obj, expected, desired, succ, fail)	\
-    c89atomic_compare_exchange_strong_explicit_64((atomic_ullong *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired, succ, fail)
+    c89atomic_compare_exchange_strong_explicit_64((atomic_ullong *)obj, (c89atomic_uint64 *)expected, (c89atomic_uint64)desired, succ, fail)
 #endif
 #endif
 

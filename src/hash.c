@@ -401,7 +401,7 @@ void_t oa_string_cp(const_t data, void_t arg) {
     size_t input_length = strlen(input) + 1;
     char *result = try_calloc(1, sizeof(*result) * input_length + sizeof(values_t) + 1);
 
-    co_strcpy(result, input, input_length);
+    str_copy(result, input, input_length);
     return result;
 }
 

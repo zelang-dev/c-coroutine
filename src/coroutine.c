@@ -23,19 +23,8 @@ CO_FORCE_INLINE co_collector_t *co_collector_list(void) {
     return coroutine_list();
 }
 
-args_t *args_for(const char *desc, ...) {
-    va_list ap;
-    args_t *params;
-
-    va_start(ap, desc);
-    params = raii_args_for(co_scope(), desc, ap);
-    va_end(ap);
-
-    return params;
-}
-
 values_type args_get(void_t params, int item) {
-    args_t *args = (args_t *)params;
+    args_t args = (args_t)params;
     if (!args->defer_set) {
         args->defer_set = true;
         defer(args_free, args);
@@ -261,9 +250,9 @@ wait_result_t wait_for(wait_group_t wg) {
                 id = group_id - 1;
                 gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_relaxed);
                 begin = gi[sched_id()];
-                wait_group = (wait_group_t *)atomic_load(&gq_sys.wait_group);
+                wait_group = (wait_group_t *)atomic_load_explicit(&gq_sys.wait_group, memory_order_acquire);
                 wait_group[id] = wg;
-                atomic_store(&gq_sys.wait_group, wait_group);
+                atomic_store_explicit(&gq_sys.wait_group, wait_group, memory_order_release);
             }
             group_capacity = wg->group_capacity;
         }
@@ -326,7 +315,7 @@ wait_result_t wait_for(wait_group_t wg) {
         c->wait_active = false;
         c->wait_group = NULL;
         if (is_multi && group_id) {
-            while (atomic_load(&wg->size) != 0)
+            while (atomic_load_explicit(&wg->size, memory_order_relaxed) != 0)
                 co_yield();
 
             gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_acquire);
@@ -427,8 +416,8 @@ CO_FORCE_INLINE void co_info(routine_t *t, int pos) {
 
     char line[SCRAPE_SIZE];
     snprintf(line, SCRAPE_SIZE, "\033[0K\n\r\033[%dA", pos);
-    fprintf(stderr, "\t\t - Thrd #%lx, cid: %u (%s) %s cycles: %zu%s",
-            co_async_self(),
+    fprintf(stderr, "\t\t - Thrd #%zx, cid: %u (%s) %s cycles: %zu%s",
+            thrd_self(),
             t->cid,
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->is_channeling ? "" : "channel"),
             co_state(t->status),
@@ -518,8 +507,7 @@ CO_FORCE_INLINE void_t co_malloc(routine_t *coro, size_t size) {
     return co_malloc_full(coro, size, CO_FREE);
 }
 
-CO_FORCE_INLINE void_t co_memdup(routine_t *coro, const_t src, size_t len) {
-    void_t ptr = co_new_by(1, len + 1);
-
-    return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;
+CO_FORCE_INLINE void co_yield_info(void) {
+    co_info(co_active(), 1);
+    co_yield();
 }

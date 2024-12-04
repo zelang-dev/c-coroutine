@@ -1,8 +1,7 @@
 #ifndef RAII_H
 #define RAII_H
 
-#include "rtypes.h"
-#include "exception.h"
+#include "swar.h"
 #include "cthread.h"
 #include "catomic.h"
 #include <stdio.h>
@@ -19,10 +18,15 @@
 /* Smart memory pointer, the allocated memory requested in `arena` field,
 all other fields private, this object binds any additional requests to it's lifetime. */
 typedef struct memory_s memory_t;
+typedef struct _future future;
 typedef memory_t unique_t;
 typedef void (*func_t)(void *);
 typedef void (*func_args_t)(void *, ...);
+typedef void *(*raii_func_args_t)(void *, ...);
 typedef void *(*raii_func_t)(void *);
+typedef intptr_t (*raii_callable_t)(intptr_t);
+typedef uintptr_t (*raii_callable_args_t)(uintptr_t, ...);
+typedef uintptr_t *(*raii_callable_const_t)(const char *, ...);
 typedef enum {
     RAII_NULL,
     RAII_INT,
@@ -79,6 +83,9 @@ typedef enum {
     RAII_THREAD,
     RAII_GUARDED_STATUS,
     RAII_QUEUE,
+    RAII_SPAWN,
+    RAII_POOL,
+    RAII_SYNC,
     RAII_COUNT
 } raii_type;
 
@@ -105,15 +112,16 @@ typedef union {
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
-    char **array;
     void *object;
+    ptrdiff_t **array;
+    intptr_t **array_int;
+    uintptr_t **array_uint;
     raii_func_t func;
-    const char const_char[128];
+    const char const_char[256];
 } values_type;
 
 typedef struct {
     values_type value;
-    raii_type type;
 } raii_values_t;
 
 typedef struct {
@@ -147,35 +155,141 @@ typedef struct {
 
 struct memory_s {
     void *arena;
-    int status;
     bool is_recovered;
-    void *volatile err;
-    const char *volatile panic;
     bool is_protected;
     bool is_arena;
     bool is_emulated;
-    ex_ptr_t *protector;
-    defer_t defer;
+    int status;
     size_t mid;
+    defer_t defer;
+    ex_ptr_t *protector;
+    void *volatile err;
+    const char *volatile panic;
 };
 
 typedef struct args_s {
     raii_type type;
-    /* allocated array of arguments */
-    raii_values_t *args;
-    unique_t *context;
+    int defer_set;
 
+    unique_t *context;
+    size_t args_size;
     /* total number of args in set */
     size_t n_args;
-    bool defer_set;
-} args_t;
+
+    /* allocated array of arguments */
+    raii_values_t *args;
+} *args_t;
+
+typedef void (*for_func_t)(i64, i64);
+typedef void_t (*thrd_func_t)(args_t);
+typedef void_t (*result_func_t)(void_t result, size_t id, values_type iter);
+typedef void (*wait_func)(void);
+typedef struct _promise {
+    raii_type type;
+    int id;
+    atomic_flag done;
+    atomic_spinlock mutex;
+    raii_values_t result[1];
+} promise;
+
+typedef struct {
+    raii_type type;
+    int id;
+    size_t value_count;
+    raii_values_t **values;
+} thrd_values_t;
+
+typedef struct _future_arg future_arg;
+typedef struct future_deque future_deque_t;
+struct _future_arg {
+    raii_type type;
+    int id;
+    void_t arg;
+    thrd_func_t func;
+    promise *value;
+    future_deque_t *queue;
+};
+
+make_atomic(future_arg, atomic_future_arg)
+typedef struct {
+    atomic_size_t size;
+    atomic_future_arg buffer[];
+} future_array_t;
+
+make_atomic(future_array_t *, atomic_future_t)
+struct future_deque {
+    /* Assume that they never overflow */
+    atomic_size_t top, bottom;
+    atomic_future_t array;
+};
+
+typedef struct result_data {
+    raii_type type;
+    bool is_ready;
+    raii_values_t *result;
+} *result_t;
+
+typedef struct future_pool {
+    raii_type type;
+    int thread_count;
+    size_t cpu_present;
+    memory_t *scope;
+    future **futures;
+    result_t *results;
+    future_deque_t queue[1];
+} future_t;
+
+struct _future {
+    raii_type type;
+    int id;
+    thrd_t thread;
+    thrd_func_t func;
+    promise *value;
+};
+
+/* Calls fn (with args as arguments) in separate thread, returning without waiting
+for the execution of fn to complete. The value returned by fn can be accessed
+by calling `thrd_get()`. */
+C_API future *thrd_async(thrd_func_t fn, void_t args);
+
+/* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
+function blocks the calling thread and waits until it is ready. */
+C_API values_type thrd_get(future *);
+
+/* This function blocks the calling thread and waits until `future` is ready,
+will execute provided `yield` callback function continuously.  */
+C_API void thrd_wait(future *, wait_func yield);
+
+/* Check status of `future` object state, if `true` indicates thread execution has ended,
+any call thereafter to `thrd_get` is guaranteed non-blocking. */
+C_API bool thrd_is_done(future *);
+C_API uintptr_t thrd_self(void);
+C_API size_t thrd_cpu_count(void);
+C_API raii_values_t *thrd_returning(args_t, void_t value);
+
+C_API future_t *thrd_scope(void);
+C_API future_t *thrd_sync(future_t *);
+C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
+C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
+C_API values_type thrd_result(result_t value);
+
+C_API future_t *thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
+C_API future_t *thrd_pool(size_t count, size_t queue_count);
+C_API int thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+
+C_API void thrd_then(result_func_t callback, future_t *iter, void_t result);
+C_API void thrd_destroy(future_t *);
+C_API bool thrd_is_finish(future_t *);
+
+#define thrd_data(value) ((raii_values_t *)&value)
+#define thrd_value(value) ((raii_values_t *)value)
 
 /**
 * `Release/free` allocated memory, must be called if not using `get_args()` function.
 *
 * @param params arbitrary arguments
 */
-C_API void args_free(args_t *params);
+C_API void args_free(args_t params);
 
 /**
 * Creates an scoped container for arbitrary arguments passing to an single `args` function.
@@ -195,7 +309,9 @@ C_API void args_free(args_t *params);
 * * `p` void pointer for any arbitrary object
 * @param arguments indexed by `desc` format order
 */
-C_API args_t *raii_args_for(memory_t *scope, const char *desc, ...);
+C_API args_t raii_args_for(memory_t *scope, const char *desc, ...);
+C_API args_t args_for(const char *desc, ...);
+C_API args_t raii_args_ex(memory_t *scope, const char *desc, va_list);
 
 /**
 * Returns generic union `values_type` of argument, will auto `release/free`
@@ -206,7 +322,9 @@ C_API args_t *raii_args_for(memory_t *scope, const char *desc, ...);
 * @param params arbitrary arguments
 * @param item index number
 */
-C_API values_type get_args(void *params, int item);
+C_API values_type raii_get_args(memory_t *scope, void_t params, int item);
+C_API values_type get_args(args_t params, int item);
+C_API values_type get_arg(void_t params);
 
 /**
 * Returns generic union `values_type` of argument.
@@ -214,7 +332,7 @@ C_API values_type get_args(void *params, int item);
 * @param params arguments instance
 * @param index item number
 */
-C_API values_type args_in(args_t *params, int index);
+C_API values_type args_in(args_t params, size_t index);
 
 C_API memory_t *raii_local(void);
 /* Return current `thread` smart memory pointer. */
@@ -289,6 +407,13 @@ C_API void raii_deferred_free(memory_t *);
 /* Begin `unwinding`, executing current `thread` scope `raii_defer` statements. */
 C_API void raii_deferred_clean(void);
 
+C_API void *raii_memdup(const_t src, size_t len);
+C_API string *raii_split(string_t s, string_t delim, int *count);
+C_API string raii_concat(int num_args, ...);
+C_API string raii_replace(string_t haystack, string_t needle, string_t replace);
+C_API u_string raii_encode64(u_string_t src);
+C_API u_string raii_decode64(u_string_t src);
+
 /* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
 for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
@@ -357,15 +482,15 @@ execution begins when current `guard` scope exits or panic/throw. */
 #define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, (func_t)func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _recover(err)   raii_is_caught(raii_init()->arena, err)
+#define _recover(err)   raii_is_caught(raii_local()->arena, err)
 
 /* Compare `err` to scoped error condition,
 will mark exception handled, if `true`.
 DO NOT PUT `err` in quote's like "err". */
-#define _is_caught(err)   raii_is_caught(raii_init()->arena, EX_STR(err))
+#define _is_caught(err)   raii_is_caught(raii_local()->arena, EX_STR(err))
 
 /* Get scoped error condition string. */
-#define _get_message()  raii_message_by(raii_init()->arena)
+#define _get_message()  raii_message_by(raii_local()->arena)
 
 /* Stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */
@@ -400,16 +525,16 @@ are only valid between these sections.
     exception_setup_func = guard_set;                   \
     unique_t *_$##__FUNCTION__ = unique_init();         \
     (_$##__FUNCTION__)->status = RAII_GUARDED_STATUS;   \
-    raii_init()->arena = (void *)_$##__FUNCTION__;      \
+    raii_local()->arena = (void *)_$##__FUNCTION__;     \
     ex_try {                                            \
         do {
 
     /* This ends an scoped guard section, it replaces `}`.
     On exit will begin executing deferred functions,
     return given `result` when done, use `NONE` for no return. */
-    #define unguarded(result)                                           \
-            } while (false);                                            \
-            raii_deferred_free(_$##__FUNCTION__);                       \
+#define unguarded(result)                                           \
+            } while (false);                                        \
+            raii_deferred_free(_$##__FUNCTION__);                   \
     } ex_catch_if {                                                 \
         if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
             raii_deferred_free(_$##__FUNCTION__);                   \
@@ -425,9 +550,8 @@ are only valid between these sections.
 #define guarded                                                     \
         } while (false);                                            \
         raii_deferred_free(_$##__FUNCTION__);                       \
-    } ex_catch_if {                                                \
-        if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
-            raii_deferred_free(_$##__FUNCTION__);                   \
+    } ex_catch_if {                                                 \
+        raii_deferred_free(_$##__FUNCTION__);                       \
     } ex_finally {                                                  \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
@@ -509,6 +633,15 @@ C_API size_t arena_capacity(const arena_t arena);
 C_API size_t arena_total(const arena_t arena);
 C_API void arena_print(const arena_t arena);
 
+C_API string str_memdup_ex(memory_t *defer, const_t src, size_t len);
+C_API string str_copy(string dest, string_t src, size_t len);
+C_API string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count);
+C_API string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy);
+C_API string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, string_t replace);
+C_API u_string str_encode64_ex(memory_t *defer, u_string_t src);
+C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
+C_API bool is_base64(u_string_t src);
+C_API int strpos(const char *text, char *pattern);
 
 #ifdef __cplusplus
     }

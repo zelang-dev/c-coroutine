@@ -12,10 +12,6 @@
 #include "uv_routine.h"
 #include "raii.h"
 
-#if !defined(_STDATOMIC_H)
-#define atomic_flag_load_explicit(ptr, order)	c89atomic_flag_load_explicit((atomic_flag *)ptr, order)
-#endif
-
 #if defined(_MSC_VER)
     #define CO_MPROTECT 1
     #define S_IRUSR S_IREAD  /* read, user */
@@ -122,7 +118,7 @@
 
 #if !defined(CO_MALLOC) || !defined(CO_FREE) || !defined(CO_REALLOC)|| !defined(CO_CALLOC)
     #define CO_MALLOC RAII_MALLOC
-    #define CO_FREE rpfree
+    #define CO_FREE RAII_FREE
     #define CO_REALLOC RAII_REALLOC
     #define CO_CALLOC RAII_CALLOC
 #endif
@@ -230,7 +226,6 @@ typedef enum {
 } value_types;
 
 typedef void_t (*callable_t)(void_t);
-typedef int (*thrd_func_t)(void *);
 typedef void (*any_func_t)(void_t, ...);
 typedef void_t (*multi_func_t)(void_t, ...);
 
@@ -623,11 +618,6 @@ typedef enum {
     ZE_ERR = CO_NULL,
 } result_type;
 
-typedef struct {
-    result_type type;
-    value_t *value;
-} result_t;
-
 typedef struct uv_args_s {
     value_types type;
     bool is_path;
@@ -716,25 +706,6 @@ C_API uv_loop_t *co_loop(void);
 */
 C_API values_type args_get(void_t params, int item);
 
-/**
-* Creates an container for arbitrary arguments passing to an `coroutine` or `thread`.
-* Use `args_get()` or `args_in()` for retrieval.
-*
-* @param desc format, similar to `printf()`:
-* * `i` unsigned integer,
-* * `d` signed integer,
-* * `l` signed long,
-* * `z` size_t - max size,
-* * `c` character,
-* * `s` string,
-* * `a` array,
-* * `x` function,
-* * `f` double/float,
-* * `p` void pointer for any arbitrary object
-* @param arguments indexed by `desc` format order
-*/
-C_API args_t *args_for(const char *desc, ...);
-
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);
 
@@ -815,10 +786,8 @@ will auto free `LIFO` on function exit/return, do not free! */
 C_API void_t co_new(size_t);
 C_API void_t co_malloc(routine_t *, size_t);
 C_API void_t co_malloc_full(routine_t *, size_t, func_t);
-C_API void_t co_memdup(routine_t *, const_t, size_t);
 
 C_API string co_strdup(string_t);
-C_API string co_strndup(string_t, size_t);
 C_API string co_string(string_t str, size_t length);
 C_API string *co_str_split(string_t s, string_t delim, int *count);
 C_API string co_concat_by(int num_args, ...);
@@ -895,6 +864,9 @@ C_API signed int co_err_code(void);
 
 /* Yield execution to another coroutine and reschedule current. */
 C_API void co_yield(void);
+
+/* Same as `co_yield`, will show active `co_info` in debug mode. */
+C_API void co_yield_info(void);
 
 /* Returns the current coroutine's name. */
 C_API string co_get_name(void);
@@ -1062,63 +1034,11 @@ C_API string_t co_state(int);
 
 C_API void delete(void_t ptr);
 
-typedef struct _promise {
-    value_types type;
-    values_t *result;
-    mtx_t mutex;
-    cnd_t cond;
-    bool done;
-    int id;
-} promise;
-
-typedef struct _future {
-    value_types type;
-    thrd_t thread;
-    thrd_func_t func;
-    int id;
-    promise *value;
-} future;
-
-typedef struct _future_arg {
-    value_types type;
-    thrd_func_t func;
-    void_t arg;
-    promise *value;
-} future_arg;
-
-C_API future *future_create(callable_t);
-C_API void future_start(future *, void_t);
-C_API void future_close(future *);
-
-C_API promise *promise_create();
-C_API value_t promise_get(promise *);
-C_API void promise_set(promise *, int);
-C_API bool promise_done(promise *);
-C_API void promise_close(promise *);
-
-/* Calls fn (with args as arguments) in separate thread, returning without waiting
-for the execution of fn to complete. The value `future` returned by fn can be accessed
-by calling `co_async_get()`. */
-C_API future *co_async(callable_t, void_t);
-
-/* Returns the value of a promise, a future thread's shared object, If not ready this
-function blocks the calling thread and waits until it is ready. */
-C_API value_t co_async_get(future *);
-
-/* Waits for the future thread's state to change. this function pauses current coroutine
-and execute others until future is ready, thread execution has ended. */
-C_API void co_async_wait(future *);
-
-C_API unsigned long co_async_self(void);
-
 /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
 C_API void co_stack_check(int);
 
-/* Generic "itoa" using current coroutine scrape buffer and `snprintf` */
+/* Generic "itoa" using current coroutine scrape buffer and `simd_itoa` */
 C_API string_t co_itoa(int64_t number);
-
-C_API int co_strpos(string_t text, string pattern);
-C_API void co_strcpy(string dest, string_t src, size_t len);
 
 /* Check if validated by json type */
 C_API bool is_json(json_t *);

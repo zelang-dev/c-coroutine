@@ -1776,10 +1776,10 @@ CO_FORCE_INLINE void stack_set(u32 size) {
 
 u32 go_for(callable_args_t fn, const char *desc, ...) {
     va_list ap;
-    args_t *params;
+    args_t params;
 
     va_start(ap, desc);
-    params = raii_args_for(co_scope(), desc, ap);
+    params = raii_args_for(nullptr, desc, ap);
     va_end(ap);
 
     return go((callable_t)fn, (void_t)params);
@@ -1790,7 +1790,7 @@ CO_FORCE_INLINE u32 go(callable_t fn, void_t arg) {
 }
 
 static awaitable_t async_ex(callable_t fn, void_t arg) {
-    awaitable_t awaitable = try_calloc(1, sizeof(awaitable));
+    awaitable_t awaitable = try_calloc(1, sizeof(struct awaitable_s));
     routine_t *c = co_active();
     wait_group_t wg = ht_wait_init(2);
     wg->grouping = ht_result_init();
@@ -1809,17 +1809,17 @@ static awaitable_t async_ex(callable_t fn, void_t arg) {
 
 awaitable_t async_for(callable_args_t fn, const char *desc, ...) {
     va_list ap;
-    args_t *params;
+    args_t params;
 
     va_start(ap, desc);
-    params = raii_args_for(co_scope(), desc, ap);
+    params = raii_args_for(nullptr, desc, ap);
     va_end(ap);
 
     return async((callable_t)fn, (void_t)params);
 }
 
 awaitable_t async(callable_t fn, void_t arg) {
-    awaitable_t awaitable = try_calloc(1, sizeof(awaitable));
+    awaitable_t awaitable = try_calloc(1, sizeof(struct awaitable_s));
     routine_t *c = co_active();
     wait_group_t wg = ht_wait_init(2);
     wg->grouping = ht_result_init();
@@ -2189,7 +2189,7 @@ static int thrd_scheduler(void) {
                        && (sched_empty() || l == SCHED_EMPTY_T
                            || atomic_flag_load(&gq_sys.is_finish) || !atomic_flag_load(&gq_sys.is_errorless))) {
                 atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
-                RAII_INFO("Thrd #%lx waiting to exit.\033[0K\n", co_async_self());
+                RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
                 /* Wait for global exit signal */
                 while (!atomic_flag_load(&gq_sys.is_finish) && !atomic_flag_load(&gq_sys.is_resuming))
                     thrd_yield();
@@ -2197,10 +2197,10 @@ static int thrd_scheduler(void) {
                 if (atomic_flag_load(&gq_sys.is_resuming) && sched_is_available()) {
                     atomic_store(&gq_sys.count[thread()->thrd_id], &thread()->used_count);
                     sched_steal_available();
-                    RAII_INFO("Thrd #%lx resuming, %d runnable coroutines.\033[0K\n", co_async_self(), sched_count());
+                    RAII_INFO("Thrd #%zx resuming, %d runnable coroutines.\033[0K\n", thrd_self(), sched_count());
                     l = NULL;
                 } else {
-                    RAII_INFO("Thrd #%lx exiting, %d runnable coroutines.\033[0K\n", co_async_self(), sched_count());
+                    RAII_INFO("Thrd #%zx exiting, %d runnable coroutines.\033[0K\n", thrd_self(), sched_count());
                     return thread()->exiting;
                 }
             }
