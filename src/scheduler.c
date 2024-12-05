@@ -23,7 +23,7 @@ typedef struct {
 
     u32 sleep_id;
 
-    void_t *data;
+    void_t data[3];
 
     /* record which coroutine is executing for scheduler */
     routine_t *running;
@@ -2425,6 +2425,10 @@ int main(int argc, char **argv) {
         gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
         deque_init(gq_sys.deque_run_queue, gq_sys.capacity);
     }
+
+#ifdef UV_H
+    uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
+#endif
 
     create_routine(main_main, NULL, gq_sys.stacksize * 4, RUN_MAIN);
     thrd_scheduler();
