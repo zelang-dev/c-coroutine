@@ -2092,7 +2092,7 @@ static void sched_cleanup(void) {
         if (!can_cleanup)
             return;
 
-        atomic_thread_fence(memory_order_seq_cst);
+            atomic_thread_fence(memory_order_seq_cst);
         can_cleanup = false;
     }
 
@@ -2121,9 +2121,15 @@ static int thrd_scheduler(void) {
                 sched_cleanup();
                 if (sched_count() > 0) {
                     RAII_INFO("\nNo runnable coroutines! %d stalled\n", sched_count());
+                    if (!is_raii_empty())
+                        raii_deferred_clean();
+
                     exit(1);
                 } else {
                     RAII_LOG("\nCoroutine scheduler exited");
+                    if (!is_raii_empty())
+                        raii_deferred_clean();
+
                     exit(0);
                 }
             } else if (is_multi && sched_empty() && !atomic_flag_load(&gq_sys.is_finish) && l != SCHED_EMPTY_T
