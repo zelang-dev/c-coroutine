@@ -606,7 +606,7 @@ typedef struct values_s {
     value_types type;
 } values_t;
 
-typedef void_t(*callable_args_t)(args_t *);
+typedef void_t(*callable_args_t)(args_t);
 
 typedef struct {
     value_types type;

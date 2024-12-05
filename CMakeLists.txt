@@ -26,8 +26,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.2.0.zip
-        URL_MD5 8ed970c35fff231674f1eb648a31dcd7
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.2.2.zip
+        URL_MD5 a4a598362d70357f56005eaf8e20bcdd
     )
     FetchContent_MakeAvailable(raii)
 endif()

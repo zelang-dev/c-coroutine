@@ -189,6 +189,7 @@ typedef struct _promise {
     int id;
     atomic_flag done;
     atomic_spinlock mutex;
+    memory_t *scope;
     raii_values_t result[1];
 } promise;
 
@@ -243,6 +244,7 @@ struct _future {
     raii_type type;
     int id;
     thrd_t thread;
+    memory_t *scope;
     thrd_func_t func;
     promise *value;
 };
@@ -281,8 +283,8 @@ C_API void thrd_then(result_func_t callback, future_t *iter, void_t result);
 C_API void thrd_destroy(future_t *);
 C_API bool thrd_is_finish(future_t *);
 
-#define thrd_data(value) ((raii_values_t *)&value)
-#define thrd_value(value) ((raii_values_t *)value)
+#define thrd_data(value) ((raii_values_t *)(&value))
+#define thrd_value(value) ((raii_values_t *)(value))
 
 /**
 * `Release/free` allocated memory, must be called if not using `get_args()` function.
@@ -586,11 +588,6 @@ are only valid between these sections.
 #endif
 
 #define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }
-
-/* extern declaration
-*/
-C_API bool raii_rpmalloc_set;
-C_API void raii_rpmalloc_init(void);
 
 thrd_local_extern(memory_t, raii)
 thrd_local_extern(ex_context_t, except)

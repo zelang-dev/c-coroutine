@@ -21,21 +21,21 @@ CO_FORCE_INLINE string *str_split(string_t s, string_t delim, int *count) {
     return str_split_ex(nullptr, s, delim, count);
 }
 
-CO_FORCE_INLINE string co_concat_by(int num_args, ...) {
+string co_concat_by(int num_args, ...) {
     va_list args;
-    string s;
+
     va_start(args, num_args);
-    s = str_concat_ex(co_scope(), num_args, args);
+    string s = str_concat_ex(co_scope(), num_args, args);
     va_end(args);
 
     return s;
 }
 
-CO_FORCE_INLINE string str_concat_by(int num_args, ...) {
+string str_concat_by(int num_args, ...) {
     va_list args;
-    string s;
+
     va_start(args, num_args);
-    s = str_concat_ex(nullptr, num_args, args);
+    string s = str_concat_ex(nullptr, num_args, args);
     va_end(args);
 
     return s;

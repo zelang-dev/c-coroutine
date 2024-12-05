@@ -1,7 +1,7 @@
 
 #include "coroutine.h"
 
-void *worker(args_t *arg) {
+void *worker(args_t arg) {
     int i, count = args_get(arg, 0).integer;
     char *text = args_get(arg, 1).char_ptr;
 
