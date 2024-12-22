@@ -70,7 +70,7 @@
 #   define RAII_ASSERT(c) assert(c)
 #   define RAII_LOG(s) puts(s)
 #   define RAII_INFO(s, ...) printf(s, __VA_ARGS__ )
-#   define RAII_HERE() fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
+#   define RAII_HERE fprintf(stderr, "Here %s:%d\n", __FILE__, __LINE__)
 #   ifdef _WIN32
 #       include <DbgHelp.h>
 #       pragma comment(lib,"Dbghelp.lib")
@@ -81,7 +81,7 @@
 #   define RAII_ASSERT(c)
 #   define RAII_LOG(s) (void)s
 #   define RAII_INFO(s, ...)  (void)s
-#   define RAII_HERE()  (void)0
+#   define RAII_HERE  (void)0
 #endif
 
  /* Public API qualifier. */
@@ -102,7 +102,7 @@ typedef void (*ex_unwind_func)(void *);
 
 /* low-level api
  */
-C_API void ex_throw(const char *ex, const char *file, int, const char *line, const char *message);
+C_API void ex_throw(string_t ex, string_t file, int, string_t function, string_t message, ex_backtrace_t *dump);
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API ex_context_t *ex_init(void);
@@ -184,10 +184,10 @@ enum {
     #define ex_longjmp(buf,st)  longjmp(buf,st)
 #endif
 
-#define ex_throw_loc(E, F, L, C)        \
+#define ex_throw_loc(E, F, L, C, T)        \
     do {                                \
         C_API const char EX_NAME(E)[];  \
-        ex_throw(EX_NAME(E), F, L, C, NULL);    \
+        ex_throw(EX_NAME(E), F, L, C, NULL, T);    \
     } while (0)
 
 /* An macro that stops the ordinary flow of control and begins panicking,
@@ -195,7 +195,7 @@ throws an exception of given message. */
 #define raii_panic(message)                                                     \
     do {                                                                        \
         C_API const char EX_NAME(panic)[];                                      \
-        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message));  \
+        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message), NULL);  \
     } while (0)
 
 #ifdef _WIN32
@@ -205,7 +205,7 @@ throws an exception of given message. */
             ex_err.is_rethrown = false;                         \
             ex_longjmp(ex_err.buf, ex_err.state | ex_throw_st); \
         } else if (true) {                                                \
-            ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic); \
+            ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic, ex_err.backtrace); \
         }
 
 #define ex_signal_block(ctrl)               \
@@ -290,10 +290,10 @@ throws an exception of given message. */
     pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
 
 #define rethrow()  \
-    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic)
+    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic, ex_err.backtrace)
 
 #define throw(E) \
-    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
+    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__, NULL)
 #define ex_try                              \
 {                                           \
     if (!exception_signal_set)              \

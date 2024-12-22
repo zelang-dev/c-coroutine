@@ -25,12 +25,9 @@ CO_FORCE_INLINE co_collector_t *co_collector_list(void) {
 
 values_type args_get(void_t params, int item) {
     args_t args = (args_t)params;
-    if (!args->defer_set) {
-        args->defer_set = true;
-        defer(args_free, args);
-    }
+    args_deferred_set(args, co_scope());
 
-    return args_in(args, item);
+    return args[item];
 }
 
 void delete(void_t ptr) {
@@ -41,8 +38,6 @@ void delete(void_t ptr) {
             ((object_t *)ptr)->dtor(ptr);
         or (CO_OA_HASH)
             hash_free(ptr);
-        or (CO_ARGS)
-            args_free(ptr);
         otherwise {
             if (is_valid(ptr)) {
                 memset(ptr, 0, sizeof(ptr));

@@ -1751,9 +1751,12 @@ CO_FORCE_INLINE void stack_set(u32 size) {
 
 u32 go_for(callable_args_t fn, const char *desc, ...) {
     va_list ap;
+    size_t i, count = simd_strlen(desc);
 
+    args_t params = args_for(0);
     va_start(ap, desc);
-    args_t params = raii_args_ex(co_scope(), desc, ap);
+    for (i = 0; i < count; i++)
+        vector_push_back(params, va_arg(ap, void_t));
     va_end(ap);
 
     return go((callable_t)fn, (void_t)params);
@@ -1783,9 +1786,12 @@ static awaitable_t async_ex(callable_t fn, void_t arg) {
 
 awaitable_t async_for(callable_args_t fn, const char *desc, ...) {
     va_list ap;
+    size_t i, count = simd_strlen(desc);
 
+    args_t params = args_for(0);
     va_start(ap, desc);
-    args_t params = raii_args_ex(nullptr, desc, ap);
+    for (i = 0; i < count; i++)
+        vector_push_back(params, va_arg(ap, void_t));
     va_end(ap);
 
     return async((callable_t)fn, (void_t)params);

@@ -42,7 +42,7 @@ void *func(void *args) {
 }
 
 int co_main(int argc, char **argv) {
-    args_t params = args_for("pp", channel(), channel());
+    args_t params = array(2, channel(), channel());
     go(func, params);
-    return fibonacci(args_in(params, 0).object, args_in(params, 1).object);
+    return fibonacci(params[0].object, params[1].object);
 }

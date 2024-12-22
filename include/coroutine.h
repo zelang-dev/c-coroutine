@@ -447,7 +447,6 @@ typedef struct scheduler_s {
 
 make_atomic(routine_t *, atomic_routine_t)
 make_atomic(wait_group_t, atomic_wait_t)
-make_atomic(wait_result_t, atomic_result_t)
 make_atomic(scheduler_t, atomic_scheduler_t)
 
 typedef struct {

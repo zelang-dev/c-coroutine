@@ -1264,8 +1264,8 @@ CO_FORCE_INLINE int spawn_pid(spawn_t *child) {
     return child->process->pid;
 }
 
-CO_FORCE_INLINE uv_stream_t *ipc_in(spawn_t *in) {
-    return in->handle->stdio[0].data.stream;
+CO_FORCE_INLINE uv_stream_t *ipc_in(spawn_t *_in) {
+    return _in->handle->stdio[0].data.stream;
 }
 
 CO_FORCE_INLINE uv_stream_t *ipc_out(spawn_t *out) {
