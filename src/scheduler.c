@@ -1749,13 +1749,13 @@ CO_FORCE_INLINE void stack_set(u32 size) {
     gq_sys.stacksize = size;
 }
 
-u32 go_for(callable_args_t fn, const char *desc, ...) {
+u32 go_for(callable_args_t fn, size_t num_of_args, ...) {
     va_list ap;
-    size_t i, count = simd_strlen(desc);
+    size_t i;
 
     args_t params = args_for(0);
-    va_start(ap, desc);
-    for (i = 0; i < count; i++)
+    va_start(ap, num_of_args);
+    for (i = 0; i < num_of_args; i++)
         vector_push_back(params, va_arg(ap, void_t));
     va_end(ap);
 
@@ -1784,13 +1784,13 @@ static awaitable_t async_ex(callable_t fn, void_t arg) {
     return awaitable;
 }
 
-awaitable_t async_for(callable_args_t fn, const char *desc, ...) {
+awaitable_t async_for(callable_args_t fn, size_t num_of_args, ...) {
     va_list ap;
-    size_t i, count = simd_strlen(desc);
+    size_t i;
 
     args_t params = args_for(0);
-    va_start(ap, desc);
-    for (i = 0; i < count; i++)
+    va_start(ap, num_of_args);
+    for (i = 0; i < num_of_args; i++)
         vector_push_back(params, va_arg(ap, void_t));
     va_end(ap);
 
@@ -2439,7 +2439,7 @@ int main(int argc, char **argv) {
     }
 
 #ifdef UV_H
-    uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
+ //   uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
 #endif
 
     create_routine(main_main, NULL, gq_sys.stacksize * 4, RUN_MAIN);

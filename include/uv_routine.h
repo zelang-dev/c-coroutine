@@ -26,7 +26,7 @@
 #define var_unsigned_int(arg) (arg).value.u_int
 #define var_unsigned_long(arg) (arg).value.u_long
 #define var_size_t(arg) (arg).value.max_size
-#define var_const_char(arg) (arg).value.const_char
+#define var_const_char(arg) (string_t)(arg).value.buffer
 #define var_char(arg) (arg).value.schar
 #define var_char_ptr(arg) (arg).value.char_ptr
 #define var_bool(arg) (arg).value.boolean

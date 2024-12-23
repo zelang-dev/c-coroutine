@@ -23,11 +23,8 @@ CO_FORCE_INLINE co_collector_t *co_collector_list(void) {
     return coroutine_list();
 }
 
-values_type args_get(void_t params, int item) {
-    args_t args = (args_t)params;
+void args_deferred(args_t args) {
     args_deferred_set(args, co_scope());
-
-    return args[item];
 }
 
 void delete(void_t ptr) {
@@ -94,18 +91,11 @@ values_t *co_var(var_t *data) {
 }
 
 value_t co_value(void_t data) {
-    if (data)
-        return ((values_t *)data)->value;
-
-    RAII_LOG("attempt to get value on null");
-    return ((values_t *)0)->value;
+    return co_data((values_t *)data);
 }
 
 value_t co_data(values_t *data) {
-    if (data)
-        return data->value;
-
-    return ((values_t *)0)->value;
+    return raii_value(data);
 }
 
 CO_FORCE_INLINE void co_suspend(void) {

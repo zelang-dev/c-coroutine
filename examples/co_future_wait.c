@@ -2,6 +2,7 @@
 
 // a non-optimized way of checking for prime numbers:
 void *is_prime(args_t arg) {
+    RAII_HERE;
     int i, x = get_arg(arg).integer;
     for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
     return thrd_value(true);
@@ -10,7 +11,7 @@ void *is_prime(args_t arg) {
 int co_main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future *fut = thrd_async(is_prime, thrd_data(prime));
+    future fut = thrd_async(is_prime, thrd_value(prime));
 
     printf("checking...\n");
     thrd_wait(fut, co_yield_info);

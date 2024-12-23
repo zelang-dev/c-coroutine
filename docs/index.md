@@ -89,19 +89,6 @@ There are five simple ways to create coroutines:
 which call this function as an coroutine! */
 int co_main(int, char **);
 
-/* Calls fn (with args as arguments) in separated thread, returning without waiting
-for the execution of fn to complete. The value returned by fn can be accessed through
- the future object returned (by calling `co_async_get()`). */
-C_API future *co_async(callable_t, void_t);
-
-/* Returns the value of a promise, a future thread's shared object, If not ready this
-function blocks the calling thread and waits until it is ready. */
-C_API value_t co_async_get(future *);
-
-/* Waits for the future thread's state to change. this function pauses current coroutine
-and execute others until future is ready, thread execution has ended. */
-C_API void co_async_wait(future *);
-
 /* Creates/initialize the next series/collection of coroutine's created to be part of wait group,
 same behavior of Go's waitGroups, but without passing struct or indicating when done.
 
@@ -733,27 +720,24 @@ int main ()
 #include "coroutine.h"
 
 // a non-optimized way of checking for prime numbers:
-void_t is_prime(void_t arg) {
-    int x = c_int(arg);
-    for (int i = 2; i < x; ++i)
-        if (x % i == 0) return (void_t)false;
-    return (void_t)true;
+void *is_prime(args_t arg) {
+    int i, x = get_arg(arg).integer;
+    for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
+    return thrd_value(true);
 }
 
 int co_main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future *fut = co_async(is_prime, &prime);
+    future fut = thrd_async(is_prime, thrd_value(prime));
 
     printf("checking...\n");
     // Pause and run other coroutines
     // until thread state changes.
-    co_async_wait(fut);
+    thrd_wait(fut, co_yield_info);
 
     printf("\n194232491 ");
-    // guaranteed to be ready (and not block)
-    // after wait returns
-    if (co_async_get(fut).boolean)
+    if (thrd_get(fut).boolean) // guaranteed to be ready (and not block) after wait returns
         printf("is prime.\n");
     else
         printf("is not prime.\n");

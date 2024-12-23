@@ -578,39 +578,9 @@ C_API atomic_deque_t gq_sys;
 C_API routine_t *EMPTY_T;
 
 /* Generic simple union storage types. */
-typedef union {
-    int integer;
-    unsigned int u_int;
-    signed long s_long;
-    unsigned long u_long;
-    long long long_long;
-    size_t max_size;
-    float point;
-    double precision;
-    bool boolean;
-    signed short s_short;
-    unsigned short u_short;
-    signed char schar;
-    unsigned char uchar;
-    unsigned char *uchar_ptr;
-    char *char_ptr;
-    char **array;
-    void_t object;
-    callable_t func;
-    const char const_char[512];
-} value_t;
-
-typedef struct values_s {
-    value_t value;
-    value_types type;
-} values_t;
-
+typedef values_type value_t;
+typedef raii_values_t values_t;
 typedef void_t(*callable_args_t)(args_t);
-
-typedef struct {
-    value_types type;
-    value_t value;
-} generics_t;
 
 typedef enum {
     ZE_OK = CO_NONE,
@@ -695,15 +665,11 @@ C_API uv_loop_t *co_loop(void);
 #endif
 
 /**
-* Returns generic union `values_type` of argument, will auto `release/free`
-* allocated memory when current coroutine return/exit.
-*
-* Must be called at least once to release `allocated` memory.
+* Must be called at least once to release `allocated` memory, when current coroutine return/exit.
 *
 * @param params arbitrary arguments
-* @param item index number
 */
-C_API values_type args_get(void_t params, int item);
+C_API void args_deferred(args_t args);
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);
@@ -829,7 +795,7 @@ C_API value_t chan_recv(channel_t *);
 /* Creates an coroutine of given function with argument,
 and add to schedular, same behavior as Go in golang. */
 C_API u32 go(callable_t, void_t);
-C_API u32 go_for(callable_args_t fn, const char *desc, ...);
+C_API u32 go_for(callable_args_t fn, size_t num_of_args, ...);
 
 /* Creates an coroutine of given function with argument, and immediately execute. */
 C_API void launch(func_t, void_t);
@@ -1021,7 +987,7 @@ C_API wait_result_t wait_for_ex(wait_group_t);
 /* Returns results of the given completed coroutine id, value in union value_t storage format. */
 C_API value_t wait_result(wait_result_t, u32);
 
-C_API awaitable_t async_for(callable_args_t fn, const char *desc, ...);
+C_API awaitable_t async_for(callable_args_t fn, size_t num_of_args, ...);
 C_API awaitable_t async(callable_t fn, void_t arg);
 C_API value_t await(awaitable_t task);
 
