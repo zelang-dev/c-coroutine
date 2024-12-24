@@ -210,16 +210,6 @@ static wait_group_t wait_group_ex(u32 capacity) {
     if (!is_zero(capacity) && (capacity > gq_sys.thread_count * 2))
         wait_capacity(capacity);
 
-    if (atomic_flag_load(&gq_sys.is_multi) && is_empty(gq_sys.deque_run_queue)) {
-        gq_sys.deque_run_queue = try_calloc(1, sizeof(deque_t));
-        deque_init(gq_sys.deque_run_queue, gq_sys.capacity);
-    } else if (atomic_flag_load(&gq_sys.is_multi) && atomic_load_explicit(&gq_sys.deque_run_queue->array->size, memory_order_relaxed) < gq_sys.capacity) {
-        deque_array_t *a = (deque_array_t *)atomic_load_explicit(&gq_sys.deque_run_queue->array, memory_order_acquire);
-        a = try_realloc(a, sizeof(deque_array_t) + sizeof(routine_t *) * gq_sys.capacity);
-        atomic_store(&a->size, gq_sys.capacity);
-        atomic_store_explicit(&gq_sys.deque_run_queue->array, a, memory_order_release);
-    }
-
     wait_group_t wg = ht_wait_init(capacity + (capacity * 0.0025));
     wg->grouping = ht_result_init();
     if (sched_is_assignable(capacity))
@@ -244,28 +234,14 @@ CO_FORCE_INLINE wait_group_t wait_group_by(u32 capacity) {
 wait_result_t wait_for(wait_group_t wg) {
     routine_t *co, *c = co_active();
     wait_result_t wgr = NULL;
-    wait_group_t *wait_group;
     void_t key;
     oa_pair *pair;
-    u32 i, *gi, group_capacity, capacity, group_id = 0, id = 0, begin = 0;
-    bool has_erred = false, has_completed = false, is_multi = atomic_flag_load(&gq_sys.is_multi);
+    u32 i, capacity, id = 0, begin = 0;
+    bool has_erred = false, has_completed = false;
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
         co_yield();
-        if (is_multi && atomic_flag_load(&gq_sys.is_threading_waitable)) {
-            group_id = atomic_load_explicit(&gq_sys.group_id, memory_order_relaxed);
-            if (group_id) {
-                id = group_id - 1;
-                gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_relaxed);
-                begin = gi[sched_id()];
-                wait_group = (wait_group_t *)atomic_load_explicit(&gq_sys.wait_group, memory_order_acquire);
-                wait_group[id] = wg;
-                atomic_store_explicit(&gq_sys.wait_group, wait_group, memory_order_release);
-            }
-            group_capacity = wg->group_capacity;
-        }
-
         wgr = wg->grouping;
         co_deferred(c, VOID_FUNC(hash_free), wgr);
         while (atomic_load_explicit(&wg->size, memory_order_relaxed) != 0 && !has_completed) {
@@ -275,21 +251,13 @@ wait_result_t wait_for(wait_group_t wg) {
                 if (!is_empty(pair) && !is_empty(pair->value)) {
                     co = (routine_t *)pair->value;
                     key = pair->key;
-                    if (is_multi && group_id && group_capacity == 0) {
-                        has_completed = true;
-                        break;
-                    } else if (is_multi && co->tid != sched_id()) {
-                        continue;
-                    } else if (!co_terminated(co)) {
+                    if (!co_terminated(co)) {
                         if (!co->interrupt_active && co->status == CO_NORMAL)
                             sched_enqueue(co);
 
                         co_info(c, 1);
                         sched_yielding();
                     } else {
-                        if (is_multi && group_id)
-                            group_capacity--;
-
                         if ((!is_empty(co->results) && !co->is_event_err) || co->is_plain) {
                             if (co->is_plain)
                                 hash_put(wgr, co_itoa(co->cid), &co->plain_results);
@@ -303,9 +271,7 @@ wait_result_t wait_for(wait_group_t wg) {
                         }
 
                         if (co->is_event_err) {
-                            wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
                             wg->has_erred = true;
-                            atomic_store_explicit(&gq_sys.wait_group[id], wg, memory_order_release);
                             hash_remove(wg, key);
                             continue;
                         }
@@ -323,18 +289,6 @@ wait_result_t wait_for(wait_group_t wg) {
         has_erred = wg->has_erred;
         c->wait_active = false;
         c->wait_group = NULL;
-        if (is_multi && group_id) {
-            while (atomic_load_explicit(&wg->size, memory_order_relaxed) != 0)
-                co_yield();
-
-            gi = (u32 *)atomic_load_explicit(&gq_sys.group_index[id], memory_order_acquire);
-            atomic_store_explicit(&gq_sys.group_index[id], NULL, memory_order_release);
-            wg = (wait_group_t)atomic_load_explicit(&gq_sys.wait_group[id], memory_order_acquire);
-            wgr = wg->grouping;
-            atomic_store_explicit(&gq_sys.wait_group[id], NULL, memory_order_release);
-            CO_FREE(gi);
-        }
-
         sched_dec();
         hash_free(wg);
         return has_erred ? NULL : wgr;

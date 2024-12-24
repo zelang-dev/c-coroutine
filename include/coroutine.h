@@ -516,20 +516,8 @@ typedef struct {
     atomic_flag is_interruptable;
     cacheline_pad_t pad18;
 
-    atomic_flag is_multi;
-    cacheline_pad_t pad17;
-
     atomic_flag is_finish;
     cacheline_pad_t pad16;
-
-    atomic_flag is_threading_waitable;
-    cacheline_pad_t pad15;
-
-    atomic_flag is_started;
-    cacheline_pad_t pad14;
-
-    atomic_flag is_resuming;
-    cacheline_pad_t pad13;
 
     atomic_size_t take_count;
     cacheline_pad_t pad12;
@@ -538,40 +526,9 @@ typedef struct {
     atomic_size_t active_count;
     cacheline_pad_t pad11;
 
-    atomic_size_t group_id;
-    cacheline_pad_t pad10;
-
     /* coroutine unique id generator */
     atomic_size_t id_generate;
     cacheline_pad_t pad9;
-
-    atomic_int **count;
-    cacheline_pad_t pad8;
-
-    atomic_flag *any_stealable;
-    cacheline_pad_t pad7;
-
-    atomic_size_t *stealable_thread;
-    cacheline_pad_t pad6;
-
-    atomic_size_t *stealable_amount;
-    cacheline_pad_t pad5;
-
-    /* track each thread number of available coroutines */
-    atomic_size_t *available;
-    cacheline_pad_t pad1;
-
-    /* Global `wait_group` track queue */
-    atomic_wait_t *wait_group;
-    cacheline_pad_t pad4;
-
-    /* Thread start index into `wait_group` queue */
-    atomic_uint *group_index;
-    cacheline_pad_t pad3;
-
-    /* Global coroutine run queue */
-    deque_t *deque_run_queue;
-    cacheline_pad_t pad2;
 } atomic_deque_t;
 
 C_API atomic_deque_t gq_sys;
@@ -727,14 +684,6 @@ C_API void co_scheduler(void);
 
 /* Yield to specified coroutine, passing data. */
 C_API void co_yielding(routine_t *);
-
-/* Multithreading checker for available coroutines, if any,
-transfers from `global run queue` to current thread `local run queue`.
-
-If `Main thread` caller, checks global run queue,
-and assign availability count for threads. Will also globally
-signal all child threads to start there execution. */
-C_API void co_stealer(void);
 
 /* Returns the status of the coroutine. */
 C_API co_states co_status(routine_t *);
