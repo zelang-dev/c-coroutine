@@ -17,8 +17,8 @@ int fibonacci(channel_t *c, channel_t *quit) {
     } select_end;
 }
 
-void *func(args_t args) {
-    args_deferred(args);
+void *func(void_t arg) {
+    args_t args = args_deferred(arg);
     channel_t *c = args[0].object;
     channel_t *quit = args[1].object;
     int i;
@@ -43,7 +43,7 @@ void *func(args_t args) {
 }
 
 int co_main(int argc, char **argv) {
-    args_t params = array(2, channel(), channel());
+    args_t params = args_ex(2, channel(), channel());
     go(func, params);
     return fibonacci(params[0].object, params[1].object);
 }

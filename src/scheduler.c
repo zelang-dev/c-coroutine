@@ -1753,7 +1753,7 @@ u32 go_for(callable_args_t fn, size_t num_of_args, ...) {
     va_list ap;
     size_t i;
 
-    args_t params = args_for(0);
+    args_t params = args_for_ex(co_scope(), 0);
     va_start(ap, num_of_args);
     for (i = 0; i < num_of_args; i++)
         vector_push_back(params, va_arg(ap, void_t));
@@ -1788,7 +1788,7 @@ awaitable_t async_for(callable_args_t fn, size_t num_of_args, ...) {
     va_list ap;
     size_t i;
 
-    args_t params = args_for(0);
+    args_t params = args_for_ex(co_scope(), 0);
     va_start(ap, num_of_args);
     for (i = 0; i < num_of_args; i++)
         vector_push_back(params, va_arg(ap, void_t));
@@ -2098,7 +2098,7 @@ static void sched_cleanup(void) {
         if (!can_cleanup)
             return;
 
-            atomic_thread_fence(memory_order_seq_cst);
+        atomic_thread_fence(memory_order_seq_cst);
         can_cleanup = false;
     }
 
@@ -2336,7 +2336,7 @@ static void_t thrd_main_main(void_t v) {
     return 0;
 }
 
-static  int thrd_main(void_t args) {
+static int thrd_main(void_t args) {
     int res = 0, id = *(int *)args;
     CO_FREE(args);
     rpmalloc_init();
@@ -2408,7 +2408,7 @@ int main(int argc, char **argv) {
     RAII_INFO("%s", sched_uname());
 #endif
 
-    if ((gq_sys.cpu_count > 1 && CO_MT_STATE) && (gq_sys.threads = try_calloc(gq_sys.cpu_count, sizeof(thrd_t)))) {
+    if ((gq_sys.cpu_count > 1 && 0) && (gq_sys.threads = try_calloc(gq_sys.cpu_count, sizeof(thrd_t)))) {
         RAII_INFO(", %zu threads initialized.\n", gq_sys.cpu_count);
         atomic_flag_test_and_set(&gq_sys.is_multi);
         atomic_init(&gq_sys.count, try_calloc(gq_sys.thread_count, sizeof(atomic_int)));

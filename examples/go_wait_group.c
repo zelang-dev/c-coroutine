@@ -1,7 +1,7 @@
 #include "coroutine.h"
 
-void *worker(args_t arg) {
-    args_deferred(arg);
+void *worker(void_t args) {
+    args_t arg = args_deferred(args);
     int wid = arg[0].integer + 1;
     int id = co_id();
 
@@ -26,7 +26,7 @@ int co_main(int argc, char **argv) {
 
     wait_group_t wg = wait_group_by(50);
     for (i = 0; i < 50; i++) {
-        cid[i] = go(worker, args_for(1, i));
+        cid[i] = go(worker, args_ex(1, i));
     }
     wait_result_t wgr = wait_for(wg);
 

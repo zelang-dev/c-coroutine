@@ -665,11 +665,30 @@ C_API uv_loop_t *co_loop(void);
 #endif
 
 /**
-* Must be called at least once to release `allocated` memory, when current coroutine return/exit.
+* Creates an scoped `vector/array/container` for arbitrary arguments passing
+* into an single `paramater` function.
+* - Use standard `array access` for retrieval of an `union` storage type.
 *
-* @param params arbitrary arguments
+* - MUST CALL `args_deferred` to have memory auto released in caller's `coroutine` context.
+*
+* - OTHERWISE `memory leak` will be shown in DEBUG build.
+*
+* @param count number of parameters, `0` will create empty `vector/array`.
+* @param arguments indexed in given order.
 */
-C_API void args_deferred(args_t args);
+C_API args_t args_ex(size_t, ...);
+
+/**
+* Cast `void *` to `args_t`, and mark `allocated` arguments for cleanup.
+*
+* - Must be called at least once to release `allocated` memory, when current coroutine return/exit.
+*
+* @param params arbitrary arguments container
+*/
+C_API args_t args_deferred(void_t args);
+
+C_API future thrd_launch(thrd_func_t fn, void_t args);
+C_API void thrd_until(future fut);
 
 /* Return handle to current coroutine. */
 C_API routine_t *co_active(void);

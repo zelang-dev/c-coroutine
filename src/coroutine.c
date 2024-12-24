@@ -23,8 +23,32 @@ CO_FORCE_INLINE co_collector_t *co_collector_list(void) {
     return coroutine_list();
 }
 
-void args_deferred(args_t args) {
-    args_deferred_set(args, co_scope());
+args_t args_ex(size_t num_of_args, ...) {
+    va_list ap;
+    size_t i;
+
+    args_t params = args_for_ex(co_scope(), 0);
+    va_start(ap, num_of_args);
+    for (i = 0; i < num_of_args; i++)
+        vector_push_back(params, va_arg(ap, void_t));
+    va_end(ap);
+
+    return params;
+}
+
+args_t args_deferred(void_t args) {
+    args_t arg = (args_t)args;
+    args_deferred_set(arg, co_scope());
+
+    return arg;
+}
+
+CO_FORCE_INLINE future thrd_launch(thrd_func_t fn, void_t args) {
+    return thrd_async_ex(co_scope(), fn, args);
+}
+
+CO_FORCE_INLINE void thrd_until(future fut) {
+    thrd_wait(fut, co_yield_info);
 }
 
 void delete(void_t ptr) {
@@ -442,6 +466,7 @@ CO_FORCE_INLINE size_t co_deferred_count(routine_t *coro) {
 
 CO_FORCE_INLINE void co_deferred_free(routine_t *coro) {
     raii_deferred_free(coro->scope);
+    raii_deferred_init(&coro->scope->defer);
 }
 
 CO_FORCE_INLINE size_t co_defer(func_t func, void_t data) {
