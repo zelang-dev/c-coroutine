@@ -1877,8 +1877,8 @@ u32 sleep_for(u32 ms) {
 
     if (!thread()->sleep_activated) {
         thread()->sleep_activated = true;
-        co_stealer();
         thread()->sleep_id = create_routine(coroutine_wait, NULL, CO_STACK_SIZE, RUN_SYSTEM);
+        co_stealer();
     }
 
     now = nsec();
@@ -2170,7 +2170,7 @@ static int thrd_scheduler(void) {
                 atomic_store(&gq_sys.count[thread()->thrd_id], NULL);
                 RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
                 /* Wait for global exit signal */
-                while (!atomic_flag_load(&gq_sys.is_finish) && !atomic_flag_load(&gq_sys.is_resuming))
+                while (!atomic_flag_load(&gq_sys.is_finish) && atomic_flag_load(&gq_sys.is_resuming))
                     thrd_yield();
 
                 if (atomic_flag_load(&gq_sys.is_resuming) && sched_is_available()) {
