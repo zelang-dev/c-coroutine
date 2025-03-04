@@ -1746,12 +1746,12 @@ static int thrd_main(void_t args) {
     int res = 0, id = *(int *)args;
     CO_FREE(args);
 
+    sched_init(false, id);
     create_routine(thrd_main_main, NULL, gq_sys.stacksize * 3, RUN_THRD);
     res = thrd_scheduler();
     sched_shutdown_interrupt(false);
     chan_collector_free();
     co_collector_free();
-    memset(&gq_sys.threads[id], -1, sizeof(gq_sys.threads[id]));
 
     return 0;
 }
