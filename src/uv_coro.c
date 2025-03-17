@@ -5,7 +5,7 @@ static void_t uv_init(void_t);
 
 static void uv_arguments_free(uv_args_t *uv_args) {
     if (is_type(uv_args, RAII_INTERRUPT_ARG)) {
-        RAII_FREE(uv_args->args);
+        array_delete(uv_args->args);
         memset(uv_args, 0, sizeof(raii_type));
         RAII_FREE(uv_args);
     }
@@ -13,15 +13,16 @@ static void uv_arguments_free(uv_args_t *uv_args) {
 
 static uv_args_t *uv_arguments(int count, bool auto_free) {
     uv_args_t *uv_args = NULL;
-    value_t *params = NULL;
+    arrays_t params = NULL;
     if (auto_free) {
         uv_args = (uv_args_t *)calloc_local(1, sizeof(uv_args_t));
-        params = (value_t *)calloc_local(count, sizeof(value_t));
+        params = arrays();
     } else {
         uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-        params = (value_t *)try_calloc(count, sizeof(value_t));
+        params = (arrays_t)try_calloc(count, sizeof(value_t));
     }
 
+    uv_args->n_args = count;
     uv_args->args = params;
     uv_args->type = RAII_INTERRUPT_ARG;
     return uv_args;
@@ -78,22 +79,18 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
 
 static void close_cb(uv_handle_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
-    routine_t *co = uv->context;
-
-    co->halt = true;
-    interrupt_switch(co->context);
-    co_scheduler();
+    coro_interrupt_switch(uv->context);
 }
 
 static void error_catch(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
 
-    if (!is_empty((void_t)co_message())) {
+    if (!is_empty((void_t)get_message())) {
         co->scope->is_recovered = true;
         if (uv_loop_alive(ze_loop()) && interrupt_listen_args()) {
             co->halt = true;
             co->is_event_err = true;
-            co->status = CO_ERRED;
+            co->status = RAII_ERR;
             interrupt_cleanup(co);
             memset(interrupt_listen_args(), 0, sizeof(uv_args_t));
         }
@@ -102,22 +99,18 @@ static void error_catch(void_t uv) {
 
 static void connect_cb(uv_connect_t *client, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(client));
-    value_t *args = uv->args;
+    arrays_t args = uv->args;
     routine_t *co = uv->context;
 
     if (status) {
         fprintf(stderr, "Error: %s\n", uv_strerror(status));
     }
 
-    co->halt = true;
     if (status < 0) {
-        co_plain_set(co, (size_t)status);
+        coro_interrupt_complete(co, casting(status));
     } else {
-        co_result_set(co, args[0].value.object);
+        coro_interrupt_complete(co, args[0].object);
     }
-
-    interrupt_switch(co->context);
-    co_scheduler();
 }
 
 RAII_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
@@ -156,17 +149,15 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     uv_args_t *uv = (uv_args_t *)ut->uv_args;
     routine_t *co = uv->context;
 
-    co->halt = true;
     if (0 == status) {
         co->is_address = true;
-        co_result_set(co, streamer(ut->tcp_hdl));
+        coro_interrupt_complete(co, streamer(ut->tcp_hdl));
     } else {
         co->event_err_code = status;
         co_plain_set(co, -1);
+        coro_interrupt_complete(co, -1);
     }
 
-    interrupt_switch(co->context);
-    co_scheduler();
 }
 
 static void connection_cb(uv_stream_t *server, int status) {
@@ -231,15 +222,12 @@ static void connection_cb(uv_stream_t *server, int status) {
 
 static void write_cb(uv_write_t *req, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(req));
-    routine_t *co = uv->context;
+    struct routine_s *co = uv->context;
     if (status < 0) {
         fprintf(stderr, "Error: %s\n", uv_strerror(status));
     }
 
-    co->halt = true;
-    co_plain_set(co, (size_t)status);
-    interrupt_switch(co->context);
-    co_scheduler();
+    coro_interrupt_complete(co, casting(status));
 }
 
 static void tls_write_cb(uv_tls_t *tls, int status) {
@@ -259,7 +247,7 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) 
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
     routine_t *co = uv->context;
 
-    buf->base = (string)co_calloc_full(co, 1, suggested_size + 1, RAII_FREE);
+    buf->base = (string)calloc_full(co, 1, suggested_size + 1, RAII_FREE);
     buf->len = (unsigned int)suggested_size;
 }
 
@@ -1278,9 +1266,6 @@ RAII_INLINE void interrupt_switch(routine_t *co) {
 void interrupt_cleanup(void_t t) {
     routine_t *co = (routine_t *)t;
     uv_loop_t *uvLoop = ze_loop();
-    if (!is_empty(co) && !is_empty(co->context) && is_type(co->context->wait_group, CO_OA_HASH))
-        hash_free(co->context->wait_group);
-
     if (uv_loop_alive(uvLoop)) {
         if (interrupt_listen_args() && interrupt_listen_args()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);

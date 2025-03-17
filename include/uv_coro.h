@@ -349,7 +349,7 @@ typedef struct uv_args_s {
     size_t n_args;
 
     /* allocated array of arguments */
-    values_type *args;
+    arrays_t args;
     routine_t *context;
 
     string buffer;
@@ -364,11 +364,6 @@ typedef struct uv_args_s {
 } uv_args_t;
 
 C_API uv_loop_t *ze_loop(void);
-
-C_API value_t co_event(callable_t, void_t arg);
-C_API value_t co_await(callable_t fn, void_t arg);
-C_API void co_handler(func_t fn, void_t handle, func_t dtor);
-C_API void co_process(func_t fn, void_t args);
 
 /* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
 C_API string_t ze_uname(void);
