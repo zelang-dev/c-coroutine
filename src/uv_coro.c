@@ -1,38 +1,30 @@
-#include "coroutine.h"
+#include "uv_coro.h"
 
 static void_t fs_init(void_t);
 static void_t uv_init(void_t);
 
 static void uv_arguments_free(uv_args_t *uv_args) {
-    if (is_type(uv_args, CO_EVENT_ARG)) {
-        CO_FREE(uv_args->args);
-        memset(uv_args, 0, sizeof(value_types));
-        CO_FREE(uv_args);
+    if (is_type(uv_args, RAII_INTERRUPT_ARG)) {
+        RAII_FREE(uv_args->args);
+        memset(uv_args, 0, sizeof(raii_type));
+        RAII_FREE(uv_args);
     }
 }
 
 static uv_args_t *uv_arguments(int count, bool auto_free) {
     uv_args_t *uv_args = NULL;
-    values_t *params = NULL;
+    value_t *params = NULL;
     if (auto_free) {
-        uv_args = (uv_args_t *)co_new_by(1, sizeof(uv_args_t));
-        params = (values_t *)co_new_by(count, sizeof(values_t));
+        uv_args = (uv_args_t *)calloc_local(1, sizeof(uv_args_t));
+        params = (value_t *)calloc_local(count, sizeof(value_t));
     } else {
         uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-        params = (values_t *)try_calloc(count, sizeof(values_t));
+        params = (value_t *)try_calloc(count, sizeof(value_t));
     }
 
     uv_args->args = params;
-    uv_args->type = CO_EVENT_ARG;
+    uv_args->type = RAII_INTERRUPT_ARG;
     return uv_args;
-}
-
-void_t uv_error_post(routine_t *co, int r) {
-    co->is_event_err = true;
-    co->event_err_code = r;
-    co->status = CO_ERRED;
-    fprintf(stderr, "failed: %s\n", uv_strerror(r));
-    return NULL;
 }
 
 static void _close_cb(uv_handle_t *handle) {
@@ -40,7 +32,7 @@ static void _close_cb(uv_handle_t *handle) {
         return;
 
     memset(handle, 0, sizeof(uv_handle_t));
-    CO_FREE(handle);
+    RAII_FREE(handle);
 }
 
 void uv_close_free(void_t handle) {
@@ -59,7 +51,7 @@ void tls_close_free(void_t handle) {
         return;
     }
 
-    uv_tls_close((uv_tls_t *)h, (uv_tls_close_cb)CO_FREE);
+    uv_tls_close((uv_tls_t *)h, (uv_tls_close_cb)RAII_FREE);
 }
 
 static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, bool is_path) {
@@ -67,7 +59,8 @@ static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, b
     uv_args->n_args = n_args;
     uv_args->is_path = is_path;
 
-    return co_event(fs_init, uv_args);
+    args_t params = args_for(1, uv_args);
+    return coro_interrupt(fs_init, 1, uv_args);
 }
 
 static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_request) {
@@ -79,7 +72,8 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
 
     uv_args->n_args = n_args;
 
-    return co_event(uv_init, uv_args);
+    args_t params = args_for(1, uv_args);
+    return coro_interrupt(uv_init, 1, uv_args);
 }
 
 static void close_cb(uv_handle_t *handle) {
@@ -96,7 +90,7 @@ static void error_catch(void_t uv) {
 
     if (!is_empty((void_t)co_message())) {
         co->scope->is_recovered = true;
-        if (uv_loop_alive(co_loop()) && interrupt_listen_args()) {
+        if (uv_loop_alive(ze_loop()) && interrupt_listen_args()) {
             co->halt = true;
             co->is_event_err = true;
             co->status = CO_ERRED;
@@ -108,7 +102,7 @@ static void error_catch(void_t uv) {
 
 static void connect_cb(uv_connect_t *client, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(client));
-    values_t *args = uv->args;
+    value_t *args = uv->args;
     routine_t *co = uv->context;
 
     if (status) {
@@ -126,15 +120,15 @@ static void connect_cb(uv_connect_t *client, int status) {
     co_scheduler();
 }
 
-CO_FORCE_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
-    CO_ASSERT(tls->tcp_hdl->data == tls);
+RAII_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
+    RAII_ASSERT(tls->tcp_hdl->data == tls);
     connect_cb((uv_connect_t *)tls->data, status);
 }
 
 void on_connect(uv_connect_t *req, int status) {
     evt_ctx_t *ctx = (evt_ctx_t *)uv_req_get_data(requester(req));
     uv_args_t *uv = (uv_args_t *)ctx->data;
-    values_t *args = uv->args;
+    value_t *args = uv->args;
     routine_t *co = uv->context;
     uv_tcp_t *tcp = (uv_tcp_t *)req->handle;
 
@@ -142,13 +136,13 @@ void on_connect(uv_connect_t *req, int status) {
         //free on uv_tls_close
         uv_tls_t *client = try_malloc(sizeof(*client));
         if (uv_tls_init(ctx, tcp, client) < 0) {
-            CO_FREE(client);
+            RAII_FREE(client);
             req->data = (void_t)uv;
             connect_cb(req, status);
             return;
         }
 
-        CO_ASSERT(tcp->data == client);
+        RAII_ASSERT(tcp->data == client);
         client->data = (void_t)req;
         client->uv_args = (void_t)uv;
         uv_tls_connect(client, on_connect_handshake);
@@ -178,13 +172,13 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
 static void connection_cb(uv_stream_t *server, int status) {
     uv_args_t *uv = NULL;
     void_t check = uv_handle_get_data((uv_handle_t *)server);
-    if (is_type(check, CO_EVENT_ARG))
+    if (is_type(check, RAII_INTERRUPT_ARG))
         uv = (uv_args_t *)check;
     else
         uv = (uv_args_t *)((evt_ctx_t *)check)->data;
 
     routine_t *co = uv->context;
-    uv_loop_t *uvLoop = co_loop();
+    uv_loop_t *uvLoop = ze_loop();
     void_t handle = NULL;
     int r = status;
 
@@ -200,14 +194,14 @@ static void connection_cb(uv_stream_t *server, int status) {
                     r = uv_tls_accept(client, on_listen_handshake);
                     client->uv_args = (void_t)uv;
                 } else {
-                    CO_FREE(client);
+                    RAII_FREE(client);
                 }
             }
         } else if (uv->bind_type == UV_TCP) {
-            handle = CO_CALLOC(1, sizeof(uv_tcp_t));
+            handle = RAII_CALLOC(1, sizeof(uv_tcp_t));
             r = uv_tcp_init(uvLoop, (uv_tcp_t *)handle);
         } else if (uv->bind_type == UV_NAMED_PIPE) {
-            handle = CO_CALLOC(1, sizeof(uv_pipe_t));
+            handle = RAII_CALLOC(1, sizeof(uv_pipe_t));
             r = uv_pipe_init(uvLoop, (uv_pipe_t *)handle, 0);
         }
 
@@ -223,7 +217,7 @@ static void connection_cb(uv_stream_t *server, int status) {
     if (r) {
         fprintf(stderr, "Error: %s\n", uv_strerror(r));
         if (!is_empty(handle))
-            CO_FREE(handle);
+            RAII_FREE(handle);
 
         co->event_err_code = r;
         co_plain_set(co, (size_t)status);
@@ -265,7 +259,7 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) 
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
     routine_t *co = uv->context;
 
-    buf->base = (string)co_calloc_full(co, 1, suggested_size + 1, CO_FREE);
+    buf->base = (string)co_calloc_full(co, 1, suggested_size + 1, RAII_FREE);
     buf->len = (unsigned int)suggested_size;
 }
 
@@ -379,15 +373,15 @@ static void fs_cb(uv_fs_t *req) {
 
     interrupt_switch(co->context);
     uv_fs_req_cleanup(req);
-    CO_FREE(req);
+    RAII_FREE(req);
     co_scheduler();
 }
 
 static void_t fs_init(void_t uv_args) {
     uv_fs_t *req = try_calloc(1, sizeof(uv_fs_t));
-    uv_loop_t *uvLoop = co_loop();
+    uv_loop_t *uvLoop = ze_loop();
     uv_args_t *fs = (uv_args_t *)uv_args;
-    values_t *args = fs->args;
+    value_t *args = fs->args;
     uv_uid_t uid, gid;
     uv_file in_fd;
     size_t length;
@@ -521,23 +515,23 @@ static void_t fs_init(void_t uv_args) {
     }
 
     if (result) {
-        CO_FREE(req);
-        return uv_error_post(co_active(), result);
+        RAII_FREE(req);
+        return coro_interrupt_erred(coro_active(), result);
     }
 
-    fs->context = co_active();
+    fs->context = coro_active();
     uv_req_set_data(requester(req), (void_t)fs);
     return 0;
 }
 
 static void_t uv_init(void_t uv_args) {
     uv_args_t *uv = (uv_args_t *)uv_args;
-    values_t *args = uv->args;
+    value_t *args = uv->args;
     int length;
     int result = -4083;
 
     uv_handle_t *stream = var_cast(uv_handle_t, args[0]);
-    uv->context = co_active();
+    uv->context = coro_active();
     if (uv->is_request) {
         uv_req_t *req;
         switch (uv->req_type) {
@@ -546,12 +540,12 @@ static void_t uv_init(void_t uv_args) {
                     ((uv_tls_t *)stream)->uv_args = uv;
                     result = uv_tls_write((uv_tls_t *)stream, &uv->bufs, tls_write_cb);
                 } else {
-                    req = co_new_by(1, sizeof(uv_write_t));
+                    req = calloc_local(1, sizeof(uv_write_t));
                     result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb);
                 }
                 break;
             case UV_CONNECT:
-                req = co_new_by(1, sizeof(uv_connect_t));
+                req = calloc_local(1, sizeof(uv_connect_t));
                 int scheme = var_int(args[2]);
                 switch (scheme) {
                     case UV_NAMED_PIPE:
@@ -663,14 +657,14 @@ static void_t uv_init(void_t uv_args) {
 
     if (result) {
         uv->context->context->event_err_code = result;
-        uv_error_post(uv->context, result);
+        coro_interrupt_erred(uv->context, result);
         interrupt_switch(uv->context->context);
     }
 
     return 0;
 }
 
-CO_FORCE_INLINE uv_file fs_open(string_t path, int flags, int mode) {
+RAII_INLINE uv_file fs_open(string_t path, int flags, int mode) {
     uv_args_t *uv_args = uv_arguments(3, true);
     uv_args->args[0].value.char_ptr = (string)path;
     uv_args->args[1].value.integer = flags;
@@ -679,21 +673,21 @@ CO_FORCE_INLINE uv_file fs_open(string_t path, int flags, int mode) {
     return (uv_file)fs_start(uv_args, UV_FS_OPEN, 3, true).integer;
 }
 
-CO_FORCE_INLINE int fs_unlink(string_t path) {
+RAII_INLINE int fs_unlink(string_t path) {
     uv_args_t *uv_args = uv_arguments(1, true);
     uv_args->args[0].value.char_ptr = (string)path;
 
     return (uv_file)fs_start(uv_args, UV_FS_UNLINK, 1, true).integer;
 }
 
-CO_FORCE_INLINE uv_stat_t *fs_fstat(uv_file fd) {
+RAII_INLINE uv_stat_t *fs_fstat(uv_file fd) {
     uv_args_t *uv_args = uv_arguments(1, true);
     uv_args->args[0].value.integer = fd;
 
     return (uv_stat_t *)fs_start(uv_args, UV_FS_FSTAT, 1, false).object;
 }
 
-CO_FORCE_INLINE int fs_fsync(uv_file fd) {
+RAII_INLINE int fs_fsync(uv_file fd) {
     uv_args_t *uv_args = uv_arguments(1, true);
     uv_args->args[0].value.integer = fd;
 
@@ -704,7 +698,7 @@ string fs_read(uv_file fd, int64_t offset) {
     uv_stat_t *stat = fs_fstat(fd);
     uv_args_t *uv_args = uv_arguments(2, true);
 
-    uv_args->buffer = co_new_by(1, (size_t)stat->st_size + 1);
+    uv_args->buffer = calloc_local(1, (size_t)stat->st_size + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
 
     uv_args->args[0].value.integer = fd;
@@ -717,7 +711,7 @@ int fs_write(uv_file fd, string_t text, int64_t offset) {
     size_t size = sizeof(text) + 1;
     uv_args_t *uv_args = uv_arguments(2, true);
 
-    uv_args->buffer = co_new_by(1, size);
+    uv_args->buffer = calloc_local(1, size);
     memcpy(uv_args->buffer, text, size);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
 
@@ -758,11 +752,11 @@ int fs_write_file(string_t path, string_t text) {
     return co_err_code();
 }
 
-CO_FORCE_INLINE void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
+RAII_INLINE void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
     if (is_tls((uv_handle_t *)client))
-        co_handler(VOID_FUNC(connected), client, tls_close_free);
+        coro_interrupt_event(VOID_FUNC(connected), client, tls_close_free);
     else
-        co_handler(VOID_FUNC(connected), client, uv_close_free);
+        coro_interrupt_event(VOID_FUNC(connected), client, uv_close_free);
 }
 
 int stream_write(uv_stream_t *handle, string_t text) {
@@ -771,7 +765,7 @@ int stream_write(uv_stream_t *handle, string_t text) {
 
     size_t size = strlen(text) + 1;
     uv_args_t *uv_args = uv_arguments(1, false);
-    uv_args->buffer = co_new_by(1, size);
+    uv_args->buffer = calloc_local(1, size);
     memcpy(uv_args->buffer, text, size);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
     uv_args->args[0].value.object = handle;
@@ -825,7 +819,7 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     }
 
     if (!r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     switch (scheme) {
@@ -836,7 +830,7 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
             handle = udp_create();
             r = uv_udp_connect(handle, (const struct sockaddr *)addr_set);
             if (r) {
-                return uv_error_post(co_active(), r);
+                return coro_interrupt_erred(coro_active(), r);
             }
             return streamer(handle);
         case UV_TLS:
@@ -876,7 +870,7 @@ uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
 
     uv_args_t *uv_args = NULL;
     void_t check = uv_handle_get_data((uv_handle_t *)stream);
-    if (is_type(check, CO_EVENT_ARG)) {
+    if (is_type(check, RAII_INTERRUPT_ARG)) {
         uv_args = (uv_args_t *)check;
     } else {
         uv_args = (uv_args_t *)((evt_ctx_t *)check)->data;
@@ -957,7 +951,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
     }
 
     if (r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     uv_args->args[0].value.object = handle;
@@ -986,51 +980,51 @@ void coro_uv_close(uv_handle_t *handle) {
 }
 
 uv_udp_t *udp_create(void) {
-    uv_udp_t *udp = (uv_udp_t *)co_calloc_full(co_active(), 1, sizeof(uv_udp_t), uv_close_free);
-    int r = uv_udp_init(co_loop(), udp);
+    uv_udp_t *udp = (uv_udp_t *)co_calloc_full(coro_active(), 1, sizeof(uv_udp_t), uv_close_free);
+    int r = uv_udp_init(ze_loop(), udp);
     if (r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     return udp;
 }
 
 uv_pipe_t *pipe_create(bool is_ipc) {
-    uv_pipe_t *pipe = (uv_pipe_t *)co_calloc_full(co_active(), 1, sizeof(uv_pipe_t), uv_close_free);
-    int r = uv_pipe_init(co_loop(), pipe, (int)is_ipc);
+    uv_pipe_t *pipe = (uv_pipe_t *)co_calloc_full(coro_active(), 1, sizeof(uv_pipe_t), uv_close_free);
+    int r = uv_pipe_init(ze_loop(), pipe, (int)is_ipc);
     if (r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     return pipe;
 }
 
 uv_tcp_t *tcp_create(void) {
-    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(co_active(), 1, sizeof(uv_tcp_t), uv_close_free);
-    int r = uv_tcp_init(co_loop(), tcp);
+    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(coro_active(), 1, sizeof(uv_tcp_t), uv_close_free);
+    int r = uv_tcp_init(ze_loop(), tcp);
     if (r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     return tcp;
 }
 
 uv_tty_t *tty_create(uv_file fd) {
-    uv_tty_t *tty = (uv_tty_t *)co_calloc_full(co_active(), 1, sizeof(uv_tty_t), uv_close_free);
-    int r = uv_tty_init(co_loop(), tty, fd, 0);
+    uv_tty_t *tty = (uv_tty_t *)co_calloc_full(coro_active(), 1, sizeof(uv_tty_t), uv_close_free);
+    int r = uv_tty_init(ze_loop(), tty, fd, 0);
     if (r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     return tty;
 }
 
 uv_tcp_t *tls_tcp_create(void_t extra) {
-    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(co_active(), 1, sizeof(uv_tcp_t), tls_close_free);
+    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(coro_active(), 1, sizeof(uv_tcp_t), tls_close_free);
     tcp->data = extra;
-    int r = uv_tcp_init(co_loop(), tcp);
+    int r = uv_tcp_init(ze_loop(), tcp);
     if (r) {
-        return uv_error_post(co_active(), r);
+        return coro_interrupt_erred(coro_active(), r);
     }
 
     return tcp;
@@ -1039,8 +1033,8 @@ uv_tcp_t *tls_tcp_create(void_t extra) {
 static void spawn_free(spawn_t *child) {
     uv_handle_t *handle = (uv_handle_t *)&child->process;
 
-    CO_FREE(child->handle);
-    CO_FREE(child);
+    RAII_FREE(child->handle);
+    RAII_FREE(child);
 
     if (uv_is_active(handle) || !uv_is_closing(handle))
         uv_close(handle, NULL);
@@ -1063,7 +1057,7 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
 
 static void_t stdio_handler(void_t uv_args) {
     uv_args_t *uv = (uv_args_t *)uv_args;
-    values_t *args = uv->args;
+    value_t *args = uv->args;
     spawn_t *child = var_cast(spawn_t, args[0]);
     stdio_cb std = (stdio_cb)var_func(args[1]);
     uv_stream_t *io = var_cast(uv_stream_t, args[2]);
@@ -1085,19 +1079,19 @@ static void_t stdio_handler(void_t uv_args) {
 
 static void spawning(void_t uv_args) {
     uv_args_t *uv = (uv_args_t *)uv_args;
-    values_t *args = uv->args;
+    value_t *args = uv->args;
     spawn_t *child = var_cast(spawn_t, args[0]);
     spawn_cb exiting_cb;
-    routine_t *co = co_active();
+    routine_t *co = coro_active();
 
     uv_handle_set_data((uv_handle_t *)&child->process, (void_t)child);
-    co->event_err_code = uv_spawn(co_loop(), child->process, child->handle->options);
+    co->event_err_code = uv_spawn(ze_loop(), child->process, child->handle->options);
     defer(spawn_free, child);
     if (!is_empty(child->handle->data))
-        CO_FREE(child->handle->data);
+        RAII_FREE(child->handle->data);
 
     child->handle->data = (void_t)co;
-    CO_FREE(var_ptr(args[1]));
+    RAII_FREE(var_ptr(args[1]));
     uv_arguments_free(uv);
 
     if (!co->event_err_code) {
@@ -1119,7 +1113,7 @@ static void spawning(void_t uv_args) {
     }
 }
 
-CO_FORCE_INLINE uv_stdio_container_t *stdio_fd(int fd, int flags) {
+RAII_INLINE uv_stdio_container_t *stdio_fd(int fd, int flags) {
     uv_stdio_container_t *stdio = try_calloc(1, sizeof(uv_stdio_container_t));
     stdio->flags = flags;
     stdio->data.fd = fd;
@@ -1127,7 +1121,7 @@ CO_FORCE_INLINE uv_stdio_container_t *stdio_fd(int fd, int flags) {
     return stdio;
 }
 
-CO_FORCE_INLINE uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
+RAII_INLINE uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
     uv_stdio_container_t *stdio = try_calloc(1, sizeof(uv_stdio_container_t));
     stdio->flags = flags;
     stdio->data.stream = (uv_stream_t *)handle;
@@ -1162,7 +1156,7 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, u
         for (i = 0; i < no_of_stdio; i++) {
             p = va_arg(argp, uv_stdio_container_t *);
             memcpy(&handle->stdio[i], p, sizeof(uv_stdio_container_t));
-            CO_FREE(p);
+            RAII_FREE(p);
         }
         va_end(argp);
     }
@@ -1190,7 +1184,7 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
 
     string command_arg = str_concat_by(has_args, command, ",", args);
     string *command_args = str_split(command_arg, ",", NULL);
-    CO_FREE(command_arg);
+    RAII_FREE(command_arg);
     handle->options->args = command_args;
 
     process->handle = handle;
@@ -1200,12 +1194,12 @@ spawn_t *spawn(const char *command, const char *args, spawn_options_t *handle) {
     uv_args_t *uv_args = uv_arguments(2, false);
     uv_args->args[0].value.object = process;
     uv_args->args[1].value.object = command_args;
-    co_process(spawning, uv_args);
+    coro_interrupt_event(spawning, uv_args, nullptr);
 
     return process;
 }
 
-CO_FORCE_INLINE int spawn_signal(spawn_t *handle, int sig) {
+RAII_INLINE int spawn_signal(spawn_t *handle, int sig) {
     return uv_process_kill(&handle->process[0], sig);
 }
 
@@ -1220,7 +1214,7 @@ int spawn_detach(spawn_t *child) {
     return ((routine_t *)child->handle->data)->event_err_code;
 }
 
-CO_FORCE_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
+RAII_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
     co_yield();
 
@@ -1260,30 +1254,30 @@ int spawn_err(spawn_t *child, stderr_cb std_func) {
     return ((routine_t *)child->handle->data)->event_err_code;
 }
 
-CO_FORCE_INLINE int spawn_pid(spawn_t *child) {
+RAII_INLINE int spawn_pid(spawn_t *child) {
     return child->process->pid;
 }
 
-CO_FORCE_INLINE uv_stream_t *ipc_in(spawn_t *_in) {
+RAII_INLINE uv_stream_t *ipc_in(spawn_t *_in) {
     return _in->handle->stdio[0].data.stream;
 }
 
-CO_FORCE_INLINE uv_stream_t *ipc_out(spawn_t *out) {
+RAII_INLINE uv_stream_t *ipc_out(spawn_t *out) {
     return out->handle->stdio[1].data.stream;
 }
 
-CO_FORCE_INLINE uv_stream_t *ipc_err(spawn_t *err) {
+RAII_INLINE uv_stream_t *ipc_err(spawn_t *err) {
     return err->handle->stdio[2].data.stream;
 }
 
-CO_FORCE_INLINE void interrupt_switch(routine_t *co) {
+RAII_INLINE void interrupt_switch(routine_t *co) {
     if (!co_terminated(co))
         co_switch(co);
 }
 
 void interrupt_cleanup(void_t t) {
     routine_t *co = (routine_t *)t;
-    uv_loop_t *uvLoop = co_loop();
+    uv_loop_t *uvLoop = ze_loop();
     if (!is_empty(co) && !is_empty(co->context) && is_type(co->context->wait_group, CO_OA_HASH))
         hash_free(co->context->wait_group);
 
@@ -1295,4 +1289,93 @@ void interrupt_cleanup(void_t t) {
 
         uv_run(uvLoop, UV_RUN_DEFAULT);
     }
+}
+
+RAII_INLINE bool is_tls(uv_handle_t *self) {
+    return ((var_t *)self)->type == UV_TLS;
+}
+
+string_t ze_uname(void) {
+    if (is_str_empty(gq_sys.powered_by)) {
+        uv_utsname_t buffer[1];
+        uv_os_uname(buffer);
+        string_t powered_by = str_concat_by(8, "Beta - ",
+                                            co_itoa(thrd_cpu_count()), " cores, ",
+                                            buffer->sysname, " ",
+                                            buffer->machine, " ",
+                                            buffer->release);
+
+        strncpy((char *)gq_sys.powered_by, powered_by, SCRAPE_SIZE);
+        RAII_FREE((void_t)powered_by);
+    }
+
+    return gq_sys.powered_by;
+}
+
+RAII_INLINE uv_loop_t *ze_loop(void) {
+    if (!is_empty(interrupt_handle()))
+        return (uv_loop_t *)interrupt_handle();
+
+    return uv_default_loop();
+}
+
+RAII_INLINE uv_args_t *interrupt_listen_args(void) {
+    return thread()->interrupt_args;
+}
+
+RAII_INLINE void interrupt_listen_set(uv_args_t uv_args) {
+    thread()->interrupt_args = &uv_args;
+}
+
+static void ze_shutdown_interrupt(void_t handle) {
+    uv_loop_t *uvLoop = ze_loop();
+    if (atomic_flag_load(&gq_sys.is_errorless)) {
+        if (uv_loop_alive(interrupt_handle())) {
+            if (interrupt_listen_args() && interrupt_listen_args()->bind_type == UV_TLS)
+                uv_walk(uvLoop, (uv_walk_cb)tls_close_free, NULL);
+            else
+                uv_walk(uvLoop, (uv_walk_cb)uv_close_free, NULL);
+
+            uv_run(uvLoop, UV_RUN_DEFAULT);
+        }
+    }
+
+    if (interrupt_handle()) {
+        if (atomic_flag_load(&gq_sys.is_errorless)) {
+            uv_stop(interrupt_handle());
+            uv_run(interrupt_handle(), UV_RUN_DEFAULT);
+        }
+
+        uv_loop_close(interrupt_handle());
+        set_interrupt_handle(nullptr);
+    }
+}
+
+static void create_loop(void) {
+    uv_loop_t *handle = calloc_local(1, sizeof(uv_loop_t));
+    if (uv_loop_init(handle)) {
+        fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+        handle = nullptr;
+    }
+
+    set_interrupt_handle(handle);
+    return 0;
+}
+
+static void_t uv_main(void_t v) {
+    uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
+    RAII_INFO("%s\n\n", ze_uname());
+    coroutine_interrupt_setup(uv_run, create_loop, interrupt_cleanup);
+#ifdef UV_H
+    if (atomic_flag_load(&gq_sys.is_interruptable) && !thread()->interrupt_handle) {
+        thread()->interrupt_handle = thread()->interrupt_buffer;
+        if (uv_loop_init(thread()->interrupt_handle)) {
+            fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+            thread()->interrupt_handle = NULL;
+        }
+    }
+#endif
+    coroutine_name("co_main");
+    thread()->exiting = co_main(main_argc, main_argv);
+    return 0;
 }

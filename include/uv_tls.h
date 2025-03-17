@@ -11,17 +11,12 @@
 #ifndef UV_TLS_H
 #define UV_TLS_H
 
+#include "uv.h"
+#include "evt_tls.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "evt_tls.h"
-#include "uv.h"
-#if defined(_WIN32) || defined(_WIN64)
-    #include "compat/unistd.h"
-#else
-    #include <unistd.h>
-#endif
-
 //copied gladly from libuv
 #define CONTAINER_OF(ptr, type, member)                                       \
     ((type *) ((char *) (ptr) - offsetof(type, member)))

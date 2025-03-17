@@ -1,15 +1,12 @@
-#ifndef UV_ROUTINE_H
-#define UV_ROUTINE_H
+#ifndef UV_CORO_H
+#define UV_CORO_H
 
-#include <ctype.h>
-#include "uv_tls.h"
-#include "parson.h"
-#include <stdbool.h>
-
-/* Public API qualifier. */
-#ifndef C_API
-#define C_API extern
+#ifndef CERTIFICATE
+    #define CERTIFICATE "localhost"
 #endif
+
+#include "uv_tls.h"
+#include "raii.h"
 
 /* Cast ~libuv~ `obj` to `uv_stream_t` ptr. */
 #define streamer(obj) ((uv_stream_t *)obj)
@@ -40,6 +37,21 @@
 #define var_ptr(arg) (arg).value.object
 #define var_func(arg) (arg).value.func
 #define var_cast(type, arg) (type *)(arg).value.object
+
+#if defined(_MSC_VER)
+    #define S_IRUSR S_IREAD  /* read, user */
+    #define S_IWUSR S_IWRITE /* write, user */
+    #define S_IXUSR 0 /* execute, user */
+    #define S_IRGRP 0 /* read, group */
+    #define S_IWGRP 0 /* write, group */
+    #define S_IXGRP 0 /* execute, group */
+    #define S_IROTH 0 /* read, others */
+    #define S_IWOTH 0 /* write, others */
+    #define S_IXOTH 0 /* execute, others */
+    #define S_IRWXU 0
+    #define S_IRWXG 0
+    #define S_IRWXO 0
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -184,9 +196,9 @@ C_API int spawn_err(spawn_t *, stderr_cb std_func);
 C_API int spawn_pid(spawn_t *child);
 C_API int spawn_signal(spawn_t *, int sig);
 C_API int spawn_detach(spawn_t *);
-C_API uv_stream_t *ipc_in(spawn_t *in);
-C_API uv_stream_t *ipc_out(spawn_t *out);
-C_API uv_stream_t *ipc_err(spawn_t *err);
+C_API uv_stream_t *ipc_in(spawn_t *);
+C_API uv_stream_t *ipc_out(spawn_t *);
+C_API uv_stream_t *ipc_err(spawn_t *);
 
 C_API void coro_uv_close(uv_handle_t *);
 C_API void interrupt_cleanup(void *handle);
@@ -316,366 +328,96 @@ C_API void coro_udp_send(uv_udp_send_t *req,
 /** @return void */
 C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 
-/** @return int */
-C_API void coro_thread_create(uv_thread_t *tid, uv_thread_cb entry, void *arg);
-
-#define CRLF "\r\n"
 #define UV_TLS UV_HANDLE + UV_STREAM + UV_POLL
 #define UV_SERVER_LISTEN UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP
 #define UV_CTX UV_SERVER_LISTEN + UV_POLL
 
-#ifdef _WIN32
-#include <sys/utime.h>
+typedef struct uv_args_s {
+    raii_type type;
+    bool is_path;
+    bool is_request;
+    int bind_type;
+    uv_fs_type fs_type;
+    uv_req_type req_type;
+    uv_handle_type handle_type;
+    uv_dirent_type_t dirent_type;
+    uv_tty_mode_t tty_mode;
+    uv_stdio_flags stdio_flag;
+    uv_errno_t errno_code;
 
-#define SLASH '\\'
-#define DIR_SEP	';'
-#define IS_SLASH(c)	((c) == '/' || (c) == '\\')
-#define IS_SLASH_P(c)	(*(c) == '/' || \
-        (*(c) == '\\' && !IsDBCSLeadByte(*(c-1))))
+    /* total number of args in set */
+    size_t n_args;
 
-/* COPY_ABS_PATH is 2 under Win32 because by chance both regular absolute paths
-   in the file system and UNC paths need copying of two characters */
-#define COPY_ABS_PATH(path) 2
-#define IS_UNC_PATH(path, len) \
-	(len >= 2 && IS_SLASH(path[0]) && IS_SLASH(path[1]))
-#define IS_ABS_PATH(path, len) \
-	(len >= 2 && (/* is local */isalpha(path[0]) && path[1] == ':' || /* is UNC */IS_SLASH(path[0]) && IS_SLASH(path[1])))
+    /* allocated array of arguments */
+    values_type *args;
+    routine_t *context;
 
-#else
-#include <dirent.h>
+    string buffer;
+    uv_buf_t bufs;
+    uv_stat_t stat[1];
+    uv_statfs_t statfs[1];
+    evt_ctx_t ctx;
+    char ip[32];
+    struct sockaddr name[1];
+    struct sockaddr_in in4[1];
+    struct sockaddr_in6 in6[1];
+} uv_args_t;
 
-#define SLASH '/'
+C_API uv_loop_t *ze_loop(void);
 
-#ifdef __riscos__
-    #define DIR_SEP  ';'
-#else
-    #define DIR_SEP  ':'
-#endif
+C_API value_t co_event(callable_t, void_t arg);
+C_API value_t co_await(callable_t fn, void_t arg);
+C_API void co_handler(func_t fn, void_t handle, func_t dtor);
+C_API void co_process(func_t fn, void_t args);
 
-#define IS_SLASH(c)	((c) == '/')
-#define IS_SLASH_P(c)	(*(c) == '/')
-#endif
+/* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
+C_API string_t ze_uname(void);
 
-#ifndef COPY_ABS_PATH
-#define COPY_ABS_PATH(path) 0
-#endif
+C_API uv_args_t *interrupt_listen_args(void);
+C_API void interrupt_listen_set(uv_args_t);
+C_API bool is_tls(uv_handle_t *);
 
-#ifndef IS_ABS_PATH
-#define IS_ABS_PATH(path, len) \
-	(IS_SLASH(path[0]))
-#endif
+#define c_int(data) co_value((data)).integer
+#define c_long(data) co_value((data)).s_long
+#define c_int64(data) co_value((data)).long_long
+#define c_unsigned_int(data) co_value((data)).u_int
+#define c_unsigned_long(data) co_value((data)).u_long
+#define c_size_t(data) co_value((data)).max_size
+#define c_const_char(data) co_value((data)).const_char
+#define c_char(data) co_value((data)).schar
+#define c_char_ptr(data) co_value((data)).char_ptr
+#define c_bool(data) co_value((data)).boolean
+#define c_float(data) co_value((data)).point
+#define c_double(data) co_value((data)).precision
+#define c_unsigned_char(data) co_value((data)).uchar
+#define c_char_ptr_ptr(data) co_value((data)).array
+#define c_unsigned_char_ptr(data) co_value((data)).uchar_ptr
+#define c_short(data) co_value((data)).s_short
+#define c_unsigned_short(data) co_value((data)).u_short
+#define c_void_ptr(data) co_value((data)).object
+#define c_callable(data) co_value((data)).func
+#define c_cast(type, data) (type *)co_value((data)).object
 
-typedef struct fileinfo_s {
-    const char *dirname;
-    const char *base;
-    const char *extension;
-    const char *filename;
-} fileinfo_t;
-
-typedef struct url_s {
-    uv_handle_type uv_type;
-    char *scheme;
-    char *user;
-    char *pass;
-    char *host;
-    unsigned short port;
-    char *path;
-    char *query;
-    char *fragment;
-} url_t;
-
-typedef enum {
-    URL_SCHEME,
-    URL_HOST,
-    URL_PORT,
-    URL_USER,
-    URL_PASS,
-    URL_PATH,
-    URL_QUERY,
-    URL_FRAGMENT,
-} url_key;
-
-typedef enum {
-    // Informational 1xx
-    STATUS_CONTINUE = 100,
-    STATUS_SWITCHING_PROTOCOLS = 101,
-    STATUS_PROCESSING = 102,
-    STATUS_EARLY_HINTS = 103,
-    // Successful 2xx
-    STATUS_OK = 200,
-    STATUS_CREATED = 201,
-    STATUS_ACCEPTED = 202,
-    STATUS_NON_AUTHORITATIVE_INFORMATION = 203,
-    STATUS_NO_CONTENT = 204,
-    STATUS_RESET_CONTENT = 205,
-    STATUS_PARTIAL_CONTENT = 206,
-    STATUS_MULTI_STATUS = 207,
-    STATUS_ALREADY_REPORTED = 208,
-    STATUS_IM_USED = 226,
-    // Redirection 3xx
-    STATUS_MULTIPLE_CHOICES = 300,
-    STATUS_MOVED_PERMANENTLY = 301,
-    STATUS_FOUND = 302,
-    STATUS_SEE_OTHER = 303,
-    STATUS_NOT_MODIFIED = 304,
-    STATUS_USE_PROXY = 305,
-    STATUS_RESERVED = 306,
-    STATUS_TEMPORARY_REDIRECT = 307,
-    STATUS_PERMANENT_REDIRECT = 308,
-    // Client Errors 4xx
-    STATUS_BAD_REQUEST = 400,
-    STATUS_UNAUTHORIZED = 401,
-    STATUS_PAYMENT_REQUIRED = 402,
-    STATUS_FORBIDDEN = 403,
-    STATUS_NOT_FOUND = 404,
-    STATUS_METHOD_NOT_ALLOWED = 405,
-    STATUS_NOT_ACCEPTABLE = 406,
-    STATUS_PROXY_AUTHENTICATION_REQUIRED = 407,
-    STATUS_REQUEST_TIMEOUT = 408,
-    STATUS_CONFLICT = 409,
-    STATUS_GONE = 410,
-    STATUS_LENGTH_REQUIRED = 411,
-    STATUS_PRECONDITION_FAILED = 412,
-    STATUS_PAYLOAD_TOO_LARGE = 413,
-    STATUS_URI_TOO_LONG = 414,
-    STATUS_UNSUPPORTED_MEDIA_TYPE = 415,
-    STATUS_RANGE_NOT_SATISFIABLE = 416,
-    STATUS_EXPECTATION_FAILED = 417,
-    STATUS_IM_A_TEAPOT = 418,
-    STATUS_MISDIRECTED_REQUEST = 421,
-    STATUS_UNPROCESSABLE_ENTITY = 422,
-    STATUS_LOCKED = 423,
-    STATUS_FAILED_DEPENDENCY = 424,
-    STATUS_TOO_EARLY = 425,
-    STATUS_UPGRADE_REQUIRED = 426,
-    STATUS_PRECONDITION_REQUIRED = 428,
-    STATUS_TOO_MANY_REQUESTS = 429,
-    STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431,
-    STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 451,
-    // Server Errors 5xx
-    STATUS_INTERNAL_SERVER_ERROR = 500,
-    STATUS_NOT_IMPLEMENTED = 501,
-    STATUS_BAD_GATEWAY = 502,
-    STATUS_SERVICE_UNAVAILABLE = 503,
-    STATUS_GATEWAY_TIMEOUT = 504,
-    STATUS_VERSION_NOT_SUPPORTED = 505,
-    STATUS_VARIANT_ALSO_NEGOTIATES = 506,
-    STATUS_INSUFFICIENT_STORAGE = 507,
-    STATUS_LOOP_DETECTED = 508,
-    STATUS_NOT_EXTENDED = 510,
-    STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511
-} http_status;
-
-typedef enum {
-    /* Request Methods */
-    HTTP_DELETE,
-    HTTP_GET,
-    HTTP_HEAD,
-    HTTP_POST,
-    HTTP_PUT,
-    /* pathological */
-    HTTP_CONNECT,
-    HTTP_OPTIONS,
-    HTTP_TRACE,
-    /* webdav */
-    HTTP_COPY,
-    HTTP_LOCK,
-    HTTP_MKCOL,
-    HTTP_MOVE,
-    HTTP_PROPFIND,
-    HTTP_PROPPATCH,
-    HTTP_SEARCH,
-    HTTP_UNLOCK,
-    /* subversion */
-    HTTP_REPORT,
-    HTTP_MKACTIVITY,
-    HTTP_CHECKOUT,
-    HTTP_MERGE,
-    /* upnp */
-    HTTP_MSEARCH,
-    HTTP_NOTIFY,
-    HTTP_SUBSCRIBE,
-    HTTP_UNSUBSCRIBE,
-    /* RFC-5789 */
-    HTTP_PATCH,
-    HTTP_PURGE
-} http_method;
-
-typedef enum {
-    HTTP_REQUEST,
-    HTTP_RESPONSE,
-    HTTP_BOTH
-} http_parser_type;
-
-typedef enum {
-    F_CHUNKED = 1 << 0,
-    F_CONNECTION_KEEP_ALIVE = 1 << 1,
-    F_CONNECTION_CLOSE = 1 << 2,
-    F_TRAILING = 1 << 3,
-    F_UPGRADE = 1 << 4,
-    F_SKIP_BODY = 1 << 5
-} http_flags;
-
-typedef struct cookie_s {
-    char *domain;
-    char *lifetime;
-    int expiry;
-    bool httpOnly;
-    int maxAge;
-    char *name;
-    char *path;
-    bool secure;
-    char *value;
-    bool strict;
-    char *sameSite;
-} cookie_t;
-
-typedef struct http_s {
-    http_parser_type action;
-
-    /* The current response status */
-    http_status status;
-
-    /* The cookie headers */
-    cookie_t *cookies;
-
-    /* The current response body */
-    char *body;
-
-    /* The unchanged data from server */
-    char *raw;
-
-    /* The current headers */
-    void *headers;
-
-
-    /* The protocol */
-    char *protocol;
-
-    /* The protocol version */
-    double version;
-
-    /* The requested status code */
-    http_status code;
-
-    /* The requested status message */
-    char *message;
-
-    /* The requested method */
-    char *method;
-
-    /* The requested path */
-    char *path;
-
-    /* The requested uri */
-    char *uri;
-
-    /* The request params */
-    void *parameters;
-
-    char *hostname;
-
-    /* Response headers to send */
-    void *header;
-} http_t;
-
-/*
-Parse a URL and return its components, return `NULL` for malformed URLs.
-
-Modifed C code from PHP userland function
-see https://php.net/manual/en/function.parse-url.php
-*/
-C_API url_t *parse_url(char const *str);
-C_API url_t *url_parse_ex(char const *str, size_t length);
-C_API url_t *url_parse_ex2(char const *str, size_t length, bool *has_port);
-C_API char *url_decode(char *str, size_t len);
-C_API char *url_encode(char const *s, size_t len);
-
-/*
-Returns valid HTTP status codes reasons.
-
-Verified 2020-05-22
-
-see https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
-*/
-C_API const char *http_status_str(uint16_t const status);
-
-/* Return date string in standard format for http headers */
-C_API char *http_std_date(time_t t);
-
-/* Parse/prepare server headers, and store. */
-C_API void parse_http(http_t *, char *headers);
-
-/**
- * Returns `http_t` instance, for simple generic handling/constructing **http** request/response
- * messages, following the https://tools.ietf.org/html/rfc2616.html specs.
- *
- * - For use with `http_response()` and `http_request()`.
- *
- * - `action` either HTTP_RESPONSE or HTTP_REQUEST
- * - `hostname` for `Host:` header request,  will be ignored on `path/url` setting
- * - `protocol` version for `HTTP/` header
- */
-C_API http_t *http_for(http_parser_type action, char *hostname, double protocol);
-
-/**
- * Construct a new response string.
- *
- * - `body` defaults to `Not Found`, if `status` empty
- * - `status` defaults to `STATUS_NO_FOUND`, if `body` empty, otherwise `STATUS_OK`
- * - `type`
- * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
- */
-C_API char *http_response(http_t *, char *body, http_status status, char *type, char *extras);
-
-/**
- * Construct a new request string.
- *
- * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
- */
-C_API char *http_request(http_t *,
-                         http_method method,
-                         char *path,
-                         char *type,
-                         char *connection,
-                         char *body_data,
-                         char *extras);
-
-/**
- * Return a request header `content`.
- */
-C_API char *get_header(http_t *, char *key);
-
-/**
- * Return a request header content `variable` value.
- *
- * - `key` header to check for
- * - `var` variable to find
- */
-C_API char *get_variable(http_t *, char *key, char *var);
-
-/**
- * Return a request parameter `value`.
- */
-C_API char *get_parameter(http_t *, char *key);
-
-/**
- * Add or overwrite an response header parameter.
- */
-C_API void put_header(http_t *, char *key, char *value, bool force_cap);
-
-C_API bool has_header(http_t *, char *key);
-C_API bool has_variable(http_t *, char *key, char *var);
-C_API bool has_flag(http_t *, char *key, char *flag);
-C_API bool has_parameter(http_t *, char *key);
-
-#ifndef HTTP_AGENT
-#define HTTP_AGENT "uv_client"
-#endif
-
-#ifndef HTTP_SERVER
-#define HTTP_SERVER "uv_server"
-#endif
+#define c_integer(value) co_data((value)).integer
+#define c_signed_long(value) co_data((value)).s_long
+#define c_long_long(value) co_data((value)).long_long
+#define c_unsigned_integer(value) co_data((value)).u_int
+#define c_unsigned_long_int(value) co_data((value)).u_long
+#define c_unsigned_long_long(value) co_data((value)).max_size
+#define c_string(value) co_data((value)).const_char
+#define c_signed_chars(value) co_data((value)).schar
+#define c_const_chars(value) co_data((value)).char_ptr
+#define c_boolean(value) co_data((value)).boolean
+#define c_point(value) co_data((value)).point
+#define c_precision(value) co_data((value)).precision
+#define c_unsigned_chars(value) co_data((value)).uchar
+#define c_chars_array(value) co_data((value)).array
+#define c_unsigned_chars_ptr(value) co_data((value)).uchar_ptr
+#define c_signed_shorts(value) co_data((value)).s_short
+#define c_unsigned_shorts(value) co_data((value)).u_short
+#define c_object(value) co_data((value)).object
+#define c_func(value) co_data((value)).func
+#define c_cast_of(type, value) (type *)co_data((value)).object
 
 #ifdef __cplusplus
 }

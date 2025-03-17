@@ -22,12 +22,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
-# if CMake versions earlier than 3.14 need to be supported see https://cmake.org/cmake/help/v3.14/module/FetchContent.html
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/1.3.6.zip
-        URL_MD5 918bef3ec87af35cf3c0e059b6fb14fa
+        URL https://github.com/zelang-dev/c-raii/archive/refs/heads/main.zip
+        URL_MD5 f6f69f4e72680ec1a68f16b8b0b600fb
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -45,36 +44,30 @@ file(GLOB lib_files
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 )
 
-add_library(coroutine STATIC ${lib_files})
-set_property(TARGET coroutine PROPERTY POSITION_INDEPENDENT_CODE True)
-target_link_libraries(coroutine PUBLIC uv_a)
+add_library(uv_coro STATIC ${lib_files})
+set_property(TARGET uv_coro PROPERTY POSITION_INDEPENDENT_CODE True)
+target_link_libraries(uv_coro PUBLIC uv_a)
+target_include_directories(uv_coro AFTER PUBLIC $<BUILD_INTERFACE:${RAII_INCLUDE_DIR} $<INSTALL_INTERFACE:${RAII_INCLUDE_DIR})
+target_link_libraries(uv_coro PUBLIC raii)
 
-find_package(OpenSSL 0.9.8...<3.0.0)
-if(OPENSSL_FOUND AND WIN32)
-    target_include_directories(coroutine BEFORE PUBLIC ${OPENSSL_INCLUDE_DIR})
-    add_definitions(-DOPENSSL_USE_STATIC_LIBS=TRUE)
-    add_definitions(-DOPENSSL_MSVC_STATIC_RT=TRUE)
-    add_definitions(-DNO_GETTIMEOFDAY)
-    target_link_libraries(coroutine PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
-    target_link_libraries(coroutine PUBLIC ${OPENSSL_SSL_LIBRARY})
-else()
-    find_package(LibreSSL QUIET)
-    if(NOT LibreSSL_FOUND)
-        set(LibreSSL_FOUND 1)
-        FetchContent_Declare(libressl
-            URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
-            URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
-        )
-        FetchContent_MakeAvailable(libressl)
-    endif()
-    target_compile_definitions(crypto PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-    target_compile_definitions(ssl PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-    target_compile_definitions(tls PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-    target_link_libraries(coroutine PUBLIC crypto)
-    target_link_libraries(coroutine PUBLIC ssl)
+
+find_package(LibreSSL QUIET)
+if(NOT LibreSSL_FOUND)
+    set(LibreSSL_FOUND 1)
+    FetchContent_Declare(libressl
+        URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
+        URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
+    )
+    FetchContent_MakeAvailable(libressl)
 endif()
+target_compile_definitions(crypto PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+target_compile_definitions(ssl PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+target_compile_definitions(tls PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+target_include_directories(uv_coro PUBLIC $<BUILD_INTERFACE:${LibreSSL_INCLUDE_DIR} $<INSTALL_INTERFACE:${LibreSSL_INCLUDE_DIR})
+target_link_libraries(uv_coro PUBLIC crypto)
+target_link_libraries(uv_coro PUBLIC ssl)
 
-target_include_directories(coroutine
+target_include_directories(uv_coro
     PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(UNIX)
@@ -88,12 +81,8 @@ if(WIN32)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
 endif()
 
-target_include_directories(raii AFTER PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(coroutine PUBLIC raii)
-
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    option(BUILD_EXAMPLES   "whether or not examples should be built" ON)
+    option(BUILD_EXAMPLES   "whether or not examples should be built" OFF)
 
     if(BUILD_EXAMPLES)
         enable_testing()
@@ -121,5 +110,5 @@ set(CPACK_PACKAGE_VERSION 1.0.0)
 include(CPack)
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
-install(TARGETS ${coroutine} DESTINATION lib)
+install(TARGETS ${uv_coro} DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include)
