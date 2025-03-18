@@ -1,4 +1,4 @@
-#include "coroutine.h"
+#include "uv_coro.h"
 
 int co_main(int argc, char *argv[]) {
     char hostname[UV_MAXHOSTNAMESIZE];
@@ -19,14 +19,14 @@ int co_main(int argc, char *argv[]) {
         command = "hi";
     }
 
-    url_t *url = parse_url(!is_str_in(hostname, "://")
-                                 ? (string_t)co_concat_by(2, "tcp://", hostname)
-                                 : hostname);
+    url_t *url = parse_url((string_t)(!is_str_in(hostname, "://")
+                                 ? str_concat(2, "tcp://", hostname)
+                                 : hostname));
     if (url->host)
         host_part = url->host;
 
     if (argc >= 1) {
-        headers = co_concat_by(9,
+        headers = str_concat(9,
                                "GET ",
                                (command == NULL ? "/" : command),
                                " HTTP/1.1\r\n",
@@ -47,7 +47,7 @@ int co_main(int argc, char *argv[]) {
     return 0;
 
     // Connect to Server
-    uv_stream_t *socket = stream_connect_ex(url->uv_type, url->host, (url->port == 0 ? 5000 : url->port));
+    uv_stream_t *socket = stream_connect_ex(url->type, url->host, (url->port == 0 ? 5000 : url->port));
 
     // Send a command
     stream_write(socket, http);

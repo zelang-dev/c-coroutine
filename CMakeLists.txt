@@ -26,7 +26,7 @@ find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
         URL https://github.com/zelang-dev/c-raii/archive/refs/heads/main.zip
-        URL_MD5 f6f69f4e72680ec1a68f16b8b0b600fb
+        URL_MD5 a4f75b21ac313a029ffad2de1fef8ce7
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -34,8 +34,8 @@ endif()
 find_package(libuv QUIET)
 if(NOT libuv_FOUND)
     FetchContent_Declare(libuv
-        URL https://github.com/libuv/libuv/archive/refs/tags/v1.49.2.zip
-        URL_MD5 e637c8dd733d75d59a0570b01cef815a
+        URL https://github.com/libuv/libuv/archive/refs/tags/v1.50.0.zip
+        URL_MD5 a18a89613896512afd062c89a32a7176
     )
     FetchContent_MakeAvailable(libuv)
 endif()

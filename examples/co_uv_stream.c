@@ -1,6 +1,6 @@
-#include "coroutine.h"
+#include "uv_coro.h"
 
-int co_main(int argc, char *argv[]) {
+int uv_main(int argc, char **argv) {
     uv_file fd = 1;
     stack_set(Kb(32));
     uv_tty_t *tty = tty_create(fd);

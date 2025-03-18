@@ -6,7 +6,9 @@
 #endif
 
 #include "uv_tls.h"
-#include "raii.h"
+#define INTERRUPT_MODE UV_RUN_NOWAIT
+#include "url_http.h"
+#include "reflection.h"
 
 /* Cast ~libuv~ `obj` to `uv_stream_t` ptr. */
 #define streamer(obj) ((uv_stream_t *)obj)
@@ -16,27 +18,6 @@
 
 /* Cast ~libuv~ `obj` to `uv_req_t` ptr. */
 #define requester(obj) ((uv_req_t *)obj)
-
-#define var_int(arg) (arg).value.integer
-#define var_long(arg) (arg).value.s_long
-#define var_long_long(arg) (arg).value.long_long
-#define var_unsigned_int(arg) (arg).value.u_int
-#define var_unsigned_long(arg) (arg).value.u_long
-#define var_size_t(arg) (arg).value.max_size
-#define var_const_char(arg) (string_t)(arg).value.buffer
-#define var_char(arg) (arg).value.schar
-#define var_char_ptr(arg) (arg).value.char_ptr
-#define var_bool(arg) (arg).value.boolean
-#define var_float(arg) (arg).value.point
-#define var_double(arg) (arg).value.precision
-#define var_unsigned_char(arg) (arg).value.uchar
-#define var_char_array(arg) (arg).value.array
-#define var_unsigned_char_ptr(arg) (arg).value.uchar_ptr
-#define var_signed_short(arg) (arg).value.s_short
-#define var_unsigned_short(arg) (arg).value.u_short
-#define var_ptr(arg) (arg).value.object
-#define var_func(arg) (arg).value.func
-#define var_cast(type, arg) (type *)(arg).value.object
 
 #if defined(_MSC_VER)
     #define S_IRUSR S_IREAD  /* read, user */
@@ -91,7 +72,7 @@ typedef union
 typedef struct sockaddr_in sock_in_t;
 typedef struct sockaddr_in6 sock_in6_t;
 typedef void (*spawn_cb)(int64_t status, int signal);
-typedef void (*stdio_cb)(const char *buf);
+typedef void (*stdio_cb)(string_t buf);
 typedef stdio_cb stdin_cb;
 typedef stdio_cb stdout_cb;
 typedef stdio_cb stderr_cb;
@@ -171,7 +152,7 @@ C_API uv_stdio_container_t *stdio_stream(void *handle, int flags);
  *
  * @param no_of_stdio Number of `uv_stdio_container_t` for each stream or file descriptors to be passed to a child process. Use `stdio_stream()` or `stdio_fd()` functions to create.
  */
-C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_t uid, uv_gid_t gid, int no_of_stdio, ...);
+C_API spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, uv_gid_t gid, int no_of_stdio, ...);
 
 /**
  * Initializes the process handle and starts the process.
@@ -188,7 +169,7 @@ C_API spawn_options_t *spawn_opts(char *env, const char *cwd, int flags, uv_uid_
  * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
  * If `NULL` defaults `stderr` of subprocess to parent.
  */
-C_API spawn_t *spawn(const char *command, const char *args, spawn_options_t *options);
+C_API spawn_t *spawn(string_t command, string_t args, spawn_options_t *options);
 C_API int spawn_exit(spawn_t *, spawn_cb exit_func);
 C_API int spawn_in(spawn_t *, stdin_cb std_func);
 C_API int spawn_out(spawn_t *, stdout_cb std_func);
@@ -201,18 +182,15 @@ C_API uv_stream_t *ipc_out(spawn_t *);
 C_API uv_stream_t *ipc_err(spawn_t *);
 
 C_API void coro_uv_close(uv_handle_t *);
-C_API void interrupt_cleanup(void *handle);
-C_API void interrupt_notify(void *event);
-C_API void interrupt_resume(uv_async_t *handle);
 
-C_API char *fs_readfile(const char *path);
-C_API int fs_write_file(const char *path, const char *text);
-C_API uv_file fs_open(const char *path, int flags, int mode);
+C_API string fs_readfile(string_t path);
+C_API int fs_write_file(string_t path, string_t text);
+C_API uv_file fs_open(string_t path, int flags, int mode);
 C_API int fs_close(uv_file fd);
 C_API uv_stat_t *fs_fstat(uv_file fd);
-C_API char *fs_read(uv_file fd, int64_t offset);
-C_API int fs_write(uv_file fd, const char *text, int64_t offset);
-C_API int fs_unlink(const char *path);
+C_API string fs_read(uv_file fd, int64_t offset);
+C_API int fs_write(uv_file fd, string_t text, int64_t offset);
+C_API int fs_unlink(string_t path);
 C_API int fs_fsync(uv_file file);
 C_API int fs_fdatasync(uv_file file);
 C_API int fs_ftruncate(uv_file file, int64_t offset);
@@ -221,43 +199,43 @@ C_API int fs_fchmod(uv_file file, int mode);
 C_API int fs_fchown(uv_file file, uv_uid_t uid, uv_gid_t gid);
 C_API int fs_futime(uv_file file, double atime, double mtime);
 
-C_API int fs_copyfile(const char *path, const char *new_path, int flags);
-C_API int fs_mkdir(const char *path, int mode);
-C_API int fs_mkdtemp(const char *tpl);
-C_API int fs_mkstemp(const char *tpl);
-C_API int fs_rmdir(const char *path);
-C_API int fs_scandir(const char *path, int flags);
-C_API int fs_opendir(const char *path);
+C_API int fs_copyfile(string_t path, string_t new_path, int flags);
+C_API int fs_mkdir(string_t path, int mode);
+C_API int fs_mkdtemp(string_t tpl);
+C_API int fs_mkstemp(string_t tpl);
+C_API int fs_rmdir(string_t path);
+C_API int fs_scandir(string_t path, int flags);
+C_API int fs_opendir(string_t path);
 C_API int fs_readdir(uv_dir_t *dir);
 C_API int fs_closedir(uv_dir_t *dir);
-C_API int fs_stat(const char *path);
-C_API int fs_rename(const char *path, const char *new_path);
-C_API int fs_access(const char *path, int mode);
-C_API int fs_chmod(const char *path, int mode);
-C_API int fs_utime(const char *path, double atime, double mtime);
-C_API int fs_lutime(const char *path, double atime, double mtime);
-C_API int fs_lstat(const char *path);
-C_API int fs_link(const char *path, const char *new_path);
-C_API int fs_symlink(const char *path, const char *new_path, int flags);
-C_API int fs_readlink(const char *path);
-C_API int fs_realpath(const char *path);
-C_API int fs_chown(const char *path, uv_uid_t uid, uv_gid_t gid);
-C_API int fs_lchown(const char *path, uv_uid_t uid, uv_gid_t gid);
-C_API uv_statfs_t *fs_statfs(const char *path);
+C_API int fs_stat(string_t path);
+C_API int fs_rename(string_t path, string_t new_path);
+C_API int fs_access(string_t path, int mode);
+C_API int fs_chmod(string_t path, int mode);
+C_API int fs_utime(string_t path, double atime, double mtime);
+C_API int fs_lutime(string_t path, double atime, double mtime);
+C_API int fs_lstat(string_t path);
+C_API int fs_link(string_t path, string_t new_path);
+C_API int fs_symlink(string_t path, string_t new_path, int flags);
+C_API int fs_readlink(string_t path);
+C_API int fs_realpath(string_t path);
+C_API int fs_chown(string_t path, uv_uid_t uid, uv_gid_t gid);
+C_API int fs_lchown(string_t path, uv_uid_t uid, uv_gid_t gid);
+C_API uv_statfs_t *fs_statfs(string_t path);
 
-C_API void fs_poll_start(const char *path, int interval);
-C_API void fs_event_start(const char *path, int flags);
+C_API void fs_poll_start(string_t path, int interval);
+C_API void fs_event_start(string_t path, int flags);
 
-C_API char *stream_read(uv_stream_t *);
-C_API int stream_write(uv_stream_t *, const char *text);
-C_API uv_stream_t *stream_connect(const char *address);
-C_API uv_stream_t *stream_connect_ex(uv_handle_type scheme, const char *address, int port);
+C_API string stream_read(uv_stream_t *);
+C_API int stream_write(uv_stream_t *, string_t text);
+C_API uv_stream_t *stream_connect(string_t address);
+C_API uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port);
 C_API uv_stream_t *stream_listen(uv_stream_t *, int backlog);
-C_API uv_stream_t *stream_bind(const char *address, int flags);
-C_API uv_stream_t *stream_bind_ex(uv_handle_type scheme, const char *address, int port, int flags);
+C_API uv_stream_t *stream_bind(string_t address, int flags);
+C_API uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, int flags);
 C_API void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client);
 
-C_API int stream_write2(uv_stream_t *, const char *text, uv_stream_t *send_handle);
+C_API int stream_write2(uv_stream_t *, string_t text, uv_stream_t *send_handle);
 
 C_API void stream_shutdown(uv_shutdown_t *, uv_stream_t *, uv_shutdown_cb cb);
 
@@ -266,7 +244,7 @@ C_API uv_tty_t *tty_create(uv_file fd);
 C_API uv_udp_t *udp_create(void);
 
 C_API uv_pipe_t *pipe_create(bool is_ipc);
-C_API void pipe_connect(uv_pipe_t *, const char *name);
+C_API void pipe_connect(uv_pipe_t *, string_t name);
 
 C_API uv_tcp_t *tcp_create(void);
 C_API void tcp_connect(uv_tcp_t *handle, const struct sockaddr *addr);
@@ -303,8 +281,8 @@ C_API void coro_idle_start(uv_idle_t *idle, uv_idle_cb callback);
 C_API void coro_getaddrinfo(uv_loop_t *loop,
                           uv_getaddrinfo_t *req,
                           uv_getaddrinfo_cb getaddrinfo_cb,
-                          const char *node,
-                          const char *service,
+                          string_t node,
+                          string_t service,
                           const struct addrinfo *hints);
 
 /** @return int */
@@ -334,9 +312,10 @@ C_API void coro_walk(uv_loop_t, uv_walk_cb walk_cb, void *arg);
 
 typedef struct uv_args_s {
     raii_type type;
+    int bind_type;
     bool is_path;
     bool is_request;
-    int bind_type;
+    bool is_freeable;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
@@ -368,51 +347,13 @@ C_API uv_loop_t *ze_loop(void);
 /* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
 C_API string_t ze_uname(void);
 
-C_API uv_args_t *interrupt_listen_args(void);
-C_API void interrupt_listen_set(uv_args_t);
+C_API uv_args_t *uv_coro_data(void);
+C_API void uv_coro_update(uv_args_t);
 C_API bool is_tls(uv_handle_t *);
 
-#define c_int(data) co_value((data)).integer
-#define c_long(data) co_value((data)).s_long
-#define c_int64(data) co_value((data)).long_long
-#define c_unsigned_int(data) co_value((data)).u_int
-#define c_unsigned_long(data) co_value((data)).u_long
-#define c_size_t(data) co_value((data)).max_size
-#define c_const_char(data) co_value((data)).const_char
-#define c_char(data) co_value((data)).schar
-#define c_char_ptr(data) co_value((data)).char_ptr
-#define c_bool(data) co_value((data)).boolean
-#define c_float(data) co_value((data)).point
-#define c_double(data) co_value((data)).precision
-#define c_unsigned_char(data) co_value((data)).uchar
-#define c_char_ptr_ptr(data) co_value((data)).array
-#define c_unsigned_char_ptr(data) co_value((data)).uchar_ptr
-#define c_short(data) co_value((data)).s_short
-#define c_unsigned_short(data) co_value((data)).u_short
-#define c_void_ptr(data) co_value((data)).object
-#define c_callable(data) co_value((data)).func
-#define c_cast(type, data) (type *)co_value((data)).object
-
-#define c_integer(value) co_data((value)).integer
-#define c_signed_long(value) co_data((value)).s_long
-#define c_long_long(value) co_data((value)).long_long
-#define c_unsigned_integer(value) co_data((value)).u_int
-#define c_unsigned_long_int(value) co_data((value)).u_long
-#define c_unsigned_long_long(value) co_data((value)).max_size
-#define c_string(value) co_data((value)).const_char
-#define c_signed_chars(value) co_data((value)).schar
-#define c_const_chars(value) co_data((value)).char_ptr
-#define c_boolean(value) co_data((value)).boolean
-#define c_point(value) co_data((value)).point
-#define c_precision(value) co_data((value)).precision
-#define c_unsigned_chars(value) co_data((value)).uchar
-#define c_chars_array(value) co_data((value)).array
-#define c_unsigned_chars_ptr(value) co_data((value)).uchar_ptr
-#define c_signed_shorts(value) co_data((value)).s_short
-#define c_unsigned_shorts(value) co_data((value)).u_short
-#define c_object(value) co_data((value)).object
-#define c_func(value) co_data((value)).func
-#define c_cast_of(type, value) (type *)co_data((value)).object
+/* This library provides its own ~main~,
+which call this function as an coroutine! */
+C_API int uv_main(int, char **);
 
 #ifdef __cplusplus
 }

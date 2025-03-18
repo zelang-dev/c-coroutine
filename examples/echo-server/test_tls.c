@@ -8,7 +8,7 @@
 //
 //%///////////////////////////////////////////////////////////////////////////
 
-#include "../../include/uv_tls.h"
+#include "uv_tls.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
