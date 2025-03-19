@@ -716,9 +716,9 @@ int fs_write_file(string_t path, string_t text) {
 
 RAII_INLINE void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client) {
     if (is_tls((uv_handle_t *)client))
-        coro_interrupt_event(VOID_FUNC(connected), client, tls_close_free);
+        coro_interrupt_event((func_t)connected, client, tls_close_free);
     else
-        coro_interrupt_event(VOID_FUNC(connected), client, uv_close_free);
+        coro_interrupt_event((func_t)connected, client, uv_close_free);
 }
 
 int stream_write(uv_stream_t *handle, string_t text) {
@@ -943,7 +943,7 @@ void coro_uv_close(uv_handle_t *handle) {
 }
 
 uv_udp_t *udp_create(void) {
-    uv_udp_t *udp = (uv_udp_t *)co_calloc_full(coro_active(), 1, sizeof(uv_udp_t), uv_close_free);
+    uv_udp_t *udp = (uv_udp_t *)calloc_full(coro_scope(), 1, sizeof(uv_udp_t), uv_close_free);
     int r = uv_udp_init(ze_loop(), udp);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
@@ -953,7 +953,7 @@ uv_udp_t *udp_create(void) {
 }
 
 uv_pipe_t *pipe_create(bool is_ipc) {
-    uv_pipe_t *pipe = (uv_pipe_t *)co_calloc_full(coro_active(), 1, sizeof(uv_pipe_t), uv_close_free);
+    uv_pipe_t *pipe = (uv_pipe_t *)calloc_full(coro_scope(), 1, sizeof(uv_pipe_t), uv_close_free);
     int r = uv_pipe_init(ze_loop(), pipe, (int)is_ipc);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
@@ -963,7 +963,7 @@ uv_pipe_t *pipe_create(bool is_ipc) {
 }
 
 uv_tcp_t *tcp_create(void) {
-    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(coro_active(), 1, sizeof(uv_tcp_t), uv_close_free);
+    uv_tcp_t *tcp = (uv_tcp_t *)calloc_full(coro_scope(), 1, sizeof(uv_tcp_t), uv_close_free);
     int r = uv_tcp_init(ze_loop(), tcp);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
@@ -973,7 +973,7 @@ uv_tcp_t *tcp_create(void) {
 }
 
 uv_tty_t *tty_create(uv_file fd) {
-    uv_tty_t *tty = (uv_tty_t *)co_calloc_full(coro_active(), 1, sizeof(uv_tty_t), uv_close_free);
+    uv_tty_t *tty = (uv_tty_t *)calloc_full(coro_scope(), 1, sizeof(uv_tty_t), uv_close_free);
     int r = uv_tty_init(ze_loop(), tty, fd, 0);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
@@ -983,7 +983,7 @@ uv_tty_t *tty_create(uv_file fd) {
 }
 
 uv_tcp_t *tls_tcp_create(void_t extra) {
-    uv_tcp_t *tcp = (uv_tcp_t *)co_calloc_full(coro_active(), 1, sizeof(uv_tcp_t), tls_close_free);
+    uv_tcp_t *tcp = (uv_tcp_t *)calloc_full(coro_scope(), 1, sizeof(uv_tcp_t), tls_close_free);
     tcp->data = extra;
     int r = uv_tcp_init(ze_loop(), tcp);
     if (r) {
@@ -1289,7 +1289,6 @@ static void create_loop(void) {
     }
 
     set_interrupt_handle(handle);
-    return 0;
 }
 
 main(int argc, char **argv) {
