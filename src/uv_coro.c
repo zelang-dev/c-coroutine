@@ -1,5 +1,5 @@
 #include "uv_coro.h"
-static string_t uv_coro_powered_by[SCRAPE_SIZE] = {0};
+static const char uv_coro_powered_by[SCRAPE_SIZE] = {0};
 static void_t fs_init(params_t);
 static void_t uv_init(params_t);
 
@@ -244,7 +244,7 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) 
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
     routine_t *co = uv->context;
 
-    buf->base = (string)calloc_full(co, 1, suggested_size + 1, RAII_FREE);
+    buf->base = (string)calloc_full(get_coro_scope(co), 1, suggested_size + 1, RAII_FREE);
     buf->len = (unsigned int)suggested_size;
 }
 
@@ -1141,7 +1141,7 @@ spawn_t *spawn(string_t command, string_t args, spawn_options_t *handle) {
     if (is_empty((void_t)args))
         has_args = 2;
 
-    string command_arg = str_concat_ex(nullptr, has_args, command, ",", args);
+    string command_arg = str_cat_ex(nullptr, has_args, command, ",", args);
     string *command_args = str_split_ex(nullptr, command_arg, ",", nullptr);
     RAII_FREE(command_arg);
     handle->options->args = command_args;
@@ -1234,11 +1234,11 @@ RAII_INLINE bool is_tls(uv_handle_t *self) {
 }
 
 string_t ze_uname(void) {
-    if (is_str_empty(uv_coro_powered_by)) {
+    if (is_str_empty((string_t)uv_coro_powered_by)) {
         char scrape[SCRAPE_SIZE];
         uv_utsname_t buffer[1];
         uv_os_uname(buffer);
-        string_t powered_by = str_concat_ex(nullptr, 8, "Beta - ",
+        string_t powered_by = str_cat_ex(nullptr, 8, "Beta - ",
                                             simd_itoa(thrd_cpu_count(), scrape), " cores, ",
                                             buffer->sysname, " ",
                                             buffer->machine, " ",
@@ -1248,7 +1248,7 @@ string_t ze_uname(void) {
         RAII_FREE((void_t)powered_by);
     }
 
-    return uv_coro_powered_by;
+    return (string_t)uv_coro_powered_by;
 }
 
 RAII_INLINE uv_loop_t *ze_loop(void) {
