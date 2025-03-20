@@ -25,18 +25,15 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run test examples
         run: |
             cd build
-            ./go_channel
-            ./go_sleep
-            ./go_select
-            ./go_wait_group
-            ./go_panic
+            ./go_readfile
             ./co_uv_fs
             ./co_uv_spawn
+            ./co_uv_stream
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -54,16 +51,13 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF -A ${{ matrix.arch }}
+            cmake .. -DBUILD_EXAMPLES=ON -A ${{ matrix.arch }}
             cmake --build . --config Debug
       - name: Run test examples
         shell: cmd
         run: |
             cd build\Debug
-            .\go_channel.exe
-            .\go_sleep.exe
-            .\go_select.exe
-            .\go_wait_group.exe
-            .\go_panic.exe
-            .\co_uv_fs.exe
-            .\co_uv_spawn.exe
+            ./go_readfile.exe
+            ./co_uv_fs.exe
+            ./co_uv_spawn.exe
+            ./co_uv_stream.exe

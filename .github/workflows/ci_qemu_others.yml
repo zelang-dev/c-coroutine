@@ -35,19 +35,9 @@ jobs:
           run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON ..
             cmake --build .
-            ./chan_3
-            ./primes
-            ./test_delay 2
-            ./go_channel
-            ./go_sleep
-            ./go_select
-            if [ "${{ matrix.target }}" != "arm" ]; then
-                ./go_wait_group
-                ./go_panic
-            fi
+            ./go_readfile
             ./co_uv_fs
             ./co_uv_spawn
             ./co_uv_stream
-            ./co_cpp_future_wait

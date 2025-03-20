@@ -50,7 +50,6 @@ target_link_libraries(uv_coro PUBLIC uv_a)
 target_include_directories(uv_coro AFTER PUBLIC $<BUILD_INTERFACE:${RAII_INCLUDE_DIR} $<INSTALL_INTERFACE:${RAII_INCLUDE_DIR})
 target_link_libraries(uv_coro PUBLIC raii)
 
-
 find_package(LibreSSL QUIET)
 if(NOT LibreSSL_FOUND)
     FetchContent_Declare(libressl
@@ -84,7 +83,7 @@ else()
 endif()
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    option(BUILD_EXAMPLES   "whether or not examples should be built" OFF)
+    option(BUILD_EXAMPLES "whether or not examples should be built" ON)
 
     if(BUILD_EXAMPLES)
         enable_testing()

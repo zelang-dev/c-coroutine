@@ -2,11 +2,10 @@
 
 int uv_main(int argc, char **argv) {
     uv_file fd = 1;
-    stack_set(Kb(32));
     uv_tty_t *tty = tty_create(fd);
 
     printf("Created tty with fd: %d\n", fd);
-    sleep_for(1);
+    sleepfor(1);
     int status = stream_write(streamer(tty), "hello world\n");
     printf("Wrote to stream - tty, status: %d\n", status);
 

@@ -1,6 +1,6 @@
 #include "uv_coro.h"
 
-int co_main(int argc, char *argv[]) {
+int uv_main(int argc, char *argv[]) {
     char hostname[UV_MAXHOSTNAMESIZE];
     size_t len = sizeof(hostname);
     string_t command, port, http;

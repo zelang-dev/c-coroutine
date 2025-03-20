@@ -3,10 +3,9 @@
 char buf[] = "blablabla\n";
 const char *path = "write.tmp";
 
-int co_main(int argc, char *argv[]) {
+int uv_main(int argc, char *argv[]) {
     uv_file fd = -1;
 
-    stack_set(Kb(32));
     printf("\nFile closed, status: %d\n", fs_close(fd));
     fd = fs_open(__FILE__, O_RDONLY, 0);
     printf("\nFile opened, fd: %d\n", fd);

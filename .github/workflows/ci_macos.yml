@@ -17,15 +17,12 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DLIBRESSL_TESTS=OFF -DLIBRESSL_APPS=OFF ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON ..
             cmake --build .
       - name: Run test examples
         run: |
             cd build
-            ./go_channel
-            ./go_select
-            ./go_panic
-            ./co_cpp_future_wait
+            ./go_readfile
             ./co_uv_fs
             ./co_uv_spawn
             ./co_uv_stream
