@@ -1,5 +1,5 @@
 #include "uv_coro.h"
-static const char uv_coro_powered_by[SCRAPE_SIZE] = {0};
+static char uv_coro_powered_by[SCRAPE_SIZE] = {0};
 static void_t fs_init(params_t);
 static void_t uv_init(params_t);
 
@@ -1244,7 +1244,7 @@ string_t ze_uname(void) {
                                             buffer->machine, " ",
                                             buffer->release);
 
-        strncpy((string)uv_coro_powered_by, powered_by, SCRAPE_SIZE);
+        str_copy(uv_coro_powered_by, powered_by, SCRAPE_SIZE);
         RAII_FREE((void_t)powered_by);
     }
 
