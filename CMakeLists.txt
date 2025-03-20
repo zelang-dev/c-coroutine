@@ -53,16 +53,16 @@ target_link_libraries(uv_coro PUBLIC raii)
 
 find_package(LibreSSL QUIET)
 if(NOT LibreSSL_FOUND)
-    set(LibreSSL_FOUND 1)
     FetchContent_Declare(libressl
-        URL https://github.com/libressl/portable/releases/download/v3.9.2/libressl-3.9.2.tar.gz
-        URL_MD5 0c9eb9b9b0f4e76e44f0647b21575391
+        URL https://github.com/libressl/portable/releases/download/v4.0.0/libressl-4.0.0.tar.gz
+        URL_MD5 4775b6b187a93c527eeb95a13e6ebd64
     )
+    option(LIBRESSL_APPS "Build apps" OFF)
+    option(LIBRESSL_TESTS "Build tests" OFF)
     FetchContent_MakeAvailable(libressl)
 endif()
-target_compile_definitions(crypto PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-target_compile_definitions(ssl PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
-target_compile_definitions(tls PUBLIC LIBRESSL_TESTS=OFF LIBRESSL_APPS=OFF)
+set(LIBRESSL_APPS OFF CACHE BOOL "Build apps" FORCE)
+set(LIBRESSL_TESTS OFF CACHE BOOL "Build tests" FORCE)
 target_include_directories(uv_coro PUBLIC $<BUILD_INTERFACE:${LibreSSL_INCLUDE_DIR} $<INSTALL_INTERFACE:${LibreSSL_INCLUDE_DIR})
 target_link_libraries(uv_coro PUBLIC crypto)
 target_link_libraries(uv_coro PUBLIC ssl)
@@ -71,14 +71,16 @@ target_include_directories(uv_coro
     PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -rdynamic -D USE_DEBUG -D USE_VALGRIND ")
+    if(APPLE)
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -Wno-format -D USE_DEBUG ")
+    else()
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -rdynamic -Wno-format -D USE_DEBUG -D USE_VALGRIND")
+    endif()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
-endif()
-
-if(WIN32)
+else()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG ")
-    add_definitions(-D_CRT_SECURE_NO_DEPRECATE -DPTW32_STATIC_LIB)
-    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4311")
+    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
 endif()
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
