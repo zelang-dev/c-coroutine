@@ -79,7 +79,8 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
 
 static void close_cb(uv_handle_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
-    coro_interrupt_switch(uv->context);
+    routine_t *co = uv->context;
+    coro_interrupt_complete(co, nullptr, 0, false);
 }
 
 static void uv_coro_cleanup(void_t t) {
@@ -114,12 +115,14 @@ static void connect_cb(uv_connect_t *client, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(client));
     arrays_t args = uv->args;
     routine_t *co = uv->context;
+    bool is_plain = true;
 
-    if (status) {
+    if (status)
         fprintf(stderr, "Error: %s\n", uv_strerror(status));
-    }
+    else if (!status)
+        is_plain = false;
 
-    coro_interrupt_complete(co, (status < 0 ? casting(status) : args[0].object));
+    coro_interrupt_complete(co, (status < 0 ? nullptr : args[0].object), status, is_plain);
 }
 
 RAII_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
@@ -156,14 +159,14 @@ void on_connect(uv_connect_t *req, int status) {
 static void on_listen_handshake(uv_tls_t *ut, int status) {
     uv_args_t *uv = (uv_args_t *)ut->uv_args;
     routine_t *co = uv->context;
+    bool is_plain = true;
 
-    if (0 == status) {
-        coro_interrupt_complete(co, streamer(ut->tcp_hdl));
-    } else {
+    if (0 == status)
+        is_plain = false;
+    else
         coro_err_set(co, status);
-        coro_interrupt_complete(co, casting(status));
-    }
 
+    coro_interrupt_complete(co, (!is_plain ? streamer(ut->tcp_hdl) : nullptr), -1, is_plain);
 }
 
 static void connection_cb(uv_stream_t *server, int status) {
@@ -178,7 +181,7 @@ static void connection_cb(uv_stream_t *server, int status) {
     uv_loop_t *uvLoop = ze_loop();
     void_t handle = nullptr;
     int r = status;
-    bool halt = true;
+    bool is_ready = false, halt = true;
 
     if (status == 0) {
         if (uv->bind_type == UV_TLS) {
@@ -202,8 +205,11 @@ static void connection_cb(uv_stream_t *server, int status) {
             r = uv_pipe_init(uvLoop, (uv_pipe_t *)handle, 0);
         }
 
-        if (uv->bind_type != UV_TLS && !r)
+        if ((uv->bind_type != UV_TLS) && !r)
             r = uv_accept(server, streamer(handle));
+
+        if (uv->bind_type != UV_TLS && !r)
+            is_ready = true;
     }
 
     if (r) {
@@ -214,10 +220,10 @@ static void connection_cb(uv_stream_t *server, int status) {
         coro_err_set(co, r);
     }
 
-    coro_interrupt_finisher(co, ((uv->bind_type != UV_TLS && !r)
-                                 ? streamer(handle)
-                                 : (r ? casting(status) : nullptr)),
-                            nullptr, nullptr, halt, uv->bind_type != UV_TLS);
+    coro_interrupt_finisher(co, (is_ready
+                                 ? streamer(handle) : nullptr),
+                                 status,
+                            nullptr, nullptr, halt, (uv->bind_type != UV_TLS), r);
 }
 
 static void write_cb(uv_write_t *req, int status) {
@@ -227,7 +233,7 @@ static void write_cb(uv_write_t *req, int status) {
         fprintf(stderr, "Error: %s\n", uv_strerror(status));
     }
 
-    coro_interrupt_complete(co, casting(status));
+    coro_interrupt_complete(co, nullptr, status, true);
 }
 
 static void tls_write_cb(uv_tls_t *tls, int status) {
@@ -237,7 +243,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
         fprintf(stderr, "Error: %s\n", uv_strerror(status));
     }
 
-    coro_interrupt_complete(co, casting(status));
+    coro_interrupt_complete(co, nullptr, status, true);
 }
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
@@ -251,25 +257,31 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) 
 static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data((uv_handle_t *)stream);
     routine_t *co = uv->context;
+    bool is_plain = true;
 
     if (nread < 0) {
         if (nread != UV_EOF)
             fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
 
         uv_read_stop(stream);
+    } else if (nread > 0) {
+        is_plain = false;
     }
 
-    coro_interrupt_complete(co, (nread < 0 ? casting(nread) : (nread > 0 ? buf->base : 0)));
+    coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain);
 }
 
 static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     uv_args_t *uv = (uv_args_t *)strm->uv_args;
     routine_t *co = uv->context;
+    bool is_plain = true;
 
     if (nread < 0 && nread != UV_EOF)
         fprintf(stderr, "Error: %s\n", uv_strerror((int)nread));
+    else if (nread > 0)
+        is_plain = false;
 
-    coro_interrupt_complete(co, (nread < 0 ? casting(nread) : (nread > 0 ? buf->base : 0)));
+    coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -335,8 +347,8 @@ static void fs_cb(uv_fs_t *req) {
         }
     }
 
-    coro_interrupt_finisher(co, (!override ? casting(uv_fs_get_result(req)) : data),
-                            fs_cleanup, req, true, true);
+    coro_interrupt_finisher(co, data, uv_fs_get_result(req),
+                            fs_cleanup, req, true, true, !override);
 }
 
 static void_t fs_init(params_t uv_args) {
@@ -1012,7 +1024,7 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
         coro_err_set(co, exit_status);
     }
 
-    coro_interrupt_complete(co, casting(term_signal));
+    coro_interrupt_complete(co, casting(term_signal), term_signal, true);
 }
 
 static void_t stdio_handler(params_t uv_args) {

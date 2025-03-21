@@ -26,7 +26,7 @@ find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
         URL https://github.com/zelang-dev/c-raii/archive/refs/heads/main.zip
-        URL_MD5 30ed01f4979389f20014dc4eaee957b0
+        URL_MD5 ed4cadec111c404b68d56fec6f1d2cbc
     )
     FetchContent_MakeAvailable(raii)
 endif()
