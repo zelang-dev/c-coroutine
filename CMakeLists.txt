@@ -26,7 +26,7 @@ find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
         URL https://github.com/zelang-dev/c-raii/archive/refs/heads/main.zip
-        URL_MD5 ed4cadec111c404b68d56fec6f1d2cbc
+        URL_MD5 3a3079f445fd692a0a18c4889b500247
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -50,21 +50,33 @@ target_link_libraries(uv_coro PUBLIC uv_a)
 target_include_directories(uv_coro AFTER PUBLIC $<BUILD_INTERFACE:${RAII_INCLUDE_DIR} $<INSTALL_INTERFACE:${RAII_INCLUDE_DIR})
 target_link_libraries(uv_coro PUBLIC raii)
 
-find_package(LibreSSL QUIET)
-if(NOT LibreSSL_FOUND)
-    FetchContent_Declare(libressl
-        URL https://github.com/libressl/portable/releases/download/v4.0.0/libressl-4.0.0.tar.gz
-        URL_MD5 4775b6b187a93c527eeb95a13e6ebd64
-    )
-    option(LIBRESSL_APPS "Build apps" OFF)
-    option(LIBRESSL_TESTS "Build tests" OFF)
-    FetchContent_MakeAvailable(libressl)
+find_package(OpenSSL 0.9.8...<2.0.0)
+if(OPENSSL_FOUND)
+    target_include_directories(uv_coro PUBLIC $<BUILD_INTERFACE:${OPENSSL_INCLUDE_DIR} $<INSTALL_INTERFACE:${OPENSSL_INCLUDE_DIR})
+    if(WIN32)
+        add_definitions(-DOPENSSL_USE_STATIC_LIBS=TRUE)
+        add_definitions(-DOPENSSL_MSVC_STATIC_RT=TRUE)
+        add_definitions(-DNO_GETTIMEOFDAY)
+    endif()
+    target_link_libraries(uv_coro PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+    target_link_libraries(uv_coro PUBLIC ${OPENSSL_SSL_LIBRARY})
+else()
+    find_package(LibreSSL QUIET)
+    if(NOT LibreSSL_FOUND)
+        FetchContent_Declare(libressl
+            URL https://github.com/libressl/portable/releases/download/v4.0.0/libressl-4.0.0.tar.gz
+            URL_MD5 4775b6b187a93c527eeb95a13e6ebd64
+        )
+        option(LIBRESSL_APPS "Build apps" OFF)
+        option(LIBRESSL_TESTS "Build tests" OFF)
+        FetchContent_MakeAvailable(libressl)
+    endif()
+    set(LIBRESSL_APPS OFF CACHE BOOL "Build apps" FORCE)
+    set(LIBRESSL_TESTS OFF CACHE BOOL "Build tests" FORCE)
+    target_include_directories(uv_coro PUBLIC $<BUILD_INTERFACE:${LibreSSL_INCLUDE_DIR} $<INSTALL_INTERFACE:${LibreSSL_INCLUDE_DIR})
+    target_link_libraries(uv_coro PUBLIC crypto)
+    target_link_libraries(uv_coro PUBLIC ssl)
 endif()
-set(LIBRESSL_APPS OFF CACHE BOOL "Build apps" FORCE)
-set(LIBRESSL_TESTS OFF CACHE BOOL "Build tests" FORCE)
-target_include_directories(uv_coro PUBLIC $<BUILD_INTERFACE:${LibreSSL_INCLUDE_DIR} $<INSTALL_INTERFACE:${LibreSSL_INCLUDE_DIR})
-target_link_libraries(uv_coro PUBLIC crypto)
-target_link_libraries(uv_coro PUBLIC ssl)
 
 target_include_directories(uv_coro
     PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

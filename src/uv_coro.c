@@ -77,15 +77,15 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
     return coro_interrupt(uv_init, 1, uv_args);
 }
 
-static void close_cb(uv_handle_t *handle) {
+static RAII_INLINE void close_cb(uv_handle_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
-    routine_t *co = uv->context;
-    coro_interrupt_complete(co, nullptr, 0, false);
+    coro_interrupt_complete(uv->context, nullptr, 0, false);
 }
 
 static void uv_coro_cleanup(void_t t) {
     routine_t *co = (routine_t *)t;
     uv_loop_t *uvLoop = ze_loop();
+    coro_interrupt_waitgroup_destroy(co);
     if (uv_loop_alive(uvLoop)) {
         if (uv_coro_data() && uv_coro_data()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, nullptr);
@@ -284,10 +284,6 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain);
 }
 
-static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
-    uv_fs_req_cleanup(req);
-    RAII_FREE(req);
-}
 
 static void fs_cb(uv_fs_t *req) {
     ssize_t result = uv_fs_get_result(req);
@@ -348,11 +344,16 @@ static void fs_cb(uv_fs_t *req) {
     }
 
     coro_interrupt_finisher(co, data, uv_fs_get_result(req),
-                            fs_cleanup, req, true, true, !override);
+                            nullptr, nullptr, true, true, !override);
+}
+
+static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
+    uv_fs_req_cleanup(req);
+    RAII_FREE(req);
 }
 
 static void_t fs_init(params_t uv_args) {
-    uv_fs_t *req = try_calloc(1, sizeof(uv_fs_t));
+    uv_fs_t *req = calloc_full(coro_scope(), 1, sizeof(uv_fs_t), (func_t)fs_cleanup);
     uv_loop_t *uvLoop = ze_loop();
     uv_args_t *fs = uv_args->object;
     arrays_t args = fs->args;
@@ -821,7 +822,7 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
 
             evt_ctx_init_ex(&uv_args->ctx, crt, key);
             evt_ctx_set_nio(&uv_args->ctx, nullptr, uv_tls_writer);
-            defer(evt_ctx_free, &uv_args->ctx);
+            defer((func_t)evt_ctx_free, &uv_args->ctx);
             uv_args->bind_type = UV_TLS;
             handle = tls_tcp_create(&uv_args->ctx);
             break;
@@ -913,7 +914,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
 
                 evt_ctx_init_ex(&uv_args->ctx, crt, key);
                 evt_ctx_set_nio(&uv_args->ctx, nullptr, uv_tls_writer);
-                defer(evt_ctx_free, &uv_args->ctx);
+                defer((func_t)evt_ctx_free, &uv_args->ctx);
                 handle = tls_tcp_create(&uv_args->ctx);
                 r = uv_tcp_bind(handle, (const struct sockaddr *)addr_set, flags);
                 break;
@@ -1057,7 +1058,7 @@ static void spawning(void_t uv_args) {
 
     uv_handle_set_data((uv_handle_t *)&child->process, (void_t)child);
     coro_err_set(co, uv_spawn(ze_loop(), child->process, child->handle->options));
-    defer(spawn_free, child);
+    defer((func_t)spawn_free, child);
     if (!is_empty(child->handle->data))
         RAII_FREE(child->handle->data);
 
@@ -1283,18 +1284,20 @@ static void uv_coro_shutdown(void_t t) {
         uv_coro_cleanup(t);
 
     if (interrupt_handle()) {
+        uv_loop_t *handle = interrupt_handle();
         if (atomic_flag_load(&gq_result.is_errorless)) {
-            uv_stop(interrupt_handle());
-            uv_run(interrupt_handle(), UV_RUN_DEFAULT);
+            uv_stop(handle);
+            uv_run(handle, UV_RUN_DEFAULT);
         }
 
-        uv_loop_close(interrupt_handle());
+        uv_loop_close(handle);
+        RAII_FREE((void_t)handle);
         set_interrupt_handle(nullptr);
     }
 }
 
 static void create_loop(void) {
-    uv_loop_t *handle = calloc_local(1, sizeof(uv_loop_t));
+    uv_loop_t *handle = try_calloc(1, sizeof(uv_loop_t));
     if (uv_loop_init(handle)) {
         fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
         handle = nullptr;
