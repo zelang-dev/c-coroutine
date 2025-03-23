@@ -345,6 +345,7 @@ static void fs_cb(uv_fs_t *req) {
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
+    uv_arguments_free((uv_args_t *)uv_req_get_data(requester(req)));
     uv_fs_req_cleanup(req);
     RAII_FREE(req);
 }
@@ -487,7 +488,6 @@ static void_t fs_init(params_t uv_args) {
     }
 
     if (result) {
-        RAII_FREE(req);
         return coro_interrupt_erred(coro_active(), result);
     }
 
@@ -637,7 +637,7 @@ static void_t uv_init(params_t uv_args) {
 }
 
 RAII_INLINE uv_file fs_open(string_t path, int flags, int mode) {
-    uv_args_t *uv_args = uv_arguments(3, true);
+    uv_args_t *uv_args = uv_arguments(3, false);
     $append_string(uv_args->args, path);
     $append_signed(uv_args->args, flags);
     $append_signed(uv_args->args, mode);
@@ -646,21 +646,21 @@ RAII_INLINE uv_file fs_open(string_t path, int flags, int mode) {
 }
 
 RAII_INLINE int fs_unlink(string_t path) {
-    uv_args_t *uv_args = uv_arguments(1, true);
+    uv_args_t *uv_args = uv_arguments(1, false);
     $append_string(uv_args->args, path);
 
     return (uv_file)fs_start(uv_args, UV_FS_UNLINK, 1, true).integer;
 }
 
 RAII_INLINE uv_stat_t *fs_fstat(uv_file fd) {
-    uv_args_t *uv_args = uv_arguments(1, true);
+    uv_args_t *uv_args = uv_arguments(1, false);
     $append(uv_args->args, casting(fd));
 
     return (uv_stat_t *)fs_start(uv_args, UV_FS_FSTAT, 1, false).object;
 }
 
 RAII_INLINE int fs_fsync(uv_file fd) {
-    uv_args_t *uv_args = uv_arguments(1, true);
+    uv_args_t *uv_args = uv_arguments(1, false);
     $append(uv_args->args, casting(fd));
 
     return fs_start(uv_args, UV_FS_FSYNC, 1, false).integer;
@@ -668,7 +668,7 @@ RAII_INLINE int fs_fsync(uv_file fd) {
 
 string fs_read(uv_file fd, int64_t offset) {
     uv_stat_t *stat = fs_fstat(fd);
-    uv_args_t *uv_args = uv_arguments(2, true);
+    uv_args_t *uv_args = uv_arguments(2, false);
 
     uv_args->buffer = calloc_local(1, (size_t)stat->st_size + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
@@ -681,7 +681,7 @@ string fs_read(uv_file fd, int64_t offset) {
 
 int fs_write(uv_file fd, string_t text, int64_t offset) {
     size_t size = sizeof(text) + 1;
-    uv_args_t *uv_args = uv_arguments(2, true);
+    uv_args_t *uv_args = uv_arguments(2, false);
 
     uv_args->buffer = calloc_local(1, size);
     memcpy(uv_args->buffer, text, size);
@@ -1248,8 +1248,8 @@ string_t ze_uname(void) {
         char scrape[SCRAPE_SIZE];
         uv_utsname_t buffer[1];
         uv_os_uname(buffer);
-        string_t powered_by = str_cat_ex(nullptr, 8, "Beta - ",
-                                            simd_itoa(thrd_cpu_count(), scrape), " cores, ",
+        string_t powered_by = str_cat_ex(nullptr, 7,
+                                         simd_itoa(thrd_cpu_count(), scrape), " Cores, ",
                                             buffer->sysname, " ",
                                             buffer->machine, " ",
                                             buffer->release);
@@ -1295,7 +1295,7 @@ static void uv_coro_shutdown(void_t t) {
     }
 }
 
-static void create_loop(void) {
+static void uv_create_loop(void) {
     uv_loop_t *handle = try_calloc(1, sizeof(uv_loop_t));
     if (uv_loop_init(handle)) {
         fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
@@ -1308,6 +1308,6 @@ static void create_loop(void) {
 main(int argc, char **argv) {
     uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
     RAII_INFO("%s\n\n", ze_uname());
-    coro_interrupt_setup((call_interrupter_t)uv_run, create_loop, uv_coro_shutdown);
+    coro_interrupt_setup((call_interrupter_t)uv_run, uv_create_loop, uv_coro_shutdown);
     return coro_start((coro_sys_func)uv_main, argc, argv, 0);
 }

@@ -316,6 +316,7 @@ typedef struct uv_args_s {
     bool is_path;
     bool is_request;
     bool is_freeable;
+    bool is_flaged;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
@@ -336,10 +337,10 @@ typedef struct uv_args_s {
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
     evt_ctx_t ctx;
-    char ip[32];
     struct sockaddr name[1];
     struct sockaddr_in in4[1];
     struct sockaddr_in6 in6[1];
+    char ip[32];
 } uv_args_t;
 
 C_API uv_loop_t *ze_loop(void);
