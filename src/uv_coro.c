@@ -83,9 +83,8 @@ static RAII_INLINE void close_cb(uv_handle_t *handle) {
 }
 
 static void uv_coro_cleanup(void_t t) {
-    routine_t *co = (routine_t *)t;
     uv_loop_t *uvLoop = ze_loop();
-    coro_interrupt_waitgroup_destroy(co);
+    coro_interrupt_waitgroup_destroy((routine_t *)t);
     if (uv_loop_alive(uvLoop)) {
         if (uv_coro_data() && uv_coro_data()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, nullptr);
@@ -222,8 +221,7 @@ static void connection_cb(uv_stream_t *server, int status) {
 
     coro_interrupt_finisher(co, (is_ready
                                  ? streamer(handle) : nullptr),
-                                 status,
-                            nullptr, nullptr, halt, (uv->bind_type != UV_TLS), r);
+                                 status, false, halt, (uv->bind_type != UV_TLS), r);
 }
 
 static void write_cb(uv_write_t *req, int status) {
@@ -343,8 +341,7 @@ static void fs_cb(uv_fs_t *req) {
         }
     }
 
-    coro_interrupt_finisher(co, data, uv_fs_get_result(req),
-                            nullptr, nullptr, true, true, !override);
+    coro_interrupt_finisher(co, data, uv_fs_get_result(req), false, true, true, !override);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -657,14 +654,14 @@ RAII_INLINE int fs_unlink(string_t path) {
 
 RAII_INLINE uv_stat_t *fs_fstat(uv_file fd) {
     uv_args_t *uv_args = uv_arguments(1, true);
-    $append_signed(uv_args->args, fd);
+    $append(uv_args->args, casting(fd));
 
     return (uv_stat_t *)fs_start(uv_args, UV_FS_FSTAT, 1, false).object;
 }
 
 RAII_INLINE int fs_fsync(uv_file fd) {
     uv_args_t *uv_args = uv_arguments(1, true);
-    $append_signed(uv_args->args, fd);
+    $append(uv_args->args, casting(fd));
 
     return fs_start(uv_args, UV_FS_FSYNC, 1, false).integer;
 }
@@ -676,7 +673,7 @@ string fs_read(uv_file fd, int64_t offset) {
     uv_args->buffer = calloc_local(1, (size_t)stat->st_size + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
 
-    $append_signed(uv_args->args, fd);
+    $append(uv_args->args, casting(fd));
     $append_unsigned(uv_args->args, offset);
 
     return fs_start(uv_args, UV_FS_READ, 2, false).char_ptr;
@@ -690,7 +687,7 @@ int fs_write(uv_file fd, string_t text, int64_t offset) {
     memcpy(uv_args->buffer, text, size);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
 
-    $append_signed(uv_args->args, fd);
+    $append(uv_args->args, casting(fd));
     $append_unsigned(uv_args->args, offset);
 
     return fs_start(uv_args, UV_FS_WRITE, 2, false).integer;
@@ -1025,7 +1022,7 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
         coro_err_set(co, exit_status);
     }
 
-    coro_interrupt_complete(co, casting(term_signal), term_signal, true);
+    coro_interrupt_finisher(co, casting(term_signal), term_signal, true, true, false, true);
 }
 
 static void_t stdio_handler(params_t uv_args) {
@@ -1283,16 +1280,18 @@ static void uv_coro_shutdown(void_t t) {
     if (atomic_flag_load(&gq_result.is_errorless))
         uv_coro_cleanup(t);
 
-    if (interrupt_handle()) {
-        uv_loop_t *handle = interrupt_handle();
-        if (atomic_flag_load(&gq_result.is_errorless)) {
-            uv_stop(handle);
-            uv_run(handle, UV_RUN_DEFAULT);
-        }
+    if (is_empty(t)) {
+        if (interrupt_handle()) {
+            uv_loop_t *handle = interrupt_handle();
+            if (atomic_flag_load(&gq_result.is_errorless)) {
+                uv_stop(handle);
+                uv_run(handle, UV_RUN_DEFAULT);
+            }
 
-        uv_loop_close(handle);
-        RAII_FREE((void_t)handle);
-        set_interrupt_handle(nullptr);
+            uv_loop_close(handle);
+            RAII_FREE((void_t)handle);
+            set_interrupt_handle(nullptr);
+        }
     }
 }
 
