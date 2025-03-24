@@ -340,10 +340,11 @@ typedef struct uv_args_s {
     struct sockaddr name[1];
     struct sockaddr_in in4[1];
     struct sockaddr_in6 in6[1];
+    uv_fs_t req[1];
     char ip[32];
 } uv_args_t;
 
-C_API uv_loop_t *ze_loop(void);
+C_API uv_loop_t *uv_coro_loop(void);
 
 /* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
 C_API string_t ze_uname(void);

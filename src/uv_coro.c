@@ -83,7 +83,7 @@ static RAII_INLINE void close_cb(uv_handle_t *handle) {
 }
 
 static void uv_coro_cleanup(void_t t) {
-    uv_loop_t *uvLoop = ze_loop();
+    uv_loop_t *uvLoop = uv_coro_loop();
     coro_interrupt_waitgroup_destroy((routine_t *)t);
     if (uv_loop_alive(uvLoop)) {
         if (uv_coro_data() && uv_coro_data()->bind_type == UV_TLS)
@@ -101,7 +101,7 @@ static void error_catch(void_t uv) {
 
     if (!is_empty((void_t)text)) {
         raii_is_caught(get_coro_scope(co), text);
-        if (uv_loop_alive(ze_loop()) && uv_coro_data()) {
+        if (uv_loop_alive(uv_coro_loop()) && uv_coro_data()) {
             coro_halt_set(co);
             coro_interrupt_erred(co, get_coro_err(co));
             uv_coro_cleanup(co);
@@ -177,7 +177,7 @@ static void connection_cb(uv_stream_t *server, int status) {
         uv = (uv_args_t *)((evt_ctx_t *)check)->data;
 
     routine_t *co = uv->context;
-    uv_loop_t *uvLoop = ze_loop();
+    uv_loop_t *uvLoop = uv_coro_loop();
     void_t handle = nullptr;
     int r = status;
     bool is_ready = false, halt = true;
@@ -345,16 +345,17 @@ static void fs_cb(uv_fs_t *req) {
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
-    uv_arguments_free((uv_args_t *)uv_req_get_data(requester(req)));
-    uv_fs_req_cleanup(req);
-    RAII_FREE(req);
+    uv_args_t *args = (uv_args_t *)uv_req_get_data(requester(req));
+    uv_fs_req_cleanup(args->req);
+    uv_arguments_free(args);
 }
 
 static void_t fs_init(params_t uv_args) {
-    uv_fs_t *req = calloc_full(coro_scope(), 1, sizeof(uv_fs_t), (func_t)fs_cleanup);
-    uv_loop_t *uvLoop = ze_loop();
+    uv_loop_t *uvLoop = uv_coro_loop();
     uv_args_t *fs = uv_args->object;
+    uv_fs_t *req = fs->req;
     arrays_t args = fs->args;
+    defer((func_t)fs_cleanup, req);
     uv_uid_t uid, gid;
     uv_file in_fd;
     size_t length;
@@ -680,11 +681,10 @@ string fs_read(uv_file fd, int64_t offset) {
 }
 
 int fs_write(uv_file fd, string_t text, int64_t offset) {
-    size_t size = sizeof(text) + 1;
+    size_t size = simd_strlen(text);
     uv_args_t *uv_args = uv_arguments(2, false);
 
-    uv_args->buffer = calloc_local(1, size);
-    memcpy(uv_args->buffer, text, size);
+    uv_args->buffer = str_trim(text, size);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
 
     $append(uv_args->args, casting(fd));
@@ -954,7 +954,7 @@ void coro_uv_close(uv_handle_t *handle) {
 
 uv_udp_t *udp_create(void) {
     uv_udp_t *udp = (uv_udp_t *)calloc_full(coro_scope(), 1, sizeof(uv_udp_t), uv_close_free);
-    int r = uv_udp_init(ze_loop(), udp);
+    int r = uv_udp_init(uv_coro_loop(), udp);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -964,7 +964,7 @@ uv_udp_t *udp_create(void) {
 
 uv_pipe_t *pipe_create(bool is_ipc) {
     uv_pipe_t *pipe = (uv_pipe_t *)calloc_full(coro_scope(), 1, sizeof(uv_pipe_t), uv_close_free);
-    int r = uv_pipe_init(ze_loop(), pipe, (int)is_ipc);
+    int r = uv_pipe_init(uv_coro_loop(), pipe, (int)is_ipc);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -974,7 +974,7 @@ uv_pipe_t *pipe_create(bool is_ipc) {
 
 uv_tcp_t *tcp_create(void) {
     uv_tcp_t *tcp = (uv_tcp_t *)calloc_full(coro_scope(), 1, sizeof(uv_tcp_t), uv_close_free);
-    int r = uv_tcp_init(ze_loop(), tcp);
+    int r = uv_tcp_init(uv_coro_loop(), tcp);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -984,7 +984,7 @@ uv_tcp_t *tcp_create(void) {
 
 uv_tty_t *tty_create(uv_file fd) {
     uv_tty_t *tty = (uv_tty_t *)calloc_full(coro_scope(), 1, sizeof(uv_tty_t), uv_close_free);
-    int r = uv_tty_init(ze_loop(), tty, fd, 0);
+    int r = uv_tty_init(uv_coro_loop(), tty, fd, 0);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -995,7 +995,7 @@ uv_tty_t *tty_create(uv_file fd) {
 uv_tcp_t *tls_tcp_create(void_t extra) {
     uv_tcp_t *tcp = (uv_tcp_t *)calloc_full(coro_scope(), 1, sizeof(uv_tcp_t), tls_close_free);
     tcp->data = extra;
-    int r = uv_tcp_init(ze_loop(), tcp);
+    int r = uv_tcp_init(uv_coro_loop(), tcp);
     if (r) {
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -1054,7 +1054,7 @@ static void spawning(void_t uv_args) {
     routine_t *co = coro_active();
 
     uv_handle_set_data((uv_handle_t *)&child->process, (void_t)child);
-    coro_err_set(co, uv_spawn(ze_loop(), child->process, child->handle->options));
+    coro_err_set(co, uv_spawn(uv_coro_loop(), child->process, child->handle->options));
     defer((func_t)spawn_free, child);
     if (!is_empty(child->handle->data))
         RAII_FREE(child->handle->data);
@@ -1261,7 +1261,7 @@ string_t ze_uname(void) {
     return (string_t)uv_coro_powered_by;
 }
 
-RAII_INLINE uv_loop_t *ze_loop(void) {
+RAII_INLINE uv_loop_t *uv_coro_loop(void) {
     if (!is_empty(interrupt_handle()))
         return (uv_loop_t *)interrupt_handle();
 
@@ -1306,7 +1306,7 @@ static void uv_create_loop(void) {
 }
 
 main(int argc, char **argv) {
-    uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
+    //uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
     RAII_INFO("%s\n\n", ze_uname());
     coro_interrupt_setup((call_interrupter_t)uv_run, uv_create_loop, uv_coro_shutdown);
     return coro_start((coro_sys_func)uv_main, argc, argv, 0);
