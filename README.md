@@ -15,6 +15,9 @@
 
 This branch `main`, is now an **WIP** to incorporate [libuv](http://docs.libuv.org) with [c-raii](https://github.com/zelang-dev/c-raii). See `branches` for previous setup.
 
+There seems a similar approach has been made for ***C++20***, an implementation in [uvco](https://github.com/dermesser/uvco).
+The *[tests](https://github.com/dermesser/uvco/tree/master/test)* presented there currently being reimplemented for *C89* here, this project will be considered stable when *completed*.
+
 ## Synopsis
 
 ```c

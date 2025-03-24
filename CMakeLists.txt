@@ -96,10 +96,14 @@ endif()
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     option(BUILD_EXAMPLES "whether or not examples should be built" ON)
+    option(BUILD_TESTS "whether or not tests should be built" ON)
 
     if(BUILD_EXAMPLES)
-        enable_testing()
         add_subdirectory(examples)
+    endif()
+    if(BUILD_TESTS)
+        enable_testing()
+        add_subdirectory(tests)
     endif()
 endif()
 

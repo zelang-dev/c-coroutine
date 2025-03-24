@@ -694,7 +694,7 @@ int fs_write(uv_file fd, string_t text, int64_t offset) {
 }
 
 int fs_close(uv_file fd) {
-    uv_args_t *uv_args = uv_arguments(1, true);
+    uv_args_t *uv_args = uv_arguments(1, false);
     $append_signed(uv_args->args, fd);
 
     return fs_start(uv_args, UV_FS_CLOSE, 1, false).integer;
