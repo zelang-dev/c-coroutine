@@ -347,7 +347,7 @@ typedef struct uv_args_s {
 C_API uv_loop_t *uv_coro_loop(void);
 
 /* Returns Cpu core count, library version, and OS system info from `uv_os_uname()`. */
-C_API string_t ze_uname(void);
+C_API string_t uv_coro_uname(void);
 
 C_API uv_args_t *uv_coro_data(void);
 C_API void uv_coro_update(uv_args_t);

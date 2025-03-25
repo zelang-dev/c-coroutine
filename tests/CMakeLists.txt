@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.11...3.14)
 
 set(TARGET_LIST
- test-fs_close
+ test-fs
 #async_work_test.cc
 #fs_test.cc
 #http10.exe.cc
