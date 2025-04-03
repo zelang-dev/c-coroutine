@@ -181,7 +181,7 @@ C_API uv_stream_t *ipc_in(spawn_t *);
 C_API uv_stream_t *ipc_out(spawn_t *);
 C_API uv_stream_t *ipc_err(spawn_t *);
 
-C_API void coro_uv_close(uv_handle_t *);
+C_API void uv_coro_close(uv_handle_t *);
 
 C_API string fs_readfile(string_t path);
 C_API int fs_write_file(string_t path, string_t text);
@@ -248,6 +248,8 @@ C_API void pipe_connect(uv_pipe_t *, string_t name);
 
 C_API uv_tcp_t *tcp_create(void);
 C_API void tcp_connect(uv_tcp_t *handle, const struct sockaddr *addr);
+
+C_API uv_timer_t *time_create(void);
 
 C_API uv_tcp_t *tls_tcp_create(void *extra);
 
