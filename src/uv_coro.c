@@ -32,7 +32,7 @@ static uv_args_t *uv_arguments(int count, bool auto_free) {
 }
 
 static void _close_cb(uv_handle_t *handle) {
-    if (UV_UNKNOWN_HANDLE == handle->type)
+    if (!handle)
         return;
 
     memset(handle, 0, sizeof(uv_handle_t));
@@ -345,8 +345,14 @@ static void fs_cb(uv_fs_t *req) {
 
 static RAII_INLINE void timer_cb(uv_timer_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
+    routine_t *co = uv->context;
+    ptrdiff_t result;
+
     uv_timer_stop(handle);
-    coro_interrupt_complete(uv->context, nullptr, ((get_timer() - uv->args[2].max_size) / 1000000), true);
+    uv_close(handler(handle), _close_cb);
+    result = ((uv_now(uv_coro_loop()) - uv->args[2].max_size) / 1000000);
+    uv_arguments_free(uv);
+    coro_interrupt_complete(co, nullptr, result, true);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -960,9 +966,10 @@ void uv_coro_close(uv_handle_t *handle) {
 }
 
 uv_timer_t *time_create(void) {
-    uv_timer_t *timer = (uv_timer_t *)calloc_full(coro_scope(), 1, sizeof(uv_timer_t), uv_close_free);
+    uv_timer_t *timer = (uv_timer_t *)try_calloc(1, sizeof(uv_timer_t));
     int r = uv_timer_init(uv_coro_loop(), timer);
     if (r) {
+        RAII_FREE(timer);
         return coro_interrupt_erred(coro_active(), r);
     }
 
@@ -1261,14 +1268,14 @@ RAII_INLINE bool is_tls(uv_handle_t *self) {
 }
 
 static u32 uv_coro_sleep(u32 ms) {
-    uv_args_t *uv_args = uv_arguments(3, true);
+    uv_args_t *uv_args = uv_arguments(3, false);
     uv_timer_t *timer = time_create();
     if (is_empty(timer))
         return RAII_ERR;
 
     $append(uv_args->args, timer);
     $append_unsigned(uv_args->args, ms);
-    $append_unsigned(uv_args->args, get_timer());
+    $append_unsigned(uv_args->args, uv_now(uv_coro_loop()));
 
     return uv_start(uv_args, UV_TIMER, 3, false).u_int;
 }
