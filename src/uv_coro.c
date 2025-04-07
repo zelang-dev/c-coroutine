@@ -346,7 +346,7 @@ static void fs_cb(uv_fs_t *req) {
 static RAII_INLINE void timer_cb(uv_timer_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
     uv_timer_stop(handle);
-    coro_interrupt_complete(uv->context, nullptr, ((u32)(get_timer() - uv->args[2].u_int) / 1000000), true);
+    coro_interrupt_complete(uv->context, nullptr, ((get_timer() - uv->args[2].max_size) / 1000000), true);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -1339,5 +1339,6 @@ main(int argc, char **argv) {
     uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
     RAII_INFO("%s\n\n", uv_coro_uname());
     coro_interrupt_setup((call_interrupter_t)uv_run, uv_create_loop, (call_timer_t)uv_coro_sleep, uv_coro_shutdown);
+    coro_stacksize_set(Kb(32));
     return coro_start((coro_sys_func)uv_main, argc, argv, 0);
 }

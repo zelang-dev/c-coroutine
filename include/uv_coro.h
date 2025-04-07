@@ -10,6 +10,12 @@
 #include "url_http.h"
 #include "reflection.h"
 
+#ifdef _WIN32
+#define INVALID_FD -EBADF
+#else
+#define INVALID_FD -EBADF
+#endif
+
 /* Cast ~libuv~ `obj` to `uv_stream_t` ptr. */
 #define streamer(obj) ((uv_stream_t *)obj)
 
