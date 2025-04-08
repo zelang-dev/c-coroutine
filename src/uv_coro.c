@@ -345,14 +345,8 @@ static void fs_cb(uv_fs_t *req) {
 
 static RAII_INLINE void timer_cb(uv_timer_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
-    routine_t *co = uv->context;
-    ptrdiff_t result;
-
     uv_timer_stop(handle);
-    uv_close(handler(handle), _close_cb);
-    result = ((uv_now(uv_coro_loop()) - uv->args[2].max_size) / 1000000);
-    uv_arguments_free(uv);
-    coro_interrupt_complete(co, nullptr, result, true);
+    coro_interrupt_complete(uv->context, nullptr, ((uv_now(uv_coro_loop()) - uv->args[2].max_size) / 1000000), true);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -1267,15 +1261,33 @@ RAII_INLINE bool is_tls(uv_handle_t *self) {
     return is_type(self, UV_TLS);
 }
 
-static u32 uv_coro_sleep(u32 ms) {
-    uv_args_t *uv_args = uv_arguments(3, false);
-    uv_timer_t *timer = time_create();
-    if (is_empty(timer))
-        return RAII_ERR;
+static u32 uv_coro_sleep_close(uv_args_t *uv) {
+    uv_timer_t *handle = uv->args[0].object;
+    uv_close(handler(handle), _close_cb);
+    uv_arguments_free(uv);
+    coro_data_set(coro_active(), nullptr);
+}
 
-    $append(uv_args->args, timer);
-    $append_unsigned(uv_args->args, ms);
-    $append_unsigned(uv_args->args, uv_now(uv_coro_loop()));
+static u32 uv_coro_sleep(u32 ms) {
+    uv_args_t *uv_args = nullptr;
+    routine_t *co = coro_active();
+    uv_update_time(uv_coro_loop());
+    if (is_empty(get_coro_data(co))) {
+        uv_args = uv_arguments(3, false);
+        uv_timer_t *timer = time_create();
+        if (is_empty(timer))
+            return RAII_ERR;
+
+        $append(uv_args->args, timer);
+        $append_unsigned(uv_args->args, ms);
+        $append_unsigned(uv_args->args, uv_now(uv_coro_loop()));
+        coro_data_set(co, (void_t)uv_args);
+        defer((func_t)uv_coro_sleep_close, uv_args);
+    } else {
+        uv_args = (uv_args_t *)get_coro_data(co);
+        uv_args->args[1].ulong_long = ms;
+        uv_args->args[2].ulong_long = uv_now(uv_coro_loop());
+    }
 
     return uv_start(uv_args, UV_TIMER, 3, false).u_int;
 }

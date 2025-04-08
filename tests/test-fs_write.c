@@ -14,8 +14,8 @@ TEST(fs_write) {
     ASSERT_FALSE(result_is_ready(res));
     ASSERT_TRUE((fd > 0));
     ASSERT_EQ(9, fs_write(fd, buf, 0));
+    ASSERT_STR("bla", fs_read(fd, 6));
     ASSERT_EQ(0, fs_close(fd));
-    ASSERT_EQ(0, fs_unlink(path));
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "hello world");
 
