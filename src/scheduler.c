@@ -11,6 +11,7 @@ typedef struct {
 
     /* track the number of coroutines used */
     int used_count;
+    int interrupt_active;
 
     /* indicator for thread termination. */
     u32 exiting;
@@ -131,6 +132,7 @@ CO_FORCE_INLINE bool sched_is_sleeping(void) {
 
 static void sched_init(bool is_main, u32 thread_id) {
     thread()->is_main = is_main;
+    thread()->interrupt_active = false;
     thread()->exiting = 0;
     thread()->thrd_id = thread_id;
     thread()->sleep_activated = false;
@@ -1421,8 +1423,14 @@ static CO_FORCE_INLINE int coroutine_loop(int mode) {
     return !atomic_flag_load(&gq_sys.is_interruptable) ? -1 : CO_EVENT_LOOP(co_loop(), mode);
 }
 
+CO_FORCE_INLINE int interrupt_active(void) {
+    return thread()->interrupt_active;
+}
+
 CO_FORCE_INLINE void coroutine_interrupt(void) {
+    thread()->interrupt_active = true;
     coroutine_loop(UV_RUN_NOWAIT);
+    thread()->interrupt_active = false;
 }
 
 static void_t coroutine_wait(void_t v) {

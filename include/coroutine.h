@@ -850,6 +850,7 @@ C_API void channel_free(channel_t *);
 C_API uv_args_t *interrupt_listen_args(void);
 C_API void interrupt_listen_set(uv_args_t);
 C_API void interrupt_switch(routine_t *);
+C_API int interrupt_active(void);
 C_API void co_interrupt_on(void);
 C_API void co_interrupt_off(void);
 

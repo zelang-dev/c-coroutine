@@ -127,7 +127,9 @@ CO_FORCE_INLINE void co_suspend(void) {
 }
 
 CO_FORCE_INLINE void co_yielding(routine_t *co) {
-    co_stack_check(0);
+    if (!interrupt_active())
+        co_stack_check(0);
+
     co_switch(co);
 }
 
