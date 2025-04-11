@@ -1292,7 +1292,7 @@ static u32 uv_coro_async(u32 ms) {
     $append(uv_args->args, uv_async);
     uv_handle_set_data(handler(uv_async), (void_t)uv_args);
     coro_timer_set(co, uv_async);
-    yielding();
+    coro_suspend();
 
     return 0;
 }
