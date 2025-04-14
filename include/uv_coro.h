@@ -325,6 +325,8 @@ typedef struct uv_args_s {
     bool is_request;
     bool is_freeable;
     bool is_flaged;
+    bool is_timer;
+    bool is_yield;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
