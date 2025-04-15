@@ -31,7 +31,7 @@ TEST(fs_close) {
 }
 
 void_t worker2(params_t args) {
-    sleepfor(10);
+    sleepfor(1);
     return "hello world";
 }
 
@@ -52,9 +52,9 @@ TEST(fs_write_read) {
 
 void_t worker3(params_t args) {
     ASSERT_WORKER(($size(args) == 2));
+    sleepfor(args[0].u_int);
     ASSERT_WORKER((args[0].u_int == 1));
     ASSERT_WORKER(is_str_eq("worker", args[1].char_ptr));
-    sleepfor(args[0].u_int);
     return "finish";
 }
 
@@ -64,8 +64,8 @@ TEST(fs_open) {
     printf("\nWill indicate memory leak at exit, no `fs_close()`.\n");
     uv_file fd = fs_open(__FILE__, O_RDONLY, 0);
     ASSERT_TRUE((fd > 0));
-    ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR("/******hello  world******/", str_trim(fs_read(fd, 27), 26));
+    ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "finish");
 
     return 0;

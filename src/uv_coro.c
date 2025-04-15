@@ -1302,17 +1302,18 @@ static u32 uv_sleeping(u32 ms) {
 }
 
 static void uv_yielding(routine_t *co) {
-    if (is_interrupting() && co != coro_running()) {
+    if (is_interrupting()) {
+        routine_t *running = coro_running();
         uv_async_t *uv_async = try_calloc(1, sizeof(uv_async_t));
         if (uv_async_init(uv_coro_loop(), uv_async, async_cb))
-            return RAII_ERR;
+            raii_panic("Failed: uv_async_init");
 
         uv_args_t *uv_args = uv_arguments(1, false);
-        uv_args->context = coro_running();
+        uv_args->context = co != running ? co : running;
         uv_args->is_yield = true;
         $append(uv_args->args, uv_async);
         uv_handle_set_data(handler(uv_async), (void_t)uv_args);
-        coro_yielder_set(co, uv_async);
+        coro_yielder_set((co != running ? running : co), uv_async);
     }
 }
 
@@ -1382,7 +1383,11 @@ static RAII_INLINE int uv_coro_run(uv_loop_t *handle, uv_run_mode mode) {
     if (get_coro_yielder(coro_running()))
         uv_async_send((uv_async_t *)get_coro_yielder(coro_running()));
 
-    return uv_run(handle, mode);
+    int r = uv_run(handle, mode);
+    if (!is_empty(coro_running()) && get_coro_yielder(coro_running()))
+        uv_async_send((uv_async_t *)get_coro_yielder(coro_running()));
+
+    return r;
 }
 
 main(int argc, char **argv) {
