@@ -1,47 +1,9 @@
 #include "assertions.h"
 
-char buf[] = "blablabla";
-char *path = "write.tmp";
-
 /******hello  world******/
 
-void_t worker2(params_t args) {
-    RAII_HERE;
-    sleepfor(10);
-    return "hello world";
-}
-
-TEST(fs_write) {
-    rid_t res = go(worker2, 0);
-    uv_file fd = fs_open(path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-    ASSERT_FALSE(result_is_ready(res));
-    ASSERT_TRUE((fd > 0));
-    int status = fs_write(fd, buf, 0);
-    ASSERT_EQ(9, status);
-    string text = fs_read(fd, 6);
-    ASSERT_STR("bla", text);
-    ASSERT_EQ(0, fs_close(fd));
-    ASSERT_EQ(0, fs_unlink(path));
-    ASSERT_TRUE(result_is_ready(res));
-    ASSERT_STR(result_for(res).char_ptr, "hello world");
-    ASSERT_EQ(INVALID_FD, fs_close(fd));
-
-    return 0;
-}
-
-void_t worker3(params_t args) {
-    RAII_HERE;
-    sleepfor(args->u_int);
-    return "finish";
-}
-
-TEST(fs_open) {
-    ASSERT_EQ(fs_open("does_not_exist", O_RDONLY, 0), UV_ENOENT);
-    printf("\nWill indicate memory leak at exit, no `fs_close()`.\n");
-    ASSERT_TRUE((fs_open(__FILE__, O_RDONLY, 0) > 0));
-
-    return 0;
-}
+char buf[] = "blablabla";
+char *path = "write.tmp";
 
 void_t worker(params_t args) {
     ASSERT_WORKER(is_str_eq("hello world", args->char_ptr));
@@ -68,12 +30,53 @@ TEST(fs_close) {
     return 0;
 }
 
+void_t worker2(params_t args) {
+    sleepfor(10);
+    return "hello world";
+}
+
+TEST(fs_write_read) {
+    rid_t res = go(worker2, 0);
+    uv_file fd = fs_open(path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    ASSERT_FALSE(result_is_ready(res));
+    ASSERT_TRUE((fd > 0));
+    ASSERT_EQ(9, fs_write(fd, buf, 0));
+    ASSERT_STR("bla", fs_read(fd, 6));
+    ASSERT_EQ(0, fs_close(fd));
+    ASSERT_EQ(0, fs_unlink(path));
+    ASSERT_TRUE(result_is_ready(res));
+    ASSERT_STR(result_for(res).char_ptr, "hello world");
+
+    return 0;
+}
+
+void_t worker3(params_t args) {
+    ASSERT_WORKER(($size(args) == 2));
+    ASSERT_WORKER((args[0].u_int == 1));
+    ASSERT_WORKER(is_str_eq("worker", args[1].char_ptr));
+    sleepfor(args[0].u_int);
+    return "finish";
+}
+
+TEST(fs_open) {
+    rid_t res = go(worker3, 2, 1, "worker");
+    ASSERT_EQ(fs_open("does_not_exist", O_RDONLY, 0), UV_ENOENT);
+    printf("\nWill indicate memory leak at exit, no `fs_close()`.\n");
+    uv_file fd = fs_open(__FILE__, O_RDONLY, 0);
+    ASSERT_TRUE((fd > 0));
+    ASSERT_TRUE(result_is_ready(res));
+    ASSERT_STR("/******hello  world******/", str_trim(fs_read(fd, 27), 26));
+    ASSERT_STR(result_for(res).char_ptr, "finish");
+
+    return 0;
+}
+
 TEST(list) {
     int result = 0;
 
-   // EXEC_TEST(fs_write);
-    EXEC_TEST(fs_open);
     EXEC_TEST(fs_close);
+    EXEC_TEST(fs_write_read);
+    EXEC_TEST(fs_open);
 
     return result;
 }
