@@ -1271,8 +1271,6 @@ static void uv_coro_closer(uv_args_t *uv) {
         coro_timer_set(co, nullptr);
     else if (is_yield)
         coro_yielder_set(co, nullptr);
-    else
-        coro_data_set(co, nullptr);
 }
 
 static void async_cb(uv_async_t *handle) {
