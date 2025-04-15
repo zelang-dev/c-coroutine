@@ -1277,7 +1277,7 @@ static void async_cb(uv_async_t *handle) {
     uv_args_t *uv = uv_handle_get_data(handler(handle));
     routine_t *co = uv->context;
     uv_coro_closer(uv);
-    coro_interrupt_finisher(co, nullptr, 0, true, false, false, false);
+    coro_interrupt_switch(co);
 }
 
 static RAII_INLINE uv_coro_send(uv_async_t *handle) {
@@ -1285,7 +1285,7 @@ static RAII_INLINE uv_coro_send(uv_async_t *handle) {
 }
 
 static u32 uv_sleeping(u32 ms) {
-    routine_t *co = coro_active();
+    routine_t *co = is_interrupting() ? coro_active() : coro_running();
     uv_async_t *uv_async = try_calloc(1, sizeof(uv_async_t));
     if (uv_async_init(uv_coro_loop(), uv_async, async_cb))
         return RAII_ERR;
