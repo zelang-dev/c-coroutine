@@ -31,7 +31,7 @@ TEST(fs_close) {
 }
 
 void_t worker2(params_t args) {
-    sleepfor(10);
+    sleepfor(100);
     return "hello world";
 }
 
