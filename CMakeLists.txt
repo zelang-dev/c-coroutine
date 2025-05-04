@@ -26,7 +26,7 @@ find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
         URL https://github.com/zelang-dev/c-raii/archive/refs/heads/main.zip
-        URL_MD5 742709d4e4489bf0ee4457920f646e18
+        URL_MD5 e1c9633b3b8a9195354f8fcd37d86cf6
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -92,6 +92,24 @@ else()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG ")
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
+endif()
+
+# enable the address sanitizer to catch bugs
+option(ENABLE_ASAN "Enable AddressSanitizer for Debug builds" ON)
+
+# Only add sanitizer flags in Debug builds
+if(ENABLE_ASAN AND CMAKE_BUILD_TYPE MATCHES Debug)
+    if(MSVC)
+        # MSVC supports address sanitizer with /fsanitize=address.
+        set(ASAN_COMPILE_FLAG "/fsanitize=address")
+        set(ASAN_LINK_FLAG "/fsanitize=address")
+    else()
+        # GCC/Clang
+        set(ASAN_COMPILE_FLAG "-fsanitize=address -fno-omit-frame-pointer")
+        set(ASAN_LINK_FLAG "-fsanitize=address -fno-omit-frame-pointer")
+    endif()
+    target_compile_options(uv_coro PUBLIC ${ASAN_COMPILE_FLAG})
+    target_link_options(uv_coro PUBLIC ${ASAN_LINK_FLAG})
 endif()
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
