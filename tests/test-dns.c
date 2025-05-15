@@ -29,11 +29,12 @@ TEST(get_addrinfo) {
 
 TEST(get_nameinfo) {
     nameinfo_t *dns;
-    rid_t res = go(worker_misc, 2, 10000, "nameinfo");
+    rid_t res = go(worker_misc, 2, 600, "nameinfo");
     ASSERT_TRUE(is_type(dns = get_nameinfo(gni, 443, 0), UV_CORO_NAME));
     ASSERT_FALSE(result_is_ready(res));
-    while (!result_is_ready(res))
+    while (!result_is_ready(res)) {
         yielding();
+    }
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "nameinfo");

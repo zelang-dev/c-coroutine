@@ -58,10 +58,17 @@ static void uv_coro_closer(uv_args_t *uv) {
 
     if (uv->is_timer)
         coro_timer_set(co, nullptr);
-    else if (uv->is_yield)
-        coro_yielder_set(co, nullptr);
 
     uv_arguments_free(uv);
+}
+
+static void timer_cb(uv_timer_t *handle) {
+    uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
+    u32 lapse = ((get_timer() - uv->args[2].max_size) / 1000000);
+    routine_t *co = uv->context;
+    uv_timer_stop(handle);
+    uv_coro_closer(uv);
+    coro_interrupt_complete(co, nullptr, lapse, true, true);
 }
 
 static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, int status) {
@@ -75,12 +82,12 @@ static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, in
         coro_interrupt_erred(co, status);
         uv_fs_event_stop(handle);
         uv_coro_closer(uv_args);
-        coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, false);
+        coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
     } else if (events & UV_RENAME || events & UV_CHANGE) {
         watchfunc(filename, events, status);
        // coro_enqueue(get_coro_context(co));
       //  coro_enqueue(coro_sleeping());
-        coro_enqueue(coro);
+      //  coro_enqueue(coro);
     }
 }
 
@@ -100,11 +107,9 @@ static void fs_poll_cb(uv_fs_poll_t *handle, int status, const uv_stat_t *prev, 
         coro_interrupt_erred(co, status);
         uv_fs_poll_stop(handle);
         uv_coro_closer(uv_args);
-        coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, false);
+        coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
     } else {
         pollerfunc(status, prev, curr);
-        coro_enqueue(get_coro_context(co));
-        coro_enqueue(coro);
     }
 }
 
@@ -190,7 +195,7 @@ static void connect_cb(uv_connect_t *client, int status) {
     else if (!status)
         is_plain = false;
 
-    coro_interrupt_complete(co, (status < 0 ? nullptr : args[0].object), status, is_plain, false);
+    coro_interrupt_complete(co, (status < 0 ? nullptr : args[0].object), status, is_plain, true);
 }
 
 RAII_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
@@ -234,7 +239,7 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     else
         coro_err_set(co, status);
 
-    coro_interrupt_complete(co, (!is_plain ? streamer(ut->tcp_hdl) : nullptr), -1, is_plain, false);
+    coro_interrupt_complete(co, (!is_plain ? streamer(ut->tcp_hdl) : nullptr), -1, is_plain, true);
 }
 
 static void connection_cb(uv_stream_t *server, int status) {
@@ -290,7 +295,7 @@ static void connection_cb(uv_stream_t *server, int status) {
 
     coro_interrupt_finisher(co, (is_ready
                                  ? streamer(handle) : nullptr),
-                            status, false, halt, (uv->bind_type != UV_TLS), r, false);
+                            status, false, halt, (uv->bind_type != UV_TLS), r, true);
 }
 
 static void getnameinfo_cb(uv_getnameinfo_t *req, int status, string_t hostname, string_t service) {
@@ -349,7 +354,7 @@ static void write_cb(uv_write_t *req, int status) {
         uv_log_error(status);
     }
 
-    coro_interrupt_complete(co, nullptr, status, true, false);
+    coro_interrupt_complete(co, nullptr, status, true, true);
 }
 
 static void tls_write_cb(uv_tls_t *tls, int status) {
@@ -359,7 +364,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
         uv_log_error(status);
     }
 
-    coro_interrupt_complete(co, nullptr, status, true, false);
+    coro_interrupt_complete(co, nullptr, status, true, true);
 }
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
@@ -384,7 +389,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
         is_plain = false;
     }
 
-    coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain, false);
+    coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain, true);
 }
 
 static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
@@ -397,7 +402,7 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     else if (nread > 0)
         is_plain = false;
 
-    coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain, false);
+    coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain, true);
 }
 
 
@@ -468,7 +473,7 @@ static void fs_cb(uv_fs_t *req) {
         }
     }
 
-    coro_interrupt_finisher(co, data, uv_fs_get_result(req), false, true, true, !override, false);
+    coro_interrupt_finisher(co, data, uv_fs_get_result(req), false, true, true, !override, true);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -727,8 +732,10 @@ static void_t uv_init(params_t uv_args) {
                     result = uv_read_start((uv_stream_t *)stream, alloc_cb, read_cb);
                 }
                 break;
-            case UV_HANDLE:
             case UV_TIMER:
+                result = uv_timer_start((uv_timer_t *)args[0].object, timer_cb, args[1].ulong_long, 0);
+                break;
+            case UV_HANDLE:
             case UV_PROCESS:
             case UV_TCP:
             case UV_TTY:
@@ -1336,7 +1343,7 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
         coro_err_set(co, exit_status);
     }
 
-    coro_interrupt_finisher(co, casting(term_signal), term_signal, true, true, false, true, false);
+    coro_interrupt_finisher(co, casting(term_signal), term_signal, true, true, false, true, true);
 }
 
 static void_t stdio_handler(params_t uv_args) {
@@ -1490,7 +1497,6 @@ int spawn_detach(spawn_t *child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref((uv_handle_t *)&child->process);
         child->is_detach = true;
-        // sched_dec();
         yielding();
     }
 
@@ -1561,7 +1567,7 @@ static void async_cb(uv_async_t *handle) {
     uv_args_t *uv = uv_handle_get_data(handler(handle));
     routine_t *co = uv->context;
     uv_coro_closer(uv);
-    coro_interrupt_switch(co);
+    coro_interrupt_finisher(co, nullptr, 0, true, false, false, false, true);
 }
 
 static u32 uv_sleeping(u32 ms) {
@@ -1574,7 +1580,7 @@ static u32 uv_sleeping(u32 ms) {
     }
 
     uv_args_t *uv_args = uv_arguments(1, false);
-    uv_args->context = is_interrupting() || co != running ? co : running;
+    uv_args->context = is_interrupting() ? co : running;
     uv_args->is_timer = true;
     $append(uv_args->args, uv_async);
     uv_handle_set_data(handler(uv_async), (void_t)uv_args);
@@ -1582,26 +1588,6 @@ static u32 uv_sleeping(u32 ms) {
     coro_suspend();
 
     return ms;
-}
-
-static void uv_yielding(routine_t *running) {
-    if (is_interrupting()) {
-        int r = -1;
-        uv_async_t *uv_async = RAII_CALLOC(1, sizeof(uv_async_t));
-        if (is_empty(uv_async) || (r = uv_async_init(uv_coro_loop(), uv_async, async_cb))) {
-            uv_log_error(r);
-            return;
-        }
-
-        uv_args_t *uv_args = uv_arguments(1, false);
-        uv_args->context = coro_active();
-        uv_args->is_yield = true;
-        $append(uv_args->args, uv_async);
-        uv_handle_set_data(handler(uv_async), (void_t)uv_args);
-        coro_yielder_set(running, uv_async);
-    }
-
-    coro_enqueue(running);
 }
 
 string_t uv_coro_uname(void) {
@@ -1669,23 +1655,36 @@ static void uv_create_loop(void) {
 static RAII_INLINE int uv_coro_run(uv_loop_t *handle, uv_run_mode mode) {
     if (get_coro_timer(coro_running()))
         uv_async_send((uv_async_t *)get_coro_timer(coro_running()));
-    else if (get_coro_yielder(coro_running()))
-        uv_async_send((uv_async_t *)get_coro_yielder(coro_running()));
 
-    int r = uv_run(handle, mode);
-    if (get_coro_yielder(coro_running()))
-        uv_async_send((uv_async_t *)get_coro_yielder(coro_running()));
-    else if (get_coro_timer(coro_running()))
-        uv_async_send((uv_async_t *)get_coro_timer(coro_running()));
+    return uv_run(handle, mode);
+}
 
-    return r;
+static u32 uv_coro_sleep(u32 ms) {
+    yielding();
+    uv_args_t *uv_args = uv_arguments(3, false);
+    uv_timer_t *timer = time_create();
+    if (is_empty(timer))
+        return RAII_ERR;
+
+    $append(uv_args->args, timer);
+    $append_unsigned(uv_args->args, ms);
+    $append_unsigned(uv_args->args, get_timer());
+
+    return uv_start(uv_args, UV_TIMER, 3, false).u_int;
+}
+
+static void uv_coro_system(void) {
+    while (raii_is_running()) {
+        yielding();
+        coro_info(coro_active(), 1);
+    }
 }
 
 main(int argc, char **argv) {
     uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
     RAII_INFO("%s\n\n", uv_coro_uname());
     coro_interrupt_setup((call_interrupter_t)uv_coro_run, uv_create_loop,
-                         uv_coro_shutdown, (call_timer_t)uv_sleeping, uv_yielding, nullptr);
-    coro_stacksize_set(Kb(64));
+                         uv_coro_shutdown, (call_timer_t)uv_coro_sleep, uv_coro_system);
+    coro_stacksize_set(Kb(32));
     return coro_start((coro_sys_func)uv_main, argc, argv, 0);
 }

@@ -35,6 +35,7 @@ TEST(fs_close) {
 }
 
 void_t worker2(params_t args) {
+    ASSERT_WORKER(($size(args) == 0));
     sleepfor(100);
     return "hello world";
 }
@@ -192,12 +193,12 @@ TEST(fs_watch) {
 TEST(list) {
     int result = 0;
 
-    //EXEC_TEST(fs_close);
-    //EXEC_TEST(fs_write_read);
-    //EXEC_TEST(fs_open);
-    //EXEC_TEST(fs_mkdir);
-    //EXEC_TEST(fs_rename);
-    //EXEC_TEST(fs_scandir);
+    EXEC_TEST(fs_close);
+    EXEC_TEST(fs_write_read);
+    EXEC_TEST(fs_open);
+    EXEC_TEST(fs_mkdir);
+    EXEC_TEST(fs_rename);
+    EXEC_TEST(fs_scandir);
     EXEC_TEST(fs_watch);
 
     return result;
