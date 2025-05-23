@@ -3,9 +3,9 @@
 /******hello  world******/
 
 string buf = "blablabla";
-string path = "write.tmp";
+string path = "write.temp";
 string dir_path = "tmp_dir";
-string ren_path = "tmp_tmp";
+string ren_path = "tmp_temp";
 string scan_path = "scandir";
 string_t watch_path = "watchdir";
 
@@ -36,7 +36,7 @@ TEST(fs_close) {
 
 void_t worker2(params_t args) {
     ASSERT_WORKER(($size(args) == 0));
-    sleepfor(100);
+    sleepfor(300);
     return "hello world";
 }
 
@@ -92,7 +92,7 @@ void_t worker_misc(params_t args) {
 }
 
 TEST(fs_mkdir) {
-    rid_t res = go(worker_misc, 2, 25, "mkdir");
+    rid_t res = go(worker_misc, 2, 250, "mkdir");
     ASSERT_EQ(0, fs_mkdir(dir_path, 0));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res))

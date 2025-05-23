@@ -26,7 +26,7 @@ find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
         URL https://github.com/zelang-dev/c-raii/archive/refs/heads/main.zip
-        URL_MD5 7eebff981d644b9525f69eb667c0f190
+        URL_MD5 5f4f06172ca6d40c62dfe828b8ee202f
     )
     FetchContent_MakeAvailable(raii)
 endif()
@@ -34,8 +34,8 @@ endif()
 find_package(libuv QUIET)
 if(NOT libuv_FOUND)
     FetchContent_Declare(libuv
-        URL https://github.com/libuv/libuv/archive/refs/tags/v1.50.0.zip
-        URL_MD5 a18a89613896512afd062c89a32a7176
+        URL https://github.com/libuv/libuv/archive/refs/tags/v1.51.0.zip
+        URL_MD5 89997b2ecd52664fa117ffc82560f5eb
     )
     FetchContent_MakeAvailable(libuv)
 endif()
@@ -64,8 +64,8 @@ else()
     find_package(LibreSSL QUIET)
     if(NOT LibreSSL_FOUND)
         FetchContent_Declare(libressl
-            URL https://github.com/libressl/portable/releases/download/v4.0.0/libressl-4.0.0.tar.gz
-            URL_MD5 4775b6b187a93c527eeb95a13e6ebd64
+            URL https://github.com/libressl/portable/releases/download/v4.1.0/libressl-4.1.0.tar.gz
+            URL_MD5 18079dcf72a398d8c188e67e30c1dc13
         )
         option(LIBRESSL_APPS "Build apps" OFF)
         option(LIBRESSL_TESTS "Build tests" OFF)

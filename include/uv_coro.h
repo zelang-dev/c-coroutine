@@ -1,12 +1,12 @@
-#ifndef UV_CORO_H
-#define UV_CORO_H
+#ifndef _UV_CORO_H
+#define _UV_CORO_H
 
+#define INTERRUPT_MODE UV_RUN_NOWAIT
 #ifndef CERTIFICATE
     #define CERTIFICATE "localhost"
 #endif
 
 #include "uv_tls.h"
-#define INTERRUPT_MODE UV_RUN_NOWAIT
 #include "url_http.h"
 #include "reflection.h"
 
@@ -149,7 +149,6 @@ typedef struct uv_args_s {
     bool is_request;
     bool is_freeable;
     bool is_timer;
-    bool is_yield;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
@@ -363,4 +362,4 @@ C_API int uv_main(int, char **);
 }
 #endif
 
-#endif
+#endif /* _UV_CORO_H */
