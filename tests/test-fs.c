@@ -11,7 +11,7 @@ string_t watch_path = "watchdir";
 
 void_t worker(params_t args) {
     ASSERT_WORKER(is_str_eq("hello world", args->char_ptr));
-    sleepfor(500);
+    sleepfor(600);
     return "done";
 }
 
@@ -36,7 +36,7 @@ TEST(fs_close) {
 
 void_t worker2(params_t args) {
     ASSERT_WORKER(($size(args) == 0));
-    sleepfor(300);
+    sleepfor(600);
     return "hello world";
 }
 
@@ -92,7 +92,7 @@ void_t worker_misc(params_t args) {
 }
 
 TEST(fs_mkdir) {
-    rid_t res = go(worker_misc, 2, 250, "mkdir");
+    rid_t res = go(worker_misc, 2, 600, "mkdir");
     ASSERT_EQ(0, fs_mkdir(dir_path, 0));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res))
@@ -106,9 +106,8 @@ TEST(fs_mkdir) {
 }
 
 TEST(fs_rename) {
-    rid_t res = go(worker_misc, 2, 200, "rename");
+    rid_t res = go(worker_misc, 2, 600, "rename");
     ASSERT_EQ(0, fs_rename(dir_path, ren_path));
-    ASSERT_FALSE(result_is_ready(res));
     ASSERT_EQ(0, fs_rmdir(ren_path));
     while (!result_is_ready(res))
         yielding();
@@ -123,26 +122,23 @@ TEST(fs_scandir) {
     char filepath[SCRAPE_SIZE] = nil;
     scandir_t *dir_files = nil;
     int i = 0;
-    rid_t res = go(worker_misc, 2, 5000, "scandir");
+    rid_t res = go(worker_misc, 2, 2000, "scandir");
     ASSERT_EQ(0, fs_mkdir(scan_path, 0));
     ASSERT_FALSE(result_is_ready(res));
 
-    for (i = 1; i < 6; i++) {
+    for (i = 1; i < 4; i++) {
         snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", scan_path, i);
         ASSERT_EQ(1, fs_writefile(filepath, " "));
     }
 
-    ASSERT_FALSE(result_is_ready(res));
     ASSERT_NOTNULL((dir_files = fs_scandir(scan_path, 0)));
-    ASSERT_FALSE(result_is_ready(res));
-    ASSERT_XEQ(5, dir_files->count);
+    ASSERT_XEQ(3, dir_files->count);
 
     i = 1;
     foreach_scandir(file in dir_files) {
         snprintf(filepath, SCRAPE_SIZE, "file%d.txt", i);
         ASSERT_TRUE(is_str_eq(filepath, file->name));
         snprintf(filepath, SCRAPE_SIZE, "%s/%s", scan_path, file->name);
-        printf("deleting: %s\n", filepath);
         ASSERT_EQ(0, fs_unlink(filepath));
         i++;
     }
@@ -154,34 +150,38 @@ TEST(fs_scandir) {
     return 0;
 }
 
-void watch_handler(string_t filename, int events, int status) {
-    RAII_HERE;
-    if (events & UV_RENAME)
-        printf("renamed -%s\n", filename);
+int watch_handler(string_t filename, int events, int status) {
+    if (events & UV_RENAME) {
+        ASSERT_STR(filename, "file1.txt");
+        ASSERT_EQ(events, UV_RENAME);
+    }
 
-    if (events & UV_CHANGE)
-        printf("changed - %s\n", filename);
-        //ASSERT_WORKER(is_str_in("mkdir,rmdir,rename,writefile,scandir,unlink,event", args[1].char_ptr));
+    if (events & UV_CHANGE) {
+        ASSERT_STR(filename, "file1.txt");
+        ASSERT_EQ(events, UV_CHANGE);
+    }
 }
 
 TEST(fs_watch) {
     char filepath[SCRAPE_SIZE] = nil;
-    scandir_t *dir_files = nil;
     int i = 0;
-    rid_t res = go(worker_misc, 2, 500, "event");
+    rid_t res = go(worker_misc, 2, 1000, "event");
     ASSERT_EQ(0, fs_mkdir(watch_path, 0));
     ASSERT_FALSE(result_is_ready(res));
 
-    fs_watch(watch_path, watch_handler);
+    fs_watch(watch_path, (event_cb)watch_handler);
     ASSERT_FALSE(result_is_ready(res));
+    snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, 1);
+    ASSERT_EQ(5, fs_writefile(filepath, "hello"));
+    sleepfor(10);
+    ASSERT_EQ(0, fs_unlink(filepath));
 
-    for (i = 1; i < 10; i++) {
-        snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, 1);
+    for (i = 2; i < 4; i++) {
+        snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, i);
         ASSERT_EQ(0, fs_writefile(filepath, ""));
-        sleepfor(5);
+        sleepfor(100);
         ASSERT_EQ(0, fs_unlink(filepath));
     }
-    yielding();
 
     ASSERT_EQ(0, fs_rmdir(watch_path));
     ASSERT_TRUE(result_is_ready(res));

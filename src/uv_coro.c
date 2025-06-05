@@ -44,7 +44,6 @@ static void _close_cb(uv_handle_t *handle) {
 }
 
 static void uv_coro_closer(uv_args_t *uv) {
-    routine_t *co = uv->context;
     if (uv->req_type == UV_GETNAMEINFO) {
         void_t handle = uv->args[0].object;
         RAII_FREE(handle);
@@ -65,8 +64,33 @@ static void timer_cb(uv_timer_t *handle) {
     uv_timer_stop(handle);
     uv_coro_closer(uv);
     coro_halt_set(running);
-    coro_timer_set(running, nullptr);
     coro_interrupt_complete(co, nullptr, 0, false, true);
+}
+
+static void fs_event_cleanup(uv_args_t *uv_args, routine_t *co, int status) {
+    arrays_t arr = interrupt_array();
+    i32 i, inset = interrupt_code();
+    if (arr && inset) {
+        for (i = 0; i < $size(arr); i = i + 3) {
+            if ((uv_fs_type)arr[i].integer == uv_args->fs_type && (uv_args_t *)arr[i + 1].object == uv_args) {
+                arr[i].integer = RAII_ERR;
+                inset--;
+                break;
+            }
+        }
+
+        if (!inset) {
+            array_delete(arr);
+            interrupt_array_set(nullptr);
+        }
+
+        interrupt_code_set(inset);
+    }
+
+    uv_log_error(status);
+    coro_interrupt_erred(co, status);
+    uv_coro_closer(uv_args);
+    coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
 }
 
 static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, int status) {
@@ -75,20 +99,30 @@ static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, in
     event_cb watchfunc = (event_cb)uv_args->args[2].func;
 
     if (status < 0) {
-        uv_log_error(status);
-        coro_interrupt_erred(co, status);
         uv_fs_event_stop(handle);
-        uv_coro_closer(uv_args);
-        coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
+        fs_event_cleanup(uv_args, co, status);
     } else if ((events & UV_RENAME) || (events & UV_CHANGE)) {
         watchfunc(filename, events, status);
-        coro_interrupt_finisher(get_coro_context(co), nullptr, 0, true, false, false, false, true);
+        uv_fs_event_stop(handle);
+        if (status = uv_fs_event_start(handle, fs_event_cb, uv_args->args[1].char_ptr, UV_FS_EVENT_RECURSIVE)) {
+            fs_event_cleanup(uv_args, co, status);
+        }
     }
 }
 
 static RAII_INLINE void_t coro_fs_event(params_t args) {
+    i32 num_args_set = interrupt_code();
     coro_name("fs_event #%d", coro_active_id());
-    return uv_start((uv_args_t *)args->object, UV_FS_EVENT, 4, false).object;
+    interrupt_code_set(++num_args_set);
+    if (!interrupt_array()) {
+        interrupt_array_set(array_of(coro_scope(), 3, UV_FS_EVENT, args->object, coro_active()));
+    } else {
+        $append_signed(interrupt_array(), UV_FS_EVENT);
+        $append(interrupt_array(), args->object);
+        $append(interrupt_array(), coro_active());
+    }
+
+    return uv_start((uv_args_t *)args->object, UV_FS_EVENT, 3, false).object;
 }
 
 static void fs_poll_cb(uv_fs_poll_t *handle, int status, const uv_stat_t *prev, const uv_stat_t *curr) {
@@ -97,20 +131,30 @@ static void fs_poll_cb(uv_fs_poll_t *handle, int status, const uv_stat_t *prev, 
     poll_cb pollerfunc = (poll_cb)uv_args->args[2].func;
 
     if (status < 0) {
-        uv_log_error(status);
-        coro_interrupt_erred(co, status);
         uv_fs_poll_stop(handle);
-        uv_coro_closer(uv_args);
-        coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
+        fs_event_cleanup(uv_args, co, status);
     } else {
         pollerfunc(status, prev, curr);
-        coro_interrupt_finisher(get_coro_context(co), nullptr, 0, true, false, false, false, true);
+        uv_fs_poll_stop(handle);
+        if (status = uv_fs_poll_start(handle, fs_poll_cb, uv_args->args[1].char_ptr, uv_args->args[3].integer)) {
+            fs_event_cleanup(uv_args, co, status);
+        }
     }
 }
 
 static RAII_INLINE void_t coro_fs_poll(params_t args) {
-    coro_name("fs_poll");
-    return uv_start((uv_args_t *)args->object, UV_FS_POLL, 5, false).object;
+    i32 num_poll_set = interrupt_code();
+    coro_name("fs_poll #%d", coro_active_id());
+    interrupt_code_set(++num_poll_set);
+    if (!interrupt_array()) {
+        interrupt_array_set(array_of(coro_scope(), 3, UV_FS_POLL, args->object, coro_active()));
+    } else {
+        $append_signed(interrupt_array(), UV_FS_POLL);
+        $append(interrupt_array(), args->object);
+        $append(interrupt_array(), coro_active());
+    }
+
+    return uv_start((uv_args_t *)args->object, UV_FS_POLL, 4, false).object;
 }
 
 void uv_close_free(void_t handle) {
@@ -154,8 +198,8 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
 static void uv_coro_cleanup(void_t t) {
     uv_loop_t *uvLoop = uv_coro_loop();
     coro_interrupt_waitgroup_destroy((routine_t *)t);
-    if (uv_loop_alive(uvLoop)) {
-        if (uv_coro_data() && uv_coro_data()->bind_type == UV_TLS)
+    if (uv_loop_alive(uvLoop) && uv_coro_data()) {
+        if (uv_coro_data()->bind_type == UV_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, nullptr);
         else
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, nullptr);
@@ -400,20 +444,26 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     coro_interrupt_complete(co, (!is_plain ? buf->base : nullptr), nread, is_plain, true);
 }
 
+static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
+    uv_args_t *args = (uv_args_t *)uv_req_get_data(requester(req));
+    uv_fs_req_cleanup(req);
+    uv_arguments_free(args);
+}
 
 static void fs_cb(uv_fs_t *req) {
     ssize_t result = uv_fs_get_result(req);
     uv_args_t *fs = (uv_args_t *)uv_req_get_data(requester(req));
     routine_t *co = fs->context;
-    void_t data = nullptr;
+    void_t fs_ptr, data = nullptr;
+    uv_fs_type fs_type = UV_FS_CUSTOM;
     bool override = false;
 
     if (result < 0) {
         uv_log_error(result);
         coro_interrupt_erred(co, result);
     } else {
-        void_t fs_ptr = uv_fs_get_ptr(req);
-        uv_fs_type fs_type = uv_fs_get_type(req);
+        fs_ptr = uv_fs_get_ptr(req);
+        fs_type = uv_fs_get_type(req);
 
         switch (fs_type) {
             case UV_FS_CLOSE:
@@ -468,13 +518,11 @@ static void fs_cb(uv_fs_t *req) {
         }
     }
 
-    coro_interrupt_finisher(co, data, uv_fs_get_result(req), false, true, true, !override, true);
-}
+    coro_interrupt_finisher(co, data, result, false, true, true, !override, false);
+    if (fs_type != UV_FS_SCANDIR)
+        fs_cleanup(req);
 
-static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
-    uv_args_t *args = (uv_args_t *)uv_req_get_data(requester(req));
-    uv_fs_req_cleanup(req);
-    uv_arguments_free(args);
+    coro_interrupt_finisher(nullptr, nullptr, 0, false, false, false, false, true);
 }
 
 static void_t fs_init(params_t uv_args) {
@@ -483,8 +531,6 @@ static void_t fs_init(params_t uv_args) {
     uv_fs_t *req = fs->req;
     arrays_t args = fs->args;
     int result = UV_ENOENT;
-    if (fs->fs_type != UV_FS_SCANDIR)
-        defer((func_t)fs_cleanup, req);
 
     if (fs->is_path) {
         string_t path = args[0].char_ptr;
@@ -829,10 +875,10 @@ int fs_fsync(uv_file fd) {
 string fs_read(uv_file fd, int64_t offset) {
     uv_stat_t *stat = fs_fstat(fd);
     uv_args_t *uv_args = uv_arguments(2, false);
+    size_t sz = (size_t)stat->st_size;
 
-    uv_args->buffer = calloc_local(1, (size_t)stat->st_size + 1);
-    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)stat->st_size);
-
+    uv_args->buffer = calloc_local(1, sz + 1);
+    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)sz);
     $append(uv_args->args, casting(fd));
     $append_unsigned(uv_args->args, offset);
 
@@ -843,9 +889,7 @@ int fs_write(uv_file fd, string_t text, int64_t offset) {
     size_t size = simd_strlen(text);
     uv_args_t *uv_args = uv_arguments(2, false);
 
-    uv_args->buffer = str_trim(text, size);
-    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
-
+    uv_args->bufs = uv_buf_init(str_trim(text, size), (unsigned int)size);
     $append(uv_args->args, casting(fd));
     $append_unsigned(uv_args->args, offset);
 
@@ -890,12 +934,11 @@ void fs_poll(string_t path, poll_cb pollfunc, int interval) {
     if (is_empty(poll))
         raii_panic("Initialization failed: `fs_poll_create`");
 
-    uv_args_t *uv_args = uv_arguments(5, false);
+    uv_args_t *uv_args = uv_arguments(4, false);
     $append(uv_args->args, poll);
-    $append_string(uv_args->args, path);
+    $append_string(uv_args->args, str_dup(path));
     $append_func(uv_args->args, pollfunc);
     $append_signed(uv_args->args, interval);
-    $append(uv_args->args, coro_running());
     interrupt_launch(coro_fs_poll, 1, uv_args);
 }
 
@@ -904,11 +947,10 @@ void fs_watch(string_t path, event_cb watchfunc) {
     if (is_empty(event))
         raii_panic("Initialization failed: `fs_event_create`");
 
-    uv_args_t *uv_args = uv_arguments(4, false);
+    uv_args_t *uv_args = uv_arguments(3, false);
     $append(uv_args->args, event);
-    $append_string(uv_args->args, path);
+    $append_string(uv_args->args, str_dup(path));
     $append_func(uv_args->args, watchfunc);
-    $append(uv_args->args, coro_running());
     interrupt_launch(coro_fs_event, 1, uv_args);
 }
 
@@ -1006,11 +1048,9 @@ int stream_write(uv_stream_t *handle, string_t text) {
     if (is_empty(handle))
         return -1;
 
-    size_t size = strlen(text) + 1;
+    size_t size = simd_strlen(text);
     uv_args_t *uv_args = uv_arguments(1, false);
-    uv_args->buffer = calloc_local(1, size);
-    memcpy(uv_args->buffer, text, size);
-    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
+    uv_args->bufs = uv_buf_init(str_trim(text, size), (unsigned int)size);
     $append(uv_args->args, handle);
 
     if (is_tls((uv_handle_t *)handle))
@@ -1589,20 +1629,59 @@ RAII_INLINE void uv_coro_update(uv_args_t uv_args) {
     interrupt_data_set(&uv_args);
 }
 
+static void uv_coro_free(routine_t *coro, routine_t *co, uv_args_t *uv_args) {
+    raii_deferred_free(get_coro_scope(coro));
+    RAII_FREE(coro);
+
+    hash_free(get_coro_waitgroup(co));
+    raii_deferred_free(get_coro_scope(co));
+    RAII_FREE(co);
+
+    uv_coro_closer(uv_args);
+}
+
 static void uv_coro_shutdown(void_t t) {
     if (atomic_flag_load(&gq_result.is_errorless))
         uv_coro_cleanup(t);
 
     if (is_empty(t)) {
-        if (interrupt_handle()) {
-            uv_loop_t *handle = interrupt_handle();
+        uv_loop_t *loop = interrupt_handle();
+        i32 num_of = interrupt_code();
+        if (num_of) {
+            uv_handle_type fs_type;
+            uv_args_t *uv_args;
+            routine_t *coro, *co;
+            do {
+                num_of--;
+                fs_type = (uv_handle_type)$shift(interrupt_array()).integer;
+                uv_args = $shift(interrupt_array()).object;
+                co = $shift(interrupt_array()).object;
+                if (fs_type == UV_FS_EVENT) {
+                    coro = uv_args->context;
+                    uv_fs_event_stop((uv_fs_event_t *)uv_args->args[0].object);
+                    uv_coro_free(coro, co, uv_args);
+                } else if (fs_type == UV_FS_POLL) {
+                    coro = uv_args->context;
+                    uv_fs_poll_stop((uv_fs_poll_t *)uv_args->args[0].object);
+                    uv_coro_free(coro, co, uv_args);
+                }
+            } while (num_of);
+
+            array_delete(interrupt_array());
+            interrupt_array_set(nullptr);
+            interrupt_code_set(num_of);
+            if (loop && atomic_flag_load(&gq_result.is_errorless))
+                uv_run(loop, UV_RUN_DEFAULT);
+        }
+
+        if (loop) {
             if (atomic_flag_load(&gq_result.is_errorless)) {
-                uv_stop(handle);
-                uv_run(handle, UV_RUN_DEFAULT);
+                uv_stop(loop);
+                uv_run(loop, UV_RUN_DEFAULT);
             }
 
-            uv_loop_close(handle);
-            RAII_FREE((void_t)handle);
+            uv_loop_close(loop);
+            RAII_FREE((void_t)loop);
             interrupt_handle_set(nullptr);
         }
     }
@@ -1610,8 +1689,9 @@ static void uv_coro_shutdown(void_t t) {
 
 static void uv_create_loop(void) {
     uv_loop_t *handle = try_calloc(1, sizeof(uv_loop_t));
-    if (uv_loop_init(handle)) {
-        fprintf(stderr, "Event loop creation failed in file %s at line # %d", __FILE__, __LINE__);
+    int r = 0;
+    if (r = uv_loop_init(handle)) {
+        uv_log_error(r);
         handle = nullptr;
     }
 
@@ -1630,18 +1710,11 @@ static u32 uv_coro_sleep(u32 ms) {
     return uv_start(uv_args, UV_TIMER, 2, false).u_int;
 }
 
-static void uv_coro_system(void) {
-    while (raii_is_running()) {
-        yielding();
-        coro_info(coro_active(), 1);
-    }
-}
-
 main(int argc, char **argv) {
     uv_replace_allocator(rp_malloc, rp_realloc, rp_calloc, rpfree);
     RAII_INFO("%s\n\n", uv_coro_uname());
     coro_interrupt_setup((call_interrupter_t)uv_run, uv_create_loop,
-                         uv_coro_shutdown, (call_timer_t)uv_coro_sleep, uv_coro_system);
+                         uv_coro_shutdown, (call_timer_t)uv_coro_sleep, nullptr);
     coro_stacksize_set(Kb(32));
     return coro_start((coro_sys_func)uv_main, argc, argv, 0);
 }
