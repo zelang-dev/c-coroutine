@@ -720,8 +720,9 @@ static void_t fs_init(params_t uv_args) {
 static void_t uv_init(params_t uv_args) {
     uv_args_t *uv = uv_args->object;
     arrays_t args = uv->args;
-    int length, result = UV_EBADF;
+    int length, r, result = UV_EBADF;
     uv_handle_t *stream = handler(args[0].object);
+    string name[SCRAPE_SIZE * 2] = nil;
     uv->context = coro_active();
     if (uv->is_request) {
         uv_req_t *req;
@@ -822,29 +823,31 @@ static void_t uv_init(params_t uv_args) {
                     length = sizeof(uv->dns->name);
                     switch (uv->bind_type) {
                         case RAII_SCHEME_PIPE:
+                            length = sizeof(name);
+                            r = uv_pipe_getsockname((const uv_pipe_t *)args[0].object, name, &length);
                             break;
                         case RAII_SCHEME_UDP:
-                            result = uv_udp_getsockname((const uv_udp_t *)args[0].object, uv->dns->name, &length);
+                            r = uv_udp_getsockname((const uv_udp_t *)args[0].object, uv->dns->name, &length);
                             break;
                         default:
-                            result = uv_tcp_getsockname((const uv_tcp_t *)stream, uv->dns->name, &length);
+                            r = uv_tcp_getsockname((const uv_tcp_t *)stream, uv->dns->name, &length);
                             break;
                     }
 
-                    if (uv->bind_type != RAII_SCHEME_PIPE) {
+                    if (!r && uv->bind_type != RAII_SCHEME_PIPE) {
                         if (is_str_in(args[3].char_ptr, ":")) {
                             uv_ip6_name((const struct sockaddr_in6 *)uv->dns->name, uv->dns->ip, sizeof uv->dns->ip);
                         } else if (is_str_in(args[3].char_ptr, ".")) {
                             uv_ip4_name((const struct sockaddr_in *)uv->dns->name, uv->dns->ip, sizeof uv->dns->ip);
                         }
-
-                        fprintf(stdout, "Listening to %s:%d for%s connections, %s.\033[0K\n",
-                                uv->dns->ip,
-                                args[4].integer,
-                                (uv->bind_type == RAII_SCHEME_TLS ? " secure" : ""),
-                                http_std_date(0)
-                        );
                     }
+
+                    fprintf(stdout, "Listening to %s:%d for%s connections, %s.\033[0K\n",
+                            (uv->bind_type == RAII_SCHEME_PIPE ? name : uv->dns->ip),
+                            args[4].integer,
+                            (uv->bind_type == RAII_SCHEME_TLS ? " secure" : ""),
+                            http_std_date(0)
+                    );
 
                     if (is_empty(uv_coro_data()))
                         uv_coro_update(*uv);
