@@ -3,9 +3,8 @@ cmake_minimum_required(VERSION 3.11...3.14)
 set(TARGET_LIST
  test-fs
  test-dns
-#fs_test.cc
-#stream_test.cc
-#tcp_test.cc
+ test-stream
+ test-tcp
 #udp_test.cc
 #uds_test.cc
 )

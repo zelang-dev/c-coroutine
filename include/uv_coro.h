@@ -45,36 +45,6 @@ extern "C"
 {
 #endif
 
-typedef union
-{
-    uv_alloc_cb alloc;
-    uv_read_cb read;
-    uv_write_cb write;
-    uv_connect_cb connect;
-    uv_shutdown_cb shutdown;
-    uv_connection_cb connection;
-    uv_close_cb close;
-    uv_poll_cb poll;
-    uv_timer_cb timer;
-    uv_async_cb async;
-    uv_prepare_cb prepare;
-    uv_check_cb _check;
-    uv_idle_cb idle;
-    uv_exit_cb exit;
-    uv_walk_cb walk;
-    uv_fs_cb fs;
-    uv_work_cb work;
-    uv_after_work_cb after_work;
-    uv_getaddrinfo_cb getaddrinfo;
-    uv_getnameinfo_cb getnameinfo;
-    uv_random_cb randoms;
-    uv_fs_poll_cb fs_poll;
-    uv_fs_event_cb fs_event;
-    uv_udp_recv_cb udp_recv;
-    uv_udp_send_cb udp_send;
-    uv_signal_cb signal;
-} uv_routine_cb;
-
 typedef enum {
     ai_family = RAII_COUNTER + 1,
     ai_socktype,
@@ -85,8 +55,64 @@ typedef enum {
 
 typedef enum {
     UV_CORO_DNS = ai_unknown + 1,
-    UV_CORO_NAME
+    UV_CORO_NAME,
+    UV_CORO_PIPE,
+    UV_CORO_TCP,
+    UV_CORO_UDP,
+    UV_CORO_SOCKET,
+    UV_CORO_TTY_0,
+    UV_CORO_TTY_1,
+    UV_CORO_TTY_2,
+    UV_CORO_LISTEN = UV_CORO_TTY_2 + UV_HANDLE_TYPE_MAX,
+    UV_CORO_ARGS
 } uv_coro_types;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd[2];
+    union {
+        uv_stream_t writer[1];
+        uv_pipe_t output[1];
+    };
+    union {
+        uv_stream_t reader[1];
+        uv_pipe_t input[1];
+    };
+} pipepair_t;
+
+typedef struct {
+    uv_coro_types type;
+    uv_os_sock_t fds[2];
+    uv_tcp_t writer[1];
+    uv_tcp_t reader[1];
+} socketpair_t;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd;
+    union {
+        uv_stream_t reader[1];
+        uv_tty_t input[1];
+    };
+} tty_in_t;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd;
+    union {
+        uv_stream_t writer[1];
+        uv_tty_t output[1];
+    };
+} tty_out_t;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd;
+    union {
+        uv_stream_t erred[1];
+        uv_tty_t err[1];
+    };
+} tty_err_t;
 
 typedef struct addrinfo addrinfo_t;
 typedef const struct sockaddr sockaddr_t;
@@ -99,7 +125,7 @@ typedef stdio_cb stdout_cb;
 typedef stdio_cb stderr_cb;
 
 typedef struct {
-    int type;
+    uv_coro_types type;
     void *data;
     int stdio_count;
     spawn_cb exiting_cb;
@@ -108,7 +134,7 @@ typedef struct {
 } spawn_options_t;
 
 typedef struct {
-    int type;
+    uv_coro_types type;
     bool is_detach;
     spawn_options_t *handle;
     uv_process_t process[1];
@@ -122,6 +148,7 @@ typedef struct nameinfo_s {
 
 typedef void (*event_cb)(string_t filename, int events, int status);
 typedef void (*poll_cb)(int status, const uv_stat_t *prev, const uv_stat_t *curr);
+typedef void (*stream_cb)(uv_stream_t *);
 
 typedef struct scandir_s {
     bool started;
@@ -143,12 +170,12 @@ typedef struct dnsinfo_s {
 } dnsinfo_t;
 
 typedef struct uv_args_s {
-    raii_type type;
-    int bind_type;
+    uv_coro_types type;
+    raii_type bind_type;
     bool is_path;
     bool is_request;
     bool is_freeable;
-    bool is_timer;
+    bool is_server;
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
@@ -173,6 +200,19 @@ typedef struct uv_args_s {
     scandir_t dir[1];
     dnsinfo_t dns[1];
 } uv_args_t;
+
+typedef struct {
+    uv_coro_types type;
+    unsigned int flags;
+    ssize_t nread;
+    string_t message;
+    uv_udp_t *handle;
+    uv_args_t *args;
+    sockaddr_t addr[1];
+    uv_udp_send_t req[1];
+} udp_packet_t;
+
+typedef void (*packet_cb)(udp_packet_t *);
 
 /**
 *@param stdio fd
@@ -286,7 +326,6 @@ C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t l
 C_API int fs_fchmod(uv_file file, int mode);
 C_API int fs_fchown(uv_file file, uv_uid_t uid, uv_gid_t gid);
 C_API int fs_futime(uv_file file, double atime, double mtime);
-
 C_API int fs_copyfile(string_t path, string_t new_path, int flags);
 C_API int fs_mkdtemp(string_t tpl);
 C_API int fs_mkstemp(string_t tpl);
@@ -304,6 +343,20 @@ C_API int fs_chown(string_t path, uv_uid_t uid, uv_gid_t gid);
 C_API int fs_lchown(string_t path, uv_uid_t uid, uv_gid_t gid);
 C_API uv_statfs_t *fs_statfs(string_t path);
 
+C_API dnsinfo_t *get_addrinfo(string_t address, string_t service, u32 numhints_pair, ...);
+C_API addrinfo_t *addrinfo_next(dnsinfo_t *);
+C_API nameinfo_t *get_nameinfo(string_t addr, int port, int flags);
+
+C_API uv_pipe_t *pipe_create(bool is_ipc);
+C_API uv_tcp_t *tcp_create(void);
+
+C_API pipepair_t *pipepair_create(bool is_ipc);
+C_API socketpair_t *socketpair_create(int type, int protocol);
+
+C_API tty_in_t *tty_input(void);
+C_API tty_out_t *tty_output(void);
+C_API tty_err_t *tty_error(void);
+
 C_API string stream_read(uv_stream_t *);
 C_API int stream_write(uv_stream_t *, string_t text);
 C_API uv_stream_t *stream_connect(string_t address);
@@ -311,30 +364,23 @@ C_API uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, in
 C_API uv_stream_t *stream_listen(uv_stream_t *, int backlog);
 C_API uv_stream_t *stream_bind(string_t address, int flags);
 C_API uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, int flags);
-C_API void stream_handler(void (*connected)(uv_stream_t *), uv_stream_t *client);
+C_API void stream_handler(stream_cb connected, uv_stream_t *client);
+C_API void stream_shutdown(uv_stream_t *);
 
-C_API int stream_write2(uv_stream_t *, string_t text, uv_stream_t *send_handle);
-C_API void stream_shutdown(uv_shutdown_t *, uv_stream_t *, uv_shutdown_cb cb);
-
-C_API uv_fs_poll_t *fs_poll_create(void);
-C_API uv_fs_event_t *fs_event_create(void);
-C_API uv_timer_t *time_create(void);
-C_API uv_tty_t *tty_create(uv_file fd);
 C_API uv_udp_t *udp_create(void);
-C_API uv_pipe_t *pipe_create(bool is_ipc);
-C_API uv_tcp_t *tcp_create(void);
-C_API uv_tcp_t *tls_tcp_create(void_t extra);
+C_API uv_udp_t *udp_bind(string_t address, unsigned int flags);
+C_API udp_packet_t *udp_listen(uv_udp_t *);
+C_API void udp_handler(packet_cb connected, udp_packet_t *);
 
-C_API dnsinfo_t *get_addrinfo(string_t address, string_t service, u32 numhints_pair, ...);
-C_API addrinfo_t *addrinfo_next(dnsinfo_t *);
-C_API nameinfo_t *get_nameinfo(string_t addr, int port, int flags);
+C_API string udp_get_message(udp_packet_t *);
+C_API int udp_get_flags(udp_packet_t *);
 
-C_API string udp_recv(uv_udp_t *);
-C_API int udp_send(uv_udp_t *, string_t, string_t addr);
+C_API uv_udp_t *udp_send(string_t message, string_t addr, unsigned int flags);
+C_API udp_packet_t *udp_recv(uv_udp_t *);
+C_API int udp_send_packet(udp_packet_t *, string_t);
 
-#define UV_TLS                  UV_HANDLE + UV_STREAM + UV_POLL
-#define UV_SERVER_LISTEN        UV_STREAM + UV_NAMED_PIPE + UV_TCP + UV_UDP
-#define UV_CTX                  UV_SERVER_LISTEN + UV_POLL
+#define UV_TLS                  RAII_SCHEME_TLS
+#define UV_CTX                  UV_CORO_ARGS + RAII_NAN
 
 #define foreach_in_dir(X, S)    uv_dirent_t *(X) = nil; \
     for(X = fs_scandir_next((scandir_t *)S); X != nullptr; X = fs_scandir_next((scandir_t *)S))
@@ -348,11 +394,22 @@ C_API uv_loop_t *uv_coro_loop(void);
 
 /* For displaying Cpu core count, library version, and OS system info from `uv_os_uname()`. */
 C_API string_t uv_coro_uname(void);
-C_API void uv_coro_close(uv_handle_t *);
+C_API string_t uv_coro_hostname(void);
 
 C_API uv_args_t *uv_coro_data(void);
 C_API void uv_coro_update(uv_args_t);
-C_API bool is_tls(uv_handle_t *);
+
+C_API bool is_tls(uv_stream_t *);
+C_API bool is_pipe(void_t);
+C_API bool is_tty(void_t);
+C_API bool is_udp(void_t);
+C_API bool is_tcp(void_t);
+C_API bool is_udp_packet(void_t);
+C_API bool is_socketpair(void_t);
+C_API bool is_pipepair(void_t);
+C_API bool is_tty_in(void_t);
+C_API bool is_tty_out(void_t);
+C_API bool is_tty_err(void_t);
 
 /* This library provides its own ~main~,
 which call this function as an coroutine! */
