@@ -5,8 +5,8 @@ set(TARGET_LIST
  test-dns
  test-stream
  test-tcp
-#udp_test.cc
-#uds_test.cc
+ test-udp
+ test-pipe
 )
 
 foreach (TARGET ${TARGET_LIST})

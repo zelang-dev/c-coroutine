@@ -114,10 +114,15 @@ typedef struct {
     };
 } tty_err_t;
 
+typedef struct udp_packet_s udp_packet_t;
 typedef struct addrinfo addrinfo_t;
 typedef const struct sockaddr sockaddr_t;
 typedef struct sockaddr_in sock_in_t;
 typedef struct sockaddr_in6 sock_in6_t;
+typedef void (*event_cb)(string_t filename, int events, int status);
+typedef void (*poll_cb)(int status, const uv_stat_t *prev, const uv_stat_t *curr);
+typedef void (*stream_cb)(uv_stream_t *);
+typedef void (*packet_cb)(udp_packet_t *);
 typedef void (*spawn_cb)(int64_t status, int signal);
 typedef void (*stdio_cb)(string_t buf);
 typedef stdio_cb stdin_cb;
@@ -145,10 +150,6 @@ typedef struct nameinfo_s {
     string_t host;
     string_t service;
 } nameinfo_t;
-
-typedef void (*event_cb)(string_t filename, int events, int status);
-typedef void (*poll_cb)(int status, const uv_stat_t *prev, const uv_stat_t *curr);
-typedef void (*stream_cb)(uv_stream_t *);
 
 typedef struct scandir_s {
     bool started;
@@ -200,19 +201,6 @@ typedef struct uv_args_s {
     scandir_t dir[1];
     dnsinfo_t dns[1];
 } uv_args_t;
-
-typedef struct {
-    uv_coro_types type;
-    unsigned int flags;
-    ssize_t nread;
-    string_t message;
-    uv_udp_t *handle;
-    uv_args_t *args;
-    sockaddr_t addr[1];
-    uv_udp_send_t req[1];
-} udp_packet_t;
-
-typedef void (*packet_cb)(udp_packet_t *);
 
 /**
 *@param stdio fd
@@ -369,13 +357,14 @@ C_API void stream_shutdown(uv_stream_t *);
 
 C_API uv_udp_t *udp_create(void);
 C_API uv_udp_t *udp_bind(string_t address, unsigned int flags);
+C_API uv_udp_t *udp_broadcast(string_t broadcast);
 C_API udp_packet_t *udp_listen(uv_udp_t *);
 C_API void udp_handler(packet_cb connected, udp_packet_t *);
 
-C_API string udp_get_message(udp_packet_t *);
-C_API int udp_get_flags(udp_packet_t *);
+C_API string_t udp_get_message(udp_packet_t *);
+C_API unsigned int udp_get_flags(udp_packet_t *);
 
-C_API uv_udp_t *udp_send(string_t message, string_t addr, unsigned int flags);
+C_API int udp_send(uv_udp_t *handle, string_t message, string_t addr);
 C_API udp_packet_t *udp_recv(uv_udp_t *);
 C_API int udp_send_packet(udp_packet_t *, string_t);
 

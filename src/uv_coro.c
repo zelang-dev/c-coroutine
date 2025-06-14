@@ -1,4 +1,15 @@
 #include "uv_coro.h"
+struct udp_packet_s {
+    uv_coro_types type;
+    unsigned int flags;
+    ssize_t nread;
+    string_t message;
+    uv_udp_t *handle;
+    uv_args_t *args;
+    sockaddr_t addr[1];
+    uv_udp_send_t req[1];
+};
+
 static char uv_coro_powered_by[SCRAPE_SIZE] = nil;
 static char uv_coro_host[UV_MAXHOSTNAMESIZE] = nil;
 static uv_fs_poll_t *fs_poll_create(void);
@@ -50,11 +61,19 @@ static void _close_cb(uv_handle_t *handle) {
     RAII_FREE(handle);
 }
 
+static void fs_remove_pipe(uv_args_t *uv) {
+    uv_fs_t req;
+    if (uv->bind_type == RAII_SCHEME_PIPE
+        && !uv_fs_unlink(uv_coro_loop(), &req, (string_t)uv->args[2].object, nullptr)) {
+        uv_fs_req_cleanup(&req);
+    }
+}
+
 static void uv_coro_closer(uv_args_t *uv) {
     if (uv->req_type == UV_GETNAMEINFO || uv->req_type == UV_WRITE) {
         RAII_FREE(uv->args[0].object);
     } else if (uv->req_type == UV_GETADDRINFO) {
-        uv_freeaddrinfo((addrinfo_t * )uv->args[0].object);
+        uv_freeaddrinfo((addrinfo_t *)uv->args[0].object);
     } else {
         uv_close(handler(uv->args[0].object), _close_cb);
     }
@@ -301,10 +320,10 @@ static void connection_cb(uv_stream_t *server, int status) {
 
     if (status == 0) {
         if (uv->bind_type == RAII_SCHEME_TLS) {
-            handle = try_calloc(1, sizeof(uv_tcp_t));
+            handle = RAII_CALLOC(1, sizeof(uv_tcp_t));
             r = uv_tcp_init(uvLoop, (uv_tcp_t *)handle);
             if (!r && !(r = uv_accept(server, (uv_stream_t *)handle))) {
-                uv_tls_t *client = try_malloc(sizeof(uv_tls_t)); //freed on uv_close callback
+                uv_tls_t *client = RAII_MALLOC(sizeof(uv_tls_t)); //freed on uv_close callback
                 if (!(r = uv_tls_init(&uv->ctx, handle, client))) {
                     halt = false;
                     r = uv_tls_accept(client, on_listen_handshake);
@@ -1170,7 +1189,9 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     size_t len = sizeof(name);
     int r = 0;
 
-    if (is_str_in(address, ":")) {
+    if (scheme == RAII_SCHEME_PIPE) {
+        addr_set = str_concat(2, SYS_PIPE, address);
+    } else if (is_str_in(address, ":")) {
         r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->dns->in6);
         addr_set = uv_args->dns->in6;
     } else if (is_str_in(address, ".")) {
@@ -1277,6 +1298,8 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
             case RAII_SCHEME_PIPE:
                 handle = pipe_create(false);
                 r = uv_pipe_bind(handle, (string_t)addr_set);
+                if (!r)
+                    defer((func_t)fs_remove_pipe, uv_args);
                 break;
             case RAII_SCHEME_TLS:
                 if (is_str_eq(name, "localhost"))
@@ -1367,6 +1390,17 @@ uv_udp_t *udp_bind(string_t address, unsigned int flags) {
     return handle;
 }
 
+uv_udp_t *udp_broadcast(string_t broadcast) {
+    uv_udp_t *handle = udp_bind(broadcast, 0);
+    int r = uv_udp_set_broadcast(handle, 1);
+    if (r) {
+        uv_log_error(r);
+        return coro_interrupt_erred(coro_active(), r);
+    }
+
+    return handle;
+}
+
 udp_packet_t *udp_recv(uv_udp_t *handle) {
     if (is_empty(handle))
         return nullptr;
@@ -1407,6 +1441,18 @@ static void udp_packet_free(udp_packet_t *handle) {
     }
 }
 
+RAII_INLINE string_t udp_get_message(udp_packet_t *udpp) {
+    string_t message = udpp->message;
+    yielding();
+    return message;
+}
+
+RAII_INLINE unsigned int udp_get_flags(udp_packet_t *udpp) {
+    unsigned int flags = udpp->flags;
+    yielding();
+    return flags;
+}
+
 RAII_INLINE void udp_handler(packet_cb connected, udp_packet_t *client) {
     if (is_empty(client->args))
         coro_interrupt_event((func_t)connected, client, (func_t)udp_packet_free);
@@ -1416,23 +1462,29 @@ RAII_INLINE void udp_handler(packet_cb connected, udp_packet_t *client) {
     yielding();
 }
 
-uv_udp_t *udp_send(string_t message, string_t addr, unsigned int flags) {
+int udp_send(uv_udp_t *handle, string_t message, string_t addr) {
     udp_packet_t *packet = nullptr;
-    uv_udp_t *handle = nullptr;
     void_t addr_set;
     string_t host = nullptr;
+    bool is_args_set = false;
     int r = RAII_ERR;
-    if (is_empty((void_t)addr) || is_empty((void_t)message))
-        return handle;
+    if (is_empty((void_t)addr) || is_empty((void_t)message) || is_empty(handle))
+        return r;
 
     url_t *url = parse_url((string_t)(is_str_in(addr, "://")
                                       ? addr
                                       : str_concat(2, "udp://", addr)));
     if (is_empty(url))
-        return handle;
+        return r;
 
     host = (string_t)url->host;
-    uv_args_t *uv_args = uv_arguments(4, true);
+    uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
+    if (is_empty(uv_args)) {
+        is_args_set = true;
+        uv_args = uv_arguments(4, true);
+        uv_handle_set_data(handler(handle), (void_t)uv_args);
+    }
+
     if (is_str_in(host, ":")) {
         r = uv_ip6_addr(host, url->port, (struct sockaddr_in6 *)uv_args->dns->in6);
         addr_set = uv_args->dns->in6;
@@ -1441,15 +1493,23 @@ uv_udp_t *udp_send(string_t message, string_t addr, unsigned int flags) {
         addr_set = uv_args->dns->in4;
     }
 
-    handle = udp_create();
-    if (!(r = uv_udp_bind(handle, (sockaddr_t *)addr_set, flags))) {
+    if (!r) {
         size_t size = simd_strlen(message);
         uv_args->buffer = (string)message;
         uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
-        packet = calloc_local(1, sizeof(udp_packet_t));
-        $append(uv_args->args, packet->req);
-        $append(uv_args->args, handle);
-        $append(uv_args->args, addr_set);
+        if (is_args_set) {
+            packet = calloc_local(1, sizeof(udp_packet_t));
+            $append(uv_args->args, packet->req);
+            $append(uv_args->args, handle);
+            $append(uv_args->args, addr_set);
+            $append(uv_args->args, packet);
+        } else {
+            packet = (udp_packet_t *)uv_args->args[3].object;
+            uv_args->args[0].object = packet->req;
+            uv_args->args[1].object = handle;
+            uv_args->args[2].object = addr_set;
+        }
+
         if (!(r = uv_start(uv_args, UV_UDP_SEND, 4, true).integer)) {
             memcpy((void_t)packet->addr, addr_set, sizeof(packet->addr));
             packet->flags = handle->flags;
@@ -1458,13 +1518,12 @@ uv_udp_t *udp_send(string_t message, string_t addr, unsigned int flags) {
             packet->handle = handle;
             packet->args = uv_args;
             packet->type = UV_CORO_UDP;
-            $append(uv_args->args, packet);
-            return handle;
         }
+    } else {
+        uv_log_error(r);
     }
 
-    uv_log_error(r);
-    return coro_interrupt_erred(coro_active(), r);
+    return r;
 }
 
 RAII_INLINE int udp_send_packet(udp_packet_t *connected, string_t message) {
