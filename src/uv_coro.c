@@ -70,7 +70,7 @@ static void fs_remove_pipe(uv_args_t *uv) {
 }
 
 static void uv_coro_closer(uv_args_t *uv) {
-    if (uv->req_type == UV_GETNAMEINFO || uv->req_type == UV_WRITE) {
+    if (uv->req_type == UV_GETNAMEINFO) {
         RAII_FREE(uv->args[0].object);
     } else if (uv->req_type == UV_GETADDRINFO) {
         uv_freeaddrinfo((addrinfo_t *)uv->args[0].object);
@@ -85,7 +85,6 @@ static void timer_cb(uv_timer_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
     routine_t *co = uv->context;
     uv_timer_stop(handle);
-    uv_coro_closer(uv);
     coro_interrupt_complete(co, nullptr, 0, false, true);
 }
 
@@ -179,11 +178,29 @@ static RAII_INLINE void_t coro_fs_poll(params_t args) {
     return uv_start((uv_args_t *)args->object, UV_FS_POLL, 4, false).object;
 }
 
-void uv_close_deferred(void_t handle) {
-    uv_close(handler(handle), nullptr);
+static void uv_close_deferred(void_t handle) {
+    if (is_tty_in(handle)) {
+        uv_close(handler(((tty_in_t *)handle)->input), nullptr);
+    } else if (is_tty_out(handle)) {
+        uv_close(handler(((tty_out_t *)handle)->output), nullptr);
+    } else if (is_tty_err(handle)) {
+        uv_close(handler(((tty_err_t *)handle)->err), nullptr);
+    } else if (is_pipepair(handle)) {
+        pipepair_t *pair = (pipepair_t *)handle;
+        uv_close(handler(pair->input), nullptr);
+        uv_close(handler(pair->output), nullptr);
+    } else if (is_socketpair(handle)) {
+        socketpair_t *pair = (socketpair_t *)handle;
+        uv_close(handler(pair->reader), nullptr);
+        uv_close(handler(pair->writer), nullptr);
+    } else {
+        uv_close(handler(handle), nullptr);
+    }
+
+    RAII_FREE(handle);
 }
 
-void uv_close_free(void_t handle) {
+static void uv_close_free(void_t handle) {
     uv_handle_t *h = handler(handle);
     if (!h || UV_UNKNOWN_HANDLE == h->type)
         return;
@@ -192,7 +209,7 @@ void uv_close_free(void_t handle) {
         uv_close(h, _close_cb);
 }
 
-void tls_close_free(void_t handle) {
+static void tls_close_free(void_t handle) {
     uv_handle_t *h = handler(handle);
     if (!h || UV_UNKNOWN_HANDLE == h->type)
         return;
@@ -411,14 +428,13 @@ static void getaddrinfo_cb(uv_getaddrinfo_t *req, int status, struct addrinfo *r
 static void write_cb(uv_write_t *req, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(req));
     routine_t *co = uv->context;
-    uv->args[0].object = req;
+
     if (status < 0) {
         uv_log_error(status);
     }
 
     coro_interrupt_complete(co, nullptr, status, true, false);
-    uv_coro_closer(uv);
-    coro_interrupt_finisher(nullptr, nullptr, 0, false, false, false, false, true);
+    uv_arguments_free(uv);
 }
 
 static void tls_write_cb(uv_tls_t *tls, int status) {
@@ -722,7 +738,7 @@ static void_t uv_init(params_t uv_args) {
     arrays_t args = uv->args;
     int length, r, result = UV_EBADF;
     uv_handle_t *stream = handler(args[0].object);
-    string name[SCRAPE_SIZE * 2] = nil;
+    char name[SCRAPE_SIZE * 2] = nil;
     uv->context = coro_active();
     if (uv->is_request) {
         uv_req_t *req;
@@ -732,11 +748,8 @@ static void_t uv_init(params_t uv_args) {
                     ((uv_tls_t *)stream)->uv_args = uv;
                     result = uv_tls_write((uv_tls_t *)stream, &uv->bufs, tls_write_cb);
                 } else {
-                    req = try_calloc(1, sizeof(uv_write_t));
-                    if (result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb)) {
-                        uv->args[0].object = req;
-                        uv_coro_closer(uv);
-                    }
+                    req = calloc_local(1, sizeof(uv_write_t));
+                    result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb);
                 }
                 break;
             case UV_CONNECT:
@@ -820,11 +833,11 @@ static void_t uv_init(params_t uv_args) {
                     result = uv_listen((uv_stream_t *)stream, args[1].integer, connection_cb);
 
                 if (!result) {
-                    length = sizeof(uv->dns->name);
+                    length = (int)sizeof(uv->dns->name);
                     switch (uv->bind_type) {
                         case RAII_SCHEME_PIPE:
-                            length = sizeof(name);
-                            r = uv_pipe_getsockname((const uv_pipe_t *)args[0].object, name, &length);
+                            length = (int)sizeof(name);
+                            r = uv_pipe_getsockname((const uv_pipe_t *)args[0].object, name, (size_t *)&length);
                             break;
                         case RAII_SCHEME_UDP:
                             r = uv_udp_getsockname((const uv_udp_t *)args[0].object, uv->dns->name, &length);
@@ -863,6 +876,7 @@ static void_t uv_init(params_t uv_args) {
                 }
                 break;
             case UV_TIMER:
+                defer((func_t)uv_coro_closer, uv);
                 result = uv_timer_start((uv_timer_t *)args[0].object, timer_cb, args[1].ulong_long, 0);
                 break;
             case UV_HANDLE:
@@ -1591,9 +1605,10 @@ static uv_timer_t *time_create(void) {
 }
 
 uv_udp_t *udp_create(void) {
-    uv_udp_t *udp = (uv_udp_t *)calloc_local(1, sizeof(uv_udp_t));
+    uv_udp_t *udp = (uv_udp_t *)try_calloc(1, sizeof(uv_udp_t));
     int r = uv_udp_init(uv_coro_loop(), udp);
     if (r) {
+        RAII_FREE(udp);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -1603,9 +1618,10 @@ uv_udp_t *udp_create(void) {
 }
 
 uv_pipe_t *pipe_create(bool is_ipc) {
-    uv_pipe_t *pipe = (uv_pipe_t *)calloc_local(1, sizeof(uv_pipe_t));
+    uv_pipe_t *pipe = (uv_pipe_t *)try_calloc(1, sizeof(uv_pipe_t));
     int r = uv_pipe_init(uv_coro_loop(), pipe, (int)is_ipc);
     if (r) {
+        RAII_FREE(pipe);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -1615,61 +1631,66 @@ uv_pipe_t *pipe_create(bool is_ipc) {
 }
 
 pipepair_t *pipepair_create(bool is_ipc) {
-    pipepair_t *pair = (pipepair_t *)calloc_local(1, sizeof(pipepair_t));
+    pipepair_t *pair = (pipepair_t *)try_calloc(1, sizeof(pipepair_t));
     int r = uv_pipe(pair->fd, UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     if (r) {
+        RAII_FREE(pair);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
     if ((r = uv_pipe_init(uv_coro_loop(), pair->input, (int)is_ipc))
         || (r = uv_pipe_init(uv_coro_loop(), pair->output, (int)is_ipc))) {
+        RAII_FREE(pair);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
     if ((r = uv_pipe_open(pair->input, pair->fd[0]))
         || (r = uv_pipe_open(pair->output, pair->fd[1]))) {
+        RAII_FREE(pair);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
-    defer(uv_close_deferred, pair->input);
-    defer(uv_close_deferred, pair->output);
+    defer(uv_close_deferred, pair);
     pair->type = UV_CORO_PIPE;
     return pair;
 }
 
 socketpair_t *socketpair_create(int type, int protocol) {
-    socketpair_t *pair = (socketpair_t *)calloc_local(1, sizeof(socketpair_t));
+    socketpair_t *pair = (socketpair_t *)try_calloc(1, sizeof(socketpair_t));
     int r = uv_socketpair(type, protocol, pair->fds, UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     if (r) {
+        RAII_FREE(pair);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
     if ((r = uv_tcp_init(uv_coro_loop(), pair->writer))
         || (r = uv_tcp_init(uv_coro_loop(), pair->reader))) {
+        RAII_FREE(pair);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
     if ((r = uv_tcp_open(pair->reader, pair->fds[0]))
         || (r = uv_tcp_open(pair->writer, pair->fds[1]))) {
+        RAII_FREE(pair);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
-    defer(uv_close_deferred, pair->reader);
-    defer(uv_close_deferred, pair->writer);
+    defer(uv_close_deferred, pair);
     pair->type = UV_CORO_SOCKET;
     return pair;
 }
 
 uv_tcp_t *tcp_create(void) {
-    uv_tcp_t *tcp = (uv_tcp_t *)calloc_local(1, sizeof(uv_tcp_t));
+    uv_tcp_t *tcp = (uv_tcp_t *)try_calloc(1, sizeof(uv_tcp_t));
     int r = uv_tcp_init(uv_coro_loop(), tcp);
     if (r) {
+        RAII_FREE(tcp);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
@@ -1679,43 +1700,46 @@ uv_tcp_t *tcp_create(void) {
 }
 
 tty_in_t *tty_input(void) {
-    tty_in_t *tty = (tty_in_t *)calloc_local(1, sizeof(tty_in_t));
+    tty_in_t *tty = (tty_in_t *)try_calloc(1, sizeof(tty_in_t));
     tty->fd = 0;
     int r = uv_tty_init(uv_coro_loop(), tty->input, tty->fd, 1);
     if (r) {
+        RAII_FREE(tty);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
-    defer(uv_close_deferred, tty->input);
+    defer(uv_close_deferred, tty);
     tty->type = UV_CORO_TTY_0;
     return tty;
 }
 
 tty_out_t *tty_output(void) {
-    tty_out_t *tty = (tty_out_t *)calloc_local(1, sizeof(tty_out_t));
+    tty_out_t *tty = (tty_out_t *)try_calloc(1, sizeof(tty_out_t));
     tty->fd = 1;
     int r = uv_tty_init(uv_coro_loop(), tty->output, tty->fd, 0);
     if (r) {
+        RAII_FREE(tty);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
-    defer(uv_close_deferred, tty->output);
+    defer(uv_close_deferred, tty);
     tty->type = UV_CORO_TTY_1;
     return tty;
 }
 
 tty_err_t *tty_error(void) {
-    tty_err_t *tty = (tty_err_t *)calloc_local(1, sizeof(tty_err_t));
+    tty_err_t *tty = (tty_err_t *)try_calloc(1, sizeof(tty_err_t));
     tty->fd = 2;
     int r = uv_tty_init(uv_coro_loop(), tty->err, tty->fd, 0);
     if (r) {
+        RAII_FREE(tty);
         uv_log_error(r);
         return coro_interrupt_erred(coro_active(), r);
     }
 
-    defer(uv_close_deferred, tty->err);
+    defer(uv_close_deferred, tty);
     tty->type = UV_CORO_TTY_2;
     return tty;
 }
