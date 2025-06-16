@@ -25,15 +25,12 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -BUILD_TESTS=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run test examples
         run: |
             cd build
-            ./go_readfile
-            ./co_uv_fs
-            ./co_uv_spawn
-            ./co_uv_stream
+            ctest -C Debug --output-on-failure -F
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -51,13 +48,10 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -DBUILD_EXAMPLES=ON -A ${{ matrix.arch }}
+            cmake .. -DBUILD_TESTS=ON -A ${{ matrix.arch }}
             cmake --build . --config Debug
       - name: Run test examples
         shell: cmd
         run: |
-            cd build\Debug
-            ./go_readfile.exe
-            ./co_uv_fs.exe
-            ./co_uv_spawn.exe
-            ./co_uv_stream.exe
+            cd build
+            ctest -C Debug --output-on-failure -F

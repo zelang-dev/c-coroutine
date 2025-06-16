@@ -35,9 +35,6 @@ jobs:
           run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON ..
             cmake --build .
-            ./go_readfile
-            ./co_uv_fs
-            ./co_uv_spawn
-            ./co_uv_stream
+            ctest -C Debug --output-on-failure -F

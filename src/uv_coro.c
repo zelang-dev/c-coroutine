@@ -143,6 +143,7 @@ static RAII_INLINE void_t coro_fs_event(params_t args) {
         $append(interrupt_array(), coro_active());
     }
 
+    coro_flag_set(coro_active());
     return uv_start((uv_args_t *)args->object, UV_FS_EVENT, 3, false).object;
 }
 
@@ -2088,7 +2089,8 @@ static void uv_coro_free(routine_t *coro, routine_t *co, uv_args_t *uv_args) {
     raii_deferred_free(get_coro_scope(co));
     RAII_FREE(co);
 
-    uv_coro_closer(uv_args);
+    uv_close_deferred(uv_args->args[0].object);
+    uv_arguments_free(uv_args);
 }
 
 static void uv_coro_shutdown(void_t t) {

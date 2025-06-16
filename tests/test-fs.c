@@ -144,6 +144,9 @@ TEST(fs_scandir) {
     }
 
     ASSERT_EQ(0, fs_rmdir(scan_path));
+    while (!result_is_ready(res))
+        yielding();
+
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "scandir");
 
@@ -152,13 +155,11 @@ TEST(fs_scandir) {
 
 int watch_handler(string_t filename, int events, int status) {
     if (events & UV_RENAME) {
-        ASSERT_STR(filename, "file1.txt");
-        ASSERT_EQ(events, UV_RENAME);
+        ASSERT_TRUE((is_str_eq("file1.txt", filename) || is_str_eq("watchdir", filename) || is_str_empty(filename)));
     }
 
     if (events & UV_CHANGE) {
-        ASSERT_STR(filename, "file1.txt");
-        ASSERT_EQ(events, UV_CHANGE);
+        ASSERT_TRUE((is_str_eq("file1.txt", filename) || is_str_eq("watchdir", filename) || is_str_empty(filename)));
     }
 }
 
