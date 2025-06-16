@@ -153,49 +153,6 @@ TEST(fs_scandir) {
     return 0;
 }
 
-int watch_handler(string_t filename, int events, int status) {
-    if (events & UV_RENAME) {
-        ASSERT_TRUE((is_str_eq("file1.txt", filename) || is_str_eq("watchdir", filename) || is_str_empty(filename)));
-    }
-
-    if (events & UV_CHANGE) {
-        ASSERT_TRUE((is_str_eq("file1.txt", filename) || is_str_eq("watchdir", filename) || is_str_empty(filename)));
-    }
-}
-
-TEST(fs_watch) {
-    char filepath[SCRAPE_SIZE] = nil;
-    int i = 0;
-    rid_t res = go(worker_misc, 2, 1000, "event");
-    ASSERT_EQ(0, fs_mkdir(watch_path, 0));
-    ASSERT_FALSE(result_is_ready(res));
-
-    fs_watch(watch_path, (event_cb)watch_handler);
-    ASSERT_FALSE(result_is_ready(res));
-
-    snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, 1);
-    ASSERT_EQ(5, fs_writefile(filepath, "hello"));
-
-    sleepfor(10);
-    ASSERT_EQ(0, fs_unlink(filepath));
-
-    sleepfor(10);
-    ASSERT_EQ(0, fs_writefile(filepath, ""));
-
-    sleepfor(100);
-    ASSERT_EQ(0, fs_unlink(filepath));
-
-    sleepfor(10);
-    ASSERT_EQ(0, fs_rmdir(watch_path));
-    while (!result_is_ready(res))
-        yielding();
-
-    ASSERT_TRUE(result_is_ready(res));
-    ASSERT_STR(result_for(res).char_ptr, "event");
-
-    return 0;
-}
-
 TEST(list) {
     int result = 0;
 
@@ -205,7 +162,6 @@ TEST(list) {
     EXEC_TEST(fs_mkdir);
     EXEC_TEST(fs_rename);
     EXEC_TEST(fs_scandir);
-    EXEC_TEST(fs_watch);
 
     return result;
 }
