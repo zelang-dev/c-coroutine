@@ -85,6 +85,7 @@ static void timer_cb(uv_timer_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
     routine_t *co = uv->context;
     uv_timer_stop(handle);
+    coro_halt_set(get_coro_context(get_coro_context(co)));
     coro_interrupt_complete(co, nullptr, 0, false, false);
 }
 
@@ -152,10 +153,6 @@ static void fs_poll_cb(uv_fs_poll_t *handle, int status, const uv_stat_t *prev, 
         fs_event_cleanup(uv_args, co, status);
     } else {
         pollerfunc(status, prev, curr);
-        uv_fs_poll_stop(handle);
-        if (status = uv_fs_poll_start(handle, fs_poll_cb, uv_args->args[1].char_ptr, uv_args->args[3].integer)) {
-            fs_event_cleanup(uv_args, co, status);
-        }
     }
 }
 
@@ -234,8 +231,8 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
 static void uv_coro_cleanup(void_t t) {
     uv_loop_t *uvLoop = uv_coro_loop();
     coro_interrupt_waitgroup_destroy((routine_t *)t);
-    if (uv_loop_alive(uvLoop)) {
-        if (uv_coro_data() && uv_coro_data()->bind_type == RAII_SCHEME_TLS)
+    if (uv_loop_alive(uvLoop) && uv_coro_data()) {
+        if (uv_coro_data()->bind_type == RAII_SCHEME_TLS)
             uv_walk(uvLoop, (uv_walk_cb)tls_close_free, nullptr);
         else
             uv_walk(uvLoop, (uv_walk_cb)uv_close_free, nullptr);
