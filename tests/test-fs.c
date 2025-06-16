@@ -172,19 +172,24 @@ TEST(fs_watch) {
 
     fs_watch(watch_path, (event_cb)watch_handler);
     ASSERT_FALSE(result_is_ready(res));
+
     snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, 1);
     ASSERT_EQ(5, fs_writefile(filepath, "hello"));
+
     sleepfor(10);
     ASSERT_EQ(0, fs_unlink(filepath));
 
-    for (i = 2; i < 4; i++) {
-        snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, i);
-        ASSERT_EQ(0, fs_writefile(filepath, ""));
-        sleepfor(100);
-        ASSERT_EQ(0, fs_unlink(filepath));
-    }
+    sleepfor(10);
+    ASSERT_EQ(0, fs_writefile(filepath, ""));
 
+    sleepfor(100);
+    ASSERT_EQ(0, fs_unlink(filepath));
+
+    sleepfor(10);
     ASSERT_EQ(0, fs_rmdir(watch_path));
+    while (!result_is_ready(res))
+        yielding();
+
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "event");
 

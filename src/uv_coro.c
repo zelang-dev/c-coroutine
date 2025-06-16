@@ -85,7 +85,7 @@ static void timer_cb(uv_timer_t *handle) {
     uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handler(handle));
     routine_t *co = uv->context;
     uv_timer_stop(handle);
-    coro_interrupt_complete(co, nullptr, 0, false, true);
+    coro_interrupt_complete(co, nullptr, 0, false, false);
 }
 
 static void fs_event_cleanup(uv_args_t *uv_args, routine_t *co, int status) {
@@ -124,10 +124,6 @@ static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, in
         fs_event_cleanup(uv_args, co, status);
     } else if ((events & UV_RENAME) || (events & UV_CHANGE)) {
         watchfunc(filename, events, status);
-        uv_fs_event_stop(handle);
-        if (status = uv_fs_event_start(handle, fs_event_cb, uv_args->args[1].char_ptr, UV_FS_EVENT_RECURSIVE)) {
-            fs_event_cleanup(uv_args, co, status);
-        }
     }
 }
 
@@ -143,7 +139,6 @@ static RAII_INLINE void_t coro_fs_event(params_t args) {
         $append(interrupt_array(), coro_active());
     }
 
-    coro_flag_set(coro_active());
     return uv_start((uv_args_t *)args->object, UV_FS_EVENT, 3, false).object;
 }
 
@@ -615,8 +610,6 @@ static void fs_cb(uv_fs_t *req) {
     coro_interrupt_finisher(co, data, result, false, true, true, !override, false);
     if (fs_type != UV_FS_SCANDIR)
         fs_cleanup(req);
-
-    coro_interrupt_finisher(nullptr, nullptr, 0, false, false, false, false, true);
 }
 
 static void_t fs_init(params_t uv_args) {
