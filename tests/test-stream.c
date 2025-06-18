@@ -26,7 +26,7 @@ TEST(stream_read) {
 
 TEST(stream_write) {
     rid_t res = go(worker_misc, 2, 600, "stream_write");
-    tty_out_t *tty = tty_output();
+    tty_out_t *tty = tty_out();
     ASSERT_TRUE(is_tty(tty));
     ASSERT_EQ(0, stream_write(tty->writer, "hello world\n"));
     ASSERT_FALSE(result_is_ready(res));

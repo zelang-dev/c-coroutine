@@ -60,12 +60,42 @@ typedef enum {
     UV_CORO_TCP,
     UV_CORO_UDP,
     UV_CORO_SOCKET,
+    UV_CORO_PIPE_0,
+    UV_CORO_PIPE_1,
+    UV_CORO_PIPE_FD,
     UV_CORO_TTY_0,
     UV_CORO_TTY_1,
     UV_CORO_TTY_2,
     UV_CORO_LISTEN = UV_CORO_TTY_2 + UV_HANDLE_TYPE_MAX,
     UV_CORO_ARGS
 } uv_coro_types;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd;
+    union {
+        uv_stream_t reader[1];
+        uv_pipe_t input[1];
+    };
+} pipe_in_t;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd;
+    union {
+        uv_stream_t writer[1];
+        uv_pipe_t output[1];
+    };
+} pipe_out_t;
+
+typedef struct {
+    uv_coro_types type;
+    uv_file fd;
+    union {
+        uv_stream_t handle[1];
+        uv_pipe_t file[1];
+    };
+} pipe_file_t;
 
 typedef struct {
     uv_coro_types type;
@@ -341,9 +371,13 @@ C_API uv_tcp_t *tcp_create(void);
 C_API pipepair_t *pipepair_create(bool is_ipc);
 C_API socketpair_t *socketpair_create(int type, int protocol);
 
-C_API tty_in_t *tty_input(void);
-C_API tty_out_t *tty_output(void);
-C_API tty_err_t *tty_error(void);
+C_API pipe_in_t *pipe_stdin(bool is_ipc);
+C_API pipe_out_t *pipe_stdout(bool is_ipc);
+C_API pipe_file_t *pipe_file(uv_file fd, bool is_ipc);
+
+C_API tty_in_t *tty_in(void);
+C_API tty_out_t *tty_out(void);
+C_API tty_err_t *tty_err(void);
 
 C_API string stream_read(uv_stream_t *);
 C_API int stream_write(uv_stream_t *, string_t text);
@@ -385,9 +419,6 @@ C_API uv_loop_t *uv_coro_loop(void);
 C_API string_t uv_coro_uname(void);
 C_API string_t uv_coro_hostname(void);
 
-C_API uv_args_t *uv_coro_data(void);
-C_API void uv_coro_update(uv_args_t);
-
 C_API bool is_tls(uv_stream_t *);
 C_API bool is_pipe(void_t);
 C_API bool is_tty(void_t);
@@ -396,6 +427,9 @@ C_API bool is_tcp(void_t);
 C_API bool is_udp_packet(void_t);
 C_API bool is_socketpair(void_t);
 C_API bool is_pipepair(void_t);
+C_API bool is_pipe_stdin(void_t);
+C_API bool is_pipe_stdout(void_t);
+C_API bool is_pipe_file(void_t);
 C_API bool is_tty_in(void_t);
 C_API bool is_tty_out(void_t);
 C_API bool is_tty_err(void_t);

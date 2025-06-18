@@ -5,8 +5,8 @@ string_t watch_path = "watchdir";
 void_t worker_misc(params_t args) {
     ASSERT_WORKER(($size(args) > 1));
     sleepfor(args[0].u_int);
-    ASSERT_WORKER(is_str_in("mkdir,rmdir,rename,writefile,scandir,unlink,event", args[1].char_ptr));
-    return args[1].char_ptr;
+    ASSERT_WORKER(is_str_eq("event", args[1].char_ptr));
+    return "fs_watch";
 }
 
 int watch_handler(string_t filename, int events, int status) {
@@ -47,7 +47,7 @@ TEST(fs_watch) {
         yielding();
 
     ASSERT_TRUE(result_is_ready(res));
-    ASSERT_STR(result_for(res).char_ptr, "event");
+    ASSERT_STR(result_for(res).char_ptr, "fs_watch");
 
     return 0;
 }
