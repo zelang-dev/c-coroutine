@@ -210,10 +210,6 @@ typedef struct uv_args_s {
     uv_fs_type fs_type;
     uv_req_type req_type;
     uv_handle_type handle_type;
-    uv_dirent_type_t dirent_type;
-    uv_tty_mode_t tty_mode;
-    uv_stdio_flags stdio_flag;
-    uv_errno_t errno_code;
 
     /* total number of args in set */
     size_t n_args;
