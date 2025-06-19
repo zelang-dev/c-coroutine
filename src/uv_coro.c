@@ -247,15 +247,6 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
     return coro_interrupt(uv_init, 1, uv_args);
 }
 
-static void uv_coro_cleanup(void_t t) {
-    uv_loop_t *uvLoop = uv_coro_loop();
-    coro_interrupt_waitgroup_destroy((routine_t *)t);
-    if (uv_loop_alive(uvLoop)) {
-        uv_walk(uvLoop, (uv_walk_cb)uv_close_free, nullptr);
-        uv_run(uvLoop, UV_RUN_DEFAULT);
-    }
-}
-
 static void uv_catch_error(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
     string_t text = err_message();
@@ -2104,9 +2095,7 @@ static void uv_coro_free(routine_t *coro, routine_t *co, uv_args_t *uv_args) {
 }
 
 static void uv_coro_shutdown(void_t t) {
-    if (atomic_flag_load(&gq_result.is_errorless))
-        uv_coro_cleanup(t);
-
+    coro_interrupt_waitgroup_destroy((routine_t *)t);
     if (is_empty(t)) {
         uv_loop_t *loop = interrupt_handle();
         i32 num_of = interrupt_code();
@@ -2121,9 +2110,11 @@ static void uv_coro_shutdown(void_t t) {
                 co = $shift(interrupt_array()).object;
                 if (fs_type == UV_FS_EVENT) {
                     coro = uv_args->context;
+                    uv_fs_event_stop(uv_args->args[0].object);
                     uv_coro_free(coro, co, uv_args);
                 } else if (fs_type == UV_FS_POLL) {
                     coro = uv_args->context;
+                    uv_fs_poll_stop(uv_args->args[0].object);
                     uv_coro_free(coro, co, uv_args);
                 }
             } while (num_of);
@@ -2131,13 +2122,12 @@ static void uv_coro_shutdown(void_t t) {
             array_delete(interrupt_array());
             interrupt_array_set(nullptr);
             interrupt_code_set(num_of);
-            if (loop && atomic_flag_load(&gq_result.is_errorless))
-                uv_run(loop, UV_RUN_DEFAULT);
         }
 
         if (loop) {
-            if (atomic_flag_load(&gq_result.is_errorless)) {
+            if (uv_loop_alive(loop)) {
                 uv_stop(loop);
+                uv_walk(loop, (uv_walk_cb)uv_close_free, nullptr);
                 uv_run(loop, UV_RUN_DEFAULT);
             }
 
