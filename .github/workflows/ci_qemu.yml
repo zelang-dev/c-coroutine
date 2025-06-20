@@ -18,8 +18,8 @@ jobs:
           - target: s390x
             arch: s390x
     steps:
-      - uses: actions/checkout@v3
-      - uses: uraimo/run-on-arch-action@v2
+      - uses: actions/checkout@v4
+      - uses: uraimo/run-on-arch-action@v3
         with:
           arch: ${{ matrix.arch }}
           distro:  ubuntu_latest

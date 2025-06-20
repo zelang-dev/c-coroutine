@@ -15,7 +15,7 @@ jobs:
           - target: amd64
             flags: -m64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare
         run: |
           sudo dpkg --add-architecture i386
@@ -25,7 +25,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -BUILD_TESTS=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run test examples
         run: |
@@ -34,7 +34,7 @@ jobs:
 
   build-windows:
     name: Windows (${{ matrix.arch }})
-    runs-on: windows-2019
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
@@ -43,7 +43,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Configure & build
         run: |
             mkdir build
