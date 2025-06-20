@@ -433,7 +433,6 @@ static void write_cb(uv_write_t *req, int status) {
     }
 
     coro_interrupt_complete(co, nullptr, status, true, false);
-    uv_arguments_free(uv);
 }
 
 static void tls_write_cb(uv_tls_t *tls, int status) {
@@ -744,6 +743,7 @@ static void_t uv_init(params_t uv_args) {
                     ((uv_tls_t *)stream)->uv_args = uv;
                     result = uv_tls_write((uv_tls_t *)stream, &uv->bufs, tls_write_cb);
                 } else {
+                    defer((func_t)uv_arguments_free, uv);
                     req = calloc_local(1, sizeof(uv_write_t));
                     result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb);
                 }
