@@ -4,7 +4,7 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
     cmake_policy(SET CMP0135 NEW)
 endif()
 
-project(c-coroutine LANGUAGES C)
+project(uv_coroutine LANGUAGES C)
 
 set(CMAKE_C_STANDARD 90)
 
@@ -140,7 +140,7 @@ set(CPACK_NSIS_MODIFY_PATH ON)
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
 
-set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/c-coroutine")
+set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/uv_coroutine")
 set(CPACK_PACKAGE_VERSION 1.0.0)
 include(CPack)
 

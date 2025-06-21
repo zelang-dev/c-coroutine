@@ -1,6 +1,6 @@
-# c-coroutine
+# uv_coroutine
 
-[![windows & linux & macOS](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci.yml)[![macOS](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_macos.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_macos.yml)[![armv7, aarch64, ppc64le](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu_others.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu_others.yml)[![riscv64 & s390x by ucontext  .](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu.yml/badge.svg)](https://github.com/zelang-dev/c-coroutine/actions/workflows/ci_qemu.yml)
+[![windows & linux & macOS](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci.yml)[![macOS](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci_macos.yml/badge.svg)](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci_macos.yml)[![armv7, aarch64, ppc64le](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci_qemu_others.yml/badge.svg)](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci_qemu_others.yml)[![riscv64 & s390x by ucontext  .](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci_qemu.yml/badge.svg)](https://github.com/zelang-dev/uv_coroutine/actions/workflows/ci_qemu.yml)
 
 ## Table of Contents
 
@@ -183,7 +183,7 @@ The *[tests](https://github.com/dermesser/uvco/tree/master/test)* presented ther
 
 ## Usage
 
-### See [examples](https://github.com/zelang-dev/c-coroutine/tree/main/examples) and [tests](https://github.com/zelang-dev/c-coroutine/tree/main/tests) folder
+### See [examples](https://github.com/zelang-dev/uv_coroutine/tree/main/examples) and [tests](https://github.com/zelang-dev/uv_coroutine/tree/main/tests) folder
 
 ## Installation
 
@@ -209,7 +209,7 @@ cmake --build . --config Debug/Release
 
 ## Contributing
 
-Contributions are encouraged and welcome; I am always happy to get feedback or pull requests on Github :) Create [Github Issues](https://github.com/zelang-dev/c-coroutine/issues) for bugs and new features and comment on the ones you are interested in.
+Contributions are encouraged and welcome; I am always happy to get feedback or pull requests on Github :) Create [Github Issues](https://github.com/zelang-dev/uv_coroutine/issues) for bugs and new features and comment on the ones you are interested in.
 
 ## License
 
