@@ -1095,8 +1095,6 @@ addrinfo_t *addrinfo_next(dnsinfo_t *dns) {
         if (dir->ai_canonname)
             dns->ip_name = dir->ai_canonname;
 
-        dns->ip_addr = nullptr;
-        dns->ip6_addr = nullptr;
         if (dir->ai_family == AF_INET) {
             if (is_zero(ip = uv_ip4_name((const struct sockaddr_in *)dir->ai_addr, dns->ip, INET_ADDRSTRLEN)))
                 dns->ip_addr = dns->ip;
