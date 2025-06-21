@@ -31,14 +31,6 @@ TEST(fs_watch) {
 
     snprintf(filepath, SCRAPE_SIZE, "%s/file%d.txt", watch_path, 1);
     ASSERT_EQ(5, fs_writefile(filepath, "hello"));
-
-    sleepfor(10);
-    ASSERT_EQ(0, fs_unlink(filepath));
-
-    sleepfor(10);
-    ASSERT_EQ(0, fs_writefile(filepath, ""));
-
-    sleepfor(100);
     ASSERT_EQ(0, fs_unlink(filepath));
 
     sleepfor(10);

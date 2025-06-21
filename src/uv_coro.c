@@ -2166,6 +2166,6 @@ main(int argc, char **argv) {
     RAII_INFO("%s, %s\n\n", uv_coro_uname(), uv_coro_hostname());
     coro_interrupt_setup((call_interrupter_t)uv_run, uv_create_loop,
                          uv_coro_shutdown, (call_timer_t)uv_coro_sleep, nullptr);
-    coro_stacksize_set(Kb(32));
+    coro_stacksize_set(Kb(64));
     return coro_start((coro_sys_func)uv_main, argc, argv, 0);
 }
