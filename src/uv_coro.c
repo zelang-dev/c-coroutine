@@ -430,6 +430,7 @@ static void write_cb(uv_write_t *req, int status) {
     }
 
     coro_interrupt_complete(co, nullptr, status, true, false);
+    RAII_FREE(req);
 }
 
 static void tls_write_cb(uv_tls_t *tls, int status) {
@@ -443,10 +444,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
 }
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
-    uv_args_t *uv = (uv_args_t *)uv_handle_get_data(handle);
-    routine_t *co = uv->context;
-
-    buf->base = (string)calloc_full(get_coro_scope(get_coro_context(co)), 1, suggested_size + 1, RAII_FREE);
+    buf->base = try_calloc(1, suggested_size + 1);
     buf->len = (unsigned int)suggested_size;
 }
 
@@ -462,6 +460,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     }
 
     coro_interrupt_complete(co, ((nread > 0) ? buf->base : nullptr), nread, (nread < 0), false);
+    RAII_FREE(buf->base);
 }
 
 static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
@@ -607,14 +606,18 @@ static void fs_cb(uv_fs_t *req) {
     }
 
     coro_interrupt_finisher(co, data, result, false, true, true, !override, false);
-    if (fs_type != UV_FS_SCANDIR)
+    if (fs_type != UV_FS_SCANDIR) {
+        if (fs_type == UV_FS_READ)
+            RAII_FREE(fs->bufs.base);
+
         fs_cleanup(req);
+    }
 }
 
 static void_t fs_init(params_t uv_args) {
     uv_loop_t *uvLoop = uv_coro_loop();
     uv_args_t *fs = uv_args->object;
-    uv_fs_t *req = fs->req;
+    uv_fs_t *req = &fs->req;
     arrays_t args = fs->args;
     int result = UV_ENOENT;
 
@@ -740,8 +743,7 @@ static void_t uv_init(params_t uv_args) {
                     ((uv_tls_t *)stream)->uv_args = uv;
                     result = uv_tls_write((uv_tls_t *)stream, &uv->bufs, tls_write_cb);
                 } else {
-                    defer((func_t)uv_arguments_free, uv);
-                    req = calloc_local(1, sizeof(uv_write_t));
+                    req = try_calloc(1, sizeof(uv_write_t));
                     result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb);
                 }
                 break;
@@ -977,7 +979,7 @@ string fs_read(uv_file fd, int64_t offset) {
     uv_args_t *uv_args = uv_arguments(2, false);
     size_t sz = (size_t)stat->st_size;
 
-    uv_args->buffer = calloc_local(1, sz + 1);
+    uv_args->buffer = try_calloc(1, sz + 1);
     uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)sz);
     $append(uv_args->args, casting(fd));
     $append_signed(uv_args->args, offset);
@@ -1163,19 +1165,16 @@ int stream_write(uv_stream_t *handle, string_t text) {
         return RAII_ERR;
 
     uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
-    if (is_empty(uv_args)) {
+    if (is_type(uv_args, UV_CORO_ARGS) || is_tls(handle)) {
+        uv_args->args[0].object = handle;
+    } else {
         uv_args = uv_arguments(1, true);
         $append(uv_args->args, handle);
         uv_handle_set_data(handler(handle), (void_t)uv_args);
-    } else {
-        uv_args->args[0].object = handle;
     }
 
     size_t size = simd_strlen(text);
     uv_args->bufs = uv_buf_init((string)text, (unsigned int)size);
-
-    if (is_tls(handle))
-        uv_args->bind_type = RAII_SCHEME_TLS;
 
     return uv_start(uv_args, UV_WRITE, 1, true).integer;
 }
@@ -1185,16 +1184,13 @@ string stream_read(uv_stream_t *handle) {
         return nullptr;
 
     uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
-    if (is_empty(uv_args)) {
+    if (is_type(uv_args, UV_CORO_ARGS) || is_tls(handle)) {
+        uv_args->args[0].object = handle;
+    } else {
         uv_args = uv_arguments(1, true);
         $append(uv_args->args, handle);
         uv_handle_set_data(handler(handle), (void_t)uv_args);
-    } else {
-        uv_args->args[0].object = handle;
     }
-
-    if (is_tls(handle))
-        uv_args->bind_type = RAII_SCHEME_TLS;
 
     return uv_start(uv_args, UV_STREAM, 1, false).char_ptr;
 }
@@ -1683,6 +1679,12 @@ pipepair_t *pipepair_create(bool is_ipc) {
         return uv_coro_abort(pair, r);
     }
 
+    uv_args_t *uv_args = uv_arguments(1, true);
+    uv_args_t *uv_args2 = uv_arguments(1, true);
+    $append(uv_args->args, pair->reader);
+    $append(uv_args2->args, pair->writer);
+    uv_handle_set_data(handler(pair->reader), (void_t)uv_args);
+    uv_handle_set_data(handler(pair->writer), (void_t)uv_args2);
     defer(uv_close_deferred, pair);
     pair->type = UV_CORO_PIPE;
     return pair;
@@ -1729,6 +1731,9 @@ tty_in_t *tty_in(void) {
         return uv_coro_abort(tty, r);
     }
 
+    uv_args_t *uv_args = uv_arguments(1, true);
+    $append(uv_args->args, tty->reader);
+    uv_handle_set_data(handler(tty->reader), (void_t)uv_args);
     defer(uv_close_deferred, tty);
     tty->type = UV_CORO_TTY_0;
     return tty;
@@ -1742,6 +1747,9 @@ tty_out_t *tty_out(void) {
         return uv_coro_abort(tty, r);
     }
 
+    uv_args_t *uv_args = uv_arguments(1, true);
+    $append(uv_args->args, tty->writer);
+    uv_handle_set_data(handler(tty->writer), (void_t)uv_args);
     defer(uv_close_deferred, tty);
     tty->type = UV_CORO_TTY_1;
     return tty;
@@ -1755,6 +1763,9 @@ tty_err_t *tty_err(void) {
         return uv_coro_abort(tty, r);
     }
 
+    uv_args_t *uv_args = uv_arguments(1, true);
+    $append(uv_args->args, tty->erred);
+    uv_handle_set_data(handler(tty->erred), (void_t)uv_args);
     defer(uv_close_deferred, tty);
     tty->type = UV_CORO_TTY_2;
     return tty;

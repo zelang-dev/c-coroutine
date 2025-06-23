@@ -221,9 +221,9 @@ typedef struct uv_args_s {
     evt_ctx_t ctx;
     string buffer;
     uv_buf_t bufs;
+    uv_fs_t req;
     uv_stat_t stat[1];
     uv_statfs_t statfs[1];
-    uv_fs_t req[1];
     scandir_t dir[1];
     dnsinfo_t dns[1];
 } uv_args_t;

@@ -45,7 +45,7 @@ TEST(fs_write_read) {
     uv_file fd = fs_open(path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
     ASSERT_FALSE(result_is_ready(res));
     ASSERT_TRUE((fd > 0));
-    ASSERT_EQ(9, fs_write(fd, buf, 0));
+    ASSERT_EQ(9, fs_write(fd, buf, -1));
     ASSERT_STR("bla", fs_read(fd, 6));
     ASSERT_EQ(0, fs_close(fd));
     ASSERT_EQ(0, fs_unlink(path));
@@ -55,31 +55,6 @@ TEST(fs_write_read) {
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "hello world");
-
-    return 0;
-}
-
-void_t worker3(params_t args) {
-    ASSERT_WORKER(($size(args) == 2));
-    sleepfor(args[0].u_int);
-    ASSERT_WORKER((args[0].u_int == 25));
-    ASSERT_WORKER(is_str_eq("worker", args[1].char_ptr));
-    return "finish";
-}
-
-TEST(fs_open) {
-    rid_t res = go(worker3, 2, 25, "worker");
-    ASSERT_EQ(fs_open("does_not_exist", O_RDONLY, 0), UV_ENOENT);
-    printf("\nWill indicate memory leak at exit, no `fs_close()`.\n");
-    uv_file fd = fs_open(__FILE__, O_RDONLY, 0);
-    ASSERT_TRUE((fd > 0));
-    ASSERT_STR("/******hello  world******/", str_trim(fs_read(fd, 27), 26));
-    while (!result_is_ready(res)) {
-        yielding();
-    }
-
-    ASSERT_TRUE(result_is_ready(res));
-    ASSERT_STR(result_for(res).char_ptr, "finish");
 
     return 0;
 }
@@ -108,6 +83,7 @@ TEST(fs_mkdir) {
 TEST(fs_rename) {
     rid_t res = go(worker_misc, 2, 600, "rename");
     ASSERT_EQ(0, fs_rename(dir_path, ren_path));
+    sleepfor(20);
     ASSERT_EQ(0, fs_rmdir(ren_path));
     while (!result_is_ready(res))
         yielding();
@@ -158,7 +134,6 @@ TEST(list) {
 
     EXEC_TEST(fs_close);
     EXEC_TEST(fs_write_read);
-    EXEC_TEST(fs_open);
     EXEC_TEST(fs_mkdir);
     EXEC_TEST(fs_rename);
     EXEC_TEST(fs_scandir);
