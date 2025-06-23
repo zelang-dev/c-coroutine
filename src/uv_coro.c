@@ -67,10 +67,9 @@ static uv_args_t *uv_arguments(int count, bool auto_free) {
 }
 
 static void fs_remove_pipe(uv_args_t *uv) {
-    uv_fs_t req;
     if (uv->bind_type == RAII_SCHEME_PIPE
-        && !uv_fs_unlink(uv_coro_loop(), &req, (string_t)uv->args[2].object, nullptr)) {
-        uv_fs_req_cleanup(&req);
+        && !uv_fs_unlink(uv_coro_loop(), &uv->req, (string_t)uv->args[2].object, nullptr)) {
+        uv_fs_req_cleanup(&uv->req);
     }
 }
 
@@ -750,9 +749,9 @@ static void_t uv_init(params_t uv_args) {
             case UV_CONNECT:
                 req = calloc_local(1, sizeof(uv_connect_t));
                 switch (uv->bind_type) {
-                    case UV_NAMED_PIPE:
+                    case RAII_SCHEME_PIPE:
                         uv->handle_type = UV_NAMED_PIPE;
-                        uv_pipe_connect((uv_connect_t *)req, (uv_pipe_t *)stream, (string_t)args[2].char_ptr, connect_cb);
+                        uv_pipe_connect((uv_connect_t *)req, (uv_pipe_t *)stream, (string_t)args[1].char_ptr, connect_cb);
                         result = 0;
                         break;
                     case RAII_SCHEME_TLS:
@@ -833,6 +832,9 @@ static void_t uv_init(params_t uv_args) {
                         case RAII_SCHEME_PIPE:
                             length = (int)sizeof(name);
                             r = uv_pipe_getsockname((const uv_pipe_t *)args[0].object, name, (size_t *)&length);
+                            if (memcmp(name, args[2].object, length) != 0
+                                && (r = snprintf(name, sizeof(name), "%s", args[2].object)))
+                                r = 0;
                             break;
                         case RAII_SCHEME_UDP:
                             r = uv_udp_getsockname((const uv_udp_t *)args[0].object, uv->dns->name, &length);
