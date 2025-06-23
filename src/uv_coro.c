@@ -264,13 +264,14 @@ static void uv_catch_error(void_t uv) {
 
 static void connect_cb(uv_connect_t *client, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(client));
-    arrays_t args = uv->args;
     routine_t *co = uv->context;
 
     if (status < 0)
         uv_log_error(status);
+    else
+        uv_handle_set_data(handler(uv->args[0].object), (void_t)uv);
 
-    coro_interrupt_complete(co, args[0].object, status, (status < 0), false);
+    coro_interrupt_complete(co, nullptr, status, true, false);
 }
 
 static RAII_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
@@ -368,7 +369,7 @@ static void connection_cb(uv_stream_t *server, int status) {
 
     coro_interrupt_finisher(co, (is_ready
                                  ? streamer(handle) : nullptr),
-                            status, false, halt, (uv->bind_type != RAII_SCHEME_TLS), r, false);
+                            r, false, halt, (uv->bind_type != RAII_SCHEME_TLS), r, false);
 }
 
 static void getnameinfo_cb(uv_getnameinfo_t *req, int status, string_t hostname, string_t service) {
@@ -1136,12 +1137,20 @@ nameinfo_t *get_nameinfo(string_t addr, int port, int flags) {
 static void_t stream_client(params_t args) {
     uv_stream_t *client = (uv_stream_t *)args[0].object;
     stream_cb handlerFunc = (stream_cb)args[1].func;
-    if (is_tls(client))
+    raii_type type = ((uv_args_t *)uv_handle_get_data(handler(client)))->bind_type;
+    uv_args_t *uv_args = uv_arguments(1, true);
+
+    $append(uv_args->args, client);
+    uv_args->bind_type = type;
+    uv_handle_set_data(handler(client), (void_t)uv_args);
+    if (type == RAII_SCHEME_TLS)
         defer(tls_close_free, client);
     else
         defer(uv_close_free, client);
 
     handlerFunc(client);
+    yielding();
+
     return 0;
 }
 
@@ -1153,11 +1162,17 @@ int stream_write(uv_stream_t *handle, string_t text) {
     if (is_empty(handle))
         return RAII_ERR;
 
+    uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
+    if (is_empty(uv_args)) {
+        uv_args = uv_arguments(1, true);
+        $append(uv_args->args, handle);
+        uv_handle_set_data(handler(handle), (void_t)uv_args);
+    } else {
+        uv_args->args[0].object = handle;
+    }
+
     size_t size = simd_strlen(text);
-    uv_args_t *uv_args = uv_arguments(1, false);
-    uv_args->buffer = (string)text;
-    uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
-    $append(uv_args->args, handle);
+    uv_args->bufs = uv_buf_init((string)text, (unsigned int)size);
 
     if (is_tls(handle))
         uv_args->bind_type = RAII_SCHEME_TLS;
@@ -1169,8 +1184,14 @@ string stream_read(uv_stream_t *handle) {
     if (is_empty(handle))
         return nullptr;
 
-    uv_args_t *uv_args = uv_arguments(1, true);
-    $append(uv_args->args, handle);
+    uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
+    if (is_empty(uv_args)) {
+        uv_args = uv_arguments(1, true);
+        $append(uv_args->args, handle);
+        uv_handle_set_data(handler(handle), (void_t)uv_args);
+    } else {
+        uv_args->args[0].object = handle;
+    }
 
     if (is_tls(handle))
         uv_args->bind_type = RAII_SCHEME_TLS;
@@ -1246,13 +1267,10 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     $append(uv_args->args, addr_set);
     $append_string(uv_args->args, address);
 
-    value_t connect = uv_start(uv_args, UV_CONNECT, 3, true);
-    if (!is_empty(connect.object)) {
-        uv_handle_set_data(handler(connect.object), (void_t)uv_args);
-        return streamer(connect.object);
-    }
+    if (uv_start(uv_args, UV_CONNECT, 3, true).integer < 0)
+        return nullptr;
 
-    return nullptr;
+    return streamer(handle);
 }
 
 uv_stream_t *stream_listen(uv_stream_t *stream, int backlog) {
@@ -1434,11 +1452,8 @@ udp_packet_t *udp_listen(uv_udp_t *handle) {
 
     uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
     uv_args->is_server = true;
-    value_t packet = uv_start(uv_args, UV_CORO_LISTEN, 5, false);
-    if (is_empty(packet.object))
-        return nullptr;
 
-    return (udp_packet_t *)packet.object;
+    return (udp_packet_t *)uv_start(uv_args, UV_CORO_LISTEN, 5, false).object;
 }
 
 static void udp_packet_free(udp_packet_t *handle) {

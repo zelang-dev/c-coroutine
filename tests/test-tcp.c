@@ -11,6 +11,7 @@ void_t worker_client(params_t args) {
     ASSERT_WORKER((stream_write(server, "hello") == 0));
     ASSERT_WORKER(is_str_eq("world", stream_read(server)));
 
+    sleepfor(600);
     return args[2].char_ptr;
 }
 
@@ -26,7 +27,7 @@ TEST(stream_listen) {
     uv_stream_t *client, *socket;
     rid_t res = go(worker_client, 3, 1000, "worker_client", "finish");
 
-    ASSERT_TRUE(is_tcp(socket = stream_bind("http://127.0.0.1:8090", 0)));
+    ASSERT_TRUE(is_tcp(socket = stream_bind("0.0.0.0:8090", 0)));
     ASSERT_FALSE(is_tls(socket));
 
     ASSERT_TRUE(is_tcp(client = stream_listen(socket, 128)));
