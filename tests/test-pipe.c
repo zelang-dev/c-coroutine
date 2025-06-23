@@ -8,16 +8,15 @@ void_t worker_client(params_t args) {
     ASSERT_WORKER(is_str_eq("worker_client", args[1].char_ptr));
 
     ASSERT_WORKER(is_pipe(server = stream_connect("unix://test.sock")));
-    ASSERT_WORKER((stream_write(server, "hello") == 0));
     ASSERT_WORKER(is_str_eq("world", stream_read(server)));
+    ASSERT_WORKER((stream_write(server, "hello") == 0));
 
-    sleepfor(600);
     return args[2].char_ptr;
 }
 
 void_t worker_connected(uv_stream_t *socket) {
-    ASSERT_WORKER(is_str_eq("hello", stream_read(socket)));
     ASSERT_WORKER((stream_write(socket, "world") == 0));
+    ASSERT_WORKER(is_str_eq("hello", stream_read(socket)));
 
     sleepfor(600);
     return 0;
