@@ -1,4 +1,5 @@
 #include "uv_coro.h"
+
 struct udp_packet_s {
     uv_coro_types type;
     unsigned int flags;
@@ -249,16 +250,13 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
 static void uv_catch_error(void_t uv) {
     routine_t *co = ((uv_args_t *)uv)->context;
     string_t text = err_message();
-
-    if (!is_empty((void_t)text)) {
-        raii_is_caught(get_coro_scope(co), text);
-        if (uv_loop_alive(uv_coro_loop()) && uv_server_data()) {
-            coro_halt_set(co);
-            coro_interrupt_erred(co, get_coro_err(co));
-            uv_arguments_free(uv_server_data());
-            interrupt_data_set(nullptr);
-        }
+    if (!is_empty((void_t)text) && raii_is_caught(get_coro_scope(co), text)) {
+        coro_halt_set(co);
+        coro_interrupt_erred(co, get_coro_err(co));
     }
+
+    uv_arguments_free(uv_server_data());
+    interrupt_data_set(nullptr);
 }
 
 static void connect_cb(uv_connect_t *client, int status) {
@@ -1310,7 +1308,7 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
     char key[UV_MAXHOSTNAMESIZE];
     size_t len = sizeof(name);
 
-    uv_args_t *uv_args = uv_arguments(5, true);
+    uv_args_t *uv_args = uv_arguments(5, false);
     defer_recover(uv_catch_error, uv_args);
     if (scheme == RAII_SCHEME_PIPE) {
         addr_set = str_concat(2, SYS_PIPE, address);
@@ -2166,11 +2164,9 @@ static void uv_coro_shutdown(void_t t) {
         }
 
         if (loop) {
-            if (uv_loop_alive(loop)) {
-                uv_stop(loop);
-                uv_walk(loop, (uv_walk_cb)uv_close_free, nullptr);
-                uv_run(loop, UV_RUN_DEFAULT);
-            }
+
+            uv_walk(loop, (uv_walk_cb)uv_close_free, nullptr);
+            uv_run(loop, UV_RUN_DEFAULT);
 
             uv_loop_close(loop);
             RAII_FREE((void_t)loop);
