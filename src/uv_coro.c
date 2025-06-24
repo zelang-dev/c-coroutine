@@ -1151,7 +1151,7 @@ static void_t stream_client(params_t args) {
         defer(uv_close_free, client);
 
     handlerFunc(client);
-    yielding();
+    yield();
 
     return 0;
 }
@@ -1462,13 +1462,13 @@ static void udp_packet_free(udp_packet_t *handle) {
 
 RAII_INLINE string_t udp_get_message(udp_packet_t *udpp) {
     string_t message = udpp->message;
-    yielding();
+    yield();
     return message;
 }
 
 RAII_INLINE unsigned int udp_get_flags(udp_packet_t *udpp) {
     unsigned int flags = udpp->flags;
-    yielding();
+    yield();
     return flags;
 }
 
@@ -1478,7 +1478,7 @@ RAII_INLINE void udp_handler(packet_cb connected, udp_packet_t *client) {
     else
         coro_interrupt_event((func_t)connected, client, dummy_free);
 
-    yielding();
+    yield();
 }
 
 int udp_send(uv_udp_t *handle, string_t message, string_t addr) {
@@ -1846,7 +1846,7 @@ static void spawning(void_t uv_args) {
         while (true) {
             if (!coro_terminated(co)) {
                 coro_info(co, 1);
-                yielding();
+                yield();
             } else {
                 if (!is_empty(get_coro_data(co))) {
                     exiting_cb = (spawn_cb)get_coro_data(co);
@@ -1955,7 +1955,7 @@ int spawn_detach(spawn_t *child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref(handler(&child->process));
         child->is_detach = true;
-        yielding();
+        yield();
     }
 
     return get_coro_err((routine_t *)child->handle->data);
@@ -1963,7 +1963,7 @@ int spawn_detach(spawn_t *child) {
 
 RAII_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
-    yielding();
+    yield();
 
     return get_coro_err((routine_t *)child->handle->data);
 }

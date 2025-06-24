@@ -25,7 +25,7 @@ TEST(fs_open) {
     ASSERT_TRUE((fd > 0));
     ASSERT_STR("/******hello  world******/", str_trim(fs_read(fd, 27), 26));
     while (!result_is_ready(res)) {
-        yielding();
+        yield();
     }
 
     ASSERT_TRUE(result_is_ready(res));

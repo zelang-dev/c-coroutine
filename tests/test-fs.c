@@ -24,7 +24,7 @@ TEST(fs_close) {
     ASSERT_EQ(0, fs_close(fd));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res)) {
-        yielding();
+        yield();
     }
 
     ASSERT_TRUE(result_is_ready(res));
@@ -50,7 +50,7 @@ TEST(fs_write_read) {
     ASSERT_EQ(0, fs_close(fd));
     ASSERT_EQ(0, fs_unlink(path));
     while (!result_is_ready(res)) {
-        yielding();
+        yield();
     }
 
     ASSERT_TRUE(result_is_ready(res));
@@ -71,7 +71,7 @@ TEST(fs_mkdir) {
     ASSERT_EQ(0, fs_mkdir(dir_path, 0));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "mkdir");
@@ -86,7 +86,7 @@ TEST(fs_rename) {
     sleepfor(20);
     ASSERT_EQ(0, fs_rmdir(ren_path));
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "rename");
@@ -121,7 +121,7 @@ TEST(fs_scandir) {
 
     ASSERT_EQ(0, fs_rmdir(scan_path));
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "scandir");

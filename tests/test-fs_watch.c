@@ -36,7 +36,7 @@ TEST(fs_watch) {
     sleepfor(10);
     ASSERT_EQ(0, fs_rmdir(watch_path));
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "fs_watch");

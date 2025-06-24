@@ -16,7 +16,7 @@ TEST(stream_read) {
     ASSERT_STR("ABCDE", stream_read(pair->reader));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "stream_read");
@@ -31,7 +31,7 @@ TEST(stream_write) {
     ASSERT_EQ(0, stream_write(tty->writer, "hello world\n"));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res)) {
-        yielding();
+        yield();
     }
 
     ASSERT_TRUE(result_is_ready(res));

@@ -38,7 +38,7 @@ TEST(stream_listen) {
     ASSERT_FALSE(result_is_ready(res));
 
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "finish");

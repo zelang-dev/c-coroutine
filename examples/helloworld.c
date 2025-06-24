@@ -3,7 +3,7 @@
 
 int uv_main(int argc, char **argv) {
     printf("Now quitting.\n");
-    yielding();
+    yield();
 
     return coro_err_code();
 }

@@ -34,7 +34,7 @@ This library provides **ease of use** *convenience* wrappers for **[libuv](http:
 
 int uv_main(int argc, char **argv) {
     printf("Now quitting.\n");
-    yielding();
+    yield();
 
     return coro_err_code();
 }

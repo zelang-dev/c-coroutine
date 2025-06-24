@@ -16,7 +16,7 @@ TEST(get_addrinfo) {
     ASSERT_TRUE(is_type(dns = get_addrinfo(gai, "http", 1, kv(ai_flags, AI_CANONNAME | AI_PASSIVE | AF_INET)), UV_CORO_DNS));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res))
-        yielding();
+        yield();
 
     ASSERT_TRUE(result_is_ready(res));
     ASSERT_STR(result_for(res).char_ptr, "addrinfo");
@@ -37,7 +37,7 @@ TEST(get_nameinfo) {
     ASSERT_TRUE(is_type(dns = get_nameinfo(gni, 443, 0), UV_CORO_NAME));
     ASSERT_FALSE(result_is_ready(res));
     while (!result_is_ready(res)) {
-        yielding();
+        yield();
     }
 
     ASSERT_TRUE(result_is_ready(res));
