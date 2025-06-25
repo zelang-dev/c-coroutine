@@ -29,12 +29,27 @@ static RAII_INLINE void uv_log_error(int err) {
     fprintf(stderr, "Error: %s\033[0K\n\r", uv_strerror(err));
 }
 
-static void_t uv_coro_abort(void_t handle, int err) {
+static void_t uv_coro_abort(void_t handle, int err, routine_t *co) {
     if (!is_empty(handle))
         RAII_FREE(handle);
 
     uv_log_error(err);
-    return coro_interrupt_erred(coro_active(), err);
+    return coro_interrupt_erred(co, err);
+}
+
+static void_t uv_coro_sockaddr(const char *host, int port, struct sockaddr_in6 *addr6, struct sockaddr_in *addr) {
+    void_t addr_set = nullptr;
+    int r = RAII_ERR;
+    if (is_str_in(host, ":") && !(r = uv_ip6_addr(host, port, (struct sockaddr_in6 *)addr6))) {
+        addr_set = addr6;
+    } else if (is_str_in(host, ".") && !(r = uv_ip4_addr(host, port, (struct sockaddr_in *)addr))) {
+        addr_set = addr;
+    }
+
+    if (r)
+        return uv_coro_abort(nullptr, r, coro_active());
+
+    return addr_set;
 }
 
 static void uv_arguments_free(uv_args_t *uv_args) {
@@ -167,8 +182,7 @@ static void fs_event_cleanup(uv_args_t *uv_args, routine_t *co, int status) {
         interrupt_code_set(inset);
     }
 
-    uv_log_error(status);
-    coro_interrupt_erred(co, status);
+    uv_coro_abort(nullptr, status, co);
     uv_coro_closer(uv_args);
     coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
 }
@@ -377,9 +391,8 @@ static void getnameinfo_cb(uv_getnameinfo_t *req, int status, string_t hostname,
     uv->args[0].object = req;
     if (status < 0) {
         info->type = RAII_ERR;
-        uv_log_error(status);
+        uv_coro_abort(nullptr, status, co);
         uv_coro_closer(uv);
-        coro_interrupt_erred(co, status);
     } else {
         info->service = service;
         info->host = hostname;
@@ -401,9 +414,8 @@ static void getaddrinfo_cb(uv_getaddrinfo_t *req, int status, struct addrinfo *r
     if (status < 0) {
         uv->dns->addr = nullptr;
         uv->dns->type = RAII_ERR;
-        uv_log_error(status);
+        uv_coro_abort(nullptr, status, co);
         uv_coro_closer(uv);
-        coro_interrupt_erred(co, status);
     } else {
         for (next = res->ai_next; next != nullptr; next = next->ai_next)
             count++;
@@ -497,13 +509,11 @@ static void udp_recv_cb(uv_udp_t *req, ssize_t nread, const uv_buf_t *buf,
     routine_t *co = uv->context;
     udp_packet_t *udp = nullptr;
 
-    uv_udp_recv_stop(req);
     if (nread < 0) {
-        uv_log_error(nread);
-        uv_coro_closer(uv);
-        RAII_FREE(buf->base);
-        coro_interrupt_erred(co, nread);
-    } else {
+        if (uv->is_server && buf->base)
+            RAII_FREE(buf->base);
+        uv_coro_abort(nullptr, nread, co);
+    } else if (nread > 0) {
         if (uv->is_server) {
             udp = try_calloc(1, sizeof(udp_packet_t));
         } else if ($size(uv->args) == 1) {
@@ -525,7 +535,8 @@ static void udp_recv_cb(uv_udp_t *req, ssize_t nread, const uv_buf_t *buf,
         udp->type = UV_CORO_UDP;
     }
 
-    coro_interrupt_complete(co, udp, nread, (nread < 0), false);
+    coro_interrupt_finisher(co, udp, nread, false, true, true, (nread < 0), false);
+    uv_udp_recv_stop(req);
 }
 
 static RAII_INLINE void fs_cleanup(uv_fs_t *req) {
@@ -543,8 +554,7 @@ static void fs_cb(uv_fs_t *req) {
     bool override = false;
 
     if (result < 0) {
-        uv_log_error(result);
-        coro_interrupt_erred(co, result);
+        uv_coro_abort(nullptr, result, co);
     } else {
         fs_ptr = uv_fs_get_ptr(req);
         fs_type = uv_fs_get_type(req);
@@ -616,6 +626,7 @@ static void_t fs_init(params_t uv_args) {
     uv_args_t *fs = uv_args->object;
     uv_fs_t *req = &fs->req;
     arrays_t args = fs->args;
+    routine_t *co = coro_active();
     int result = UV_ENOENT;
 
     if (fs->is_path) {
@@ -717,7 +728,7 @@ static void_t fs_init(params_t uv_args) {
     }
 
     if (result) {
-        return uv_coro_abort(nullptr, result);
+        return uv_coro_abort(nullptr, result, coro_active());
     }
 
     fs->context = coro_active();
@@ -763,7 +774,8 @@ static void_t uv_init(params_t uv_args) {
                 }
                 break;
             case UV_UDP_SEND:
-                result = uv_udp_send((uv_udp_send_t *)args[0].object, (uv_udp_t *)args[1].object,
+                req = args[0].object;
+                result = uv_udp_send((uv_udp_send_t *)req, (uv_udp_t *)args[1].object,
                                      &uv->bufs, 1, (sockaddr_t *)args[2].object, udp_send_cb);
                 break;
             case UV_SHUTDOWN:
@@ -830,7 +842,7 @@ static void_t uv_init(params_t uv_args) {
                         case RAII_SCHEME_PIPE:
                             length = (int)sizeof(name);
                             r = uv_pipe_getsockname((const uv_pipe_t *)args[0].object, name, (size_t *)&length);
-                            if (memcmp(name, args[2].object, length) != 0
+                            if (!is_equal(name, args[2].object)
                                 && (r = snprintf(name, sizeof(name), "%s", args[2].object)))
                                 r = 0;
                             break;
@@ -892,9 +904,8 @@ static void_t uv_init(params_t uv_args) {
     }
 
     if (result) {
-        uv_log_error(result);
+        uv_coro_abort(nullptr, result, uv->context);
         coro_err_set(get_coro_context(uv->context), result);
-        coro_interrupt_erred(uv->context, result);
         coro_interrupt_switch(get_coro_context(uv->context));
     }
 
@@ -1115,24 +1126,15 @@ addrinfo_t *addrinfo_next(dnsinfo_t *dns) {
 
 nameinfo_t *get_nameinfo(string_t addr, int port, int flags) {
     uv_args_t *uv_args = uv_arguments(2, false);
-    void_t addr_set = nullptr;
-    int r = 0;
+    void_t addr_set = uv_coro_sockaddr(addr, port, uv_args->dns->in6, uv_args->dns->in4);
 
-    if (is_str_in(addr, ":")) {
-        r = uv_ip6_addr(addr, port, uv_args->dns->in6);
-        addr_set = uv_args->dns->in6;
-    } else if (is_str_in(addr, ".")) {
-        r = uv_ip4_addr(addr, port, uv_args->dns->in4);
-        addr_set = uv_args->dns->in4;
-    }
-
-    if (!r) {
+    if (!addr_set) {
         $append(uv_args->args, addr_set);
         $append_signed(uv_args->args, flags);
         return (nameinfo_t *)uv_start(uv_args, UV_GETNAMEINFO, 2, true).object;
     } else {
         uv_arguments_free(uv_args);
-        return uv_coro_abort(nullptr, r);
+        return nullptr;
     }
 }
 
@@ -1218,19 +1220,15 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
     size_t len = sizeof(name);
     int r = 0;
 
-    if (scheme == RAII_SCHEME_PIPE) {
+    if (scheme == RAII_SCHEME_PIPE)
         addr_set = str_concat(2, SYS_PIPE, address);
-    } else if (is_str_in(address, ":")) {
-        r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->dns->in6);
-        addr_set = uv_args->dns->in6;
-    } else if (is_str_in(address, ".")) {
-        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->dns->in4);
-        addr_set = uv_args->dns->in4;
-    }
+    else
+        addr_set = uv_coro_sockaddr(address, port,
+                                  (struct sockaddr_in6 *)uv_args->dns->in6,
+                                  (struct sockaddr_in *)uv_args->dns->in4);
 
-    if (r) {
-        return uv_coro_abort(nullptr, r);
-    }
+    if (!addr_set)
+        return addr_set;
 
     uv_args->bind_type = scheme;
     switch (scheme) {
@@ -1301,7 +1299,7 @@ uv_stream_t *stream_bind(string_t address, int flags) {
 }
 
 uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, int flags) {
-    void_t addr_set, handle;
+    void_t addr_set = nullptr, handle;
     int r = 0;
     char name[UV_MAXHOSTNAMESIZE] = CERTIFICATE;
     char crt[UV_MAXHOSTNAMESIZE];
@@ -1310,49 +1308,45 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
 
     uv_args_t *uv_args = uv_arguments(5, false);
     defer_recover(uv_catch_error, uv_args);
-    if (scheme == RAII_SCHEME_PIPE) {
+    if (scheme == RAII_SCHEME_PIPE)
         addr_set = str_concat(2, SYS_PIPE, address);
-    } else if (is_str_in(address, ":")) {
-        r = uv_ip6_addr(address, port, (struct sockaddr_in6 *)uv_args->dns->in6);
-        addr_set = uv_args->dns->in6;
-    } else if (is_str_in(address, ".")) {
-        r = uv_ip4_addr(address, port, (struct sockaddr_in *)uv_args->dns->in4);
-        addr_set = uv_args->dns->in4;
-    }
+    else
+        addr_set = uv_coro_sockaddr(address, port, uv_args->dns->in6, uv_args->dns->in4);
 
-    if (!r) {
-        switch (scheme) {
-            case RAII_SCHEME_PIPE:
-                handle = pipe_create(false);
-                r = uv_pipe_bind(handle, (string_t)addr_set);
-                if (!r)
-                    defer((func_t)fs_remove_pipe, uv_args);
-                break;
-            case RAII_SCHEME_TLS:
-                if (is_str_eq(name, "localhost"))
-                    uv_os_gethostname(name, &len);
+    if (!addr_set)
+        return addr_set;
 
-                if (!(r = snprintf(crt, sizeof(crt), "%s.crt", name)))
-                    RAII_LOG("Invalid hostname");
+    switch (scheme) {
+        case RAII_SCHEME_PIPE:
+            handle = pipe_create(false);
+            r = uv_pipe_bind(handle, (string_t)addr_set);
+            if (!r)
+                defer((func_t)fs_remove_pipe, uv_args);
+            break;
+        case RAII_SCHEME_TLS:
+            if (is_str_eq(name, "localhost"))
+                uv_os_gethostname(name, &len);
 
-                if (!(r = snprintf(key, sizeof(key), "%s.key", name)))
-                    RAII_LOG("Invalid hostname");
+            if (!(r = snprintf(crt, sizeof(crt), "%s.crt", name)))
+                RAII_LOG("Invalid hostname");
 
-                evt_ctx_init_ex(&uv_args->ctx, crt, key);
-                evt_ctx_set_nio(&uv_args->ctx, nullptr, uv_tls_writer);
-                defer((func_t)evt_ctx_free, &uv_args->ctx);
-                handle = tls_tcp_create(&uv_args->ctx);
-                r = uv_tcp_bind(handle, (sockaddr_t *)addr_set, flags);
-                break;
-            default:
-                handle = tcp_create();
-                r = uv_tcp_bind(handle, (sockaddr_t *)addr_set, flags);
-                break;
-        }
+            if (!(r = snprintf(key, sizeof(key), "%s.key", name)))
+                RAII_LOG("Invalid hostname");
+
+            evt_ctx_init_ex(&uv_args->ctx, crt, key);
+            evt_ctx_set_nio(&uv_args->ctx, nullptr, uv_tls_writer);
+            defer((func_t)evt_ctx_free, &uv_args->ctx);
+            handle = tls_tcp_create(&uv_args->ctx);
+            r = uv_tcp_bind(handle, (sockaddr_t *)addr_set, flags);
+            break;
+        default:
+            handle = tcp_create();
+            r = uv_tcp_bind(handle, (sockaddr_t *)addr_set, flags);
+            break;
     }
 
     if (r) {
-        return uv_coro_abort(nullptr, r);
+        return uv_coro_abort(nullptr, r, coro_active());
     }
 
     $append(uv_args->args, handle);
@@ -1372,7 +1366,6 @@ uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, i
 
 uv_udp_t *udp_bind(string_t address, unsigned int flags) {
     void_t addr_set, handle;
-    string_t host = nullptr;
     int r = RAII_ERR;
     if (is_empty((void_t)address))
         return nullptr;
@@ -1383,29 +1376,20 @@ uv_udp_t *udp_bind(string_t address, unsigned int flags) {
     if (is_empty(url))
         return nullptr;
 
-    host = (string_t)url->host;
     uv_args_t *uv_args = uv_arguments(1, true);
-    if (is_str_in(host, ":")) {
-        r = uv_ip6_addr(host, url->port, (struct sockaddr_in6 *)uv_args->dns->in6);
-        addr_set = uv_args->dns->in6;
-    } else if (is_str_in(host, ".")) {
-        r = uv_ip4_addr(host, url->port, (struct sockaddr_in *)uv_args->dns->in4);
-        addr_set = uv_args->dns->in4;
-    }
-
-    if (r) {
-        return uv_coro_abort(nullptr, r);
+    if (!(addr_set = uv_coro_sockaddr(url->host, url->port, uv_args->dns->in6, uv_args->dns->in4))) {
+        return addr_set;
     }
 
     handle = udp_create();
     if (r = uv_udp_bind(handle, (sockaddr_t *)addr_set, flags)) {
-        return uv_coro_abort(nullptr, r);
+        return uv_coro_abort(nullptr, r, coro_active());
     }
 
     $append(uv_args->args, handle);
     $append_unsigned(uv_args->args, flags);
     $append(uv_args->args, addr_set);
-    $append_string(uv_args->args, host);
+    $append_string(uv_args->args, url->host);
     $append_signed(uv_args->args, url->port);
     uv_args->bind_type = RAII_SCHEME_UDP;
     uv_handle_set_data(handler(handle), (void_t)uv_args);
@@ -1417,7 +1401,7 @@ uv_udp_t *udp_broadcast(string_t broadcast) {
     uv_udp_t *handle = udp_bind(broadcast, 0);
     int r = uv_udp_set_broadcast(handle, 1);
     if (r) {
-        return uv_coro_abort(nullptr, r);
+        return uv_coro_abort(nullptr, r, coro_active());
     }
 
     return handle;
@@ -1461,24 +1445,28 @@ static void udp_packet_free(udp_packet_t *handle) {
 }
 
 RAII_INLINE string_t udp_get_message(udp_packet_t *udpp) {
-    string_t message = udpp->message;
-    yield();
-    return message;
+    return udpp->message;
 }
 
 RAII_INLINE unsigned int udp_get_flags(udp_packet_t *udpp) {
-    unsigned int flags = udpp->flags;
-    yield();
-    return flags;
+    return udpp->flags;
+}
+
+static void_t udp_client(params_t args) {
+    udp_packet_t *client = (udp_packet_t *)args[0].object;
+    packet_cb handlerFunc = (packet_cb)args[1].func;
+
+    if (is_empty(client->args))
+        defer((func_t)udp_packet_free, client);
+
+    handlerFunc(client);
+
+    return 0;
 }
 
 RAII_INLINE void udp_handler(packet_cb connected, udp_packet_t *client) {
-    if (is_empty(client->args))
-        coro_interrupt_event((func_t)connected, client, (func_t)udp_packet_free);
-    else
-        coro_interrupt_event((func_t)connected, client, dummy_free);
-
     yield();
+    launch((func_t)udp_client, 2, client, connected);
 }
 
 int udp_send(uv_udp_t *handle, string_t message, string_t addr) {
@@ -1496,7 +1484,6 @@ int udp_send(uv_udp_t *handle, string_t message, string_t addr) {
     if (is_empty(url))
         return r;
 
-    host = (string_t)url->host;
     uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
     if (is_empty(uv_args)) {
         is_args_set = true;
@@ -1504,18 +1491,13 @@ int udp_send(uv_udp_t *handle, string_t message, string_t addr) {
         uv_handle_set_data(handler(handle), (void_t)uv_args);
     }
 
-    if (is_str_in(host, ":")) {
-        r = uv_ip6_addr(host, url->port, (struct sockaddr_in6 *)uv_args->dns->in6);
-        addr_set = uv_args->dns->in6;
-    } else if (is_str_in(host, ".")) {
-        r = uv_ip4_addr(host, url->port, (struct sockaddr_in *)uv_args->dns->in4);
-        addr_set = uv_args->dns->in4;
-    }
+    addr_set = uv_coro_sockaddr((string_t)url->host, url->port,
+                            (struct sockaddr_in6 *)uv_args->dns->in6,
+                            (struct sockaddr_in *)uv_args->dns->in4);
 
-    if (!r) {
+    if (!(r = coro_err_code())) {
         size_t size = simd_strlen(message);
-        uv_args->buffer = (string)message;
-        uv_args->bufs = uv_buf_init(uv_args->buffer, (unsigned int)size);
+        uv_args->bufs = uv_buf_init((string)message, (unsigned int)size);
         if (is_args_set) {
             packet = calloc_local(1, sizeof(udp_packet_t));
             $append(uv_args->args, packet->req);
@@ -1575,7 +1557,7 @@ static uv_fs_event_t *fs_event_create(void) {
     uv_fs_event_t *event = try_calloc(1, sizeof(uv_fs_event_t));
     int r = uv_fs_event_init(uv_coro_loop(), event);
     if (r) {
-        return uv_coro_abort(event, r);
+        return uv_coro_abort(event, r, coro_active());
     }
 
     return event;
@@ -1585,7 +1567,7 @@ static uv_fs_poll_t *fs_poll_create(void) {
     uv_fs_poll_t *poll = try_calloc(1, sizeof(uv_fs_poll_t));
     int r = uv_fs_poll_init(uv_coro_loop(), poll);
     if (r) {
-        return uv_coro_abort(poll, r);
+        return uv_coro_abort(poll, r, coro_active());
     }
 
     return poll;
@@ -1595,7 +1577,7 @@ static uv_timer_t *time_create(void) {
     uv_timer_t *timer = (uv_timer_t *)try_calloc(1, sizeof(uv_timer_t));
     int r = uv_timer_init(uv_coro_loop(), timer);
     if (r) {
-        return uv_coro_abort(timer, r);
+        return uv_coro_abort(timer, r, coro_active());
     }
 
     return timer;
@@ -1605,7 +1587,7 @@ uv_udp_t *udp_create(void) {
     uv_udp_t *udp = (uv_udp_t *)try_calloc(1, sizeof(uv_udp_t));
     int r = uv_udp_init(uv_coro_loop(), udp);
     if (r) {
-        return uv_coro_abort(udp, r);
+        return uv_coro_abort(udp, r, coro_active());
     }
 
     defer(uv_close_deferred, udp);
@@ -1616,7 +1598,7 @@ uv_pipe_t *pipe_create(bool is_ipc) {
     uv_pipe_t *pipe = (uv_pipe_t *)try_calloc(1, sizeof(uv_pipe_t));
     int r = uv_pipe_init(uv_coro_loop(), pipe, (int)is_ipc);
     if (r) {
-        return uv_coro_abort(pipe, r);
+        return uv_coro_abort(pipe, r, coro_active());
     }
 
     defer(uv_close_deferred, pipe);
@@ -1628,7 +1610,7 @@ pipe_file_t *pipe_file(uv_file fd, bool is_ipc) {
     pipe->fd = fd;
     int r = uv_pipe_init(uv_coro_loop(), pipe->file, is_ipc);
     if (r || (r = uv_pipe_open(pipe->file, pipe->fd))) {
-        return uv_coro_abort(pipe, r);
+        return uv_coro_abort(pipe, r, coro_active());
     }
 
     defer(uv_close_deferred, pipe);
@@ -1641,7 +1623,7 @@ pipe_in_t *pipe_stdin(bool is_ipc) {
     pipe->fd = STDIN_FILENO;
     int r = uv_pipe_init(uv_coro_loop(), pipe->input, is_ipc);
     if (r || (r = uv_pipe_open(pipe->input, pipe->fd))) {
-        return uv_coro_abort(pipe, r);
+        return uv_coro_abort(pipe, r, coro_active());
     }
 
     defer(uv_close_deferred, pipe);
@@ -1654,7 +1636,7 @@ pipe_out_t *pipe_stdout(bool is_ipc) {
     pipe->fd = STDOUT_FILENO;
     int r = uv_pipe_init(uv_coro_loop(), pipe->output, is_ipc);
     if (r || (r = uv_pipe_open(pipe->output, pipe->fd))) {
-        return uv_coro_abort(pipe, r);
+        return uv_coro_abort(pipe, r, coro_active());
     }
 
     defer(uv_close_deferred, pipe);
@@ -1663,20 +1645,21 @@ pipe_out_t *pipe_stdout(bool is_ipc) {
 }
 
 pipepair_t *pipepair_create(bool is_ipc) {
+    routine_t *co = coro_active();
     pipepair_t *pair = (pipepair_t *)try_calloc(1, sizeof(pipepair_t));
     int r = uv_pipe(pair->fd, UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     if (r) {
-        return uv_coro_abort(pair, r);
+        return uv_coro_abort(pair, r, co);
     }
 
     if ((r = uv_pipe_init(uv_coro_loop(), pair->input, (int)is_ipc))
         || (r = uv_pipe_init(uv_coro_loop(), pair->output, (int)is_ipc))) {
-        return uv_coro_abort(pair, r);
+        return uv_coro_abort(pair, r, co);
     }
 
     if ((r = uv_pipe_open(pair->input, pair->fd[0]))
         || (r = uv_pipe_open(pair->output, pair->fd[1]))) {
-        return uv_coro_abort(pair, r);
+        return uv_coro_abort(pair, r, co);
     }
 
     uv_args_t *uv_args = uv_arguments(1, true);
@@ -1691,20 +1674,21 @@ pipepair_t *pipepair_create(bool is_ipc) {
 }
 
 socketpair_t *socketpair_create(int type, int protocol) {
+    routine_t *co = coro_active();
     socketpair_t *pair = (socketpair_t *)try_calloc(1, sizeof(socketpair_t));
     int r = uv_socketpair(type, protocol, pair->fds, UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     if (r) {
-        return uv_coro_abort(pair, r);
+        return uv_coro_abort(pair, r, co);
     }
 
     if ((r = uv_tcp_init(uv_coro_loop(), pair->writer))
         || (r = uv_tcp_init(uv_coro_loop(), pair->reader))) {
-        return uv_coro_abort(pair, r);
+        return uv_coro_abort(pair, r, co);
     }
 
     if ((r = uv_tcp_open(pair->reader, pair->fds[0]))
         || (r = uv_tcp_open(pair->writer, pair->fds[1]))) {
-        return uv_coro_abort(pair, r);
+        return uv_coro_abort(pair, r, co);
     }
 
     defer(uv_close_deferred, pair);
@@ -1716,7 +1700,7 @@ uv_tcp_t *tcp_create(void) {
     uv_tcp_t *tcp = (uv_tcp_t *)try_calloc(1, sizeof(uv_tcp_t));
     int r = uv_tcp_init(uv_coro_loop(), tcp);
     if (r) {
-        return uv_coro_abort(tcp, r);
+        return uv_coro_abort(tcp, r, coro_active());
     }
 
     defer(uv_close_deferred, tcp);
@@ -1728,7 +1712,7 @@ tty_in_t *tty_in(void) {
     tty->fd = STDIN_FILENO;
     int r = uv_tty_init(uv_coro_loop(), tty->input, tty->fd, 1);
     if (r) {
-        return uv_coro_abort(tty, r);
+        return uv_coro_abort(tty, r, coro_active());
     }
 
     uv_args_t *uv_args = uv_arguments(1, true);
@@ -1744,7 +1728,7 @@ tty_out_t *tty_out(void) {
     tty->fd = STDOUT_FILENO;
     int r = uv_tty_init(uv_coro_loop(), tty->output, tty->fd, 0);
     if (r) {
-        return uv_coro_abort(tty, r);
+        return uv_coro_abort(tty, r, coro_active());
     }
 
     uv_args_t *uv_args = uv_arguments(1, true);
@@ -1760,7 +1744,7 @@ tty_err_t *tty_err(void) {
     tty->fd = STDERR_FILENO;
     int r = uv_tty_init(uv_coro_loop(), tty->err, tty->fd, 0);
     if (r) {
-        return uv_coro_abort(tty, r);
+        return uv_coro_abort(tty, r, coro_active());
     }
 
     uv_args_t *uv_args = uv_arguments(1, true);
@@ -1776,7 +1760,7 @@ static uv_tcp_t *tls_tcp_create(void_t extra) {
     tcp->data = extra;
     int r = uv_tcp_init(uv_coro_loop(), tcp);
     if (r) {
-        return uv_coro_abort(nullptr, r);
+        return uv_coro_abort(nullptr, r, coro_active());
     }
 
     return tcp;
@@ -2077,7 +2061,7 @@ RAII_INLINE bool is_tcp(void_t self) {
 }
 
 RAII_INLINE bool is_udp(void_t self) {
-    if (!self)
+    if (!self || is_udp_packet(self))
         return false;
 
     void_t check = uv_handle_get_data(handler(self));
@@ -2164,9 +2148,10 @@ static void uv_coro_shutdown(void_t t) {
         }
 
         if (loop) {
-
-            uv_walk(loop, (uv_walk_cb)uv_close_free, nullptr);
-            uv_run(loop, UV_RUN_DEFAULT);
+            if (uv_loop_alive(loop)) {
+                uv_walk(loop, (uv_walk_cb)uv_close_free, nullptr);
+                uv_run(loop, UV_RUN_DEFAULT);
+            }
 
             uv_loop_close(loop);
             RAII_FREE((void_t)loop);

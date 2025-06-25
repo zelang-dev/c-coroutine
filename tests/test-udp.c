@@ -6,13 +6,15 @@ void_t worker_client(params_t args) {
     ASSERT_WORKER(($size(args) == 3));
 
     sleepfor(args[0].u_int);
-    ASSERT_WORKER(is_str_eq("udp_listen", args[1].char_ptr));
+    ASSERT_WORKER(is_str_eq("worker_client", args[1].char_ptr));
 
     ASSERT_WORKER(is_udp(client = udp_bind("127.0.0.1:7777", 0)));
+    sleepfor(100);
     ASSERT_WORKER((udp_send(client, "hello", "udp://0.0.0.0:9999") == 0));
     ASSERT_WORKER(is_udp_packet(packets = udp_recv(client)));
     ASSERT_WORKER(is_str_eq("world", udp_get_message(packets)));
 
+    sleepfor(600);
     return args[2].char_ptr;
 }
 
@@ -20,13 +22,14 @@ void_t worker_connected(udp_packet_t *client) {
     ASSERT_WORKER(is_str_eq("hello", udp_get_message(client)));
     ASSERT_WORKER((udp_send_packet(client, "world") == 0));
 
+    sleepfor(600);
     return 0;
 }
 
 TEST(udp_listen) {
     uv_udp_t *server;
     udp_packet_t *client;
-    rid_t res = go(worker_client, 3, 1000, "udp_listen", "udp_handler");
+    rid_t res = go(worker_client, 3, 1000, "worker_client", "finish");
 
     ASSERT_TRUE(is_udp(server = udp_bind("0.0.0.0:9999", 0)));
     ASSERT_FALSE(is_udp_packet(server));
@@ -42,7 +45,7 @@ TEST(udp_listen) {
         yield();
 
     ASSERT_TRUE(result_is_ready(res));
-    ASSERT_STR(result_for(res).char_ptr, "udp_handler");
+    ASSERT_STR(result_for(res).char_ptr, "finish");
 
     return 0;
 }
