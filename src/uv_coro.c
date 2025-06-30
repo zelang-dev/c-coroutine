@@ -11,6 +11,14 @@ struct udp_packet_s {
     uv_udp_send_t req[1];
 };
 
+struct spawn_s {
+    uv_coro_types type;
+    rid_t id;
+    bool is_detach;
+    spawn_options_t *handle;
+    uv_process_t process[1];
+};
+
 static char uv_coro_powered_by[SCRAPE_SIZE] = nil;
 static char uv_coro_host[UV_MAXHOSTNAMESIZE] = nil;
 static uv_fs_poll_t *fs_poll_create(void);
@@ -70,7 +78,7 @@ static uv_args_t *uv_arguments(int count, bool auto_free) {
         params = arrays();
     } else {
         uv_args = (uv_args_t *)try_calloc(1, sizeof(uv_args_t));
-        params =  array_of(get_scope(), 0);
+        params = array_of(get_scope(), 0);
     }
 
     uv_args->n_args = count;
@@ -468,7 +476,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
         uv_read_stop(stream);
     }
 
-    coro_interrupt_complete(co, ((nread > 0) ? buf->base : nullptr), nread, (nread < 0), false);
+    coro_interrupt_complete(co, ((nread > 0) ? buf->base : nullptr), nread, false, false);
     RAII_FREE(buf->base);
 }
 
@@ -1224,8 +1232,8 @@ uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port
         addr_set = str_concat(2, SYS_PIPE, address);
     else
         addr_set = uv_coro_sockaddr(address, port,
-                                  (struct sockaddr_in6 *)uv_args->dns->in6,
-                                  (struct sockaddr_in *)uv_args->dns->in4);
+                                    (struct sockaddr_in6 *)uv_args->dns->in6,
+                                    (struct sockaddr_in *)uv_args->dns->in4);
 
     if (!addr_set)
         return addr_set;
@@ -1492,8 +1500,8 @@ int udp_send(uv_udp_t *handle, string_t message, string_t addr) {
     }
 
     addr_set = uv_coro_sockaddr((string_t)url->host, url->port,
-                            (struct sockaddr_in6 *)uv_args->dns->in6,
-                            (struct sockaddr_in *)uv_args->dns->in4);
+                                (struct sockaddr_in6 *)uv_args->dns->in6,
+                                (struct sockaddr_in *)uv_args->dns->in4);
 
     if (!(r = coro_err_code())) {
         size_t size = simd_strlen(message);
@@ -1594,15 +1602,21 @@ uv_udp_t *udp_create(void) {
     return udp;
 }
 
-uv_pipe_t *pipe_create(bool is_ipc) {
+uv_pipe_t *pipe_create_ex(bool is_ipc, bool autofree) {
     uv_pipe_t *pipe = (uv_pipe_t *)try_calloc(1, sizeof(uv_pipe_t));
     int r = uv_pipe_init(uv_coro_loop(), pipe, (int)is_ipc);
     if (r) {
         return uv_coro_abort(pipe, r, coro_active());
     }
 
-    defer(uv_close_deferred, pipe);
+    if (autofree)
+        defer(uv_close_deferred, pipe);
+
     return pipe;
+}
+
+RAII_INLINE uv_pipe_t *pipe_create(bool is_ipc) {
+    return pipe_create_ex(is_ipc, true);
 }
 
 pipe_file_t *pipe_file(uv_file fd, bool is_ipc) {
@@ -1766,18 +1780,27 @@ static uv_tcp_t *tls_tcp_create(void_t extra) {
     return tcp;
 }
 
-static void spawn_free(spawn_t *child) {
+static void spawn_free(spawn_t child) {
     uv_handle_t *handle = handler(&child->process);
-
-    RAII_FREE(child->handle);
-    RAII_FREE(child);
+    uv_stream_t *stream = nullptr;
+    int i;
 
     if (uv_is_active(handle) || !uv_is_closing(handle))
         uv_close(handle, nullptr);
+
+    for (i = 0; i < child->handle->stdio_count; i++) {
+        if (!is_empty(stream = child->handle->stdio[i].data.stream)
+            && (size_t)child->handle->stdio[i].data.fd > 4096)
+            uv_close_free(stream);
+    }
+
+    RAII_FREE(child->handle);
+    child->type = RAII_ERR;
+    RAII_FREE(child);
 }
 
-static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) {
-    spawn_t *child = (spawn_t *)uv_handle_get_data(handler(handle));
+static void spawn_exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) {
+    spawn_t child = (spawn_t)uv_handle_get_data(handler(handle));
     routine_t *co = (routine_t *)child->handle->data;
 
     if (!is_empty(child->handle->exiting_cb)) {
@@ -1790,59 +1813,63 @@ static void exit_cb(uv_process_t *handle, int64_t exit_status, int term_signal) 
 
 static void_t stdio_handler(params_t uv_args) {
     uv_args_t *uv = uv_args->object;
-    arrays_t args = uv->args;
-    spawn_t *child = args[0].object;
-    stdio_cb std = (stdio_cb)args[1].func;
-    uv_stream_t *io = args[2].object;
-    routine_t *co = (routine_t *)child->handle->data;
-    uv_arguments_free(uv);
+    spawn_t child = uv->args[0].object;
+    stdio_cb std = (stdio_cb)uv->args[1].func;
+    uv_stream_t *io = uv->args[2].object;
+    string data = nullptr;
 
-    while (true) {
-        if (coro_terminated(co))
+    uv->args[0].object = io;
+    uv->bind_type = UV_CORO_SPAWN;
+    uv->req_type = UV_CORO_SPAWN;
+    defer((func_t)uv_arguments_free, uv);
+    uv_handle_set_data(handler(io), (void_t)uv);
+
+    while (is_spawning(child)) {
+        if (is_empty(data = stream_read(io)))
             break;
 
-        string data = stream_read(io);
-        if (!is_str_empty(data))
-            std((string_t)data);
+        std(data);
     }
 
+    uv_read_stop(io);
     return nullptr;
 }
 
-static void spawning(void_t uv_args) {
-    uv_args_t *uv = ((params_t)uv_args)->object;
-    arrays_t args = uv->args;
-    spawn_t *child = args[0].object;
+static void_t spawning(params_t uv_args) {
+    uv_args_t *uv = uv_args->object;
+    spawn_t child = uv->args[0].object;
     spawn_cb exiting_cb;
     routine_t *co = coro_active();
 
-    uv_handle_set_data(handler(&child->process), (void_t)child);
+    coro_name("Process #%d", coro_active_id());
+    uv_handle_set_data(handler(child->process), (void_t)child);
     coro_err_set(co, uv_spawn(uv_coro_loop(), child->process, child->handle->options));
     defer((func_t)spawn_free, child);
     if (!is_empty(child->handle->data))
         RAII_FREE(child->handle->data);
 
     child->handle->data = (void_t)co;
-    RAII_FREE(args[1].object);
+    RAII_FREE(uv->args[1].object);
     uv_arguments_free(uv);
 
     if (!get_coro_err(co)) {
-        while (true) {
-            if (!coro_terminated(co)) {
-                coro_info(co, 1);
-                yield();
-            } else {
-                if (!is_empty(get_coro_data(co))) {
-                    exiting_cb = (spawn_cb)get_coro_data(co);
-                    exiting_cb(get_coro_err(co), get_coro_result(co)->integer);
-                }
+        while (!coro_terminated(co)) {
+            coro_info(co, 1);
+            yield();
+        }
 
-                break;
-            }
+        if (!is_empty(get_coro_data(co))) {
+            exiting_cb = (spawn_cb)get_coro_data(co);
+            exiting_cb(get_coro_err(co), get_coro_result(co)->integer);
         }
     } else {
-        RAII_INFO("Process launch failed with: %s\033[0K\n", uv_strerror(get_coro_err(co)));
+        fprintf(stderr, "Process launch failed with: %s\033[0K\n", uv_strerror(get_coro_err(co)));
     }
+
+    raii_deferred_free(get_coro_scope(co));
+    yield();
+    unreachable;
+    return uv_coro_abort(nullptr, get_coro_err(co), co);
 }
 
 RAII_INLINE uv_stdio_container_t *stdio_fd(int fd, int flags) {
@@ -1861,18 +1888,26 @@ RAII_INLINE uv_stdio_container_t *stdio_stream(void_t handle, int flags) {
     return stdio;
 }
 
+RAII_INLINE uv_stdio_container_t *stdio_piperead(void) {
+    return stdio_stream(pipe_create_ex(true, false), UV_CREATE_PIPE | UV_READABLE_PIPE);
+}
+
+RAII_INLINE uv_stdio_container_t *stdio_pipewrite(void) {
+    return stdio_stream(pipe_create_ex(true, false), UV_CREATE_PIPE | UV_WRITABLE_PIPE);
+}
+
 spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, uv_gid_t gid, int no_of_stdio, ...) {
     spawn_options_t *handle = try_calloc(1, sizeof(spawn_options_t));
     uv_stdio_container_t *p;
     va_list argp;
     int i;
 
-    handle->data = !is_empty(env) ? str_split(env, ";", nullptr) : nullptr;
+    handle->data = !is_empty(env) ? str_split_ex(nullptr, env, ";", nullptr) : nullptr;
     handle->exiting_cb = nullptr;
     handle->options->env = handle->data;
     handle->options->cwd = cwd;
     handle->options->flags = flags;
-    handle->options->exit_cb = (flags == UV_PROCESS_DETACHED) ? nullptr : exit_cb;
+    handle->options->exit_cb = (flags == UV_PROCESS_DETACHED) ? nullptr : spawn_exit_cb;
     handle->stdio_count = no_of_stdio;
 
 #ifdef _WIN32
@@ -1893,14 +1928,14 @@ spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t uid, u
         va_end(argp);
     }
 
-    handle->options->stdio = (uv_stdio_container_t *)&handle->stdio;
+    handle->options->stdio = (uv_stdio_container_t *)handle->stdio;
     handle->options->stdio_count = handle->stdio_count;
 
     return handle;
 }
 
-spawn_t *spawn(string_t command, string_t args, spawn_options_t *handle) {
-    spawn_t *process = try_calloc(1, sizeof(spawn_t));
+spawn_t spawn(string_t command, string_t args, spawn_options_t *handle) {
+    spawn_t process = try_calloc(1, sizeof(_spawn_t));
     int has_args = 3;
 
     if (is_empty(handle)) {
@@ -1921,23 +1956,24 @@ spawn_t *spawn(string_t command, string_t args, spawn_options_t *handle) {
 
     process->handle = handle;
     process->is_detach = false;
-    process->type = RAII_PROCESS;
+    process->type = UV_CORO_SPAWN;
     uv_args_t *uv_args = uv_arguments(2, false);
 
     $append(uv_args->args, process);
     $append(uv_args->args, command_args);
-    coro_interrupt_event(spawning, uv_args, nullptr);
+    process->id = go(spawning, 1, uv_args);
 
     return process;
 }
 
-RAII_INLINE int spawn_signal(spawn_t *handle, int sig) {
-    return uv_process_kill(&handle->process[0], sig);
+RAII_INLINE int spawn_signal(spawn_t handle, int sig) {
+    return uv_process_kill(handle->process, sig);
 }
 
-int spawn_detach(spawn_t *child) {
+int spawn_detach(spawn_t child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
         uv_unref(handler(&child->process));
+        child->handle->exiting_cb = nullptr;
         child->is_detach = true;
         yield();
     }
@@ -1945,14 +1981,18 @@ int spawn_detach(spawn_t *child) {
     return get_coro_err((routine_t *)child->handle->data);
 }
 
-RAII_INLINE int spawn_exit(spawn_t *child, spawn_cb exit_func) {
+RAII_INLINE int spawn_atexit(spawn_t child, spawn_cb exit_func) {
     child->handle->exiting_cb = exit_func;
     yield();
 
     return get_coro_err((routine_t *)child->handle->data);
 }
 
-int spawn_in(spawn_t *child, stdin_cb std_func) {
+RAII_INLINE bool is_spawning(spawn_t child) {
+    return is_process(child) && result_is_ready(child->id) == false;
+}
+
+int spawn_in(spawn_t child, stdin_cb std_func) {
     uv_args_t *uv_args = uv_arguments(3, false);
 
     $append(uv_args->args, child);
@@ -1963,7 +2003,7 @@ int spawn_in(spawn_t *child, stdin_cb std_func) {
     return get_coro_err((routine_t *)child->handle->data);
 }
 
-int spawn_out(spawn_t *child, stdout_cb std_func) {
+int spawn_out(spawn_t child, stdout_cb std_func) {
     uv_args_t *uv_args = uv_arguments(3, false);
 
     $append(uv_args->args, child);
@@ -1974,7 +2014,7 @@ int spawn_out(spawn_t *child, stdout_cb std_func) {
     return get_coro_err((routine_t *)child->handle->data);
 }
 
-int spawn_err(spawn_t *child, stderr_cb std_func) {
+int spawn_err(spawn_t child, stderr_cb std_func) {
     uv_args_t *uv_args = uv_arguments(3, false);
 
     $append(uv_args->args, child);
@@ -1985,20 +2025,24 @@ int spawn_err(spawn_t *child, stderr_cb std_func) {
     return get_coro_err((routine_t *)child->handle->data);
 }
 
-RAII_INLINE int spawn_pid(spawn_t *child) {
+RAII_INLINE int spawn_pid(spawn_t child) {
     return child->process->pid;
 }
 
-RAII_INLINE uv_stream_t *ipc_in(spawn_t *_in) {
+RAII_INLINE uv_stream_t *ipc_in(spawn_t _in) {
     return _in->handle->stdio[0].data.stream;
 }
 
-RAII_INLINE uv_stream_t *ipc_out(spawn_t *out) {
+RAII_INLINE uv_stream_t *ipc_out(spawn_t out) {
     return out->handle->stdio[1].data.stream;
 }
 
-RAII_INLINE uv_stream_t *ipc_err(spawn_t *err) {
+RAII_INLINE uv_stream_t *ipc_err(spawn_t err) {
     return err->handle->stdio[2].data.stream;
+}
+
+RAII_INLINE bool is_process(void_t self) {
+    return is_type(self, UV_CORO_SPAWN);
 }
 
 RAII_INLINE bool is_tls(uv_stream_t *self) {
@@ -2079,9 +2123,9 @@ string_t uv_coro_uname(void) {
         uv_os_uname(buffer);
         string_t powered_by = str_cat_ex(nullptr, 7,
                                          simd_itoa(thrd_cpu_count(), scrape), " Cores, ",
-                                            buffer->sysname, " ",
-                                            buffer->machine, " ",
-                                            buffer->release);
+                                         buffer->sysname, " ",
+                                         buffer->machine, " ",
+                                         buffer->release);
 
         str_copy(uv_coro_powered_by, powered_by, SCRAPE_SIZE);
         RAII_FREE((void_t)powered_by);

@@ -71,6 +71,7 @@ int main() {
 
 * [Reading/Writing files](https://docs.libuv.org/en/v1.x/guide/filesystem.html#reading-writing-files) as in [uvcat/main.c](https://github.com/libuv/libuv/blob/master/docs/code/uvcat/main.c) - 62 line *script*.
 * [Buffers and Streams](https://docs.libuv.org/en/v1.x/guide/filesystem.html#buffers-and-streams) as in [uvtee/main.c](https://github.com/libuv/libuv/blob/master/docs/code/uvtee/main.c) - 79 line *script*.
+* [Spawning child processes](https://docs.libuv.org/en/v1.x/guide/processes.html#spawning-child-processes) as in [spawn/main.c](https://github.com/libuv/libuv/blob/master/docs/code/spawn/main.c) - 36 line *script*.
 * [Networking/TCP](https://docs.libuv.org/en/v1.x/guide/networking.html#tcp) as in [tcp-echo-server/main.c](https://github.com/libuv/libuv/blob/master/docs/code/tcp-echo-server/main.c) - 87 line *script*.
 
 *Reduced to:*
@@ -121,6 +122,33 @@ int uv_main(int argc, char **argv) {
     }
 
     return fd;
+}
+```
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<th>spawn.c - 13 lines</th>
+</tr>
+<tr>
+<td>
+
+```c
+#include "uv_coro.h"
+
+void _on_exit(int64_t exit_status, int term_signal) {
+    fprintf(stderr, "\nProcess exited with status %" PRId64 ", signal %d\n", exit_status, term_signal);
+}
+
+int uv_main(int argc, char **argv) {
+    spawn_t child = spawn("mkdir", "test-dir", nullptr);
+    if (!spawn_atexit(child, _on_exit))
+        fprintf(stderr, "\nLaunched process with ID %d\n", spawn_pid(child));
+
+    return coro_err_code();
 }
 ```
 

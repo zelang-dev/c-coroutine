@@ -59,6 +59,7 @@ typedef enum {
     UV_CORO_PIPE,
     UV_CORO_TCP,
     UV_CORO_UDP,
+    UV_CORO_SPAWN,
     UV_CORO_SOCKET,
     UV_CORO_PIPE_0,
     UV_CORO_PIPE_1,
@@ -168,13 +169,8 @@ typedef struct {
     uv_process_options_t options[1];
 } spawn_options_t;
 
-typedef struct {
-    uv_coro_types type;
-    bool is_detach;
-    spawn_options_t *handle;
-    uv_process_t process[1];
-} spawn_t;
-
+typedef struct spawn_s _spawn_t;
+typedef _spawn_t *spawn_t;
 typedef struct nameinfo_s {
     uv_coro_types type;
     string_t host;
@@ -262,11 +258,25 @@ C_API uv_stdio_container_t *stdio_fd(int fd, int flags);
 * -`UV_NONBLOCK_PIPE`
 * -`UV_OVERLAPPED_PIPE`
 */
-C_API uv_stdio_container_t *stdio_stream(void *handle, int flags);
+C_API uv_stdio_container_t *stdio_stream(void_t handle, int flags);
+
+/*
+Stdio container `pipe` ~pointer~ with `uv_stdio_flags` transmitted to the child process.
+* -`UV_CREATE_PIPE`
+* -`UV_READABLE_PIPE`
+*/
+C_API uv_stdio_container_t *stdio_piperead(void);
+
+/*
+Stdio container `pipe` ~pointer~ with `uv_stdio_flags` transmitted to the child process.
+* -`UV_CREATE_PIPE`
+* -`UV_WRITABLE_PIPE`
+*/
+C_API uv_stdio_container_t *stdio_pipewrite(void);
 
 /**
  * @param env Environment for the new process. Key=value, separated with semicolon like:
- * `"Key1=Value1;Key=Value2;Key3=Value3"`. If NULL the parents environment is used.
+ * `"Key1=Value1;Key2=Value2;Key3=Value3"`. If `NULL` the parents environment is used.
  *
  * @param cwd Current working directory for the subprocess.
  * @param flags  Various process flags that control how `uv_spawn()` behaves:
@@ -304,17 +314,18 @@ C_API spawn_options_t *spawn_opts(string env, string_t cwd, int flags, uv_uid_t 
  * @param options Use `spawn_opts()` function to produce `uv_stdio_container_t` and `uv_process_options_t` options.
  * If `NULL` defaults `stderr` of subprocess to parent.
  */
-C_API spawn_t *spawn(string_t command, string_t args, spawn_options_t *options);
-C_API int spawn_exit(spawn_t *, spawn_cb exit_func);
-C_API int spawn_in(spawn_t *, stdin_cb std_func);
-C_API int spawn_out(spawn_t *, stdout_cb std_func);
-C_API int spawn_err(spawn_t *, stderr_cb std_func);
-C_API int spawn_pid(spawn_t *child);
-C_API int spawn_signal(spawn_t *, int sig);
-C_API int spawn_detach(spawn_t *);
-C_API uv_stream_t *ipc_in(spawn_t *);
-C_API uv_stream_t *ipc_out(spawn_t *);
-C_API uv_stream_t *ipc_err(spawn_t *);
+C_API spawn_t spawn(string_t command, string_t args, spawn_options_t *options);
+C_API int spawn_atexit(spawn_t, spawn_cb exit_func);
+C_API bool is_spawning(spawn_t);
+C_API int spawn_in(spawn_t, stdin_cb std_func);
+C_API int spawn_out(spawn_t, stdout_cb std_func);
+C_API int spawn_err(spawn_t, stderr_cb std_func);
+C_API int spawn_pid(spawn_t);
+C_API int spawn_signal(spawn_t, int sig);
+C_API int spawn_detach(spawn_t);
+C_API uv_stream_t *ipc_in(spawn_t);
+C_API uv_stream_t *ipc_out(spawn_t);
+C_API uv_stream_t *ipc_err(spawn_t);
 
 C_API string fs_readfile(string_t path);
 C_API int fs_writefile(string_t path, string_t text);
@@ -361,6 +372,7 @@ C_API dnsinfo_t *get_addrinfo(string_t address, string_t service, u32 numhints_p
 C_API addrinfo_t *addrinfo_next(dnsinfo_t *);
 C_API nameinfo_t *get_nameinfo(string_t addr, int port, int flags);
 
+C_API uv_pipe_t *pipe_create_ex(bool is_ipc, bool autofree);
 C_API uv_pipe_t *pipe_create(bool is_ipc);
 C_API uv_tcp_t *tcp_create(void);
 
@@ -420,6 +432,7 @@ C_API bool is_pipe(void_t);
 C_API bool is_tty(void_t);
 C_API bool is_udp(void_t);
 C_API bool is_tcp(void_t);
+C_API bool is_process(void_t);
 C_API bool is_udp_packet(void_t);
 C_API bool is_socketpair(void_t);
 C_API bool is_pipepair(void_t);

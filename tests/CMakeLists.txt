@@ -9,7 +9,11 @@ set(TARGET_LIST
  test-tcp
  test-udp
  test-pipe
+ test-spawn
 )
+
+add_executable(child child.c)
+target_link_libraries(child uv_coro)
 
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )
