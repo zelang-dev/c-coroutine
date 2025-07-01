@@ -41,7 +41,9 @@ static void_t uv_coro_abort(void_t handle, int err, routine_t *co) {
     if (!is_empty(handle))
         RAII_FREE(handle);
 
-    uv_log_error(err);
+    if (err)
+        uv_log_error(err);
+
     return coro_interrupt_erred(co, err);
 }
 
@@ -192,7 +194,7 @@ static void fs_event_cleanup(uv_args_t *uv_args, routine_t *co, int status) {
 
     uv_coro_abort(nullptr, status, co);
     uv_coro_closer(uv_args);
-    coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, true);
+    coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, false);
 }
 
 static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, int status) {
