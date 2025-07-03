@@ -15,6 +15,7 @@ struct spawn_s {
     uv_coro_types type;
     rid_t id;
     bool is_detach;
+    routine_t *context;
     spawn_options_t *handle;
     uv_process_t process[1];
 };
@@ -41,10 +42,8 @@ static void_t uv_coro_abort(void_t handle, int err, routine_t *co) {
     if (!is_empty(handle))
         RAII_FREE(handle);
 
-    if (err)
-        uv_log_error(err);
-
-    return coro_interrupt_erred(co, err);
+    uv_log_error(err);
+    return coro_await_erred(co, err);
 }
 
 static void_t uv_coro_sockaddr(const char *host, int port, struct sockaddr_in6 *addr6, struct sockaddr_in *addr) {
@@ -169,7 +168,7 @@ static void timer_cb(uv_timer_t *handle) {
     routine_t *co = uv->context;
     uv_timer_stop(handle);
     coro_halt_set(get_coro_context(get_coro_context(co)));
-    coro_interrupt_complete(co, nullptr, 0, false, false);
+    coro_await_finish(co, nullptr, 0, false);
 }
 
 static void fs_event_cleanup(uv_args_t *uv_args, routine_t *co, int status) {
@@ -194,7 +193,7 @@ static void fs_event_cleanup(uv_args_t *uv_args, routine_t *co, int status) {
 
     uv_coro_abort(nullptr, status, co);
     uv_coro_closer(uv_args);
-    coro_interrupt_finisher(co, nullptr, 0, false, true, true, false, false);
+    coro_await_exit(co, nullptr, 0, false);
 }
 
 static void fs_event_cb(uv_fs_event_t *handle, string_t filename, int events, int status) {
@@ -258,7 +257,7 @@ static value_t fs_start(uv_args_t *uv_args, uv_fs_type fs_type, size_t n_args, b
     uv_args->n_args = n_args;
     uv_args->is_path = is_path;
 
-    return coro_interrupt(fs_init, 1, uv_args);
+    return coro_await(fs_init, 1, uv_args);
 }
 
 static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_request) {
@@ -268,7 +267,7 @@ static value_t uv_start(uv_args_t *uv_args, int type, size_t n_args, bool is_req
         uv_args->handle_type = type;
 
     uv_args->n_args = n_args;
-    return coro_interrupt(uv_init, 1, uv_args);
+    return coro_await(uv_init, 1, uv_args);
 }
 
 static void uv_catch_error(void_t uv) {
@@ -276,7 +275,7 @@ static void uv_catch_error(void_t uv) {
     string_t text = err_message();
     if (!is_empty((void_t)text) && raii_is_caught(get_coro_scope(co), text)) {
         coro_halt_set(co);
-        coro_interrupt_erred(co, get_coro_err(co));
+        coro_await_erred(co, get_coro_err(co));
     }
 
     uv_arguments_free(uv_server_data());
@@ -292,7 +291,7 @@ static void connect_cb(uv_connect_t *client, int status) {
     else
         uv_handle_set_data(handler(uv->args[0].object), (void_t)uv);
 
-    coro_interrupt_complete(co, nullptr, status, true, false);
+    coro_await_finish(co, nullptr, status, true);
 }
 
 static RAII_INLINE void on_connect_handshake(uv_tls_t *tls, int status) {
@@ -333,7 +332,7 @@ static void on_listen_handshake(uv_tls_t *ut, int status) {
     if (status < 0)
         coro_err_set(co, status);
 
-    coro_interrupt_complete(co, (!status ? streamer(ut->tcp_hdl) : nullptr), status, (status < 0), false);
+    coro_await_finish(co, (!status ? streamer(ut->tcp_hdl) : nullptr), status, (status < 0));
 }
 
 static void connection_cb(uv_stream_t *server, int status) {
@@ -388,9 +387,8 @@ static void connection_cb(uv_stream_t *server, int status) {
         coro_err_set(co, r);
     }
 
-    coro_interrupt_finisher(co, (is_ready
-                                 ? streamer(handle) : nullptr),
-                            r, false, halt, (uv->bind_type != RAII_SCHEME_TLS), r, false);
+    coro_await_upgrade(co, (is_ready ? streamer(handle) : nullptr),
+                       r, r, halt, (uv->bind_type != RAII_SCHEME_TLS));
 }
 
 static void getnameinfo_cb(uv_getnameinfo_t *req, int status, string_t hostname, string_t service) {
@@ -410,7 +408,7 @@ static void getnameinfo_cb(uv_getnameinfo_t *req, int status, string_t hostname,
         raii_deferred(get_coro_scope(get_coro_context(co)), (func_t)uv_coro_closer, uv);
     }
 
-    coro_interrupt_complete(co, (status ? nullptr : info), status, false, false);
+    coro_await_finish(co, (status ? nullptr : info), status, false);
 }
 
 static void getaddrinfo_cb(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
@@ -437,7 +435,7 @@ static void getaddrinfo_cb(uv_getaddrinfo_t *req, int status, struct addrinfo *r
         raii_deferred(get_coro_scope(get_coro_context(co)), (func_t)uv_coro_closer, uv);
     }
 
-    coro_interrupt_complete(co, (status ? nullptr : uv->dns), status, false, false);
+    coro_await_finish(co, (status ? nullptr : uv->dns), status, false);
 }
 
 static void write_cb(uv_write_t *req, int status) {
@@ -448,7 +446,7 @@ static void write_cb(uv_write_t *req, int status) {
         uv_log_error(status);
     }
 
-    coro_interrupt_complete(co, nullptr, status, true, false);
+    coro_await_finish(co, nullptr, status, true);
     RAII_FREE(req);
 }
 
@@ -459,7 +457,7 @@ static void tls_write_cb(uv_tls_t *tls, int status) {
         uv_log_error(status);
     }
 
-    coro_interrupt_complete(co, nullptr, status, true, false);
+    coro_await_finish(co, nullptr, status, true);
 }
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
@@ -478,7 +476,7 @@ static void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
         uv_read_stop(stream);
     }
 
-    coro_interrupt_complete(co, ((nread > 0) ? buf->base : nullptr), nread, false, false);
+    coro_await_finish(co, ((nread > 0) ? buf->base : nullptr), nread, false);
     RAII_FREE(buf->base);
 }
 
@@ -489,7 +487,7 @@ static void tls_read_cb(uv_tls_t *strm, ssize_t nread, const uv_buf_t *buf) {
     if (nread < 0 && nread != UV_EOF)
         uv_log_error(nread);
 
-    coro_interrupt_complete(co, ((nread > 0) ? buf->base : nullptr), nread, (nread < 0), false);
+    coro_await_finish(co, ((nread > 0) ? buf->base : nullptr), nread, (nread < 0));
 }
 
 static void udp_send_cb(uv_udp_send_t *req, int status) {
@@ -500,7 +498,7 @@ static void udp_send_cb(uv_udp_send_t *req, int status) {
         uv_log_error(status);
     }
 
-    coro_interrupt_complete(co, nullptr, status, true, false);
+    coro_await_finish(co, nullptr, status, true);
 }
 
 static void udp_alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
@@ -545,7 +543,7 @@ static void udp_recv_cb(uv_udp_t *req, ssize_t nread, const uv_buf_t *buf,
         udp->type = UV_CORO_UDP;
     }
 
-    coro_interrupt_finisher(co, udp, nread, false, true, true, (nread < 0), false);
+    coro_await_finish(co, udp, nread, (nread < 0));
     uv_udp_recv_stop(req);
 }
 
@@ -589,6 +587,8 @@ static void fs_cb(uv_fs_t *req) {
             case UV_FS_OPEN:
             case UV_FS_WRITE:
             case UV_FS_SENDFILE:
+            case UV_FS_ACCESS:
+            case UV_FS_COPYFILE:
                 break;
             case UV_FS_SCANDIR:
                 override = true;
@@ -622,7 +622,7 @@ static void fs_cb(uv_fs_t *req) {
         }
     }
 
-    coro_interrupt_finisher(co, data, result, false, true, true, !override, false);
+    coro_await_finish(co, data, result, !override);
     if (fs_type != UV_FS_SCANDIR) {
         if (fs_type == UV_FS_READ)
             RAII_FREE(fs->bufs.base);
@@ -656,6 +656,12 @@ static void_t fs_init(params_t uv_args) {
                 break;
             case UV_FS_RENAME:
                 result = uv_fs_rename(uvLoop, req, path, args[1].char_ptr, fs_cb);
+                break;
+            case UV_FS_ACCESS:
+                result = uv_fs_access(uvLoop, req, path, args[1].integer, fs_cb);
+                break;
+            case UV_FS_COPYFILE:
+                result = uv_fs_copyfile(uvLoop, req, path, args[1].char_ptr, args[2].integer, fs_cb);
                 break;
             case UV_FS_CHMOD:
                 result = uv_fs_chmod(uvLoop, req, path, args[1].integer, fs_cb);
@@ -914,9 +920,8 @@ static void_t uv_init(params_t uv_args) {
     }
 
     if (result) {
-        uv_coro_abort(nullptr, result, uv->context);
-        coro_err_set(get_coro_context(uv->context), result);
-        coro_interrupt_switch(get_coro_context(uv->context));
+        uv_log_error(result);
+        coro_await_canceled(uv->context, result);
     }
 
     return 0;
@@ -995,6 +1000,52 @@ int fs_fsync(uv_file fd) {
     return fs_start(uv_args, UV_FS_FSYNC, 1, false).integer;
 }
 
+int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length) {
+    uv_args_t *uv_args = uv_arguments(4, false);
+    $append(uv_args->args, casting(out_fd));
+    $append(uv_args->args, casting(in_fd));
+    $append_signed(uv_args->args, in_offset);
+    $append_unsigned(uv_args->args, length);
+
+    return fs_start(uv_args, UV_FS_SENDFILE, 4, false).integer;
+}
+
+int fs_access(string_t path, int mode) {
+    uv_args_t *uv_args = uv_arguments(2, false);
+    $append_string(uv_args->args, path);
+    $append_signed(uv_args->args, mode);
+
+    return fs_start(uv_args, UV_FS_ACCESS, 2, true).integer;
+}
+
+int fs_copyfile(string_t path, string_t new_path, int flags) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append_string(uv_args->args, path);
+    $append_string(uv_args->args, new_path);
+    $append_signed(uv_args->args, flags);
+
+    return fs_start(uv_args, UV_FS_COPYFILE, 3, true).integer;
+}
+
+uv_stat_t *fs_stat(string_t path) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, path);
+
+    return (uv_stat_t *)fs_start(uv_args, UV_FS_STAT, 1, false).object;
+}
+
+RAII_INLINE bool fs_exists(string_t path) {
+    return fs_access(path, F_OK) == 0;
+}
+
+RAII_INLINE size_t fs_filesize(string_t path) {
+    uv_stat_t *stat = fs_stat(path);
+    if (!is_empty(stat))
+        return (size_t)stat->st_size;
+
+    return 0;
+}
+
 string fs_read(uv_file fd, int64_t offset) {
     uv_stat_t *stat = fs_fstat(fd);
     uv_args_t *uv_args = uv_arguments(2, false);
@@ -1062,7 +1113,7 @@ void fs_poll(string_t path, poll_cb pollfunc, int interval) {
     $append_string(uv_args->args, str_dup(path));
     $append_func(uv_args->args, pollfunc);
     $append_signed(uv_args->args, interval);
-    interrupt_launch(coro_fs_poll, 1, uv_args);
+    coro_launch(coro_fs_poll, 1, uv_args);
 }
 
 void fs_watch(string_t path, event_cb watchfunc) {
@@ -1074,7 +1125,7 @@ void fs_watch(string_t path, event_cb watchfunc) {
     $append(uv_args->args, event);
     $append_string(uv_args->args, str_dup(path));
     $append_func(uv_args->args, watchfunc);
-    interrupt_launch(coro_fs_event, 1, uv_args);
+    coro_launch(coro_fs_event, 1, uv_args);
 }
 
 dnsinfo_t *get_addrinfo(string_t address, string_t service, u32 numhints_pair, ...) {
@@ -1810,7 +1861,7 @@ static void spawn_exit_cb(uv_process_t *handle, int64_t exit_status, int term_si
         coro_err_set(co, exit_status);
     }
 
-    coro_interrupt_finisher(co, casting(term_signal), term_signal, true, true, false, true, true);
+    coro_await_exit(co, casting(term_signal), term_signal, true);
 }
 
 static void_t stdio_handler(params_t uv_args) {
@@ -1843,7 +1894,6 @@ static void_t spawning(params_t uv_args) {
     spawn_cb exiting_cb;
     routine_t *co = coro_active();
 
-    coro_name("Process #%d", coro_active_id());
     uv_handle_set_data(handler(child->process), (void_t)child);
     coro_err_set(co, uv_spawn(uv_coro_loop(), child->process, child->handle->options));
     defer((func_t)spawn_free, child);
@@ -1963,7 +2013,9 @@ spawn_t spawn(string_t command, string_t args, spawn_options_t *handle) {
 
     $append(uv_args->args, process);
     $append(uv_args->args, command_args);
+    coro_mark();
     process->id = go(spawning, 1, uv_args);
+    process->context = coro_unmark(process->id, "Process");
 
     return process;
 }
@@ -1974,9 +2026,10 @@ RAII_INLINE int spawn_signal(spawn_t handle, int sig) {
 
 int spawn_detach(spawn_t child) {
     if (child->handle->options->flags == UV_PROCESS_DETACHED && !child->is_detach) {
-        uv_unref(handler(&child->process));
-        child->handle->exiting_cb = nullptr;
         child->is_detach = true;
+        child->handle->exiting_cb = nullptr;
+        coro_detached(child->context);
+        uv_unref(handler(&child->process));
         yield();
     }
 
@@ -2164,7 +2217,15 @@ static void uv_coro_free(routine_t *coro, routine_t *co, uv_args_t *uv_args) {
 }
 
 static void uv_coro_shutdown(void_t t) {
-    coro_interrupt_waitgroup_destroy((routine_t *)t);
+    routine_t *c = nullptr, *co = (routine_t *)t;
+    waitgroup_t wg = nullptr;
+    if (!is_empty(co)
+        && !is_empty(c = get_coro_context(co))
+        && !is_empty(wg = get_coro_waitgroup(c))
+        && is_type(wg, RAII_HASH)) {
+        hash_free(wg);
+    }
+
     if (is_empty(t)) {
         uv_loop_t *loop = interrupt_handle();
         i32 num_of = interrupt_code();

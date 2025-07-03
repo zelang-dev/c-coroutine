@@ -339,6 +339,12 @@ C_API int fs_mkdir(string_t path, int mode);
 C_API int fs_rmdir(string_t path);
 C_API int fs_rename(string_t path, string_t new_path);
 C_API int fs_fsync(uv_file file);
+C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length);
+C_API int fs_access(string_t path, int mode);
+C_API int fs_copyfile(string_t path, string_t new_path, int flags);
+C_API uv_stat_t *fs_stat(string_t path);
+C_API bool fs_exists(string_t path);
+C_API size_t fs_filesize(string_t path);
 C_API scandir_t *fs_scandir(string_t path, int flags);
 C_API uv_dirent_t *fs_scandir_next(scandir_t *dir);
 
@@ -347,15 +353,11 @@ C_API void fs_watch(string_t, event_cb watchfunc);
 
 C_API int fs_fdatasync(uv_file file);
 C_API int fs_ftruncate(uv_file file, int64_t offset);
-C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length);
 C_API int fs_fchmod(uv_file file, int mode);
 C_API int fs_fchown(uv_file file, uv_uid_t uid, uv_gid_t gid);
 C_API int fs_futime(uv_file file, double atime, double mtime);
-C_API int fs_copyfile(string_t path, string_t new_path, int flags);
 C_API int fs_mkdtemp(string_t tpl);
 C_API int fs_mkstemp(string_t tpl);
-C_API int fs_stat(string_t path);
-C_API int fs_access(string_t path, int mode);
 C_API int fs_chmod(string_t path, int mode);
 C_API int fs_utime(string_t path, double atime, double mtime);
 C_API int fs_lutime(string_t path, double atime, double mtime);
