@@ -690,8 +690,17 @@ static void_t fs_init(params_t uv_args) {
             case UV_FS_SCANDIR:
                 result = uv_fs_scandir(uvLoop, req, path, args[1].integer, fs_cb);
                 break;
+            case UV_FS_MKDTEMP:
+                result = uv_fs_mkdtemp(uvLoop, req, path, fs_cb);
+                break;
+            case UV_FS_MKSTEMP:
+                result = uv_fs_mkstemp(uvLoop, req, path, fs_cb);
+                break;
             case UV_FS_READLINK:
                 result = uv_fs_readlink(uvLoop, req, path, fs_cb);
+                break;
+            case UV_FS_REALPATH:
+                result = uv_fs_realpath(uvLoop, req, path, fs_cb);
                 break;
             case UV_FS_UNKNOWN:
             case UV_FS_CUSTOM:
@@ -966,6 +975,14 @@ int fs_rename(string_t path, string_t new_path) {
     return fs_start(uv_args, UV_FS_RENAME, 2, true).integer;
 }
 
+int fs_link(string_t path, string_t new_path) {
+    uv_args_t *uv_args = uv_arguments(2, false);
+    $append_string(uv_args->args, path);
+    $append_string(uv_args->args, new_path);
+
+    return fs_start(uv_args, UV_FS_LINK, 2, true).integer;
+}
+
 scandir_t *fs_scandir(string_t path, int flags) {
     uv_args_t *uv_args = uv_arguments(2, false);
     $append_string(uv_args->args, path);
@@ -1025,6 +1042,29 @@ int fs_copyfile(string_t path, string_t new_path, int flags) {
     $append_signed(uv_args->args, flags);
 
     return fs_start(uv_args, UV_FS_COPYFILE, 3, true).integer;
+}
+
+int fs_symlink(string_t path, string_t new_path, int flags) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append_string(uv_args->args, path);
+    $append_string(uv_args->args, new_path);
+    $append_signed(uv_args->args, flags);
+
+    return fs_start(uv_args, UV_FS_SYMLINK, 3, true).integer;
+}
+
+int fs_readlink(string_t path) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, path);
+
+    return fs_start(uv_args, UV_FS_READLINK, 1, false).integer;
+}
+
+int fs_realpath(string_t path) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, path);
+
+    return fs_start(uv_args, UV_FS_REALPATH, 1, false).integer;
 }
 
 uv_stat_t *fs_stat(string_t path) {
