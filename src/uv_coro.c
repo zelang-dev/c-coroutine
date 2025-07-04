@@ -765,10 +765,10 @@ static void_t fs_init(params_t uv_args) {
     }
 
     if (result) {
-        return uv_coro_abort(nullptr, result, coro_active());
+        return uv_coro_abort(nullptr, result, co);
     }
 
-    fs->context = coro_active();
+    fs->context = co;
     uv_req_set_data(requester(req), (void_t)fs);
     return 0;
 }
