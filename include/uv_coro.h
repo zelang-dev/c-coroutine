@@ -329,18 +329,25 @@ C_API uv_stream_t *ipc_err(spawn_t);
 
 C_API string fs_readfile(string_t path);
 C_API int fs_writefile(string_t path, string_t text);
+
 C_API uv_file fs_open(string_t path, int flags, int mode);
 C_API int fs_close(uv_file fd);
 C_API uv_stat_t *fs_fstat(uv_file fd);
 C_API string fs_read(uv_file fd, int64_t offset);
 C_API int fs_write(uv_file fd, string_t text, int64_t offset);
+C_API int fs_fsync(uv_file fd);
+C_API int fs_fdatasync(uv_file fd);
+C_API int fs_ftruncate(uv_file fd, int64_t offset);
+C_API int fs_fchmod(uv_file fd, int mode);
+C_API int fs_fchown(uv_file fd, uv_uid_t uid, uv_gid_t gid);
+C_API int fs_futime(uv_file fd, double atime, double mtime);
+C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length);
+
 C_API int fs_unlink(string_t path);
 C_API int fs_mkdir(string_t path, int mode);
 C_API int fs_rmdir(string_t path);
 C_API int fs_rename(string_t path, string_t new_path);
 C_API int fs_link(string_t path, string_t new_path);
-C_API int fs_fsync(uv_file file);
-C_API int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length);
 C_API int fs_access(string_t path, int mode);
 C_API int fs_copyfile(string_t path, string_t new_path, int flags);
 C_API int fs_symlink(string_t path, string_t new_path, int flags);
@@ -352,23 +359,19 @@ C_API size_t fs_filesize(string_t path);
 C_API scandir_t *fs_scandir(string_t path, int flags);
 C_API uv_dirent_t *fs_scandir_next(scandir_t *dir);
 
-C_API void fs_poll(string_t path, poll_cb pollfunc, int interval);
-C_API void fs_watch(string_t, event_cb watchfunc);
-
-C_API int fs_fdatasync(uv_file file);
-C_API int fs_ftruncate(uv_file file, int64_t offset);
-C_API int fs_fchmod(uv_file file, int mode);
-C_API int fs_fchown(uv_file file, uv_uid_t uid, uv_gid_t gid);
-C_API int fs_futime(uv_file file, double atime, double mtime);
-C_API int fs_mkdtemp(string_t tpl);
-C_API int fs_mkstemp(string_t tpl);
 C_API int fs_chmod(string_t path, int mode);
 C_API int fs_utime(string_t path, double atime, double mtime);
 C_API int fs_lutime(string_t path, double atime, double mtime);
-C_API int fs_lstat(string_t path);
 C_API int fs_chown(string_t path, uv_uid_t uid, uv_gid_t gid);
 C_API int fs_lchown(string_t path, uv_uid_t uid, uv_gid_t gid);
+
+C_API uv_stat_t *fs_lstat(string_t path);
 C_API uv_statfs_t *fs_statfs(string_t path);
+C_API uv_file fs_mkstemp(string_t tpl);
+C_API int fs_mkdtemp(string_t tpl);
+
+C_API void fs_poll(string_t path, poll_cb pollfunc, int interval);
+C_API void fs_watch(string_t, event_cb watchfunc);
 
 C_API dnsinfo_t *get_addrinfo(string_t address, string_t service, u32 numhints_pair, ...);
 C_API addrinfo_t *addrinfo_next(dnsinfo_t *);
@@ -391,13 +394,14 @@ C_API tty_err_t *tty_err(void);
 
 C_API string stream_read(uv_stream_t *);
 C_API int stream_write(uv_stream_t *, string_t text);
+C_API int stream_shutdown(uv_stream_t *);
+
 C_API uv_stream_t *stream_connect(string_t address);
 C_API uv_stream_t *stream_connect_ex(uv_handle_type scheme, string_t address, int port);
 C_API uv_stream_t *stream_listen(uv_stream_t *, int backlog);
 C_API uv_stream_t *stream_bind(string_t address, int flags);
 C_API uv_stream_t *stream_bind_ex(uv_handle_type scheme, string_t address, int port, int flags);
 C_API void stream_handler(stream_cb connected, uv_stream_t *client);
-C_API void stream_shutdown(uv_stream_t *);
 
 C_API uv_udp_t *udp_create(void);
 C_API uv_udp_t *udp_bind(string_t address, unsigned int flags);

@@ -438,6 +438,18 @@ static void getaddrinfo_cb(uv_getaddrinfo_t *req, int status, struct addrinfo *r
     coro_await_finish(co, (status ? nullptr : uv->dns), status, false);
 }
 
+static void shutdown_cb(uv_shutdown_t *req, int status) {
+    uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(req));
+    routine_t *co = uv->context;
+
+    if (status < 0) {
+        uv_log_error(status);
+    }
+
+    coro_await_finish(co, nullptr, status, true);
+    RAII_FREE(req);
+}
+
 static void write_cb(uv_write_t *req, int status) {
     uv_args_t *uv = (uv_args_t *)uv_req_get_data(requester(req));
     routine_t *co = uv->context;
@@ -777,7 +789,8 @@ static void_t uv_init(params_t uv_args) {
                     result = uv_tls_write((uv_tls_t *)stream, &uv->bufs, tls_write_cb);
                 } else {
                     req = try_calloc(1, sizeof(uv_write_t));
-                    result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb);
+                    if (result = uv_write((uv_write_t *)req, streamer(stream), &uv->bufs, 1, write_cb))
+                        RAII_FREE(req);
                 }
                 break;
             case UV_CONNECT:
@@ -804,6 +817,10 @@ static void_t uv_init(params_t uv_args) {
                                      &uv->bufs, 1, (sockaddr_t *)args[2].object, udp_send_cb);
                 break;
             case UV_SHUTDOWN:
+                req = try_calloc(1, sizeof(uv_shutdown_t));
+                if (result = uv_shutdown((uv_shutdown_t *)req, streamer(stream), shutdown_cb))
+                    RAII_FREE(req);
+                break;
             case UV_WORK:
             case UV_GETADDRINFO:
                 req = try_calloc(1, sizeof(uv_getaddrinfo_t));
@@ -1017,6 +1034,91 @@ int fs_fsync(uv_file fd) {
     return fs_start(uv_args, UV_FS_FSYNC, 1, false).integer;
 }
 
+int fs_fdatasync(uv_file fd) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append(uv_args->args, casting(fd));
+
+    return fs_start(uv_args, UV_FS_FDATASYNC, 1, false).integer;
+}
+
+int fs_ftruncate(uv_file fd, int64_t offset) {
+    uv_args_t *uv_args = uv_arguments(2, false);
+    $append(uv_args->args, casting(fd));
+    $append_signed(uv_args->args, offset);
+
+    return fs_start(uv_args, UV_FS_FTRUNCATE, 2, false).integer;
+}
+
+int fs_fchmod(uv_file fd, int mode) {
+    uv_args_t *uv_args = uv_arguments(2, false);
+    $append(uv_args->args, casting(fd));
+    $append_signed(uv_args->args, mode);
+
+    return fs_start(uv_args, UV_FS_FCHMOD, 2, false).integer;
+}
+
+int fs_fchown(uv_file fd, uv_uid_t uid, uv_gid_t gid) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append(uv_args->args, casting(fd));
+    $append_char(uv_args->args, uid);
+    $append_char(uv_args->args, gid);
+
+    return fs_start(uv_args, UV_FS_FCHOWN, 3, false).integer;
+}
+
+int fs_futime(uv_file fd, double atime, double mtime) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append(uv_args->args, casting(fd));
+    $append_double(uv_args->args, atime);
+    $append_double(uv_args->args, mtime);
+
+    return fs_start(uv_args, UV_FS_FUTIME, 3, false).integer;
+}
+
+int fs_chmod(string_t path, int mode) {
+    uv_args_t *uv_args = uv_arguments(2, false);
+    $append_string(uv_args->args, path);
+    $append_signed(uv_args->args, mode);
+
+    return fs_start(uv_args, UV_FS_CHMOD, 2, true).integer;
+}
+
+int fs_utime(string_t path, double atime, double mtime) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append_string(uv_args->args, path);
+    $append_double(uv_args->args, atime);
+    $append_double(uv_args->args, mtime);
+
+    return fs_start(uv_args, UV_FS_UTIME, 3, false).integer;
+}
+
+int fs_lutime(string_t path, double atime, double mtime) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append_string(uv_args->args, path);
+    $append_double(uv_args->args, atime);
+    $append_double(uv_args->args, mtime);
+
+    return fs_start(uv_args, UV_FS_LUTIME, 3, false).integer;
+}
+
+int fs_chown(string_t path, uv_uid_t uid, uv_gid_t gid) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append_string(uv_args->args, path);
+    $append_char(uv_args->args, uid);
+    $append_char(uv_args->args, gid);
+
+    return fs_start(uv_args, UV_FS_CHOWN, 3, false).integer;
+}
+
+int fs_lchown(string_t path, uv_uid_t uid, uv_gid_t gid) {
+    uv_args_t *uv_args = uv_arguments(3, false);
+    $append_string(uv_args->args, path);
+    $append_char(uv_args->args, uid);
+    $append_char(uv_args->args, gid);
+
+    return fs_start(uv_args, UV_FS_LCHOWN, 3, false).integer;
+}
+
 int fs_sendfile(uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length) {
     uv_args_t *uv_args = uv_arguments(4, false);
     $append(uv_args->args, casting(out_fd));
@@ -1057,21 +1159,49 @@ int fs_readlink(string_t path) {
     uv_args_t *uv_args = uv_arguments(1, false);
     $append_string(uv_args->args, path);
 
-    return fs_start(uv_args, UV_FS_READLINK, 1, false).integer;
+    return fs_start(uv_args, UV_FS_READLINK, 1, true).integer;
 }
 
 int fs_realpath(string_t path) {
     uv_args_t *uv_args = uv_arguments(1, false);
     $append_string(uv_args->args, path);
 
-    return fs_start(uv_args, UV_FS_REALPATH, 1, false).integer;
+    return fs_start(uv_args, UV_FS_REALPATH, 1, true).integer;
 }
 
 uv_stat_t *fs_stat(string_t path) {
     uv_args_t *uv_args = uv_arguments(1, false);
     $append_string(uv_args->args, path);
 
-    return (uv_stat_t *)fs_start(uv_args, UV_FS_STAT, 1, false).object;
+    return (uv_stat_t *)fs_start(uv_args, UV_FS_STAT, 1, true).object;
+}
+
+uv_stat_t *fs_lstat(string_t path) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, path);
+
+    return (uv_stat_t *)fs_start(uv_args, UV_FS_LSTAT, 1, true).object;
+}
+
+uv_statfs_t *fs_statfs(string_t path) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, path);
+
+    return (uv_statfs_t *)fs_start(uv_args, UV_FS_STATFS, 1, true).object;
+}
+
+uv_file fs_mkstemp(string_t tpl) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, tpl);
+
+    return (uv_file)fs_start(uv_args, UV_FS_MKSTEMP, 1, true).integer;
+}
+
+int fs_mkdtemp(string_t tpl) {
+    uv_args_t *uv_args = uv_arguments(1, false);
+    $append_string(uv_args->args, tpl);
+
+    return fs_start(uv_args, UV_FS_MKDTEMP, 1, true).integer;
 }
 
 RAII_INLINE bool fs_exists(string_t path) {
@@ -1296,6 +1426,22 @@ string stream_read(uv_stream_t *handle) {
     }
 
     return uv_start(uv_args, UV_STREAM, 1, false).char_ptr;
+}
+
+int stream_shutdown(uv_stream_t *handle) {
+    if (is_empty(handle))
+        return coro_err_code();
+
+    uv_args_t *uv_args = (uv_args_t *)uv_handle_get_data(handler(handle));
+    if (is_type(uv_args, UV_CORO_ARGS) || is_tls(handle)) {
+        uv_args->args[0].object = handle;
+    } else {
+        uv_args = uv_arguments(1, true);
+        $append(uv_args->args, handle);
+        uv_handle_set_data(handler(handle), (void_t)uv_args);
+    }
+
+    return uv_start(uv_args, UV_SHUTDOWN, 1, true).integer;
 }
 
 uv_stream_t *stream_connect(string_t address) {
